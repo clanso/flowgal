@@ -1,6 +1,7 @@
 // 逆转式分层立绘：按素材包在画布上画呼吸帧 + 眨眼 + 口型，口型跟着对话框的逐字显现。规则见 lib/aa-sprite.js。
 import React from 'react'
 import { breathFrame, blinkAt, blinkGap, mouthAt } from '../../../lib/aa-sprite.js'
+import { assetUrl } from '../api.js'
 
 const packs = new Map()
 const loadImage = src => new Promise((resolve, reject) => {
@@ -10,15 +11,25 @@ const loadImage = src => new Promise((resolve, reject) => {
   img.src = src
 })
 
-/** 读素材包；同一地址只读一次，失败的下次再试。 */
-export function loadAaPack(manifest) {
-  if (!packs.has(manifest)) {
+/** 立绘记录的 aa：导入的素材包是 { pack }（文件是素材编号），预览演示是 { manifest: sprite.json 的地址 }。 */
+const packKey = aa => (aa.pack ? 'pack:' + JSON.stringify(aa.pack) : aa.manifest || '')
+
+/** 读素材包；同一份只读一次，失败的下次再试。 */
+export function loadAaPack(aa) {
+  const key = packKey(aa)
+  if (!packs.has(key)) {
     const task = (async () => {
-      const base = new URL(manifest, location.href)
-      const res = await fetch(base)
-      if (!res.ok) throw new Error('aa sprite manifest: ' + res.status)
-      const m = await res.json()
-      const at = file => new URL(file, base).href
+      let m, at
+      if (aa.pack) {
+        m = aa.pack
+        at = assetUrl
+      } else {
+        const base = new URL(aa.manifest, location.href)
+        const res = await fetch(base)
+        if (!res.ok) throw new Error('aa sprite manifest: ' + res.status)
+        m = await res.json()
+        at = file => new URL(file, base).href
+      }
       const frames = await Promise.all(m.breath.frames.map(f => loadImage(at(f))))
       const parts = {}
       for (const [part, states] of Object.entries(m.parts || {})) {
@@ -27,30 +38,31 @@ export function loadAaPack(manifest) {
       }
       return { m, frames, parts, w: m.size[0], h: m.size[1] }
     })()
-    task.catch(() => packs.delete(manifest))
-    packs.set(manifest, task)
+    task.catch(() => packs.delete(key))
+    packs.set(key, task)
   }
-  return packs.get(manifest)
+  return packs.get(key)
 }
 
 const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /**
- * talk：{ key, type, chars, speed, startedAt, done }，只在这个人正在说这一句时传。
+ * aa：立绘记录的 aa（见 packKey）。talk：{ key, type, chars, speed, startedAt, done }，只在这个人正在说这一句时传。
  * fallback：素材包读好之前（或读失败）显示的东西，一般是原来的 <img>。
  * 换素材包（换表情）时，新包读好之前继续画旧包，不闪空。
  */
-export function AaSprite({ manifest, talk, fallback, className, label }) {
+export function AaSprite({ aa, talk, fallback, className, label }) {
   const [pack, setPack] = React.useState(null)
   const canvas = React.useRef(null)
   const talkRef = React.useRef(talk)
   talkRef.current = talk
+  const key = packKey(aa)
 
   React.useEffect(() => {
     let live = true
-    loadAaPack(manifest).then(p => { if (live) setPack(p) }, () => {})
+    loadAaPack(aa).then(p => { if (live) setPack(p) }, () => {})
     return () => { live = false }
-  }, [manifest])
+  }, [key])
 
   // 画布一挂上就同步画第一帧（在浏览器重绘之前），从 <img> 换成画布时不留空白帧
   React.useLayoutEffect(() => {

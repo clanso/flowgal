@@ -6,6 +6,7 @@ import { SKY, placeKey, actorX, cgSrc, TIME_LABEL, WEATHER_LABEL } from './playb
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite } from '../../../lib/look.js'
 import { AaSprite } from './AaSprite.jsx'
+import { stinger } from './audio.js'
 
 const TRANSITION = {
   dissolve: ['fg-dissolve', '1.1s'], cinematic: ['fg-cinematic', '1.5s'], wipe: ['fg-wipe', '1s'], iris: ['fg-iris', '1.2s'],
@@ -211,12 +212,12 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   }, [src])
   const uploaded = Boolean(person && Object.values(person.sprites || {}).some(r => r && r.assetId === sprite && r.uploaded))
   // 立绘记录带逆转式素材包时，用分层画布（呼吸帧 + 眨眼 + 口型），原图作读包前的后备
-  const aa = (person && Object.values(person.sprites || {}).find(r => r && r.assetId === sprite && r.aa?.manifest))?.aa.manifest || ''
+  const aa = (person && Object.values(person.sprites || {}).find(r => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null
   const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
   return (
     <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}${aa ? ' is-aa' : ''}`} style={{ '--x': actorX(entry.pos) + '%', '--side': SIDE[entry.pos] || '0%' }} data-name={entry.name}>
       <div className="fg-actor-body">
-        {aa ? <AaSprite manifest={aa} talk={speaking && talk && talk.key === beat.key ? talk : null} fallback={still} className="fg-aa" label={entry.name} /> : still}
+        {aa ? <AaSprite aa={aa} talk={speaking && talk && talk.key === beat.key ? talk : null} fallback={still} className="fg-aa" label={entry.name} /> : still}
       </div>
       {speaking && beat.sym && (
         <div className="fg-symbol-anchor"><MangaSymbol key={beat.key} kind={beat.sym} /></div>
@@ -342,6 +343,37 @@ export function TitleCard({ beat }) {
       <div className="fg-titlecard-line" style={{ width: '14cqw', marginTop: '1cqw' }} />
     </div>
   )
+}
+
+/** 震动强度 1~3：位移（占元素宽高的百分比）和时长。 */
+const QUAKE = [[0, 0], [0.6, 300], [1.2, 420], [2, 560]]
+function quake(el, power) {
+  const [amp, ms] = QUAKE[power] || QUAKE[1]
+  const path = [0, -1, 0.8, -0.7, 0.5, -0.3, 0.15, 0]
+  el.animate(path.map((k, i) => ({ transform: `translate(${(k * amp).toFixed(3)}%, ${((i % 2 ? -0.6 : 0.6) * k * amp).toFixed(3)}%)` })), { duration: ms, easing: 'linear' })
+}
+
+/**
+ * 落字特效：演出计划（lib/typing.js）在某个字上要的震屏、震对话框、闪白 / 红闪、音效。
+ * 用 Web Animations 直接动舞台和对话框，不碰镜头的推拉摇。系统设了「减少动态效果」时只留声音；声音跟音效开关走。
+ */
+export function useHits(stageRef, flashRef, soundOn) {
+  const sound = React.useRef(soundOn)
+  sound.current = soundOn
+  return React.useCallback(f => {
+    if (f.kind === 'sound') { if (sound.current) stinger(f.sound); return }
+    if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const stage = stageRef.current
+    if (!stage || typeof stage.animate !== 'function') return
+    if (f.kind === 'shake') quake(stage, f.power)
+    else if (f.kind === 'box') { const box = stage.querySelector('.fg-dialog'); if (box) quake(box, f.power) }
+    else if (f.kind === 'flash' || f.kind === 'redflash') {
+      const el = flashRef.current
+      if (!el) return
+      el.classList.toggle('is-red', f.kind === 'redflash')
+      el.animate([{ opacity: 0.25 + 0.25 * f.power }, { opacity: 0 }], { duration: 260 + 120 * f.power, easing: 'ease-out' })
+    }
+  }, [stageRef, flashRef])
 }
 
 /** 镜头：每一拍重新触发一次动画。 */

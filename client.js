@@ -44,7 +44,7 @@ module.exports = __toCommonJS(index_exports);
 var import_react10 = __toESM(require("react"), 1);
 
 // src/client/styles/theater.css
-var theater_default = '/* ───────────── 沉浸式 Galgame · 剧场 ─────────────\n   所有类名以 fg- 开头；皮肤只改 data-skin 上的变量与少量装饰。\n   舞台是 16:9 的容器（container-type:size），字号用 cqw 随舞台缩放。 */\n\n.fg-theater {\n  --accent: #ff7eb6; --accent2: #9b7bff; --accent3: #5ee7ff;\n  --ink: #f5f3ff; --ink-dim: rgba(235, 232, 255, .62);\n  --box-bg: linear-gradient(180deg, rgba(18, 16, 40, .66), rgba(8, 8, 24, .86));\n  --box-border: rgba(255, 255, 255, .14);\n  --box-radius: 1.4cqw;\n  --box-blur: blur(18px) saturate(1.5);\n  --name-ink: #fff;\n  --panel-bg: rgba(10, 10, 26, .82);\n  --chip-bg: rgba(10, 10, 28, .5);\n  --font-body: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;\n  --font-display: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", serif;\n  --font-latin: "Cormorant Garamond", "Playfair Display", Georgia, serif;\n  --wait-glyph: "◆";\n  position: fixed; inset: 0; z-index: 2147483000; overflow: hidden; overflow: clip;\n  display: flex; align-items: center; justify-content: center;\n  background: #05040c; color: var(--ink);\n  font-family: var(--font-body);\n  -webkit-font-smoothing: antialiased;\n  user-select: none; -webkit-user-select: none;\n  animation: fg-fade-in .5s ease both;\n}\n.fg-theater *, .fg-theater *::before, .fg-theater *::after { box-sizing: border-box; }\n:where(.fg-theater) button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }\n.fg-theater.is-closing { animation: fg-fade-out .35s ease both; }\n\n.fg-stage {\n  position: relative; overflow: hidden; overflow: clip;\n  width: min(100vw, calc(100vh * 16 / 9)); height: min(100vh, calc(100vw * 9 / 16));\n  container-type: size; container-name: stage;\n  background: #000;\n  box-shadow: 0 0 120px rgba(0, 0, 0, .8);\n}\n@media (max-aspect-ratio: 4/5) {\n  /* 竖屏手机：舞台铺满，立绘居中放大，对话框加高。 */\n  .fg-stage { width: 100vw; height: 100vh; }\n}\n.fg-camera { position: absolute; inset: 0; transform-origin: 50% 45%; }\n\n/* ── 背景层 ── */\n.fg-bg { position: absolute; inset: -3%; background-size: cover; background-position: center 42%; will-change: transform, opacity; }\n.fg-bg.is-image { animation: fg-kenburns 38s ease-in-out infinite alternate; }\n.fg-bg.is-enter { animation: var(--enter-anim, fg-dissolve) var(--enter-dur, 1.1s) cubic-bezier(.6, .05, .3, 1) both, fg-kenburns 38s ease-in-out infinite alternate; }\n.fg-bg.is-leave { animation: fg-fade-out .9s ease both; }\n@keyframes fg-kenburns { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.1) translate(-1.6%, -1.2%); } }\n@keyframes fg-dissolve { from { opacity: 0; filter: blur(8px) brightness(1.3); } to { opacity: 1; filter: none; } }\n@keyframes fg-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }\n@keyframes fg-iris { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(80% at 50% 50%); } }\n@keyframes fg-cinematic { 0% { clip-path: inset(50% 0 50% 0); filter: brightness(2); } 60% { clip-path: inset(8% 0 8% 0); } 100% { clip-path: inset(0 0 0 0); filter: none; } }\n@keyframes fg-strips { from { -webkit-mask-size: 100% 0%; mask-size: 100% 0%; } to { -webkit-mask-size: 100% 100%; mask-size: 100% 100%; } }\n.fg-bg.is-enter[data-tr="strips"] { -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 8%, transparent 8% 8.0001%); mask-image: linear-gradient(#000, #000); -webkit-mask-repeat: no-repeat; }\n@keyframes fg-flash-in { 0% { opacity: 0; filter: brightness(4); } 30% { opacity: 1; filter: brightness(3); } 100% { filter: none; } }\n@keyframes fg-black-in { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }\n\n/* 没有背景图时的程序化舞台：天色渐变 + 远景剪影 + 光斑。 */\n.fg-sky { position: absolute; inset: 0; transition: background 1.6s ease; }\n.fg-sky::before { content: ""; position: absolute; left: -10%; right: -10%; bottom: 0; height: 46%;\n  background:\n    radial-gradient(60% 120% at 20% 100%, rgba(0, 0, 0, .55), transparent 70%),\n    radial-gradient(50% 90% at 78% 100%, rgba(0, 0, 0, .5), transparent 70%);\n}\n.fg-sky::after { content: ""; position: absolute; inset: 0;\n  background: radial-gradient(40% 30% at var(--sun-x, 70%) var(--sun-y, 30%), var(--sun, rgba(255, 220, 180, .55)), transparent 70%);\n  mix-blend-mode: screen; animation: fg-breathe-light 9s ease-in-out infinite;\n}\n.fg-skyline { position: absolute; left: 0; right: 0; bottom: 0; height: 38%; opacity: .9; }\n@keyframes fg-breathe-light { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }\n\n/* 时段调色：叠一层渐变，混合模式按时段变化。 */\n.fg-grade { position: absolute; inset: 0; pointer-events: none; transition: background 1.4s ease, opacity 1.4s ease; mix-blend-mode: soft-light; }\n.fg-grade[data-time="dawn"] { background: linear-gradient(180deg, rgba(255, 170, 200, .55), rgba(120, 140, 255, .35)); }\n.fg-grade[data-time="morning"] { background: linear-gradient(180deg, rgba(255, 245, 220, .35), rgba(255, 255, 255, 0)); }\n.fg-grade[data-time="noon"] { opacity: 0; }\n.fg-grade[data-time="afternoon"] { background: linear-gradient(180deg, rgba(255, 220, 160, .35), rgba(255, 200, 120, .15)); }\n.fg-grade[data-time="dusk"] { background: linear-gradient(180deg, rgba(255, 120, 60, .7), rgba(140, 40, 120, .55)); mix-blend-mode: overlay; }\n.fg-grade[data-time="evening"] { background: linear-gradient(180deg, rgba(90, 60, 200, .6), rgba(255, 110, 120, .35)); mix-blend-mode: overlay; }\n.fg-grade[data-time="night"] { background: linear-gradient(180deg, rgba(10, 20, 80, .78), rgba(20, 10, 60, .7)); mix-blend-mode: multiply; }\n.fg-grade[data-time="midnight"] { background: linear-gradient(180deg, rgba(4, 6, 40, .86), rgba(10, 4, 30, .8)); mix-blend-mode: multiply; }\n.fg-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, .55)); }\n.fg-letterbox::before, .fg-letterbox::after { content: ""; position: absolute; left: 0; right: 0; height: 9%; background: #000; z-index: 30; animation: fg-bars .8s cubic-bezier(.6, 0, .2, 1) both; }\n.fg-letterbox::before { top: 0; transform-origin: top; } .fg-letterbox::after { bottom: 0; transform-origin: bottom; }\n@keyframes fg-bars { from { transform: scaleY(0); } }\n\n.fg-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }\n\n/* ── 立绘 ── */\n.fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; }\n.fg-actor {\n  position: absolute; bottom: -2%; height: 92%; width: 34%;\n  left: var(--x, 50%); transform: translateX(-50%);\n  transition: left .55s cubic-bezier(.4, .1, .2, 1), filter .4s ease, opacity .45s ease;\n  filter: brightness(.7) saturate(.78);\n  animation: fg-actor-in .6s cubic-bezier(.2, .7, .2, 1) both;\n}\n.fg-actor.is-speaking { filter: brightness(1.04) saturate(1.05) drop-shadow(0 0 1.4cqw rgba(255, 255, 255, .18)); z-index: 2; }\n.fg-actor.is-leaving { animation: fg-actor-out .45s ease both; }\n.fg-actor-body { position: absolute; inset: 0; transform-origin: 50% 100%; animation: fg-breathe 4.8s ease-in-out infinite; }\n.fg-actor.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1), fg-breathe 4.8s ease-in-out .42s infinite; }\n/* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */\n.fg-actor.is-aa .fg-actor-body { animation: none; }\n.fg-actor.is-aa.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }\n.fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: 0; height: 100%; width: auto; max-width: none; transform: translateX(-50%);\n  -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 99%), radial-gradient(120% 100% at 50% 40%, #000 62%, transparent 82%);\n  -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, #000 78%, transparent 99%); }\n.fg-actor.is-upload img, .fg-actor.is-upload .fg-aa { -webkit-mask-image: none; mask-image: none; }\n.fg-actor img.is-swap { animation: fg-expr-swap .25s ease; }\n/* 登场从靠近的一侧滑进来，退场往同一侧淡出（--side 由站位决定）。 */\n@keyframes fg-actor-in { from { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(3%); } }\n@keyframes fg-actor-out { to { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(2%); } }\n@keyframes fg-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.008) translateY(-.25%); } }\n@keyframes fg-speak-hop { 0% { transform: translateY(0); } 40% { transform: translateY(-1.6%); } 100% { transform: translateY(0); } }\n@keyframes fg-expr-swap { from { opacity: .4; filter: brightness(1.4); } }\n\n/* 没有立绘时的剪影立绘：角色色渐变 + 轮廓光。 */\n.fg-silhouette { position: absolute; left: 50%; bottom: 0; height: 94%; aspect-ratio: 0.52; transform: translateX(-50%); }\n.fg-silhouette svg { width: 100%; height: 100%; overflow: visible; }\n.fg-silhouette .sil-rim { fill: none; stroke: color-mix(in oklab, var(--c) 55%, #fff); stroke-width: 2.4; opacity: .85; filter: drop-shadow(0 0 5px var(--c)) drop-shadow(0 0 14px var(--c)); stroke-dasharray: 1400; animation: fg-rim-draw 2.4s cubic-bezier(.4, 0, .2, 1) both; }\n@keyframes fg-rim-draw { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }\n.fg-silhouette-name { position: absolute; left: 50%; top: 50%; transform: translateX(-50%); font-family: var(--font-display); font-size: 5.4cqw; font-weight: 900; letter-spacing: .25em; color: transparent; -webkit-text-stroke: 1px color-mix(in oklab, var(--c) 40%, #fff); opacity: .5; writing-mode: vertical-rl; white-space: nowrap; }\n.fg-silhouette-tag { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); font-family: var(--font-latin); font-size: .75cqw; letter-spacing: .5em; white-space: nowrap; color: rgba(255, 255, 255, .55); }\n.fg-symbol-anchor { position: absolute; left: 50%; top: 9%; width: 0; height: 0; z-index: 4; }\n/* 漫画符号：外层管弹出与淡出（--life），内层按种类循环一个小动作。 */\n.fg-symbol { position: absolute; left: 3cqw; top: -2cqw; width: 6cqw; height: 6cqw; pointer-events: none; transform-origin: 30% 90%; animation: fg-sym-life var(--life, 2.6s) cubic-bezier(.2, .9, .3, 1.2) both; }\n.fg-symbol-art, .fg-symbol-art svg { display: block; width: 100%; height: 100%; }\n.fg-symbol-art { filter: drop-shadow(0 .3cqw .5cqw rgba(0, 0, 0, .45)); transform-origin: 50% 60%; }\n.fg-symbol[data-kind="heart"] .fg-symbol-art, .fg-symbol[data-kind="bloom"] .fg-symbol-art { animation: fg-sym-beat .7s ease-in-out .3s infinite; }\n.fg-symbol[data-kind="anger"] .fg-symbol-art { animation: fg-sym-throb .32s ease-in-out .2s infinite alternate; }\n.fg-symbol[data-kind="sweat"] .fg-symbol-art { animation: fg-sym-drip 1.4s ease-in .25s infinite; }\n.fg-symbol[data-kind="sparkle"] .fg-symbol-art { animation: fg-sym-twinkle 1.1s ease-in-out infinite; }\n.fg-symbol[data-kind="surprise"] .fg-symbol-art { animation: fg-sym-jolt .5s cubic-bezier(.3, 1.6, .5, 1) .05s 2; }\n.fg-symbol[data-kind="gloom"] { left: -3cqw; top: -4cqw; width: 8cqw; }\n.fg-symbol[data-kind="gloom"] .fg-symbol-art { animation: fg-sym-sink 2.4s ease-out both; }\n.fg-symbol[data-kind="note"] .fg-symbol-art { animation: fg-sym-sway 1.2s ease-in-out infinite; }\n.fg-symbol[data-kind="zzz"] .fg-symbol-art { animation: fg-sym-drift 2.2s ease-in-out infinite; }\n.fg-symbol[data-kind="bulb"] .fg-symbol-art { animation: fg-sym-flicker 1s steps(1) both; }\n.fg-symbol[data-kind="heartbreak"] .fg-symbol-art { animation: fg-sym-crack .9s cubic-bezier(.4, 0, .6, 1) .25s both; }\n.fg-symbol[data-kind="sigh"] .fg-symbol-art { animation: fg-sym-puff 2s ease-out both; }\n.fg-symbol[data-kind="dizzy"] .fg-symbol-art { animation: fg-sym-spin 1.4s linear infinite; transform-origin: 50% 50%; }\n.fg-symbol[data-kind="fire"] .fg-symbol-art { animation: fg-sym-flame .18s ease-in-out infinite alternate; transform-origin: 50% 95%; }\n.fg-symbol[data-kind="blush"] { left: -3.5cqw; top: 6cqw; width: 7cqw; height: 3.4cqw; }\n.fg-symbol[data-kind="blush"] .fg-symbol-art { animation: fg-sym-glow 1.6s ease-in-out infinite alternate; }\n.fg-symbol[data-kind="bloom"] .fg-symbol-art svg { animation: fg-sym-spin 6s linear infinite; }\n.fg-symbol[data-kind="silence"] .fg-symbol-art { animation: fg-sym-bob 1.2s ease-in-out infinite; }\n@keyframes fg-sym-life {\n  0% { opacity: 0; transform: scale(.2) rotate(-14deg); }\n  12% { opacity: 1; transform: scale(1.18) rotate(4deg); }\n  20% { transform: scale(.94) rotate(-2deg); }\n  28%, 82% { opacity: 1; transform: scale(1) rotate(0); }\n  100% { opacity: 0; transform: scale(.9) translateY(-1cqw); }\n}\n@keyframes fg-sym-beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.16); } 30% { transform: scale(.98); } 45% { transform: scale(1.1); } }\n@keyframes fg-sym-throb { from { transform: scale(.92) rotate(-3deg); } to { transform: scale(1.12) rotate(3deg); } }\n@keyframes fg-sym-drip { 0% { transform: translateY(0); opacity: 1; } 80% { transform: translateY(1.6cqw); opacity: 1; } 100% { transform: translateY(2cqw); opacity: 0; } }\n@keyframes fg-sym-twinkle { 0%, 100% { transform: scale(1) rotate(0); filter: brightness(1); } 50% { transform: scale(1.12) rotate(18deg); filter: brightness(1.35); } }\n@keyframes fg-sym-jolt { 0% { transform: translateY(0); } 30% { transform: translateY(-1.2cqw) scale(1.08); } 60% { transform: translateY(.3cqw); } 100% { transform: translateY(0); } }\n@keyframes fg-sym-sink { from { transform: translateY(-1.4cqw); opacity: 0; } to { transform: translateY(0); opacity: .95; } }\n@keyframes fg-sym-sway { 0%, 100% { transform: translate(0, 0) rotate(-8deg); } 50% { transform: translate(.8cqw, -.8cqw) rotate(8deg); } }\n@keyframes fg-sym-drift { 0% { transform: translate(0, .6cqw); opacity: .4; } 50% { opacity: 1; } 100% { transform: translate(1.2cqw, -1.6cqw); opacity: .4; } }\n@keyframes fg-sym-flicker { 0% { filter: brightness(.4); } 15% { filter: brightness(1.5); } 22% { filter: brightness(.6); } 30%, 100% { filter: brightness(1.15); } }\n@keyframes fg-sym-crack { 0%, 40% { transform: none; } 50% { transform: translateX(-.3cqw) rotate(-4deg); } 60% { transform: translateX(.3cqw) rotate(4deg); } 100% { transform: translateY(1.2cqw) rotate(-6deg); opacity: .7; } }\n@keyframes fg-sym-puff { from { transform: translateX(-1cqw) scale(.7); opacity: 0; } 40% { opacity: 1; } to { transform: translateX(1.6cqw) scale(1.1); opacity: .6; } }\n@keyframes fg-sym-spin { to { transform: rotate(360deg); } }\n@keyframes fg-sym-flame { from { transform: scale(1, .94) skewX(-2deg); } to { transform: scale(.96, 1.06) skewX(2deg); } }\n@keyframes fg-sym-glow { from { opacity: .55; } to { opacity: 1; } }\n@keyframes fg-sym-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-.6cqw); } }\n\n/* ── CG ── */\n.fg-cg { position: absolute; inset: 0; z-index: 6; background-size: cover; background-position: center; animation: fg-cg-in 1.2s cubic-bezier(.5, 0, .2, 1) both; }\n.fg-cg.is-leaving { animation: fg-cg-out .8s ease both; pointer-events: none; }\n@keyframes fg-cg-out { from { opacity: 1; } to { opacity: 0; filter: brightness(1.15); } }\n.fg-cg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, .45)); }\n.fg-cg-img { position: absolute; inset: -2%; background-size: cover; background-position: center; animation: fg-kenburns 30s ease-in-out infinite alternate; }\n/* 竖版插画：模糊的同图垫底，前景铺满宽度，顶 → 底 → 拉远看全貌，再倒放回来。 */\n.fg-cg.is-tall { background: #000; }\n.fg-cg-back { position: absolute; inset: -6%; background-size: cover; background-position: center; filter: blur(2.4cqw) brightness(.5) saturate(1.15); }\n.fg-cg-pan { position: absolute; left: 0; top: 0; width: 100%; height: auto; transform-origin: 50% 0; box-shadow: 0 0 5cqw rgba(0, 0, 0, .65); animation: fg-cg-pan var(--pan, 26s) ease-in-out infinite alternate; will-change: transform; user-select: none; }\n@keyframes fg-cg-pan {\n  0%, 10% { transform: translateY(0) scale(1); }\n  55%, 64% { transform: translateY(calc((var(--r) - 1) * 100%)) scale(1); }\n  90%, 100% { transform: translateY(0) scale(var(--r)); }\n}\n.fg-cg-caption { position: absolute; right: 4%; top: 12%; flex-direction: row-reverse; z-index: 2; display: flex; align-items: center; gap: 1cqw; font-family: var(--font-latin); letter-spacing: .3em; font-size: 1.1cqw; color: rgba(255, 255, 255, .85); text-shadow: 0 2px 8px rgba(0, 0, 0, .6); animation: fg-slide-in 1.2s .4s ease both; }\n.fg-cg-caption b { font-family: var(--font-display); font-size: 1.9cqw; letter-spacing: .18em; font-weight: 700; }\n.fg-cg-caption i { width: 4cqw; height: 1px; background: linear-gradient(270deg, var(--accent), transparent); }\n@keyframes fg-cg-in { 0% { opacity: 0; clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); filter: brightness(2.2); } 55% { opacity: 1; } 100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); filter: none; } }\n.fg-cg-wait { position: absolute; right: 2.4%; top: 12%; z-index: 20; display: flex; align-items: center; gap: .6cqw; font-size: 1cqw; padding: .5cqw 1cqw; border-radius: 99px; background: var(--chip-bg); backdrop-filter: blur(8px); color: var(--ink-dim); }\n.fg-cg-wait i { width: .7cqw; height: .7cqw; border-radius: 50%; background: var(--accent); animation: fg-pulse 1.2s ease-in-out infinite; }\n\n/* ── 镜头 ── */\n.fg-camera[data-cam="shake"] { animation: fg-shake .5s linear; }\n.fg-camera[data-cam="zoom"] { animation: fg-zoom 1.6s cubic-bezier(.2, .7, .2, 1) both; }\n.fg-camera[data-cam="zoomout"] { animation: fg-zoomout 1.6s cubic-bezier(.2, .7, .2, 1) both; }\n.fg-camera[data-cam="pan"] { animation: fg-pan 3s ease-in-out both; }\n.fg-camera[data-cam="tilt"] { animation: fg-tilt 1.2s ease both; }\n.fg-camera[data-cam="blur"] { animation: fg-blur 2.2s ease both; }\n@keyframes fg-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-1.2%, .6%); } 30% { transform: translate(1%, -.8%); } 45% { transform: translate(-.8%, .4%); } 60% { transform: translate(.6%, .6%); } 80% { transform: translate(-.3%, -.2%); } }\n@keyframes fg-zoom { from { transform: scale(1); } to { transform: scale(1.12); } }\n@keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }\n@keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }\n@keyframes fg-tilt { 0% { transform: rotate(0); } 40% { transform: rotate(-2.4deg) scale(1.05); } 100% { transform: rotate(-1.4deg) scale(1.04); } }\n@keyframes fg-blur { 0% { filter: blur(0); } 30% { filter: blur(6px); } 100% { filter: blur(0); } }\n.fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }\n.fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }\n.fg-flash.is-black { background: #000; animation: fg-black 1.6s ease both; }\n@keyframes fg-flash { from { opacity: .95; } to { opacity: 0; } }\n@keyframes fg-black { 0% { opacity: 0; } 35%, 60% { opacity: 1; } 100% { opacity: 0; } }\n\n/* ── 地点标题卡 ── */\n.fg-titlecard { position: absolute; left: 6%; top: 34%; z-index: 25; pointer-events: none; animation: fg-titlecard 3.2s ease both; }\n.fg-titlecard-line { width: 26cqw; height: 1px; background: linear-gradient(90deg, var(--accent), var(--accent2), transparent); transform-origin: left; animation: fg-line 1s .1s cubic-bezier(.6, 0, .2, 1) both; }\n.fg-titlecard-name { font-family: var(--font-display); font-size: 4.6cqw; font-weight: 700; letter-spacing: .32em; margin: .8cqw 0 .4cqw; text-shadow: 0 0 2cqw rgba(0, 0, 0, .8), 0 0 4cqw var(--accent2); }\n.fg-titlecard-sub { font-family: var(--font-latin); font-size: 1.3cqw; letter-spacing: .5em; color: rgba(255, 255, 255, .75); text-transform: uppercase; }\n@keyframes fg-titlecard { 0% { opacity: 0; transform: translateX(-2%); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(1%); } }\n@keyframes fg-line { from { transform: scaleX(0); } }\n\n/* ── HUD ── */\n.fg-hud { position: absolute; left: 2.2%; top: 3.2%; z-index: 20; display: flex; align-items: stretch; gap: .9cqw; transition: opacity .3s; }\n.fg-hud-bar { width: .28cqw; border-radius: 9px; background: linear-gradient(180deg, var(--accent), var(--accent2)); box-shadow: 0 0 1cqw var(--accent); }\n.fg-hud-place { font-family: var(--font-display); font-size: 1.55cqw; font-weight: 700; letter-spacing: .14em; text-shadow: 0 1px 6px rgba(0, 0, 0, .7); }\n.fg-hud-meta { margin-top: .25cqw; font-size: .95cqw; letter-spacing: .14em; color: var(--ink-dim); text-shadow: 0 1px 4px rgba(0, 0, 0, .7); display: flex; gap: .8cqw; }\n.fg-topright { position: absolute; right: 2%; top: 3%; z-index: 22; display: flex; gap: .6cqw; align-items: center; }\n.fg-pill { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1cqw; border-radius: 99px; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: .95cqw; letter-spacing: .08em; color: var(--ink); }\n.fg-pill.is-busy::before { content: ""; width: .7cqw; height: .7cqw; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: fg-spin .8s linear infinite; }\n.fg-iconbtn { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; display: grid; place-items: center; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: 1.2cqw; transition: transform .2s, background .2s; }\n.fg-iconbtn:hover { transform: rotate(90deg); background: rgba(255, 255, 255, .14); }\n\n/* ── 对话框 ── */\n.fg-dialog { position: absolute; left: 4%; right: 4%; bottom: 3.6%; height: 27%; z-index: 20; transition: opacity .3s, transform .3s; }\n.fg-ui-hidden .fg-dialog, .fg-ui-hidden .fg-hud, .fg-ui-hidden .fg-topright, .fg-ui-hidden .fg-quick { opacity: 0; pointer-events: none; }\n.fg-box { position: absolute; inset: 0; border-radius: var(--box-radius); background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); -webkit-backdrop-filter: var(--box-blur); box-shadow: 0 1.4cqw 4cqw rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .08); overflow: hidden; }\n.fg-box::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), var(--accent3), transparent); background-size: 200% 100%; animation: fg-shimmer 6s linear infinite; opacity: .9; }\n.fg-box::after { content: ""; position: absolute; right: -6cqw; bottom: -10cqw; width: 26cqw; height: 26cqw; border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--speaker, var(--accent)) 28%, transparent), transparent 65%); pointer-events: none; transition: background .6s; }\n@keyframes fg-shimmer { from { background-position: 200% 0; } to { background-position: 0 0; } }\n.fg-name { position: absolute; left: 3.2%; top: -2.3cqw; z-index: 2; display: flex; align-items: flex-end; gap: .8cqw; animation: fg-name-in .35s cubic-bezier(.2, .8, .2, 1) both; }\n.fg-name-plate { position: relative; padding: .5cqw 2.4cqw .55cqw 1.6cqw; font-family: var(--font-display); font-weight: 700; font-size: 1.75cqw; letter-spacing: .2em; color: var(--name-ink);\n  background: linear-gradient(100deg, var(--speaker, var(--accent)), color-mix(in oklab, var(--speaker, var(--accent)) 55%, var(--accent2)));\n  clip-path: polygon(0 0, 100% 0, calc(100% - 1.2cqw) 100%, 0 100%); box-shadow: 0 .4cqw 1.6cqw rgba(0, 0, 0, .35); text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }\n.fg-name-plate::after { content: ""; position: absolute; left: 1.6cqw; right: 2.4cqw; bottom: .3cqw; height: 1px; background: rgba(255, 255, 255, .55); }\n.fg-name-sub { font-family: var(--font-latin); font-size: 1cqw; letter-spacing: .32em; color: var(--ink-dim); padding-bottom: .4cqw; text-transform: uppercase; }\n@keyframes fg-name-in { from { opacity: 0; transform: translateX(-1.2cqw); } }\n.fg-text { position: absolute; left: 4.2%; right: 5%; top: 23%; bottom: 20%; font-size: 1.95cqw; line-height: 1.78; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0, 0, 0, .45); overflow: hidden; }\n.fg-text.is-narration { color: color-mix(in oklab, var(--ink) 92%, var(--accent3)); }\n.fg-text.is-thought { font-style: italic; color: color-mix(in oklab, var(--ink) 70%, var(--accent2)); }\n.fg-text.is-cardhint { color: var(--ink-dim); font-size: 1.3cqw; letter-spacing: .4em; text-align: center; }\n.fg-text.is-thought::before { content: "（"; } .fg-text.is-thought::after { content: "）"; }\n.fg-char { opacity: 0; animation: fg-char-in .22s ease forwards; animation-delay: var(--d); display: inline; }\n.fg-text.is-done .fg-char { animation: none; opacity: 1; }\n.fg-text.is-wait .fg-char { animation: none; }\n@keyframes fg-char-in { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: none; } }\n.fg-wait { position: absolute; right: 2.6%; bottom: 20%; font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }\n.fg-wait::before { content: var(--wait-glyph); }\n@keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }\n.fg-quick { position: absolute; right: 2.4%; bottom: 7%; display: flex; gap: 1.5cqw; font-family: var(--font-latin); font-size: .98cqw; font-weight: 600; letter-spacing: .2em; z-index: 3; }\n.fg-quick button { color: var(--ink-dim); transition: color .2s, text-shadow .2s; position: relative; }\n.fg-quick button:hover, .fg-quick button.is-on { color: var(--ink); text-shadow: 0 0 .8cqw var(--accent); }\n.fg-quick button.is-on::after { content: ""; position: absolute; left: 0; right: .2em; bottom: -.3cqw; height: 1px; background: var(--accent); }\n.fg-progress { position: absolute; left: 4.2%; right: 30%; bottom: 8.6%; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; }\n.fg-progress i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); box-shadow: 0 0 6px var(--accent); transition: width .4s ease; }\n.fg-status { position: absolute; left: 4.2%; bottom: 7%; font-size: .9cqw; letter-spacing: .1em; color: var(--ink-dim); display: flex; align-items: center; gap: .5cqw; }\n.fg-status::before { content: ""; width: .6cqw; height: .6cqw; border-radius: 50%; background: var(--accent3); box-shadow: 0 0 .6cqw var(--accent3); animation: fg-pulse 1.4s ease-in-out infinite; }\n\n/* ── 情境卡片（短信、信件……） ── */\n.fg-card { position: absolute; left: 50%; top: 42%; z-index: 21; width: 40cqw; transform: translate(-50%, -50%); animation: fg-card-in .7s cubic-bezier(.2, .8, .2, 1) both; font-size: 1.6cqw; line-height: 1.7; }\n@keyframes fg-card-in { from { opacity: 0; transform: translate(-50%, -42%) rotateX(35deg) scale(.9); } }\n.fg-card[data-card="sms"] { padding: 1.6cqw; border-radius: 2cqw; background: rgba(250, 250, 255, .94); color: #1b1d2a; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .5); }\n.fg-card[data-card="sms"] .fg-card-head { font-size: 1cqw; color: #6b7280; text-align: center; margin-bottom: 1cqw; letter-spacing: .1em; }\n.fg-card[data-card="sms"] .fg-card-body { display: inline-block; max-width: 90%; padding: 1cqw 1.4cqw; border-radius: 1.6cqw 1.6cqw 1.6cqw .4cqw; background: #e8ebf4; }\n.fg-card[data-card="letter"], .fg-card[data-card="diary"] { padding: 3cqw 3.4cqw; background: repeating-linear-gradient(180deg, #fbf5e6 0 2.6cqw, #e9dcc0 2.6cqw calc(2.6cqw + 1px)), #fbf5e6; color: #4a3626; font-family: var(--font-display); box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); transform-origin: 50% 0; transform: translate(-50%, -50%) rotate(-1.2deg); }\n.fg-card[data-card="note"] { width: 28cqw; padding: 2.4cqw; background: #fff59d; color: #3b3200; font-family: var(--font-display); box-shadow: 0 1.4cqw 3cqw rgba(0, 0, 0, .45); transform: translate(-50%, -50%) rotate(2deg); }\n.fg-card[data-card="note"]::before { content: ""; position: absolute; left: 38%; top: -1cqw; width: 8cqw; height: 2cqw; background: rgba(255, 255, 255, .55); transform: rotate(-3deg); }\n.fg-card[data-card="news"] { padding: 2.4cqw; background: #f3f0e8; color: #111; font-family: var(--font-display); border-top: .6cqw double #111; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); }\n.fg-card[data-card="news"] .fg-card-head { font-size: 2.6cqw; font-weight: 900; letter-spacing: .3em; border-bottom: 1px solid #111; margin-bottom: 1cqw; }\n.fg-card[data-card="terminal"] { padding: 2cqw; border-radius: .8cqw; background: rgba(4, 16, 8, .92); color: #67ff9a; font-family: "JetBrains Mono", "Cascadia Code", monospace; box-shadow: 0 0 3cqw rgba(60, 255, 140, .25), inset 0 0 2cqw rgba(60, 255, 140, .08); text-shadow: 0 0 .6cqw rgba(60, 255, 140, .7); }\n.fg-card[data-card="terminal"] .fg-card-body::after { content: "▌"; animation: fg-pulse 1s steps(2) infinite; }\n.fg-card[data-card="notice"], .fg-card[data-card="scroll"] { padding: 3cqw; background: linear-gradient(90deg, #c9a46a, #f1dcae 8%, #f6e7c4 50%, #f1dcae 92%, #c9a46a); color: #3a2410; font-family: var(--font-display); text-align: center; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); }\n.fg-card[data-card="notice"]::after { content: "印"; position: absolute; right: 2cqw; bottom: 1.4cqw; width: 4cqw; height: 4cqw; border: .25cqw solid #b3261e; color: #b3261e; display: grid; place-items: center; font-size: 2cqw; transform: rotate(-12deg); animation: fg-stamp .4s .5s cubic-bezier(.3, 1.6, .5, 1) both; }\n@keyframes fg-stamp { from { opacity: 0; transform: scale(2.2) rotate(-12deg); } }\n\n/* ── 选项 ── */\n.fg-choices { position: absolute; inset: 0; z-index: 26; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.3cqw; background: radial-gradient(70% 60% at 50% 45%, rgba(0, 0, 0, .25), rgba(0, 0, 0, .6)); animation: fg-fade-in .4s ease both; }\n.fg-choices-title { font-family: var(--font-latin); letter-spacing: .6em; font-size: 1.05cqw; color: var(--ink-dim); margin-bottom: .6cqw; }\n.fg-choice { position: relative; width: 46cqw; padding: 1.25cqw 2.4cqw 1.25cqw 6cqw; text-align: left; font-size: 1.7cqw; letter-spacing: .08em; border-radius: 99px; background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .35); transition: transform .25s cubic-bezier(.2, .8, .2, 1), border-color .25s, box-shadow .25s; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); overflow: hidden; }\n.fg-choice::before { content: attr(data-n); position: absolute; left: 2.2cqw; top: 50%; transform: translateY(-50%); font-family: var(--font-latin); font-size: 1.5cqw; font-weight: 700; color: var(--accent); letter-spacing: .1em; }\n.fg-choice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .16) 50%, transparent 70%); transform: translateX(-100%); transition: transform .6s ease; }\n.fg-choice:hover { transform: translateX(1.2cqw) scale(1.02); border-color: var(--accent); box-shadow: 0 0 2.4cqw color-mix(in oklab, var(--accent) 45%, transparent); }\n.fg-choice:hover::after { transform: translateX(100%); }\n@keyframes fg-choice-in { from { opacity: 0; transform: translateY(1.4cqw); } }\n.fg-free { display: flex; gap: .8cqw; width: 46cqw; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); }\n.fg-free input { flex: 1; min-width: 0; padding: 1cqw 1.8cqw; font: inherit; font-size: 1.45cqw; color: var(--ink); border-radius: 99px; border: 1px dashed var(--box-border); background: rgba(0, 0, 0, .35); outline: none; user-select: text; }\n.fg-free input:focus { border-color: var(--accent); border-style: solid; }\n.fg-free button { padding: 0 2cqw; border-radius: 99px; background: linear-gradient(100deg, var(--accent), var(--accent2)); font-size: 1.4cqw; font-weight: 700; letter-spacing: .2em; color: #fff; }\n\n/* ── 标题画面 ── */\n.fg-title { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; justify-content: center; padding-left: 8%; background: linear-gradient(90deg, rgba(4, 4, 14, .86) 0%, rgba(4, 4, 14, .55) 42%, transparent 75%); animation: fg-fade-in 1s ease both; }\n.fg-title-kicker { font-family: var(--font-latin); font-size: 1.1cqw; letter-spacing: .7em; color: var(--accent3); text-transform: uppercase; animation: fg-slide-in 1s .2s ease both; }\n.fg-title-logo { font-family: var(--font-display); font-weight: 900; font-size: 6cqw; line-height: 1.15; letter-spacing: .12em; margin: 1cqw 0 .6cqw; background: linear-gradient(100deg, #fff 10%, var(--accent) 45%, var(--accent2) 70%, var(--accent3)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 2.4cqw color-mix(in oklab, var(--accent2) 60%, transparent)); animation: fg-logo-in 1.4s .3s cubic-bezier(.2, .8, .2, 1) both; max-width: 60cqw; }\n.fg-title-sub { font-size: 1.2cqw; letter-spacing: .3em; color: var(--ink-dim); margin-bottom: 3.4cqw; animation: fg-slide-in 1s .6s ease both; }\n.fg-title-menu { display: flex; flex-direction: column; gap: .4cqw; align-items: flex-start; }\n.fg-title-menu button { font-family: var(--font-display); font-size: 1.75cqw; letter-spacing: .3em; padding: .45cqw 0; color: var(--ink-dim); position: relative; transition: color .2s, letter-spacing .3s, padding .3s; animation: fg-slide-in .8s ease both; animation-delay: calc(var(--i) * 80ms + 800ms); }\n.fg-title-menu button span { font-family: var(--font-latin); font-size: .9cqw; letter-spacing: .4em; margin-left: 1.2cqw; opacity: .55; }\n.fg-title-menu button.is-new { color: var(--ink); }\n.fg-title-menu button.is-new::after { content: "NEW"; position: absolute; top: .2cqw; right: -3.4cqw; padding: .1cqw .5cqw; border-radius: 99px; font-family: var(--font-latin); font-size: .7cqw; letter-spacing: .12em; color: #fff; background: linear-gradient(100deg, var(--accent), var(--accent2)); animation: fg-pulse 1.6s ease-in-out infinite; }\n.fg-title-menu button:hover { color: #fff; letter-spacing: .42em; padding-left: 1.6cqw; }\n.fg-title-menu button:hover::before { content: ""; position: absolute; left: 0; top: 50%; width: .9cqw; height: .9cqw; transform: translateY(-50%) rotate(45deg); background: var(--accent); box-shadow: 0 0 1cqw var(--accent); }\n.fg-title-foot { position: absolute; left: 8%; bottom: 5%; font-size: .85cqw; letter-spacing: .2em; color: rgba(255, 255, 255, .35); }\n@keyframes fg-logo-in { from { opacity: 0; letter-spacing: .5em; filter: blur(10px); } }\n@keyframes fg-slide-in { from { opacity: 0; transform: translateX(-1.6cqw); } }\n\n/* ── 面板（回想 / 鉴赏 / 人物志 / 设置） ── */\n.fg-panel { position: absolute; inset: 0; z-index: 60; display: flex; flex-direction: column; background: linear-gradient(135deg, rgba(8, 6, 22, .94), rgba(16, 10, 34, .92)); backdrop-filter: blur(16px); animation: fg-panel-in .35s cubic-bezier(.2, .8, .2, 1) both; user-select: text; }\n@keyframes fg-panel-in { from { opacity: 0; transform: scale(1.02); } }\n.fg-panel-head { display: flex; align-items: center; gap: 1.4cqw; padding: 2.2cqw 3cqw 1.2cqw; }\n.fg-panel-title { font-family: var(--font-display); font-size: 2.4cqw; font-weight: 700; letter-spacing: .24em; }\n.fg-panel-en { font-family: var(--font-latin); font-size: 1cqw; letter-spacing: .5em; color: var(--accent); text-transform: uppercase; }\n.fg-panel-head .fg-spacer { flex: 1; }\n.fg-panel-body { position: relative; flex: 1; overflow: auto; padding: 0 3cqw 2.4cqw; scrollbar-width: thin; scrollbar-color: var(--accent2) transparent; }\n.fg-tabs { display: flex; gap: .4cqw; padding: 0 3cqw 1cqw; flex-wrap: wrap; }\n.fg-tab { padding: .55cqw 1.4cqw; border-radius: 99px; font-size: 1.05cqw; letter-spacing: .12em; color: var(--ink-dim); border: 1px solid transparent; }\n.fg-tab.is-on { color: #fff; border-color: var(--box-border); background: linear-gradient(100deg, color-mix(in oklab, var(--accent) 35%, transparent), color-mix(in oklab, var(--accent2) 35%, transparent)); }\n\n.fg-log-item { display: grid; grid-template-columns: 9cqw 1fr; gap: 1.4cqw; padding: 1cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .06); cursor: pointer; font-size: 1.35cqw; line-height: 1.7; }\n.fg-log-item:hover { background: linear-gradient(90deg, rgba(255, 255, 255, .04), transparent); }\n.fg-log-name { font-family: var(--font-display); font-weight: 700; text-align: right; letter-spacing: .1em; }\n.fg-log-turn { grid-column: 1 / -1; font-family: var(--font-latin); font-size: .95cqw; letter-spacing: .5em; color: var(--accent); padding-top: 1.4cqw; }\n\n/* 导演日志：左边历次记录，右边详情（实时输出 / 整理结果 / 原始输出 / 提示词）。两栏各自滚动。 */\n.fg-dlog { display: grid; grid-template-columns: 22cqw minmax(0, 1fr); gap: 2cqw; height: 100%; }\n.fg-dlog-side, .fg-dlog-detail { min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--accent2) transparent; }\n.fg-dlog-side { display: flex; flex-direction: column; gap: .6cqw; padding-right: .4cqw; }\n.fg-dlog-detail { padding-right: .6cqw; }\n.fg-dlog-row { display: block; width: 100%; flex: none; text-align: left; padding: 1cqw 1.2cqw; border-radius: .8cqw; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .03); transition: background .2s, border-color .2s; }\n.fg-dlog-row:hover { background: rgba(255, 255, 255, .07); }\n.fg-dlog-row.is-on { border-color: var(--accent); background: linear-gradient(100deg, color-mix(in oklab, var(--accent) 18%, transparent), color-mix(in oklab, var(--accent2) 8%, transparent)); }\n.fg-dlog-row-head { display: flex; align-items: center; justify-content: space-between; gap: .6cqw; font-size: 1.15cqw; letter-spacing: .08em; }\n.fg-dlog-row-meta { margin-top: .3cqw; font-size: .85cqw; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.fg-dlog-row-sum { margin-top: .4cqw; font-size: .95cqw; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }\n.fg-dlog-status { padding: .1cqw .7cqw; border-radius: 99px; border: 1px solid currentColor; font-size: .8cqw; letter-spacing: .1em; white-space: nowrap; }\n.fg-dlog-status.is-running { color: var(--accent); animation: fg-pulse 1.4s ease-in-out infinite; }\n.fg-dlog-status.is-ok { color: #6ef0a8; }\n.fg-dlog-status.is-failed { color: #ff8a8a; }\n.fg-dlog-status.is-cancelled { color: var(--ink-dim); }\n.fg-dlog-head { padding: 1.2cqw 1.4cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }\n.fg-dlog-title { display: flex; align-items: center; gap: 1cqw; margin-bottom: .8cqw; font-family: var(--font-display); font-size: 1.7cqw; letter-spacing: .16em; }\n.fg-dlog-title .fg-spacer, .fg-dlog-label .fg-spacer { flex: 1; }\n.fg-dlog-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(30cqw, 1fr)); gap: .3cqw 2cqw; font-size: 1cqw; line-height: 1.6; }\n.fg-dlog-facts i { margin-right: .8cqw; font-style: normal; color: var(--ink-dim); letter-spacing: .08em; }\n.fg-dlog-notice { margin-top: .6cqw; font-size: .95cqw; color: #ffd27a; }\n.fg-dlog-error { margin: .6cqw 0; font-size: 1cqw; white-space: pre-wrap; word-break: break-word; }\n.fg-dlog-tabs { padding: 1.2cqw 0 .4cqw; }\n.fg-dlog-block { margin: 1cqw 0; }\n.fg-dlog-label { display: flex; align-items: center; gap: .8cqw; margin-bottom: .5cqw; font-size: .95cqw; letter-spacing: .12em; color: var(--accent); }\n.fg-btn.is-mini { padding: .2cqw .9cqw; font-size: .85cqw; white-space: nowrap; }\n.fg-dlog-pre { margin: 0; max-height: 34cqw; overflow: auto; padding: 1cqw 1.2cqw; border-radius: .8cqw; background: rgba(0, 0, 0, .42); border: 1px solid var(--box-border); font-family: "JetBrains Mono", Consolas, monospace; font-size: .95cqw; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: var(--ink); scrollbar-width: thin; }\n.fg-dlog-pre.has-cursor::after { content: "▍"; color: var(--accent); animation: fg-pulse 1s steps(2) infinite; }\n.fg-dlog-meter { display: flex; align-items: center; gap: .8cqw; margin: .4cqw 0; font-size: 1cqw; color: var(--ink-dim); }\n.fg-dlog-dot { width: .8cqw; height: .8cqw; border-radius: 50%; background: var(--accent); box-shadow: 0 0 1cqw var(--accent); animation: fg-pulse 1s ease-in-out infinite; }\n.fg-dlog-think summary { margin: .4cqw 0; cursor: pointer; font-size: .95cqw; color: var(--ink-dim); }\n.fg-dlog-chips { display: flex; flex-wrap: wrap; gap: .5cqw; }\n.fg-dlog-chip { display: inline-flex; align-items: center; gap: .5cqw; padding: .2cqw .8cqw; border-radius: 99px; font-size: .9cqw; background: rgba(255, 255, 255, .06); border: 1px solid var(--box-border); }\n.fg-dlog-chip i { font-style: normal; font-size: .8cqw; color: var(--ink-dim); }\n.fg-dlog-lines { border-radius: .8cqw; border: 1px solid var(--box-border); overflow: hidden; }\n.fg-dlog-line { display: grid; grid-template-columns: 4cqw minmax(0, 1fr) minmax(0, 24cqw); gap: 1.2cqw; align-items: start; padding: .7cqw 1cqw; border-bottom: 1px solid rgba(255, 255, 255, .06); font-size: 1cqw; line-height: 1.6; }\n.fg-dlog-line:last-child { border-bottom: 0; }\n.fg-dlog-line.is-plain { opacity: .6; }\n.fg-dlog-uid { padding-top: .15cqw; font-family: var(--font-latin); font-size: .85cqw; letter-spacing: .1em; color: var(--accent); }\n.fg-dlog-card { margin-bottom: .6cqw; padding: .8cqw 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); font-size: 1cqw; line-height: 1.6; }\n.fg-dlog-mono { margin-top: .4cqw; font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; word-break: break-word; }\n.fg-dlog-k { display: inline-block; margin-right: .6cqw; padding: 0 .5cqw; border-radius: .3cqw; font-style: normal; font-family: var(--font-body); font-size: .8cqw; letter-spacing: .08em; color: var(--ink-dim); border: 1px solid var(--box-border); }\n.fg-dlog-cgchar { margin-top: .4cqw; padding-left: .8cqw; border-left: 2px solid var(--box-border); }\n.fg-dlog-list-plain { margin: 0; padding-left: 2cqw; font-size: 1.05cqw; line-height: 1.8; }\n.fg-pill.is-link { cursor: pointer; transition: border-color .2s; }\n.fg-pill.is-link:hover { border-color: var(--accent); }\n\n.fg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20cqw, 1fr)); gap: 1.4cqw; }\n.fg-thumb { position: relative; aspect-ratio: 16 / 10; border-radius: 1cqw; overflow: hidden; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); cursor: zoom-in; transition: transform .25s, box-shadow .25s; }\n.fg-thumb:hover { transform: translateY(-.4cqw); box-shadow: 0 1cqw 3cqw rgba(0, 0, 0, .5), 0 0 0 1px var(--accent); }\n.fg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }\n.fg-thumb-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 2cqw 1cqw .7cqw; font-size: 1cqw; letter-spacing: .1em; background: linear-gradient(transparent, rgba(0, 0, 0, .75)); }\n.fg-thumb.is-locked { cursor: default; display: grid; place-items: center; color: var(--ink-dim); font-size: 1cqw; background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .03) 0 1cqw, transparent 1cqw 2cqw); }\n\n.fg-person { display: grid; grid-template-columns: 13cqw 1fr; gap: 2cqw; padding: 1.6cqw; margin-bottom: 1.4cqw; border-radius: 1.2cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }\n.fg-track { display: grid; grid-template-columns: 4.2cqw 1fr; gap: 1.4cqw; padding: 1.2cqw 1.4cqw; margin-bottom: 1cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }\n.fg-track-body { display: grid; gap: .6cqw; min-width: 0; }\n.fg-track-play { width: 4.2cqw; height: 4.2cqw; border-radius: 50%; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink); font-size: 1.3cqw; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s; }\n.fg-track-play:hover { border-color: var(--accent); }\n.fg-track-play.is-on { background: var(--accent); border-color: var(--accent); color: #111; box-shadow: 0 0 1.4cqw color-mix(in oklab, var(--accent) 55%, transparent); }\n.fg-track-desc { min-height: 4.6cqw; font-family: var(--font-body); font-size: 1.05cqw; }\n.fg-person-art { position: relative; height: 19cqw; border-radius: .8cqw; overflow: hidden; background: radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--c) 40%, transparent), rgba(0, 0, 0, .3)); }\n.fg-person-art img { width: 100%; height: 100%; object-fit: cover; object-position: top; }\n.fg-person-art .fg-silhouette { height: 100%; }\n.fg-person h3 { margin: 0 0 .6cqw; font-family: var(--font-display); font-size: 2cqw; letter-spacing: .2em; display: flex; align-items: center; gap: 1cqw; }\n.fg-person h3 small { font-family: var(--font-body); font-size: .9cqw; letter-spacing: .1em; padding: .2cqw .7cqw; border-radius: 99px; border: 1px solid var(--box-border); color: var(--ink-dim); }\n.fg-emos { display: flex; flex-wrap: wrap; gap: .5cqw; margin: .8cqw 0; }\n.fg-emo { position: relative; width: 5.4cqw; height: 6.6cqw; border-radius: .6cqw; overflow: hidden; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); font-size: .78cqw; color: var(--ink-dim); cursor: pointer; transition: border-color .2s, transform .2s; }\n.fg-emo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }\n.fg-emo span { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.4cqw .2cqw .3cqw; line-height: 1.2; text-align: center; text-shadow: 0 1px 3px #000; background: linear-gradient(transparent, rgba(0, 0, 0, .78) 70%); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }\n.fg-emo.is-busy::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .25), transparent 80%); background-size: 200% 100%; animation: fg-skeleton 1.2s linear infinite; }\n.fg-emo:hover { border-color: var(--accent); transform: translateY(-.2cqw); }\n.fg-emo.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 1.2cqw color-mix(in oklab, var(--accent) 45%, transparent); }\n.fg-emo.is-custom { border-style: dashed; }\n.fg-emo.is-custom span { color: var(--ink); }\n.fg-person-main { min-width: 0; }\n.fg-person-tags { font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; color: var(--ink-dim); line-height: 1.5; margin-bottom: .6cqw; word-break: break-word; }\n.fg-person-folds .fg-btn.is-on, .fg-btn.is-on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 22%, transparent); }\n.fg-person-form { margin: .8cqw 0; padding: 1cqw 1.2cqw; border-radius: .9cqw; background: rgba(0, 0, 0, .22); border: 1px solid var(--box-border); }\n.fg-person-form .fg-field { grid-template-columns: 9cqw 1fr; }\n.fg-textarea.is-short { min-height: 4cqw; }\n.fg-cg-chars { display: grid; gap: .9cqw; margin: .9cqw 0 .9cqw 15.2cqw; }\n.fg-cg-char { display: grid; gap: .6cqw; padding: 1cqw; border-radius: .9cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .18); }\n.fg-sent { user-select: text; margin-top: .4cqw; display: grid; gap: .3cqw; word-break: break-word; }\n.fg-wardrobe { display: grid; gap: .5cqw; margin-bottom: .6cqw; }\n.fg-outfit { display: grid; grid-template-columns: 8cqw 1fr auto auto; gap: .7cqw; align-items: center; padding: .4cqw .6cqw; border-radius: .7cqw; border: 1px solid transparent; }\n.fg-outfit b { font-size: 1.1cqw; letter-spacing: .1em; }\n.fg-outfit.is-on { border-color: color-mix(in oklab, var(--accent) 60%, transparent); background: color-mix(in oklab, var(--accent) 10%, transparent); }\n.fg-outfit.is-new { grid-template-columns: 8cqw 1fr auto; }\n.fg-state { display: inline-flex; align-items: center; gap: .4cqw; padding: .3cqw .5cqw .3cqw .9cqw; border-radius: 99px; font-size: 1cqw; background: color-mix(in oklab, var(--accent2) 22%, transparent); border: 1px solid color-mix(in oklab, var(--accent2) 55%, transparent); }\n.fg-state button { width: 1.5cqw; height: 1.5cqw; border-radius: 50%; font-size: .8cqw; color: var(--ink-dim); }\n.fg-state button:hover { color: #fff; background: rgba(255, 255, 255, .15); }\n.fg-looks { display: flex; flex-wrap: wrap; align-items: center; gap: .5cqw; margin-top: 1cqw; }\n.fg-look { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1.1cqw; border-radius: 99px; font-size: 1cqw; letter-spacing: .08em; border: 1px solid var(--box-border); color: var(--ink-dim); background: rgba(255, 255, 255, .04); }\n.fg-look i { font-style: normal; font-size: .8cqw; padding: .05cqw .5cqw; border-radius: 99px; background: var(--accent); color: #111; }\n.fg-look.is-on { color: #fff; border-color: var(--accent); background: color-mix(in oklab, var(--accent) 22%, transparent); }\n.fg-variant { display: grid; grid-template-columns: 11cqw 1fr; gap: 1.4cqw; margin: .4cqw 0 1cqw; padding: 1cqw; border-radius: .9cqw; background: rgba(0, 0, 0, .25); border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--box-border)); animation: fg-pop .25s ease-out; }\n.fg-variant-art { height: 15cqw; border-radius: .7cqw; overflow: hidden; display: grid; place-items: center; font-size: 1cqw; color: var(--ink-dim); background: repeating-conic-gradient(rgba(255, 255, 255, .05) 0 25%, transparent 0 50%) 0 0 / 1.4cqw 1.4cqw; }\n.fg-variant-art img { width: 100%; height: 100%; object-fit: contain; object-position: top; }\n.fg-variant-body { display: grid; gap: .6cqw; align-content: start; min-width: 0; }\n.fg-variant-body b { font-size: 1.15cqw; letter-spacing: .08em; }\n.fg-emotion-row { display: grid; grid-template-columns: 12cqw 1fr 9cqw auto auto; gap: .8cqw; align-items: center; padding: .6cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .05); }\n.fg-emotion-row b { font-size: 1.15cqw; letter-spacing: .06em; }\n.fg-emotion-row.is-new { grid-template-columns: 12cqw 1fr 9cqw auto; border-bottom: 0; margin-top: .6cqw; }\n.fg-chip small { margin-left: .3em; opacity: .55; font-size: .85em; }\n\n/* 表单 */\n.fg-field { display: grid; grid-template-columns: 14cqw 1fr; gap: 1.2cqw; align-items: center; margin: .9cqw 0; font-size: 1.1cqw; }\n.fg-field > label { color: var(--ink-dim); letter-spacing: .08em; }\n.fg-field small { grid-column: 2; color: var(--ink-dim); font-size: .9cqw; margin-top: -.6cqw; }\n.fg-input, .fg-select, .fg-textarea { width: 100%; padding: .7cqw 1cqw; font: inherit; font-size: 1.1cqw; color: var(--ink); background: rgba(0, 0, 0, .35); border: 1px solid var(--box-border); border-radius: .6cqw; outline: none; }\n.fg-select option { background: #14122a; }\n.fg-textarea { min-height: 7cqw; resize: vertical; line-height: 1.5; font-family: "JetBrains Mono", Consolas, monospace; font-size: 1cqw; }\n.fg-input:focus, .fg-select:focus, .fg-textarea:focus { border-color: var(--accent); }\n.fg-btn { display: inline-flex; align-items: center; gap: .5cqw; padding: .6cqw 1.4cqw; border-radius: 99px; font-size: 1.05cqw; letter-spacing: .1em; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .05); transition: background .2s, border-color .2s; }\n.fg-btn:hover { background: rgba(255, 255, 255, .12); border-color: var(--accent); }\n.fg-btn.is-primary { background: linear-gradient(100deg, var(--accent), var(--accent2)); border-color: transparent; color: #fff; font-weight: 700; }\n.fg-btn[disabled] { opacity: .45; pointer-events: none; }\n.fg-row { display: flex; gap: .8cqw; flex-wrap: wrap; align-items: center; }\n.fg-switch { position: relative; width: 3.4cqw; height: 1.9cqw; border-radius: 99px; background: rgba(255, 255, 255, .14); transition: background .2s; }\n.fg-switch::after { content: ""; position: absolute; left: .25cqw; top: .25cqw; width: 1.4cqw; height: 1.4cqw; border-radius: 50%; background: #fff; transition: transform .25s cubic-bezier(.3, 1.4, .5, 1); }\n.fg-switch.is-on { background: linear-gradient(100deg, var(--accent), var(--accent2)); }\n.fg-switch.is-on::after { transform: translateX(1.5cqw); }\n.fg-note { font-size: .95cqw; color: var(--ink-dim); line-height: 1.6; }\n.fg-ok { color: #6ef0a8; } .fg-err { color: #ff8a8a; }\n.fg-section { margin: 1.6cqw 0 .6cqw; font-family: var(--font-display); font-size: 1.4cqw; letter-spacing: .2em; display: flex; align-items: center; gap: .8cqw; }\n.fg-section::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--box-border), transparent); }\n.fg-skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(15cqw, 1fr)); gap: 1cqw; }\n.fg-skin { padding: 1cqw; border-radius: 1cqw; border: 1px solid var(--box-border); text-align: left; transition: transform .2s; }\n.fg-skin:hover { transform: translateY(-.3cqw); }\n.fg-skin.is-on { box-shadow: 0 0 0 2px var(--accent); }\n.fg-skin-swatch { height: 4cqw; border-radius: .6cqw; margin-bottom: .6cqw; }\n.fg-skin b { display: block; font-size: 1.1cqw; letter-spacing: .1em; } .fg-skin span { font-size: .85cqw; color: var(--ink-dim); }\n\n.fg-update-done { margin: .8cqw 0; padding: .9cqw 1.2cqw; border-radius: .8cqw; font-size: 1.05cqw; line-height: 1.6; color: #6ef0a8; background: rgba(110, 240, 168, .08); border: 1px solid rgba(110, 240, 168, .3); }\n.fg-changes { margin: .4cqw 0 0 15.2cqw; border-radius: .8cqw; border: 1px solid var(--box-border); overflow: hidden; }\n.fg-changes > div { display: grid; grid-template-columns: 6cqw 1fr auto; gap: 1cqw; padding: .6cqw 1cqw; font-size: 1cqw; line-height: 1.5; border-bottom: 1px solid rgba(255, 255, 255, .06); }\n.fg-changes > div:last-child { border-bottom: 0; }\n.fg-changes code, .fg-note code { font-family: "JetBrains Mono", Consolas, monospace; color: var(--accent); }\n.fg-changes small { color: var(--ink-dim); white-space: nowrap; }\n\n.fg-lightbox { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2cqw; background: rgba(0, 0, 0, .9); animation: fg-fade-in .25s ease both; cursor: zoom-out; }\n.fg-lightbox img { max-width: 92%; max-height: 82%; object-fit: contain; box-shadow: 0 0 6cqw rgba(0, 0, 0, .8); cursor: default; }\n.fg-lightbox .fg-row { cursor: default; }\n\n@keyframes fg-fade-in { from { opacity: 0; } }\n@keyframes fg-fade-out { to { opacity: 0; } }\n@keyframes fg-spin { to { transform: rotate(360deg); } }\n@keyframes fg-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }\n@keyframes fg-skeleton { from { background-position: 200% 0; } to { background-position: -200% 0; } }\n@keyframes fg-pop { from { opacity: 0; transform: translateY(-.4cqw); } to { opacity: 1; transform: none; } }\n\n@media (prefers-reduced-motion: reduce) {\n  .fg-bg, .fg-cg-img, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-symbol-art, .fg-symbol-art svg { animation: none !important; }\n  .fg-cg-pan { animation: none !important; transform: scale(var(--r)); }\n}\n@container stage (max-aspect-ratio: 4/5) {\n  .fg-actor { width: 60%; height: 60%; bottom: 23%; }\n  .fg-dialog { left: 3%; right: 3%; height: 22%; }\n  .fg-text { font-size: 4.6cqw; top: 18%; bottom: 26%; }\n  .fg-progress { bottom: 12%; right: 4.2%; }\n  .fg-quick { bottom: 5%; left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }\n  .fg-wait { bottom: 28%; }\n  .fg-status { display: none; }\n  .fg-name-plate { font-size: 4cqw; } .fg-name { top: -5cqw; }\n  .fg-iconbtn { width: 9cqw; height: 9cqw; font-size: 4cqw; }\n  .fg-hud-place { font-size: 4cqw; } .fg-hud-meta { font-size: 2.6cqw; }\n  .fg-choice, .fg-free { width: 88cqw; font-size: 4cqw; }\n  .fg-title-logo { font-size: 11cqw; max-width: 90cqw; } .fg-title-menu button { font-size: 4.4cqw; }\n  .fg-dlog { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }\n  .fg-dlog-side { flex-direction: row; overflow-x: auto; padding: 0 0 1cqw; }\n  .fg-dlog-row { width: 46cqw; }\n  .fg-dlog-row-head, .fg-dlog-title { font-size: 3.6cqw; }\n  .fg-dlog-row-meta, .fg-dlog-row-sum, .fg-dlog-status, .fg-dlog-label, .fg-dlog-meter, .fg-dlog-think summary, .fg-dlog-chip, .fg-dlog-chip i, .fg-btn.is-mini { font-size: 2.8cqw; }\n  .fg-dlog-facts, .fg-dlog-notice, .fg-dlog-error, .fg-dlog-pre, .fg-dlog-line, .fg-dlog-card, .fg-dlog-mono, .fg-dlog-list-plain { font-size: 3cqw; }\n  .fg-dlog-facts { grid-template-columns: 1fr; }\n  .fg-dlog-pre { max-height: 90cqw; }\n  .fg-dlog-line { grid-template-columns: 9cqw minmax(0, 1fr); }\n  .fg-dlog-line > .fg-dlog-chips { grid-column: 2; }\n  .fg-dlog .fg-note, .fg-dlog-uid { font-size: 2.6cqw; }\n  .fg-dlog-list-plain { padding-left: 6cqw; }\n  .fg-panel-title { font-size: 6cqw; } .fg-panel-en { font-size: 2.2cqw; }\n  .fg-tab { padding: 1.2cqw 3cqw; font-size: 3.2cqw; }\n  .fg-pill { padding: .8cqw 2.2cqw; font-size: 2.6cqw; }\n  .fg-person { grid-template-columns: 1fr; }\n  .fg-person-art { height: 50cqw; }\n  .fg-person h3 { font-size: 5cqw; flex-wrap: wrap; } .fg-person h3 small { font-size: 2.6cqw; }\n  .fg-person-tags, .fg-note { font-size: 2.8cqw; }\n  .fg-btn, .fg-look, .fg-state { font-size: 3cqw; padding: 1cqw 2.4cqw; }\n  .fg-emo { width: 15cqw; height: 18cqw; font-size: 2.4cqw; }\n  .fg-field, .fg-person-form .fg-field { grid-template-columns: 1fr; font-size: 3cqw; }\n  .fg-input, .fg-select, .fg-textarea { font-size: 3cqw; }\n  .fg-outfit, .fg-outfit.is-new, .fg-emotion-row, .fg-emotion-row.is-new { grid-template-columns: 1fr; }\n  .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }\n  .fg-track { grid-template-columns: 9cqw 1fr; gap: 2cqw; padding: 2cqw; }\n  .fg-track-play { width: 9cqw; height: 9cqw; font-size: 3cqw; }\n  .fg-track-desc { min-height: 12cqw; font-size: 3cqw; }\n}\n';
+var theater_default = '/* ───────────── 沉浸式 Galgame · 剧场 ─────────────\n   所有类名以 fg- 开头；皮肤只改 data-skin 上的变量与少量装饰。\n   舞台是 16:9 的容器（container-type:size），字号用 cqw 随舞台缩放。 */\n\n.fg-theater {\n  --accent: #ff7eb6; --accent2: #9b7bff; --accent3: #5ee7ff;\n  --ink: #f5f3ff; --ink-dim: rgba(235, 232, 255, .62);\n  --box-bg: linear-gradient(180deg, rgba(18, 16, 40, .66), rgba(8, 8, 24, .86));\n  --box-border: rgba(255, 255, 255, .14);\n  --box-radius: 1.4cqw;\n  --box-blur: blur(18px) saturate(1.5);\n  --name-ink: #fff;\n  --panel-bg: rgba(10, 10, 26, .82);\n  --chip-bg: rgba(10, 10, 28, .5);\n  --font-body: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;\n  --font-display: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", serif;\n  --font-latin: "Cormorant Garamond", "Playfair Display", Georgia, serif;\n  --wait-glyph: "◆";\n  position: fixed; inset: 0; z-index: 2147483000; overflow: hidden; overflow: clip;\n  display: flex; align-items: center; justify-content: center;\n  background: #05040c; color: var(--ink);\n  font-family: var(--font-body);\n  -webkit-font-smoothing: antialiased;\n  user-select: none; -webkit-user-select: none;\n  animation: fg-fade-in .5s ease both;\n}\n.fg-theater *, .fg-theater *::before, .fg-theater *::after { box-sizing: border-box; }\n:where(.fg-theater) button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }\n.fg-theater.is-closing { animation: fg-fade-out .35s ease both; }\n\n.fg-stage {\n  position: relative; overflow: hidden; overflow: clip;\n  width: min(100vw, calc(100vh * 16 / 9)); height: min(100vh, calc(100vw * 9 / 16));\n  container-type: size; container-name: stage;\n  background: #000;\n  box-shadow: 0 0 120px rgba(0, 0, 0, .8);\n}\n@media (max-aspect-ratio: 4/5) {\n  /* 竖屏手机：舞台铺满，立绘居中放大，对话框加高。 */\n  .fg-stage { width: 100vw; height: 100vh; }\n}\n.fg-camera { position: absolute; inset: 0; transform-origin: 50% 45%; }\n\n/* ── 背景层 ── */\n.fg-bg { position: absolute; inset: -3%; background-size: cover; background-position: center 42%; will-change: transform, opacity; }\n.fg-bg.is-image { animation: fg-kenburns 38s ease-in-out infinite alternate; }\n.fg-bg.is-enter { animation: var(--enter-anim, fg-dissolve) var(--enter-dur, 1.1s) cubic-bezier(.6, .05, .3, 1) both, fg-kenburns 38s ease-in-out infinite alternate; }\n.fg-bg.is-leave { animation: fg-fade-out .9s ease both; }\n@keyframes fg-kenburns { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.1) translate(-1.6%, -1.2%); } }\n@keyframes fg-dissolve { from { opacity: 0; filter: blur(8px) brightness(1.3); } to { opacity: 1; filter: none; } }\n@keyframes fg-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }\n@keyframes fg-iris { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(80% at 50% 50%); } }\n@keyframes fg-cinematic { 0% { clip-path: inset(50% 0 50% 0); filter: brightness(2); } 60% { clip-path: inset(8% 0 8% 0); } 100% { clip-path: inset(0 0 0 0); filter: none; } }\n@keyframes fg-strips { from { -webkit-mask-size: 100% 0%; mask-size: 100% 0%; } to { -webkit-mask-size: 100% 100%; mask-size: 100% 100%; } }\n.fg-bg.is-enter[data-tr="strips"] { -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 8%, transparent 8% 8.0001%); mask-image: linear-gradient(#000, #000); -webkit-mask-repeat: no-repeat; }\n@keyframes fg-flash-in { 0% { opacity: 0; filter: brightness(4); } 30% { opacity: 1; filter: brightness(3); } 100% { filter: none; } }\n@keyframes fg-black-in { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }\n\n/* 没有背景图时的程序化舞台：天色渐变 + 远景剪影 + 光斑。 */\n.fg-sky { position: absolute; inset: 0; transition: background 1.6s ease; }\n.fg-sky::before { content: ""; position: absolute; left: -10%; right: -10%; bottom: 0; height: 46%;\n  background:\n    radial-gradient(60% 120% at 20% 100%, rgba(0, 0, 0, .55), transparent 70%),\n    radial-gradient(50% 90% at 78% 100%, rgba(0, 0, 0, .5), transparent 70%);\n}\n.fg-sky::after { content: ""; position: absolute; inset: 0;\n  background: radial-gradient(40% 30% at var(--sun-x, 70%) var(--sun-y, 30%), var(--sun, rgba(255, 220, 180, .55)), transparent 70%);\n  mix-blend-mode: screen; animation: fg-breathe-light 9s ease-in-out infinite;\n}\n.fg-skyline { position: absolute; left: 0; right: 0; bottom: 0; height: 38%; opacity: .9; }\n@keyframes fg-breathe-light { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }\n\n/* 时段调色：叠一层渐变，混合模式按时段变化。 */\n.fg-grade { position: absolute; inset: 0; pointer-events: none; transition: background 1.4s ease, opacity 1.4s ease; mix-blend-mode: soft-light; }\n.fg-grade[data-time="dawn"] { background: linear-gradient(180deg, rgba(255, 170, 200, .55), rgba(120, 140, 255, .35)); }\n.fg-grade[data-time="morning"] { background: linear-gradient(180deg, rgba(255, 245, 220, .35), rgba(255, 255, 255, 0)); }\n.fg-grade[data-time="noon"] { opacity: 0; }\n.fg-grade[data-time="afternoon"] { background: linear-gradient(180deg, rgba(255, 220, 160, .35), rgba(255, 200, 120, .15)); }\n.fg-grade[data-time="dusk"] { background: linear-gradient(180deg, rgba(255, 120, 60, .7), rgba(140, 40, 120, .55)); mix-blend-mode: overlay; }\n.fg-grade[data-time="evening"] { background: linear-gradient(180deg, rgba(90, 60, 200, .6), rgba(255, 110, 120, .35)); mix-blend-mode: overlay; }\n.fg-grade[data-time="night"] { background: linear-gradient(180deg, rgba(10, 20, 80, .78), rgba(20, 10, 60, .7)); mix-blend-mode: multiply; }\n.fg-grade[data-time="midnight"] { background: linear-gradient(180deg, rgba(4, 6, 40, .86), rgba(10, 4, 30, .8)); mix-blend-mode: multiply; }\n.fg-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, .55)); }\n.fg-letterbox::before, .fg-letterbox::after { content: ""; position: absolute; left: 0; right: 0; height: 9%; background: #000; z-index: 30; animation: fg-bars .8s cubic-bezier(.6, 0, .2, 1) both; }\n.fg-letterbox::before { top: 0; transform-origin: top; } .fg-letterbox::after { bottom: 0; transform-origin: bottom; }\n@keyframes fg-bars { from { transform: scaleY(0); } }\n\n.fg-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }\n\n/* ── 立绘 ── */\n.fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; }\n.fg-actor {\n  position: absolute; bottom: -2%; height: 92%; width: 34%;\n  left: var(--x, 50%); transform: translateX(-50%);\n  transition: left .55s cubic-bezier(.4, .1, .2, 1), filter .4s ease, opacity .45s ease;\n  filter: brightness(.7) saturate(.78);\n  animation: fg-actor-in .6s cubic-bezier(.2, .7, .2, 1) both;\n}\n.fg-actor.is-speaking { filter: brightness(1.04) saturate(1.05) drop-shadow(0 0 1.4cqw rgba(255, 255, 255, .18)); z-index: 2; }\n.fg-actor.is-leaving { animation: fg-actor-out .45s ease both; }\n.fg-actor-body { position: absolute; inset: 0; transform-origin: 50% 100%; animation: fg-breathe 4.8s ease-in-out infinite; }\n.fg-actor.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1), fg-breathe 4.8s ease-in-out .42s infinite; }\n/* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */\n.fg-actor.is-aa .fg-actor-body { animation: none; }\n.fg-actor.is-aa.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }\n.fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: 0; height: 100%; width: auto; max-width: none; transform: translateX(-50%);\n  -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 99%), radial-gradient(120% 100% at 50% 40%, #000 62%, transparent 82%);\n  -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, #000 78%, transparent 99%); }\n.fg-actor.is-upload img, .fg-actor.is-upload .fg-aa { -webkit-mask-image: none; mask-image: none; }\n.fg-actor img.is-swap { animation: fg-expr-swap .25s ease; }\n/* 登场从靠近的一侧滑进来，退场往同一侧淡出（--side 由站位决定）。 */\n@keyframes fg-actor-in { from { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(3%); } }\n@keyframes fg-actor-out { to { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(2%); } }\n@keyframes fg-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.008) translateY(-.25%); } }\n@keyframes fg-speak-hop { 0% { transform: translateY(0); } 40% { transform: translateY(-1.6%); } 100% { transform: translateY(0); } }\n@keyframes fg-expr-swap { from { opacity: .4; filter: brightness(1.4); } }\n\n/* 没有立绘时的剪影立绘：角色色渐变 + 轮廓光。 */\n.fg-silhouette { position: absolute; left: 50%; bottom: 0; height: 94%; aspect-ratio: 0.52; transform: translateX(-50%); }\n.fg-silhouette svg { width: 100%; height: 100%; overflow: visible; }\n.fg-silhouette .sil-rim { fill: none; stroke: color-mix(in oklab, var(--c) 55%, #fff); stroke-width: 2.4; opacity: .85; filter: drop-shadow(0 0 5px var(--c)) drop-shadow(0 0 14px var(--c)); stroke-dasharray: 1400; animation: fg-rim-draw 2.4s cubic-bezier(.4, 0, .2, 1) both; }\n@keyframes fg-rim-draw { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }\n.fg-silhouette-name { position: absolute; left: 50%; top: 50%; transform: translateX(-50%); font-family: var(--font-display); font-size: 5.4cqw; font-weight: 900; letter-spacing: .25em; color: transparent; -webkit-text-stroke: 1px color-mix(in oklab, var(--c) 40%, #fff); opacity: .5; writing-mode: vertical-rl; white-space: nowrap; }\n.fg-silhouette-tag { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); font-family: var(--font-latin); font-size: .75cqw; letter-spacing: .5em; white-space: nowrap; color: rgba(255, 255, 255, .55); }\n.fg-symbol-anchor { position: absolute; left: 50%; top: 9%; width: 0; height: 0; z-index: 4; }\n/* 漫画符号：外层管弹出与淡出（--life），内层按种类循环一个小动作。 */\n.fg-symbol { position: absolute; left: 3cqw; top: -2cqw; width: 6cqw; height: 6cqw; pointer-events: none; transform-origin: 30% 90%; animation: fg-sym-life var(--life, 2.6s) cubic-bezier(.2, .9, .3, 1.2) both; }\n.fg-symbol-art, .fg-symbol-art svg { display: block; width: 100%; height: 100%; }\n.fg-symbol-art { filter: drop-shadow(0 .3cqw .5cqw rgba(0, 0, 0, .45)); transform-origin: 50% 60%; }\n.fg-symbol[data-kind="heart"] .fg-symbol-art, .fg-symbol[data-kind="bloom"] .fg-symbol-art { animation: fg-sym-beat .7s ease-in-out .3s infinite; }\n.fg-symbol[data-kind="anger"] .fg-symbol-art { animation: fg-sym-throb .32s ease-in-out .2s infinite alternate; }\n.fg-symbol[data-kind="sweat"] .fg-symbol-art { animation: fg-sym-drip 1.4s ease-in .25s infinite; }\n.fg-symbol[data-kind="sparkle"] .fg-symbol-art { animation: fg-sym-twinkle 1.1s ease-in-out infinite; }\n.fg-symbol[data-kind="surprise"] .fg-symbol-art { animation: fg-sym-jolt .5s cubic-bezier(.3, 1.6, .5, 1) .05s 2; }\n.fg-symbol[data-kind="gloom"] { left: -3cqw; top: -4cqw; width: 8cqw; }\n.fg-symbol[data-kind="gloom"] .fg-symbol-art { animation: fg-sym-sink 2.4s ease-out both; }\n.fg-symbol[data-kind="note"] .fg-symbol-art { animation: fg-sym-sway 1.2s ease-in-out infinite; }\n.fg-symbol[data-kind="zzz"] .fg-symbol-art { animation: fg-sym-drift 2.2s ease-in-out infinite; }\n.fg-symbol[data-kind="bulb"] .fg-symbol-art { animation: fg-sym-flicker 1s steps(1) both; }\n.fg-symbol[data-kind="heartbreak"] .fg-symbol-art { animation: fg-sym-crack .9s cubic-bezier(.4, 0, .6, 1) .25s both; }\n.fg-symbol[data-kind="sigh"] .fg-symbol-art { animation: fg-sym-puff 2s ease-out both; }\n.fg-symbol[data-kind="dizzy"] .fg-symbol-art { animation: fg-sym-spin 1.4s linear infinite; transform-origin: 50% 50%; }\n.fg-symbol[data-kind="fire"] .fg-symbol-art { animation: fg-sym-flame .18s ease-in-out infinite alternate; transform-origin: 50% 95%; }\n.fg-symbol[data-kind="blush"] { left: -3.5cqw; top: 6cqw; width: 7cqw; height: 3.4cqw; }\n.fg-symbol[data-kind="blush"] .fg-symbol-art { animation: fg-sym-glow 1.6s ease-in-out infinite alternate; }\n.fg-symbol[data-kind="bloom"] .fg-symbol-art svg { animation: fg-sym-spin 6s linear infinite; }\n.fg-symbol[data-kind="silence"] .fg-symbol-art { animation: fg-sym-bob 1.2s ease-in-out infinite; }\n@keyframes fg-sym-life {\n  0% { opacity: 0; transform: scale(.2) rotate(-14deg); }\n  12% { opacity: 1; transform: scale(1.18) rotate(4deg); }\n  20% { transform: scale(.94) rotate(-2deg); }\n  28%, 82% { opacity: 1; transform: scale(1) rotate(0); }\n  100% { opacity: 0; transform: scale(.9) translateY(-1cqw); }\n}\n@keyframes fg-sym-beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.16); } 30% { transform: scale(.98); } 45% { transform: scale(1.1); } }\n@keyframes fg-sym-throb { from { transform: scale(.92) rotate(-3deg); } to { transform: scale(1.12) rotate(3deg); } }\n@keyframes fg-sym-drip { 0% { transform: translateY(0); opacity: 1; } 80% { transform: translateY(1.6cqw); opacity: 1; } 100% { transform: translateY(2cqw); opacity: 0; } }\n@keyframes fg-sym-twinkle { 0%, 100% { transform: scale(1) rotate(0); filter: brightness(1); } 50% { transform: scale(1.12) rotate(18deg); filter: brightness(1.35); } }\n@keyframes fg-sym-jolt { 0% { transform: translateY(0); } 30% { transform: translateY(-1.2cqw) scale(1.08); } 60% { transform: translateY(.3cqw); } 100% { transform: translateY(0); } }\n@keyframes fg-sym-sink { from { transform: translateY(-1.4cqw); opacity: 0; } to { transform: translateY(0); opacity: .95; } }\n@keyframes fg-sym-sway { 0%, 100% { transform: translate(0, 0) rotate(-8deg); } 50% { transform: translate(.8cqw, -.8cqw) rotate(8deg); } }\n@keyframes fg-sym-drift { 0% { transform: translate(0, .6cqw); opacity: .4; } 50% { opacity: 1; } 100% { transform: translate(1.2cqw, -1.6cqw); opacity: .4; } }\n@keyframes fg-sym-flicker { 0% { filter: brightness(.4); } 15% { filter: brightness(1.5); } 22% { filter: brightness(.6); } 30%, 100% { filter: brightness(1.15); } }\n@keyframes fg-sym-crack { 0%, 40% { transform: none; } 50% { transform: translateX(-.3cqw) rotate(-4deg); } 60% { transform: translateX(.3cqw) rotate(4deg); } 100% { transform: translateY(1.2cqw) rotate(-6deg); opacity: .7; } }\n@keyframes fg-sym-puff { from { transform: translateX(-1cqw) scale(.7); opacity: 0; } 40% { opacity: 1; } to { transform: translateX(1.6cqw) scale(1.1); opacity: .6; } }\n@keyframes fg-sym-spin { to { transform: rotate(360deg); } }\n@keyframes fg-sym-flame { from { transform: scale(1, .94) skewX(-2deg); } to { transform: scale(.96, 1.06) skewX(2deg); } }\n@keyframes fg-sym-glow { from { opacity: .55; } to { opacity: 1; } }\n@keyframes fg-sym-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-.6cqw); } }\n\n/* ── CG ── */\n.fg-cg { position: absolute; inset: 0; z-index: 6; background-size: cover; background-position: center; animation: fg-cg-in 1.2s cubic-bezier(.5, 0, .2, 1) both; }\n.fg-cg.is-leaving { animation: fg-cg-out .8s ease both; pointer-events: none; }\n@keyframes fg-cg-out { from { opacity: 1; } to { opacity: 0; filter: brightness(1.15); } }\n.fg-cg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, .45)); }\n.fg-cg-img { position: absolute; inset: -2%; background-size: cover; background-position: center; animation: fg-kenburns 30s ease-in-out infinite alternate; }\n/* 竖版插画：模糊的同图垫底，前景铺满宽度，顶 → 底 → 拉远看全貌，再倒放回来。 */\n.fg-cg.is-tall { background: #000; }\n.fg-cg-back { position: absolute; inset: -6%; background-size: cover; background-position: center; filter: blur(2.4cqw) brightness(.5) saturate(1.15); }\n.fg-cg-pan { position: absolute; left: 0; top: 0; width: 100%; height: auto; transform-origin: 50% 0; box-shadow: 0 0 5cqw rgba(0, 0, 0, .65); animation: fg-cg-pan var(--pan, 26s) ease-in-out infinite alternate; will-change: transform; user-select: none; }\n@keyframes fg-cg-pan {\n  0%, 10% { transform: translateY(0) scale(1); }\n  55%, 64% { transform: translateY(calc((var(--r) - 1) * 100%)) scale(1); }\n  90%, 100% { transform: translateY(0) scale(var(--r)); }\n}\n.fg-cg-caption { position: absolute; right: 4%; top: 12%; flex-direction: row-reverse; z-index: 2; display: flex; align-items: center; gap: 1cqw; font-family: var(--font-latin); letter-spacing: .3em; font-size: 1.1cqw; color: rgba(255, 255, 255, .85); text-shadow: 0 2px 8px rgba(0, 0, 0, .6); animation: fg-slide-in 1.2s .4s ease both; }\n.fg-cg-caption b { font-family: var(--font-display); font-size: 1.9cqw; letter-spacing: .18em; font-weight: 700; }\n.fg-cg-caption i { width: 4cqw; height: 1px; background: linear-gradient(270deg, var(--accent), transparent); }\n@keyframes fg-cg-in { 0% { opacity: 0; clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); filter: brightness(2.2); } 55% { opacity: 1; } 100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); filter: none; } }\n.fg-cg-wait { position: absolute; right: 2.4%; top: 12%; z-index: 20; display: flex; align-items: center; gap: .6cqw; font-size: 1cqw; padding: .5cqw 1cqw; border-radius: 99px; background: var(--chip-bg); backdrop-filter: blur(8px); color: var(--ink-dim); }\n.fg-cg-wait i { width: .7cqw; height: .7cqw; border-radius: 50%; background: var(--accent); animation: fg-pulse 1.2s ease-in-out infinite; }\n\n/* ── 镜头 ── */\n.fg-camera[data-cam="shake"] { animation: fg-shake .5s linear; }\n.fg-camera[data-cam="zoom"] { animation: fg-zoom 1.6s cubic-bezier(.2, .7, .2, 1) both; }\n.fg-camera[data-cam="zoomout"] { animation: fg-zoomout 1.6s cubic-bezier(.2, .7, .2, 1) both; }\n.fg-camera[data-cam="pan"] { animation: fg-pan 3s ease-in-out both; }\n.fg-camera[data-cam="tilt"] { animation: fg-tilt 1.2s ease both; }\n.fg-camera[data-cam="blur"] { animation: fg-blur 2.2s ease both; }\n@keyframes fg-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-1.2%, .6%); } 30% { transform: translate(1%, -.8%); } 45% { transform: translate(-.8%, .4%); } 60% { transform: translate(.6%, .6%); } 80% { transform: translate(-.3%, -.2%); } }\n@keyframes fg-zoom { from { transform: scale(1); } to { transform: scale(1.12); } }\n@keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }\n@keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }\n@keyframes fg-tilt { 0% { transform: rotate(0); } 40% { transform: rotate(-2.4deg) scale(1.05); } 100% { transform: rotate(-1.4deg) scale(1.04); } }\n@keyframes fg-blur { 0% { filter: blur(0); } 30% { filter: blur(6px); } 100% { filter: blur(0); } }\n.fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }\n.fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }\n.fg-flash.is-black { background: #000; animation: fg-black 1.6s ease both; }\n@keyframes fg-flash { from { opacity: .95; } to { opacity: 0; } }\n/* 落字特效的闪光层：平时透明，由演出计划在某个字上点亮（Stage.jsx 的 useHits） */\n.fg-hitflash { position: absolute; inset: 0; z-index: 41; pointer-events: none; opacity: 0; background: #fff; }\n.fg-hitflash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .25), rgba(160, 0, 20, .8)); }\n@keyframes fg-black { 0% { opacity: 0; } 35%, 60% { opacity: 1; } 100% { opacity: 0; } }\n\n/* ── 地点标题卡 ── */\n.fg-titlecard { position: absolute; left: 6%; top: 34%; z-index: 25; pointer-events: none; animation: fg-titlecard 3.2s ease both; }\n.fg-titlecard-line { width: 26cqw; height: 1px; background: linear-gradient(90deg, var(--accent), var(--accent2), transparent); transform-origin: left; animation: fg-line 1s .1s cubic-bezier(.6, 0, .2, 1) both; }\n.fg-titlecard-name { font-family: var(--font-display); font-size: 4.6cqw; font-weight: 700; letter-spacing: .32em; margin: .8cqw 0 .4cqw; text-shadow: 0 0 2cqw rgba(0, 0, 0, .8), 0 0 4cqw var(--accent2); }\n.fg-titlecard-sub { font-family: var(--font-latin); font-size: 1.3cqw; letter-spacing: .5em; color: rgba(255, 255, 255, .75); text-transform: uppercase; }\n@keyframes fg-titlecard { 0% { opacity: 0; transform: translateX(-2%); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(1%); } }\n@keyframes fg-line { from { transform: scaleX(0); } }\n\n/* ── HUD ── */\n.fg-hud { position: absolute; left: 2.2%; top: 3.2%; z-index: 20; display: flex; align-items: stretch; gap: .9cqw; transition: opacity .3s; }\n.fg-hud-bar { width: .28cqw; border-radius: 9px; background: linear-gradient(180deg, var(--accent), var(--accent2)); box-shadow: 0 0 1cqw var(--accent); }\n.fg-hud-place { font-family: var(--font-display); font-size: 1.55cqw; font-weight: 700; letter-spacing: .14em; text-shadow: 0 1px 6px rgba(0, 0, 0, .7); }\n.fg-hud-meta { margin-top: .25cqw; font-size: .95cqw; letter-spacing: .14em; color: var(--ink-dim); text-shadow: 0 1px 4px rgba(0, 0, 0, .7); display: flex; gap: .8cqw; }\n.fg-topright { position: absolute; right: 2%; top: 3%; z-index: 22; display: flex; gap: .6cqw; align-items: center; }\n.fg-pill { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1cqw; border-radius: 99px; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: .95cqw; letter-spacing: .08em; color: var(--ink); }\n.fg-pill.is-busy::before { content: ""; width: .7cqw; height: .7cqw; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: fg-spin .8s linear infinite; }\n.fg-iconbtn { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; display: grid; place-items: center; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: 1.2cqw; transition: transform .2s, background .2s; }\n.fg-iconbtn:hover { transform: rotate(90deg); background: rgba(255, 255, 255, .14); }\n\n/* ── 对话框 ── */\n.fg-dialog { position: absolute; left: 4%; right: 4%; bottom: 3.6%; height: 27%; z-index: 20; transition: opacity .3s, transform .3s; }\n.fg-ui-hidden .fg-dialog, .fg-ui-hidden .fg-hud, .fg-ui-hidden .fg-topright, .fg-ui-hidden .fg-quick { opacity: 0; pointer-events: none; }\n.fg-box { position: absolute; inset: 0; border-radius: var(--box-radius); background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); -webkit-backdrop-filter: var(--box-blur); box-shadow: 0 1.4cqw 4cqw rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .08); overflow: hidden; }\n.fg-box::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), var(--accent3), transparent); background-size: 200% 100%; animation: fg-shimmer 6s linear infinite; opacity: .9; }\n.fg-box::after { content: ""; position: absolute; right: -6cqw; bottom: -10cqw; width: 26cqw; height: 26cqw; border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--speaker, var(--accent)) 28%, transparent), transparent 65%); pointer-events: none; transition: background .6s; }\n@keyframes fg-shimmer { from { background-position: 200% 0; } to { background-position: 0 0; } }\n.fg-name { position: absolute; left: 3.2%; top: -2.3cqw; z-index: 2; display: flex; align-items: flex-end; gap: .8cqw; animation: fg-name-in .35s cubic-bezier(.2, .8, .2, 1) both; }\n.fg-name-plate { position: relative; padding: .5cqw 2.4cqw .55cqw 1.6cqw; font-family: var(--font-display); font-weight: 700; font-size: 1.75cqw; letter-spacing: .2em; color: var(--name-ink);\n  background: linear-gradient(100deg, var(--speaker, var(--accent)), color-mix(in oklab, var(--speaker, var(--accent)) 55%, var(--accent2)));\n  clip-path: polygon(0 0, 100% 0, calc(100% - 1.2cqw) 100%, 0 100%); box-shadow: 0 .4cqw 1.6cqw rgba(0, 0, 0, .35); text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }\n.fg-name-plate::after { content: ""; position: absolute; left: 1.6cqw; right: 2.4cqw; bottom: .3cqw; height: 1px; background: rgba(255, 255, 255, .55); }\n.fg-name-sub { font-family: var(--font-latin); font-size: 1cqw; letter-spacing: .32em; color: var(--ink-dim); padding-bottom: .4cqw; text-transform: uppercase; }\n@keyframes fg-name-in { from { opacity: 0; transform: translateX(-1.2cqw); } }\n.fg-text { position: absolute; left: 4.2%; right: 5%; top: 23%; bottom: 20%; font-size: 1.95cqw; line-height: 1.78; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0, 0, 0, .45); overflow: hidden; }\n.fg-text.is-narration { color: color-mix(in oklab, var(--ink) 92%, var(--accent3)); }\n.fg-text.is-thought { font-style: italic; color: color-mix(in oklab, var(--ink) 70%, var(--accent2)); }\n.fg-text.is-cardhint { color: var(--ink-dim); font-size: 1.3cqw; letter-spacing: .4em; text-align: center; }\n.fg-text.is-thought::before { content: "（"; } .fg-text.is-thought::after { content: "）"; }\n.fg-char { opacity: 0; animation: fg-char-in .22s ease forwards; animation-delay: var(--d); display: inline; }\n.fg-text.is-done .fg-char { animation: none; opacity: 1; }\n.fg-text.is-wait .fg-char { animation: none; }\n@keyframes fg-char-in { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: none; } }\n/* ── 台词演法与重音（lib/typing.js）：字的样子。要做位移、缩放的字改成 inline-block，空格照样占位 ── */\n.fg-text[class*="say-"] .fg-char, .fg-char.is-stress { display: inline-block; white-space: pre; }\n.fg-text.say-menace .fg-char { animation-name: fg-char-stamp; animation-duration: .2s; }\n.fg-text.say-excited .fg-char { animation-name: fg-char-hop; animation-duration: .14s; }\n.fg-text.say-shout .fg-char { animation-name: fg-char-pop; animation-duration: .28s; font-size: 1.16em; font-weight: 700; }\n.fg-text.say-hesitant .fg-char { animation-duration: .32s; }\n.fg-text.say-whisper { opacity: .8; }\n.fg-text.say-whisper .fg-char { font-size: .9em; animation-duration: .45s; }\n.fg-text.say-breakdown .fg-char { color: color-mix(in oklab, var(--ink) 72%, #ff3b5c); animation: fg-char-in .12s ease forwards var(--d), fg-char-quake .2s linear infinite var(--d); }\n.fg-char.is-stress { color: var(--stress, #ff4d5e); font-weight: 700; font-size: 1.1em; text-shadow: 0 0 .6cqw rgba(255, 60, 80, .45); animation-name: fg-char-stamp; animation-duration: .24s; }\n/* 点一下打完 / 等字体时：和普通台词一样立刻全显示、或先不动（要比上面的演法规则更具体才压得住） */\n.fg-text.is-done[class*="say-"] .fg-char, .fg-text.is-done .fg-char.is-stress { animation: none; opacity: 1; }\n.fg-text.is-wait[class*="say-"] .fg-char, .fg-text.is-wait .fg-char.is-stress { animation: none; }\n.fg-text.is-done.say-breakdown .fg-char { animation: fg-char-quake .2s linear infinite; opacity: 1; }\n@keyframes fg-char-stamp { from { opacity: 0; transform: translateY(-.35em) scale(1.4); } 60% { opacity: 1; transform: translateY(0) scale(.95); } to { opacity: 1; transform: none; } }\n@keyframes fg-char-pop { from { opacity: 0; transform: scale(1.9); } 55% { opacity: 1; transform: scale(.92); } to { opacity: 1; transform: none; } }\n@keyframes fg-char-hop { from { opacity: 0; transform: translateY(.3em); } to { opacity: 1; transform: none; } }\n@keyframes fg-char-quake { 0%, 100% { opacity: 1; transform: translate(0, 0); } 25% { opacity: 1; transform: translate(.05em, -.04em); } 50% { opacity: 1; transform: translate(-.04em, .05em); } 75% { opacity: 1; transform: translate(.04em, .03em); } }\n.fg-wait { position: absolute; right: 2.6%; bottom: 20%; font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }\n.fg-wait::before { content: var(--wait-glyph); }\n@keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }\n.fg-quick { position: absolute; right: 2.4%; bottom: 7%; display: flex; gap: 1.5cqw; font-family: var(--font-latin); font-size: .98cqw; font-weight: 600; letter-spacing: .2em; z-index: 3; }\n.fg-quick button { color: var(--ink-dim); transition: color .2s, text-shadow .2s; position: relative; }\n.fg-quick button:hover, .fg-quick button.is-on { color: var(--ink); text-shadow: 0 0 .8cqw var(--accent); }\n.fg-quick button.is-on::after { content: ""; position: absolute; left: 0; right: .2em; bottom: -.3cqw; height: 1px; background: var(--accent); }\n.fg-progress { position: absolute; left: 4.2%; right: 30%; bottom: 8.6%; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; }\n.fg-progress i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); box-shadow: 0 0 6px var(--accent); transition: width .4s ease; }\n.fg-status { position: absolute; left: 4.2%; bottom: 7%; font-size: .9cqw; letter-spacing: .1em; color: var(--ink-dim); display: flex; align-items: center; gap: .5cqw; }\n.fg-status::before { content: ""; width: .6cqw; height: .6cqw; border-radius: 50%; background: var(--accent3); box-shadow: 0 0 .6cqw var(--accent3); animation: fg-pulse 1.4s ease-in-out infinite; }\n\n/* ── 情境卡片（短信、信件……） ── */\n.fg-card { position: absolute; left: 50%; top: 42%; z-index: 21; width: 40cqw; transform: translate(-50%, -50%); animation: fg-card-in .7s cubic-bezier(.2, .8, .2, 1) both; font-size: 1.6cqw; line-height: 1.7; }\n@keyframes fg-card-in { from { opacity: 0; transform: translate(-50%, -42%) rotateX(35deg) scale(.9); } }\n.fg-card[data-card="sms"] { padding: 1.6cqw; border-radius: 2cqw; background: rgba(250, 250, 255, .94); color: #1b1d2a; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .5); }\n.fg-card[data-card="sms"] .fg-card-head { font-size: 1cqw; color: #6b7280; text-align: center; margin-bottom: 1cqw; letter-spacing: .1em; }\n.fg-card[data-card="sms"] .fg-card-body { display: inline-block; max-width: 90%; padding: 1cqw 1.4cqw; border-radius: 1.6cqw 1.6cqw 1.6cqw .4cqw; background: #e8ebf4; }\n.fg-card[data-card="letter"], .fg-card[data-card="diary"] { padding: 3cqw 3.4cqw; background: repeating-linear-gradient(180deg, #fbf5e6 0 2.6cqw, #e9dcc0 2.6cqw calc(2.6cqw + 1px)), #fbf5e6; color: #4a3626; font-family: var(--font-display); box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); transform-origin: 50% 0; transform: translate(-50%, -50%) rotate(-1.2deg); }\n.fg-card[data-card="note"] { width: 28cqw; padding: 2.4cqw; background: #fff59d; color: #3b3200; font-family: var(--font-display); box-shadow: 0 1.4cqw 3cqw rgba(0, 0, 0, .45); transform: translate(-50%, -50%) rotate(2deg); }\n.fg-card[data-card="note"]::before { content: ""; position: absolute; left: 38%; top: -1cqw; width: 8cqw; height: 2cqw; background: rgba(255, 255, 255, .55); transform: rotate(-3deg); }\n.fg-card[data-card="news"] { padding: 2.4cqw; background: #f3f0e8; color: #111; font-family: var(--font-display); border-top: .6cqw double #111; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); }\n.fg-card[data-card="news"] .fg-card-head { font-size: 2.6cqw; font-weight: 900; letter-spacing: .3em; border-bottom: 1px solid #111; margin-bottom: 1cqw; }\n.fg-card[data-card="terminal"] { padding: 2cqw; border-radius: .8cqw; background: rgba(4, 16, 8, .92); color: #67ff9a; font-family: "JetBrains Mono", "Cascadia Code", monospace; box-shadow: 0 0 3cqw rgba(60, 255, 140, .25), inset 0 0 2cqw rgba(60, 255, 140, .08); text-shadow: 0 0 .6cqw rgba(60, 255, 140, .7); }\n.fg-card[data-card="terminal"] .fg-card-body::after { content: "▌"; animation: fg-pulse 1s steps(2) infinite; }\n.fg-card[data-card="notice"], .fg-card[data-card="scroll"] { padding: 3cqw; background: linear-gradient(90deg, #c9a46a, #f1dcae 8%, #f6e7c4 50%, #f1dcae 92%, #c9a46a); color: #3a2410; font-family: var(--font-display); text-align: center; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); }\n.fg-card[data-card="notice"]::after { content: "印"; position: absolute; right: 2cqw; bottom: 1.4cqw; width: 4cqw; height: 4cqw; border: .25cqw solid #b3261e; color: #b3261e; display: grid; place-items: center; font-size: 2cqw; transform: rotate(-12deg); animation: fg-stamp .4s .5s cubic-bezier(.3, 1.6, .5, 1) both; }\n@keyframes fg-stamp { from { opacity: 0; transform: scale(2.2) rotate(-12deg); } }\n\n/* ── 选项 ── */\n.fg-choices { position: absolute; inset: 0; z-index: 26; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.3cqw; background: radial-gradient(70% 60% at 50% 45%, rgba(0, 0, 0, .25), rgba(0, 0, 0, .6)); animation: fg-fade-in .4s ease both; }\n.fg-choices-title { font-family: var(--font-latin); letter-spacing: .6em; font-size: 1.05cqw; color: var(--ink-dim); margin-bottom: .6cqw; }\n.fg-choice { position: relative; width: 46cqw; padding: 1.25cqw 2.4cqw 1.25cqw 6cqw; text-align: left; font-size: 1.7cqw; letter-spacing: .08em; border-radius: 99px; background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .35); transition: transform .25s cubic-bezier(.2, .8, .2, 1), border-color .25s, box-shadow .25s; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); overflow: hidden; }\n.fg-choice::before { content: attr(data-n); position: absolute; left: 2.2cqw; top: 50%; transform: translateY(-50%); font-family: var(--font-latin); font-size: 1.5cqw; font-weight: 700; color: var(--accent); letter-spacing: .1em; }\n.fg-choice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .16) 50%, transparent 70%); transform: translateX(-100%); transition: transform .6s ease; }\n.fg-choice:hover { transform: translateX(1.2cqw) scale(1.02); border-color: var(--accent); box-shadow: 0 0 2.4cqw color-mix(in oklab, var(--accent) 45%, transparent); }\n.fg-choice:hover::after { transform: translateX(100%); }\n@keyframes fg-choice-in { from { opacity: 0; transform: translateY(1.4cqw); } }\n.fg-free { display: flex; gap: .8cqw; width: 46cqw; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); }\n.fg-free input { flex: 1; min-width: 0; padding: 1cqw 1.8cqw; font: inherit; font-size: 1.45cqw; color: var(--ink); border-radius: 99px; border: 1px dashed var(--box-border); background: rgba(0, 0, 0, .35); outline: none; user-select: text; }\n.fg-free input:focus { border-color: var(--accent); border-style: solid; }\n.fg-free button { padding: 0 2cqw; border-radius: 99px; background: linear-gradient(100deg, var(--accent), var(--accent2)); font-size: 1.4cqw; font-weight: 700; letter-spacing: .2em; color: #fff; }\n\n/* ── 标题画面 ── */\n.fg-title { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; justify-content: center; padding-left: 8%; background: linear-gradient(90deg, rgba(4, 4, 14, .86) 0%, rgba(4, 4, 14, .55) 42%, transparent 75%); animation: fg-fade-in 1s ease both; }\n.fg-title-kicker { font-family: var(--font-latin); font-size: 1.1cqw; letter-spacing: .7em; color: var(--accent3); text-transform: uppercase; animation: fg-slide-in 1s .2s ease both; }\n.fg-title-logo { font-family: var(--font-display); font-weight: 900; font-size: 6cqw; line-height: 1.15; letter-spacing: .12em; margin: 1cqw 0 .6cqw; background: linear-gradient(100deg, #fff 10%, var(--accent) 45%, var(--accent2) 70%, var(--accent3)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 2.4cqw color-mix(in oklab, var(--accent2) 60%, transparent)); animation: fg-logo-in 1.4s .3s cubic-bezier(.2, .8, .2, 1) both; max-width: 60cqw; }\n.fg-title-sub { font-size: 1.2cqw; letter-spacing: .3em; color: var(--ink-dim); margin-bottom: 3.4cqw; animation: fg-slide-in 1s .6s ease both; }\n.fg-title-menu { display: flex; flex-direction: column; gap: .4cqw; align-items: flex-start; }\n.fg-title-menu button { font-family: var(--font-display); font-size: 1.75cqw; letter-spacing: .3em; padding: .45cqw 0; color: var(--ink-dim); position: relative; transition: color .2s, letter-spacing .3s, padding .3s; animation: fg-slide-in .8s ease both; animation-delay: calc(var(--i) * 80ms + 800ms); }\n.fg-title-menu button span { font-family: var(--font-latin); font-size: .9cqw; letter-spacing: .4em; margin-left: 1.2cqw; opacity: .55; }\n.fg-title-menu button.is-new { color: var(--ink); }\n.fg-title-menu button.is-new::after { content: "NEW"; position: absolute; top: .2cqw; right: -3.4cqw; padding: .1cqw .5cqw; border-radius: 99px; font-family: var(--font-latin); font-size: .7cqw; letter-spacing: .12em; color: #fff; background: linear-gradient(100deg, var(--accent), var(--accent2)); animation: fg-pulse 1.6s ease-in-out infinite; }\n.fg-title-menu button:hover { color: #fff; letter-spacing: .42em; padding-left: 1.6cqw; }\n.fg-title-menu button:hover::before { content: ""; position: absolute; left: 0; top: 50%; width: .9cqw; height: .9cqw; transform: translateY(-50%) rotate(45deg); background: var(--accent); box-shadow: 0 0 1cqw var(--accent); }\n.fg-title-foot { position: absolute; left: 8%; bottom: 5%; font-size: .85cqw; letter-spacing: .2em; color: rgba(255, 255, 255, .35); }\n@keyframes fg-logo-in { from { opacity: 0; letter-spacing: .5em; filter: blur(10px); } }\n@keyframes fg-slide-in { from { opacity: 0; transform: translateX(-1.6cqw); } }\n\n/* ── 面板（回想 / 鉴赏 / 人物志 / 设置） ── */\n.fg-panel { position: absolute; inset: 0; z-index: 60; display: flex; flex-direction: column; background: linear-gradient(135deg, rgba(8, 6, 22, .94), rgba(16, 10, 34, .92)); backdrop-filter: blur(16px); animation: fg-panel-in .35s cubic-bezier(.2, .8, .2, 1) both; user-select: text; }\n@keyframes fg-panel-in { from { opacity: 0; transform: scale(1.02); } }\n.fg-panel-head { display: flex; align-items: center; gap: 1.4cqw; padding: 2.2cqw 3cqw 1.2cqw; }\n.fg-panel-title { font-family: var(--font-display); font-size: 2.4cqw; font-weight: 700; letter-spacing: .24em; }\n.fg-panel-en { font-family: var(--font-latin); font-size: 1cqw; letter-spacing: .5em; color: var(--accent); text-transform: uppercase; }\n.fg-panel-head .fg-spacer { flex: 1; }\n.fg-panel-body { position: relative; flex: 1; overflow: auto; padding: 0 3cqw 2.4cqw; scrollbar-width: thin; scrollbar-color: var(--accent2) transparent; }\n.fg-tabs { display: flex; gap: .4cqw; padding: 0 3cqw 1cqw; flex-wrap: wrap; }\n.fg-tab { padding: .55cqw 1.4cqw; border-radius: 99px; font-size: 1.05cqw; letter-spacing: .12em; color: var(--ink-dim); border: 1px solid transparent; }\n.fg-tab.is-on { color: #fff; border-color: var(--box-border); background: linear-gradient(100deg, color-mix(in oklab, var(--accent) 35%, transparent), color-mix(in oklab, var(--accent2) 35%, transparent)); }\n\n.fg-log-item { display: grid; grid-template-columns: 9cqw 1fr; gap: 1.4cqw; padding: 1cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .06); cursor: pointer; font-size: 1.35cqw; line-height: 1.7; }\n.fg-log-item:hover { background: linear-gradient(90deg, rgba(255, 255, 255, .04), transparent); }\n.fg-log-name { font-family: var(--font-display); font-weight: 700; text-align: right; letter-spacing: .1em; }\n.fg-log-turn { grid-column: 1 / -1; font-family: var(--font-latin); font-size: .95cqw; letter-spacing: .5em; color: var(--accent); padding-top: 1.4cqw; }\n\n/* 导演日志：左边历次记录，右边详情（实时输出 / 整理结果 / 原始输出 / 提示词）。两栏各自滚动。 */\n.fg-dlog { display: grid; grid-template-columns: 22cqw minmax(0, 1fr); gap: 2cqw; height: 100%; }\n.fg-dlog-side, .fg-dlog-detail { min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--accent2) transparent; }\n.fg-dlog-side { display: flex; flex-direction: column; gap: .6cqw; padding-right: .4cqw; }\n.fg-dlog-detail { padding-right: .6cqw; }\n.fg-dlog-row { display: block; width: 100%; flex: none; text-align: left; padding: 1cqw 1.2cqw; border-radius: .8cqw; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .03); transition: background .2s, border-color .2s; }\n.fg-dlog-row:hover { background: rgba(255, 255, 255, .07); }\n.fg-dlog-row.is-on { border-color: var(--accent); background: linear-gradient(100deg, color-mix(in oklab, var(--accent) 18%, transparent), color-mix(in oklab, var(--accent2) 8%, transparent)); }\n.fg-dlog-row-head { display: flex; align-items: center; justify-content: space-between; gap: .6cqw; font-size: 1.15cqw; letter-spacing: .08em; }\n.fg-dlog-row-meta { margin-top: .3cqw; font-size: .85cqw; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.fg-dlog-row-sum { margin-top: .4cqw; font-size: .95cqw; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }\n.fg-dlog-status { padding: .1cqw .7cqw; border-radius: 99px; border: 1px solid currentColor; font-size: .8cqw; letter-spacing: .1em; white-space: nowrap; }\n.fg-dlog-status.is-running { color: var(--accent); animation: fg-pulse 1.4s ease-in-out infinite; }\n.fg-dlog-status.is-ok { color: #6ef0a8; }\n.fg-dlog-status.is-failed { color: #ff8a8a; }\n.fg-dlog-status.is-cancelled { color: var(--ink-dim); }\n.fg-dlog-head { padding: 1.2cqw 1.4cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }\n.fg-dlog-title { display: flex; align-items: center; gap: 1cqw; margin-bottom: .8cqw; font-family: var(--font-display); font-size: 1.7cqw; letter-spacing: .16em; }\n.fg-dlog-title .fg-spacer, .fg-dlog-label .fg-spacer { flex: 1; }\n.fg-dlog-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(30cqw, 1fr)); gap: .3cqw 2cqw; font-size: 1cqw; line-height: 1.6; }\n.fg-dlog-facts i { margin-right: .8cqw; font-style: normal; color: var(--ink-dim); letter-spacing: .08em; }\n.fg-dlog-notice { margin-top: .6cqw; font-size: .95cqw; color: #ffd27a; }\n.fg-dlog-error { margin: .6cqw 0; font-size: 1cqw; white-space: pre-wrap; word-break: break-word; }\n.fg-dlog-tabs { padding: 1.2cqw 0 .4cqw; }\n.fg-dlog-block { margin: 1cqw 0; }\n.fg-dlog-label { display: flex; align-items: center; gap: .8cqw; margin-bottom: .5cqw; font-size: .95cqw; letter-spacing: .12em; color: var(--accent); }\n.fg-btn.is-mini { padding: .2cqw .9cqw; font-size: .85cqw; white-space: nowrap; }\n.fg-dlog-pre { margin: 0; max-height: 34cqw; overflow: auto; padding: 1cqw 1.2cqw; border-radius: .8cqw; background: rgba(0, 0, 0, .42); border: 1px solid var(--box-border); font-family: "JetBrains Mono", Consolas, monospace; font-size: .95cqw; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: var(--ink); scrollbar-width: thin; }\n.fg-dlog-pre.has-cursor::after { content: "▍"; color: var(--accent); animation: fg-pulse 1s steps(2) infinite; }\n.fg-dlog-meter { display: flex; align-items: center; gap: .8cqw; margin: .4cqw 0; font-size: 1cqw; color: var(--ink-dim); }\n.fg-dlog-dot { width: .8cqw; height: .8cqw; border-radius: 50%; background: var(--accent); box-shadow: 0 0 1cqw var(--accent); animation: fg-pulse 1s ease-in-out infinite; }\n.fg-dlog-think summary { margin: .4cqw 0; cursor: pointer; font-size: .95cqw; color: var(--ink-dim); }\n.fg-dlog-chips { display: flex; flex-wrap: wrap; gap: .5cqw; }\n.fg-dlog-chip { display: inline-flex; align-items: center; gap: .5cqw; padding: .2cqw .8cqw; border-radius: 99px; font-size: .9cqw; background: rgba(255, 255, 255, .06); border: 1px solid var(--box-border); }\n.fg-dlog-chip i { font-style: normal; font-size: .8cqw; color: var(--ink-dim); }\n.fg-dlog-lines { border-radius: .8cqw; border: 1px solid var(--box-border); overflow: hidden; }\n.fg-dlog-line { display: grid; grid-template-columns: 4cqw minmax(0, 1fr) minmax(0, 24cqw); gap: 1.2cqw; align-items: start; padding: .7cqw 1cqw; border-bottom: 1px solid rgba(255, 255, 255, .06); font-size: 1cqw; line-height: 1.6; }\n.fg-dlog-line:last-child { border-bottom: 0; }\n.fg-dlog-line.is-plain { opacity: .6; }\n.fg-dlog-uid { padding-top: .15cqw; font-family: var(--font-latin); font-size: .85cqw; letter-spacing: .1em; color: var(--accent); }\n.fg-dlog-card { margin-bottom: .6cqw; padding: .8cqw 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); font-size: 1cqw; line-height: 1.6; }\n.fg-dlog-mono { margin-top: .4cqw; font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; word-break: break-word; }\n.fg-dlog-k { display: inline-block; margin-right: .6cqw; padding: 0 .5cqw; border-radius: .3cqw; font-style: normal; font-family: var(--font-body); font-size: .8cqw; letter-spacing: .08em; color: var(--ink-dim); border: 1px solid var(--box-border); }\n.fg-dlog-cgchar { margin-top: .4cqw; padding-left: .8cqw; border-left: 2px solid var(--box-border); }\n.fg-dlog-list-plain { margin: 0; padding-left: 2cqw; font-size: 1.05cqw; line-height: 1.8; }\n.fg-pill.is-link { cursor: pointer; transition: border-color .2s; }\n.fg-pill.is-link:hover { border-color: var(--accent); }\n\n.fg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20cqw, 1fr)); gap: 1.4cqw; }\n.fg-thumb { position: relative; aspect-ratio: 16 / 10; border-radius: 1cqw; overflow: hidden; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); cursor: zoom-in; transition: transform .25s, box-shadow .25s; }\n.fg-thumb:hover { transform: translateY(-.4cqw); box-shadow: 0 1cqw 3cqw rgba(0, 0, 0, .5), 0 0 0 1px var(--accent); }\n.fg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }\n.fg-thumb-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 2cqw 1cqw .7cqw; font-size: 1cqw; letter-spacing: .1em; background: linear-gradient(transparent, rgba(0, 0, 0, .75)); }\n.fg-thumb.is-locked { cursor: default; display: grid; place-items: center; color: var(--ink-dim); font-size: 1cqw; background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .03) 0 1cqw, transparent 1cqw 2cqw); }\n\n.fg-person { display: grid; grid-template-columns: 13cqw 1fr; gap: 2cqw; padding: 1.6cqw; margin-bottom: 1.4cqw; border-radius: 1.2cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }\n.fg-track { display: grid; grid-template-columns: 4.2cqw 1fr; gap: 1.4cqw; padding: 1.2cqw 1.4cqw; margin-bottom: 1cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }\n.fg-track-body { display: grid; gap: .6cqw; min-width: 0; }\n.fg-track-play { width: 4.2cqw; height: 4.2cqw; border-radius: 50%; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink); font-size: 1.3cqw; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s; }\n.fg-track-play:hover { border-color: var(--accent); }\n.fg-track-play.is-on { background: var(--accent); border-color: var(--accent); color: #111; box-shadow: 0 0 1.4cqw color-mix(in oklab, var(--accent) 55%, transparent); }\n.fg-track-desc { min-height: 4.6cqw; font-family: var(--font-body); font-size: 1.05cqw; }\n.fg-person-art { position: relative; height: 19cqw; border-radius: .8cqw; overflow: hidden; background: radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--c) 40%, transparent), rgba(0, 0, 0, .3)); }\n.fg-person-art img { width: 100%; height: 100%; object-fit: cover; object-position: top; }\n.fg-person-art .fg-silhouette { height: 100%; }\n.fg-person h3 { margin: 0 0 .6cqw; font-family: var(--font-display); font-size: 2cqw; letter-spacing: .2em; display: flex; align-items: center; gap: 1cqw; }\n.fg-person h3 small { font-family: var(--font-body); font-size: .9cqw; letter-spacing: .1em; padding: .2cqw .7cqw; border-radius: 99px; border: 1px solid var(--box-border); color: var(--ink-dim); }\n.fg-emos { display: flex; flex-wrap: wrap; gap: .5cqw; margin: .8cqw 0; }\n.fg-emo { position: relative; width: 5.4cqw; height: 6.6cqw; border-radius: .6cqw; overflow: hidden; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); font-size: .78cqw; color: var(--ink-dim); cursor: pointer; transition: border-color .2s, transform .2s; }\n.fg-emo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }\n.fg-emo span { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.4cqw .2cqw .3cqw; line-height: 1.2; text-align: center; text-shadow: 0 1px 3px #000; background: linear-gradient(transparent, rgba(0, 0, 0, .78) 70%); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }\n.fg-emo.is-busy::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .25), transparent 80%); background-size: 200% 100%; animation: fg-skeleton 1.2s linear infinite; }\n.fg-emo:hover { border-color: var(--accent); transform: translateY(-.2cqw); }\n.fg-emo.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 1.2cqw color-mix(in oklab, var(--accent) 45%, transparent); }\n.fg-emo.is-custom { border-style: dashed; }\n.fg-emo.is-custom span { color: var(--ink); }\n.fg-person-main { min-width: 0; }\n.fg-person-tags { font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; color: var(--ink-dim); line-height: 1.5; margin-bottom: .6cqw; word-break: break-word; }\n.fg-person-folds .fg-btn.is-on, .fg-btn.is-on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 22%, transparent); }\n.fg-person-form { margin: .8cqw 0; padding: 1cqw 1.2cqw; border-radius: .9cqw; background: rgba(0, 0, 0, .22); border: 1px solid var(--box-border); }\n.fg-person-form .fg-field { grid-template-columns: 9cqw 1fr; }\n.fg-textarea.is-short { min-height: 4cqw; }\n.fg-cg-chars { display: grid; gap: .9cqw; margin: .9cqw 0 .9cqw 15.2cqw; }\n.fg-cg-char { display: grid; gap: .6cqw; padding: 1cqw; border-radius: .9cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .18); }\n.fg-sent { user-select: text; margin-top: .4cqw; display: grid; gap: .3cqw; word-break: break-word; }\n.fg-wardrobe { display: grid; gap: .5cqw; margin-bottom: .6cqw; }\n.fg-outfit { display: grid; grid-template-columns: 8cqw 1fr auto auto; gap: .7cqw; align-items: center; padding: .4cqw .6cqw; border-radius: .7cqw; border: 1px solid transparent; }\n.fg-outfit b { font-size: 1.1cqw; letter-spacing: .1em; }\n.fg-outfit.is-on { border-color: color-mix(in oklab, var(--accent) 60%, transparent); background: color-mix(in oklab, var(--accent) 10%, transparent); }\n.fg-outfit.is-new { grid-template-columns: 8cqw 1fr auto; }\n.fg-state { display: inline-flex; align-items: center; gap: .4cqw; padding: .3cqw .5cqw .3cqw .9cqw; border-radius: 99px; font-size: 1cqw; background: color-mix(in oklab, var(--accent2) 22%, transparent); border: 1px solid color-mix(in oklab, var(--accent2) 55%, transparent); }\n.fg-state button { width: 1.5cqw; height: 1.5cqw; border-radius: 50%; font-size: .8cqw; color: var(--ink-dim); }\n.fg-state button:hover { color: #fff; background: rgba(255, 255, 255, .15); }\n.fg-looks { display: flex; flex-wrap: wrap; align-items: center; gap: .5cqw; margin-top: 1cqw; }\n.fg-look { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1.1cqw; border-radius: 99px; font-size: 1cqw; letter-spacing: .08em; border: 1px solid var(--box-border); color: var(--ink-dim); background: rgba(255, 255, 255, .04); }\n.fg-look i { font-style: normal; font-size: .8cqw; padding: .05cqw .5cqw; border-radius: 99px; background: var(--accent); color: #111; }\n.fg-look.is-on { color: #fff; border-color: var(--accent); background: color-mix(in oklab, var(--accent) 22%, transparent); }\n.fg-variant { display: grid; grid-template-columns: 11cqw 1fr; gap: 1.4cqw; margin: .4cqw 0 1cqw; padding: 1cqw; border-radius: .9cqw; background: rgba(0, 0, 0, .25); border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--box-border)); animation: fg-pop .25s ease-out; }\n.fg-variant-art { height: 15cqw; border-radius: .7cqw; overflow: hidden; display: grid; place-items: center; font-size: 1cqw; color: var(--ink-dim); background: repeating-conic-gradient(rgba(255, 255, 255, .05) 0 25%, transparent 0 50%) 0 0 / 1.4cqw 1.4cqw; }\n.fg-variant-art img { width: 100%; height: 100%; object-fit: contain; object-position: top; }\n.fg-variant-body { display: grid; gap: .6cqw; align-content: start; min-width: 0; }\n.fg-variant-body b { font-size: 1.15cqw; letter-spacing: .08em; }\n.fg-emotion-row { display: grid; grid-template-columns: 12cqw 1fr 9cqw auto auto; gap: .8cqw; align-items: center; padding: .6cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .05); }\n.fg-emotion-row b { font-size: 1.15cqw; letter-spacing: .06em; }\n.fg-emotion-row.is-new { grid-template-columns: 12cqw 1fr 9cqw auto; border-bottom: 0; margin-top: .6cqw; }\n.fg-chip small { margin-left: .3em; opacity: .55; font-size: .85em; }\n\n/* 表单 */\n.fg-field { display: grid; grid-template-columns: 14cqw 1fr; gap: 1.2cqw; align-items: center; margin: .9cqw 0; font-size: 1.1cqw; }\n.fg-field > label { color: var(--ink-dim); letter-spacing: .08em; }\n.fg-field small { grid-column: 2; color: var(--ink-dim); font-size: .9cqw; margin-top: -.6cqw; }\n.fg-input, .fg-select, .fg-textarea { width: 100%; padding: .7cqw 1cqw; font: inherit; font-size: 1.1cqw; color: var(--ink); background: rgba(0, 0, 0, .35); border: 1px solid var(--box-border); border-radius: .6cqw; outline: none; }\n.fg-select option { background: #14122a; }\n.fg-textarea { min-height: 7cqw; resize: vertical; line-height: 1.5; font-family: "JetBrains Mono", Consolas, monospace; font-size: 1cqw; }\n.fg-input:focus, .fg-select:focus, .fg-textarea:focus { border-color: var(--accent); }\n.fg-btn { display: inline-flex; align-items: center; gap: .5cqw; padding: .6cqw 1.4cqw; border-radius: 99px; font-size: 1.05cqw; letter-spacing: .1em; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .05); transition: background .2s, border-color .2s; }\n.fg-btn:hover { background: rgba(255, 255, 255, .12); border-color: var(--accent); }\n.fg-btn.is-primary { background: linear-gradient(100deg, var(--accent), var(--accent2)); border-color: transparent; color: #fff; font-weight: 700; }\n.fg-btn[disabled] { opacity: .45; pointer-events: none; }\n.fg-row { display: flex; gap: .8cqw; flex-wrap: wrap; align-items: center; }\n.fg-switch { position: relative; width: 3.4cqw; height: 1.9cqw; border-radius: 99px; background: rgba(255, 255, 255, .14); transition: background .2s; }\n.fg-switch::after { content: ""; position: absolute; left: .25cqw; top: .25cqw; width: 1.4cqw; height: 1.4cqw; border-radius: 50%; background: #fff; transition: transform .25s cubic-bezier(.3, 1.4, .5, 1); }\n.fg-switch.is-on { background: linear-gradient(100deg, var(--accent), var(--accent2)); }\n.fg-switch.is-on::after { transform: translateX(1.5cqw); }\n.fg-note { font-size: .95cqw; color: var(--ink-dim); line-height: 1.6; }\n.fg-ok { color: #6ef0a8; } .fg-err { color: #ff8a8a; }\n.fg-section { margin: 1.6cqw 0 .6cqw; font-family: var(--font-display); font-size: 1.4cqw; letter-spacing: .2em; display: flex; align-items: center; gap: .8cqw; }\n.fg-section::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--box-border), transparent); }\n.fg-skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(15cqw, 1fr)); gap: 1cqw; }\n.fg-skin { padding: 1cqw; border-radius: 1cqw; border: 1px solid var(--box-border); text-align: left; transition: transform .2s; }\n.fg-skin:hover { transform: translateY(-.3cqw); }\n.fg-skin.is-on { box-shadow: 0 0 0 2px var(--accent); }\n.fg-skin-swatch { height: 4cqw; border-radius: .6cqw; margin-bottom: .6cqw; }\n.fg-skin b { display: block; font-size: 1.1cqw; letter-spacing: .1em; } .fg-skin span { font-size: .85cqw; color: var(--ink-dim); }\n\n.fg-update-done { margin: .8cqw 0; padding: .9cqw 1.2cqw; border-radius: .8cqw; font-size: 1.05cqw; line-height: 1.6; color: #6ef0a8; background: rgba(110, 240, 168, .08); border: 1px solid rgba(110, 240, 168, .3); }\n.fg-changes { margin: .4cqw 0 0 15.2cqw; border-radius: .8cqw; border: 1px solid var(--box-border); overflow: hidden; }\n.fg-changes > div { display: grid; grid-template-columns: 6cqw 1fr auto; gap: 1cqw; padding: .6cqw 1cqw; font-size: 1cqw; line-height: 1.5; border-bottom: 1px solid rgba(255, 255, 255, .06); }\n.fg-changes > div:last-child { border-bottom: 0; }\n.fg-changes code, .fg-note code { font-family: "JetBrains Mono", Consolas, monospace; color: var(--accent); }\n.fg-changes small { color: var(--ink-dim); white-space: nowrap; }\n\n.fg-lightbox { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2cqw; background: rgba(0, 0, 0, .9); animation: fg-fade-in .25s ease both; cursor: zoom-out; }\n.fg-lightbox img { max-width: 92%; max-height: 82%; object-fit: contain; box-shadow: 0 0 6cqw rgba(0, 0, 0, .8); cursor: default; }\n.fg-lightbox .fg-row { cursor: default; }\n\n@keyframes fg-fade-in { from { opacity: 0; } }\n@keyframes fg-fade-out { to { opacity: 0; } }\n@keyframes fg-spin { to { transform: rotate(360deg); } }\n@keyframes fg-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }\n@keyframes fg-skeleton { from { background-position: 200% 0; } to { background-position: -200% 0; } }\n@keyframes fg-pop { from { opacity: 0; transform: translateY(-.4cqw); } to { opacity: 1; transform: none; } }\n\n@media (prefers-reduced-motion: reduce) {\n  .fg-bg, .fg-cg-img, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-symbol-art, .fg-symbol-art svg { animation: none !important; }\n  .fg-cg-pan { animation: none !important; transform: scale(var(--r)); }\n  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress { animation: fg-char-in .22s ease forwards var(--d) !important; }\n  .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }\n  .fg-text.is-wait .fg-char { animation: none !important; }\n}\n@container stage (max-aspect-ratio: 4/5) {\n  .fg-actor { width: 60%; height: 60%; bottom: 23%; }\n  .fg-dialog { left: 3%; right: 3%; height: 22%; }\n  .fg-text { font-size: 4.6cqw; top: 18%; bottom: 26%; }\n  .fg-progress { bottom: 12%; right: 4.2%; }\n  .fg-quick { bottom: 5%; left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }\n  .fg-wait { bottom: 28%; }\n  .fg-status { display: none; }\n  .fg-name-plate { font-size: 4cqw; } .fg-name { top: -5cqw; }\n  .fg-iconbtn { width: 9cqw; height: 9cqw; font-size: 4cqw; }\n  .fg-hud-place { font-size: 4cqw; } .fg-hud-meta { font-size: 2.6cqw; }\n  .fg-choice, .fg-free { width: 88cqw; font-size: 4cqw; }\n  .fg-title-logo { font-size: 11cqw; max-width: 90cqw; } .fg-title-menu button { font-size: 4.4cqw; }\n  .fg-dlog { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }\n  .fg-dlog-side { flex-direction: row; overflow-x: auto; padding: 0 0 1cqw; }\n  .fg-dlog-row { width: 46cqw; }\n  .fg-dlog-row-head, .fg-dlog-title { font-size: 3.6cqw; }\n  .fg-dlog-row-meta, .fg-dlog-row-sum, .fg-dlog-status, .fg-dlog-label, .fg-dlog-meter, .fg-dlog-think summary, .fg-dlog-chip, .fg-dlog-chip i, .fg-btn.is-mini { font-size: 2.8cqw; }\n  .fg-dlog-facts, .fg-dlog-notice, .fg-dlog-error, .fg-dlog-pre, .fg-dlog-line, .fg-dlog-card, .fg-dlog-mono, .fg-dlog-list-plain { font-size: 3cqw; }\n  .fg-dlog-facts { grid-template-columns: 1fr; }\n  .fg-dlog-pre { max-height: 90cqw; }\n  .fg-dlog-line { grid-template-columns: 9cqw minmax(0, 1fr); }\n  .fg-dlog-line > .fg-dlog-chips { grid-column: 2; }\n  .fg-dlog .fg-note, .fg-dlog-uid { font-size: 2.6cqw; }\n  .fg-dlog-list-plain { padding-left: 6cqw; }\n  .fg-panel-title { font-size: 6cqw; } .fg-panel-en { font-size: 2.2cqw; }\n  .fg-tab { padding: 1.2cqw 3cqw; font-size: 3.2cqw; }\n  .fg-pill { padding: .8cqw 2.2cqw; font-size: 2.6cqw; }\n  .fg-person { grid-template-columns: 1fr; }\n  .fg-person-art { height: 50cqw; }\n  .fg-person h3 { font-size: 5cqw; flex-wrap: wrap; } .fg-person h3 small { font-size: 2.6cqw; }\n  .fg-person-tags, .fg-note { font-size: 2.8cqw; }\n  .fg-btn, .fg-look, .fg-state { font-size: 3cqw; padding: 1cqw 2.4cqw; }\n  .fg-emo { width: 15cqw; height: 18cqw; font-size: 2.4cqw; }\n  .fg-field, .fg-person-form .fg-field { grid-template-columns: 1fr; font-size: 3cqw; }\n  .fg-input, .fg-select, .fg-textarea { font-size: 3cqw; }\n  .fg-outfit, .fg-outfit.is-new, .fg-emotion-row, .fg-emotion-row.is-new { grid-template-columns: 1fr; }\n  .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }\n  .fg-track { grid-template-columns: 9cqw 1fr; gap: 2cqw; padding: 2cqw; }\n  .fg-track-play { width: 9cqw; height: 9cqw; font-size: 3cqw; }\n  .fg-track-desc { min-height: 12cqw; font-size: 3cqw; }\n}\n';
 
 // src/client/styles/skins.css
 var skins_default = `/* ───────────── 皮肤 ───────────── */
@@ -225,17 +225,23 @@ var api = {
   updateTrack: (id, patch) => call("/music", { action: "update", id, patch }),
   removeTrack: (id) => call("/music", { action: "remove", id }),
   /** 上传一首配乐：请求体直接是文件字节（最大 50 MB），不走 JSON。 */
-  async uploadTrack(file) {
-    const res = await fetch(`${API}/music/upload?name=${encodeURIComponent(file.name || "")}`, { method: "POST", cache: "no-store", headers: { "x-flowgal-request": "1", "content-type": file.type || "application/octet-stream" }, body: file });
-    let data = null;
-    try {
-      data = await res.json();
-    } catch {
-    }
-    if (!res.ok || !data || data.ok === false) throw new Error(data && data.error || `HTTP ${res.status}`);
-    return data.track;
-  }
+  async uploadTrack(file2) {
+    return (await uploadFile(`/music/upload?name=${encodeURIComponent(file2.name || "")}`, file2)).track;
+  },
+  /** 某一种音效换成自己的文件（最大 5 MB）；返回最新设置。 */
+  uploadSound: (slot, file2) => uploadFile(`/sound/upload?slot=${encodeURIComponent(slot)}&name=${encodeURIComponent(file2.name || "")}`, file2),
+  removeSound: (slot) => call("/sound", { action: "remove", slot })
 };
+async function uploadFile(path, file2) {
+  const res = await fetch(API + path, { method: "POST", cache: "no-store", headers: { "x-flowgal-request": "1", "content-type": file2.type || "application/octet-stream" }, body: file2 });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+  }
+  if (!res.ok || !data || data.ok === false) throw new Error(data && data.error || `HTTP ${res.status}`);
+  return data;
+}
 function fillText(r) {
   const parts = [r.cg && `插画 ${r.cg} 张`, r.bg && `背景 ${r.bg} 张`, r.sprite && `立绘差分 ${r.sprite} 张`].filter(Boolean);
   const tail = r.undirected ? `；还有 ${r.undirected} 轮没整理，先在场景卡上点「重新整理」` : "";
@@ -457,7 +463,7 @@ function stageSteps(script, units, carry = []) {
     for (const e of line.enter || []) {
       if (cast.some((c) => c.name === e.name)) continue;
       const want = e.pos || home.get(e.name);
-      const pos = want && !cast.some((c) => c.pos === want) ? want : SLOTS.find((p) => !cast.some((c) => c.pos === p)) || want || "center";
+      const pos = want && !cast.some((c) => c.pos === want) ? want : SLOTS.find((p2) => !cast.some((c) => c.pos === p2)) || want || "center";
       cast = [...cast, { name: e.name, pos }];
       entered.push(e.name);
     }
@@ -544,6 +550,8 @@ function buildBeats(view) {
         emo: line.emo || "",
         sym: line.sym || "",
         cam: line.cam || "",
+        say: line.say || "",
+        stress: line.stress || "",
         card: line.card || "",
         scene,
         bgm: bgm2,
@@ -610,140 +618,140 @@ var import_react2 = __toESM(require("react"), 1);
 var COUNTS = { rain: 220, storm: 380, snow: 140, sakura: 70, leaves: 40, fireflies: 46, embers: 90, dust: 60, bokeh: 26, stars: 160, fog: 6 };
 var rand = (a, b) => a + Math.random() * (b - a);
 function spawn(kind, w, h, initial) {
-  const p = { x: rand(0, w), y: initial ? rand(0, h) : rand(-h * 0.2, -10), life: 0 };
+  const p2 = { x: rand(0, w), y: initial ? rand(0, h) : rand(-h * 0.2, -10), life: 0 };
   switch (kind) {
     case "rain":
     case "storm":
-      return { ...p, vx: kind === "storm" ? -7 : -2.4, vy: rand(16, 26) * (kind === "storm" ? 1.25 : 1), len: rand(12, 26), a: rand(0.18, 0.45) };
+      return { ...p2, vx: kind === "storm" ? -7 : -2.4, vy: rand(16, 26) * (kind === "storm" ? 1.25 : 1), len: rand(12, 26), a: rand(0.18, 0.45) };
     case "snow":
-      return { ...p, vx: rand(-0.4, 0.4), vy: rand(0.5, 1.6), r: rand(1, 3.6), a: rand(0.5, 0.95), ph: rand(0, 6.28) };
+      return { ...p2, vx: rand(-0.4, 0.4), vy: rand(0.5, 1.6), r: rand(1, 3.6), a: rand(0.5, 0.95), ph: rand(0, 6.28) };
     case "sakura":
     case "leaves":
-      return { ...p, x: rand(-w * 0.2, w), vx: rand(0.6, 1.8), vy: rand(0.7, 1.7), r: rand(5, 10) * (kind === "leaves" ? 1.3 : 1), rot: rand(0, 6.28), vr: rand(-0.05, 0.05), ph: rand(0, 6.28), hue: kind === "leaves" ? rand(18, 44) : rand(330, 352) };
+      return { ...p2, x: rand(-w * 0.2, w), vx: rand(0.6, 1.8), vy: rand(0.7, 1.7), r: rand(5, 10) * (kind === "leaves" ? 1.3 : 1), rot: rand(0, 6.28), vr: rand(-0.05, 0.05), ph: rand(0, 6.28), hue: kind === "leaves" ? rand(18, 44) : rand(330, 352) };
     case "fireflies":
-      return { ...p, y: initial ? rand(h * 0.3, h) : rand(h * 0.4, h), vx: rand(-0.3, 0.3), vy: rand(-0.3, 0.2), r: rand(1.2, 2.6), ph: rand(0, 6.28) };
+      return { ...p2, y: initial ? rand(h * 0.3, h) : rand(h * 0.4, h), vx: rand(-0.3, 0.3), vy: rand(-0.3, 0.2), r: rand(1.2, 2.6), ph: rand(0, 6.28) };
     case "embers":
-      return { ...p, y: initial ? rand(0, h) : h + 10, vx: rand(-0.4, 0.6), vy: -rand(0.6, 2.2), r: rand(0.8, 2.2), ph: rand(0, 6.28) };
+      return { ...p2, y: initial ? rand(0, h) : h + 10, vx: rand(-0.4, 0.6), vy: -rand(0.6, 2.2), r: rand(0.8, 2.2), ph: rand(0, 6.28) };
     case "dust":
-      return { ...p, y: rand(0, h), vx: rand(-0.15, 0.15), vy: rand(-0.12, 0.12), r: rand(0.6, 1.6), ph: rand(0, 6.28) };
+      return { ...p2, y: rand(0, h), vx: rand(-0.15, 0.15), vy: rand(-0.12, 0.12), r: rand(0.6, 1.6), ph: rand(0, 6.28) };
     case "bokeh":
-      return { ...p, y: rand(0, h), vx: rand(-0.12, 0.12), vy: rand(-0.18, -0.04), r: rand(14, 46), hue: rand(0, 360), ph: rand(0, 6.28) };
+      return { ...p2, y: rand(0, h), vx: rand(-0.12, 0.12), vy: rand(-0.18, -0.04), r: rand(14, 46), hue: rand(0, 360), ph: rand(0, 6.28) };
     case "stars":
-      return { ...p, y: rand(0, h * 0.65), r: rand(0.4, 1.5), ph: rand(0, 6.28), sp: rand(0.01, 0.05) };
+      return { ...p2, y: rand(0, h * 0.65), r: rand(0.4, 1.5), ph: rand(0, 6.28), sp: rand(0.01, 0.05) };
     case "fog":
-      return { ...p, y: rand(h * 0.35, h * 0.9), vx: rand(0.15, 0.4), r: rand(w * 0.25, w * 0.45), a: rand(0.06, 0.13) };
+      return { ...p2, y: rand(h * 0.35, h * 0.9), vx: rand(0.15, 0.4), r: rand(w * 0.25, w * 0.45), a: rand(0.06, 0.13) };
     default:
-      return p;
+      return p2;
   }
 }
-function step(kind, p, w, h, t, ctx2) {
+function step(kind, p2, w, h, t, ctx2) {
   switch (kind) {
     case "rain":
     case "storm": {
-      p.x += p.vx;
-      p.y += p.vy;
-      ctx2.strokeStyle = `rgba(200, 220, 255, ${p.a})`;
+      p2.x += p2.vx;
+      p2.y += p2.vy;
+      ctx2.strokeStyle = `rgba(200, 220, 255, ${p2.a})`;
       ctx2.lineWidth = 1;
       ctx2.beginPath();
-      ctx2.moveTo(p.x, p.y);
-      ctx2.lineTo(p.x + p.vx * 1.6, p.y - p.len);
+      ctx2.moveTo(p2.x, p2.y);
+      ctx2.lineTo(p2.x + p2.vx * 1.6, p2.y - p2.len);
       ctx2.stroke();
-      return p.y < h + 30;
+      return p2.y < h + 30;
     }
     case "snow": {
-      p.ph += 0.02;
-      p.x += p.vx + Math.sin(p.ph) * 0.4;
-      p.y += p.vy;
-      ctx2.fillStyle = `rgba(255, 255, 255, ${p.a})`;
+      p2.ph += 0.02;
+      p2.x += p2.vx + Math.sin(p2.ph) * 0.4;
+      p2.y += p2.vy;
+      ctx2.fillStyle = `rgba(255, 255, 255, ${p2.a})`;
       ctx2.beginPath();
-      ctx2.arc(p.x, p.y, p.r, 0, 6.283);
+      ctx2.arc(p2.x, p2.y, p2.r, 0, 6.283);
       ctx2.fill();
-      return p.y < h + 10;
+      return p2.y < h + 10;
     }
     case "sakura":
     case "leaves": {
-      p.ph += 0.03;
-      p.rot += p.vr;
-      p.x += p.vx + Math.sin(p.ph) * 0.8;
-      p.y += p.vy;
+      p2.ph += 0.03;
+      p2.rot += p2.vr;
+      p2.x += p2.vx + Math.sin(p2.ph) * 0.8;
+      p2.y += p2.vy;
       ctx2.save();
-      ctx2.translate(p.x, p.y);
-      ctx2.rotate(p.rot);
-      ctx2.scale(1, Math.abs(Math.sin(p.ph)) * 0.6 + 0.4);
-      ctx2.fillStyle = kind === "leaves" ? `hsla(${p.hue}, 75%, 48%, .85)` : `hsla(${p.hue}, 90%, 86%, .9)`;
+      ctx2.translate(p2.x, p2.y);
+      ctx2.rotate(p2.rot);
+      ctx2.scale(1, Math.abs(Math.sin(p2.ph)) * 0.6 + 0.4);
+      ctx2.fillStyle = kind === "leaves" ? `hsla(${p2.hue}, 75%, 48%, .85)` : `hsla(${p2.hue}, 90%, 86%, .9)`;
       ctx2.beginPath();
-      ctx2.moveTo(0, -p.r);
-      ctx2.bezierCurveTo(p.r, -p.r * 0.6, p.r * 0.7, p.r * 0.6, 0, p.r);
-      ctx2.bezierCurveTo(-p.r * 0.7, p.r * 0.6, -p.r, -p.r * 0.6, 0, -p.r);
+      ctx2.moveTo(0, -p2.r);
+      ctx2.bezierCurveTo(p2.r, -p2.r * 0.6, p2.r * 0.7, p2.r * 0.6, 0, p2.r);
+      ctx2.bezierCurveTo(-p2.r * 0.7, p2.r * 0.6, -p2.r, -p2.r * 0.6, 0, -p2.r);
       ctx2.fill();
       ctx2.restore();
-      return p.y < h + 20 && p.x < w + 30;
+      return p2.y < h + 20 && p2.x < w + 30;
     }
     case "fireflies": {
-      p.ph += 0.03;
-      p.x += p.vx + Math.sin(p.ph * 0.7) * 0.3;
-      p.y += p.vy + Math.cos(p.ph * 0.5) * 0.2;
-      const a = 0.35 + Math.sin(p.ph * 2) * 0.35;
-      const g = ctx2.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 6);
+      p2.ph += 0.03;
+      p2.x += p2.vx + Math.sin(p2.ph * 0.7) * 0.3;
+      p2.y += p2.vy + Math.cos(p2.ph * 0.5) * 0.2;
+      const a = 0.35 + Math.sin(p2.ph * 2) * 0.35;
+      const g = ctx2.createRadialGradient(p2.x, p2.y, 0, p2.x, p2.y, p2.r * 6);
       g.addColorStop(0, `rgba(230, 255, 150, ${a})`);
       g.addColorStop(1, "rgba(230, 255, 150, 0)");
       ctx2.fillStyle = g;
       ctx2.beginPath();
-      ctx2.arc(p.x, p.y, p.r * 6, 0, 6.283);
+      ctx2.arc(p2.x, p2.y, p2.r * 6, 0, 6.283);
       ctx2.fill();
-      return p.x > -20 && p.x < w + 20 && p.y > -20 && p.y < h + 20;
+      return p2.x > -20 && p2.x < w + 20 && p2.y > -20 && p2.y < h + 20;
     }
     case "embers": {
-      p.ph += 0.05;
-      p.x += p.vx + Math.sin(p.ph) * 0.5;
-      p.y += p.vy;
-      ctx2.fillStyle = `rgba(255, ${140 + Math.sin(p.ph) * 60}, 60, ${0.5 + Math.sin(p.ph * 1.7) * 0.4})`;
+      p2.ph += 0.05;
+      p2.x += p2.vx + Math.sin(p2.ph) * 0.5;
+      p2.y += p2.vy;
+      ctx2.fillStyle = `rgba(255, ${140 + Math.sin(p2.ph) * 60}, 60, ${0.5 + Math.sin(p2.ph * 1.7) * 0.4})`;
       ctx2.beginPath();
-      ctx2.arc(p.x, p.y, p.r, 0, 6.283);
+      ctx2.arc(p2.x, p2.y, p2.r, 0, 6.283);
       ctx2.fill();
-      return p.y > -10;
+      return p2.y > -10;
     }
     case "dust": {
-      p.ph += 0.01;
-      p.x += p.vx;
-      p.y += p.vy;
-      ctx2.fillStyle = `rgba(255, 245, 220, ${0.25 + Math.sin(p.ph * 3) * 0.2})`;
+      p2.ph += 0.01;
+      p2.x += p2.vx;
+      p2.y += p2.vy;
+      ctx2.fillStyle = `rgba(255, 245, 220, ${0.25 + Math.sin(p2.ph * 3) * 0.2})`;
       ctx2.beginPath();
-      ctx2.arc(p.x, p.y, p.r, 0, 6.283);
+      ctx2.arc(p2.x, p2.y, p2.r, 0, 6.283);
       ctx2.fill();
-      return p.x > -10 && p.x < w + 10 && p.y > -10 && p.y < h + 10;
+      return p2.x > -10 && p2.x < w + 10 && p2.y > -10 && p2.y < h + 10;
     }
     case "bokeh": {
-      p.ph += 0.01;
-      p.x += p.vx;
-      p.y += p.vy;
-      const g = ctx2.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-      const a = 0.08 + Math.sin(p.ph) * 0.05;
-      g.addColorStop(0, `hsla(${p.hue}, 90%, 75%, ${a + 0.06})`);
-      g.addColorStop(0.7, `hsla(${p.hue}, 90%, 70%, ${a})`);
-      g.addColorStop(1, `hsla(${p.hue}, 90%, 70%, 0)`);
+      p2.ph += 0.01;
+      p2.x += p2.vx;
+      p2.y += p2.vy;
+      const g = ctx2.createRadialGradient(p2.x, p2.y, 0, p2.x, p2.y, p2.r);
+      const a = 0.08 + Math.sin(p2.ph) * 0.05;
+      g.addColorStop(0, `hsla(${p2.hue}, 90%, 75%, ${a + 0.06})`);
+      g.addColorStop(0.7, `hsla(${p2.hue}, 90%, 70%, ${a})`);
+      g.addColorStop(1, `hsla(${p2.hue}, 90%, 70%, 0)`);
       ctx2.fillStyle = g;
       ctx2.beginPath();
-      ctx2.arc(p.x, p.y, p.r, 0, 6.283);
+      ctx2.arc(p2.x, p2.y, p2.r, 0, 6.283);
       ctx2.fill();
-      return p.y > -p.r;
+      return p2.y > -p2.r;
     }
     case "stars": {
-      p.ph += p.sp;
-      ctx2.fillStyle = `rgba(255, 255, 255, ${0.3 + Math.abs(Math.sin(p.ph)) * 0.7})`;
+      p2.ph += p2.sp;
+      ctx2.fillStyle = `rgba(255, 255, 255, ${0.3 + Math.abs(Math.sin(p2.ph)) * 0.7})`;
       ctx2.beginPath();
-      ctx2.arc(p.x, p.y, p.r, 0, 6.283);
+      ctx2.arc(p2.x, p2.y, p2.r, 0, 6.283);
       ctx2.fill();
       return true;
     }
     case "fog": {
-      p.x += p.vx;
-      const g = ctx2.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-      g.addColorStop(0, `rgba(230, 235, 245, ${p.a})`);
+      p2.x += p2.vx;
+      const g = ctx2.createRadialGradient(p2.x, p2.y, 0, p2.x, p2.y, p2.r);
+      g.addColorStop(0, `rgba(230, 235, 245, ${p2.a})`);
       g.addColorStop(1, "rgba(230, 235, 245, 0)");
       ctx2.fillStyle = g;
-      ctx2.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
-      if (p.x - p.r > w) p.x = -p.r;
+      ctx2.fillRect(p2.x - p2.r, p2.y - p2.r, p2.r * 2, p2.r * 2);
+      if (p2.x - p2.r > w) p2.x = -p2.r;
       return true;
     }
     default:
@@ -771,7 +779,7 @@ function Particles({ weather, enabled = true }) {
     const ro = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
     ro && ro.observe(canvas);
     const target = Math.round(COUNTS[kind] * Math.min(1.4, Math.max(0.5, w / 1200)));
-    let list = Array.from({ length: target }, () => spawn(kind, w, h, true));
+    let list2 = Array.from({ length: target }, () => spawn(kind, w, h, true));
     const frame = (t) => {
       raf = requestAnimationFrame(frame);
       if (document.hidden) return;
@@ -785,9 +793,9 @@ function Particles({ weather, enabled = true }) {
         }
       }
       const next = [];
-      for (const p of list) if (step(kind, p, w, h, t, ctx2)) next.push(p);
+      for (const p2 of list2) if (step(kind, p2, w, h, t, ctx2)) next.push(p2);
       while (next.length < target) next.push(spawn(kind, w, h, false));
-      list = next;
+      list2 = next;
     };
     raf = requestAnimationFrame(frame);
     return () => {
@@ -901,7 +909,7 @@ function pickSprite(sprites, look, emotion, base = "") {
 }
 function findLookTurn(timeline, key) {
   const turns = /* @__PURE__ */ new Set([0]);
-  for (const list of [timeline?.appearance, timeline?.wear, timeline?.states]) for (const e of list || []) turns.add(Number(e.fromTurn) || 0);
+  for (const list2 of [timeline?.appearance, timeline?.wear, timeline?.states]) for (const e of list2 || []) turns.add(Number(e.fromTurn) || 0);
   let found = null;
   for (const t of [...turns].sort((a, b) => a - b)) if (lookKey(lookAt(timeline, t)) === key) found = t;
   return found;
@@ -919,6 +927,7 @@ var PAUSE = [
 var DOTTED = /^[…—～~]$/u;
 var CLOSER = /^[”’」』）)\]】》〉"']$/u;
 var SILENT = /[\s，、,；;：:。！？!?.…—～~“”‘’「」『』（）()\[\]【】《》〈〉"']/u;
+var BANG = /^[！!]$/u;
 function pauseFactor(ch) {
   for (const [re, f] of PAUSE) if (re.test(ch)) return f;
   return 0;
@@ -944,15 +953,106 @@ function pausesAfter(chars, speed) {
   }
   return out;
 }
-function typeTimes(chars, speed) {
-  const pauses = pausesAfter(chars, speed);
-  const times = [];
-  let t = 0;
-  for (let i = 0; i < chars.length; i += 1) {
-    if (i > 0) t += speed + pauses[i - 1];
-    times.push(t);
+var STYLES = {
+  "": { gap: 1, pause: 1, blip: { every: 2, pitch: 1, gain: 1 }, mouth: "loop" },
+  menace: { gap: 4, min: 110, pause: 1.6, blip: { every: 1, pitch: 0.78, gain: 1.1 }, mouth: "syllable" },
+  excited: { gap: 0.55, pause: 0.5, blip: { every: 2, pitch: 1.18, gain: 1 }, mouth: "loop" },
+  shout: { gap: 1.1, chunk: 3, pause: 0.7, blip: { every: 1, pitch: 1.1, gain: 1.3 }, mouth: "wide" },
+  hesitant: { gap: 1.35, pause: 1.8, stall: true, blip: { every: 3, pitch: 0.95, gain: 0.8 }, mouth: "loop" },
+  whisper: { gap: 1.25, pause: 1.2, blip: { every: 2, pitch: 0.9, gain: 0.35 }, mouth: "soft" },
+  breakdown: { gap: 0.8, jitter: true, pause: 0.6, blip: { every: 1, pitch: 1.25, gain: 1.2 }, mouth: "wide" }
+};
+var IMPACT = {
+  "": [["shake", 1], ["sound", "impact"]],
+  menace: [["shake", 2], ["sound", "impact"]],
+  excited: [["shake", 1], ["flash", 1], ["sound", "impact"]],
+  shout: [["shake", 3], ["box", 3], ["flash", 2], ["sound", "slam"]],
+  hesitant: [["sound", "impact"]],
+  whisper: [],
+  breakdown: [["shake", 3], ["redflash", 2], ["sound", "stab"]]
+};
+function seeded(seed) {
+  let h = 2166136261;
+  for (const ch of String(seed)) h = Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0;
+  return () => {
+    h = h + 1831565813 >>> 0;
+    let x = Math.imul(h ^ h >>> 15, 1 | h);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+var HESITANT_EMO = /* @__PURE__ */ new Set(["worried", "shy", "blush", "scared", "sad", "confused"]);
+var EXCITED_EMO = /* @__PURE__ */ new Set(["surprised", "scared", "laugh", "happy"]);
+function inferDelivery(text, emo = "", type = "dialogue") {
+  if (type !== "dialogue") return "";
+  const bangs = (text.match(/[！!]/gu) || []).length;
+  const dots = (text.match(/[…]|\.{3}/gu) || []).length;
+  const stammer = new RegExp("(\\p{L})[、，,…]+\\1", "u").test(text);
+  if (bangs && emo === "angry") return "shout";
+  if (bangs >= 2 || bangs && EXCITED_EMO.has(emo)) return "excited";
+  if (stammer || dots >= 4 || dots >= 2 && HESITANT_EMO.has(emo)) return "hesitant";
+  return "";
+}
+function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialogue", seed = "" } = {}) {
+  const n = chars.length;
+  const text = chars.join("");
+  const spoken = type === "dialogue" || type === "thought";
+  const style = !spoken ? "" : say && STYLES[say] ? say : inferDelivery(text, emo, type);
+  const S = STYLES[style];
+  const base = Math.max(speed * S.gap, S.min || 0);
+  const plan = { times: [], marks: new Array(n).fill(""), say: style, gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: S.blip, fx: [] };
+  if (!n) return plan;
+  if (!(speed > 0)) {
+    plan.times = new Array(n).fill(0);
+    return plan;
   }
-  return times;
+  let s0 = -1;
+  let s1 = -1;
+  const at = stress && spoken ? text.indexOf(stress) : -1;
+  if (at >= 0) {
+    s0 = Array.from(text.slice(0, at)).length;
+    s1 = s0 + Array.from(stress).length - 1;
+    for (let i = s0; i <= s1; i += 1) plan.marks[i] = "stress";
+  }
+  const inStress = (i) => s0 >= 0 && i >= s0 && i <= s1;
+  const rand2 = seeded(`${seed}|${style}|${text}`);
+  const pauses = pausesAfter(chars, speed);
+  let t = 0;
+  for (let i = 0; i < n; i += 1) {
+    if (i > 0) {
+      const prev = chars[i - 1];
+      let gap = base;
+      if (S.chunk && !inStress(i)) gap = i % S.chunk === 0 || SILENT.test(prev) || inStress(i - 1) ? base * S.chunk : 0;
+      if (S.jitter) gap = base * (0.4 + rand2() * 1.4) + (rand2() < 0.12 ? speed * 5 : 0);
+      gap += pauses[i - 1] * S.pause;
+      if (S.stall && !SILENT.test(prev) && !SILENT.test(chars[i]) && rand2() < 0.2) gap += Math.max(speed * 4, 90);
+      if (i === s0) gap += speed * 8;
+      if (i > s0 && i <= s1) gap = Math.max(gap, base, speed * 3.5, 100);
+      if (s0 >= 0 && i === s1 + 1) gap += speed * 4;
+      t += gap;
+    }
+    plan.times.push(Math.round(t));
+  }
+  const fx = plan.fx;
+  const push = (time, list2) => {
+    for (const [kind, v] of list2) fx.push(kind === "sound" ? { at: time, kind, sound: v } : { at: time, kind, power: v });
+  };
+  if (s0 >= 0) push(plan.times[s1], IMPACT[style]);
+  else if (style === "shout") push(0, IMPACT.shout);
+  if (style === "breakdown") {
+    if (s0 !== 0) push(0, IMPACT.breakdown);
+  }
+  if (style === "excited" || style === "breakdown") {
+    let left = 3;
+    chars.forEach((ch, i) => {
+      if (left > 0 && BANG.test(ch) && !BANG.test(chars[i - 1] || "")) {
+        fx.push({ at: plan.times[i], kind: "box", power: style === "breakdown" ? 2 : 1 });
+        left -= 1;
+      }
+    });
+  }
+  fx.sort((a, b) => a.at - b.at);
+  return plan;
 }
 
 // lib/aa-sprite.js
@@ -983,22 +1083,89 @@ function mouthAt(loop, talk, now) {
   if (!talk || talk.done || talk.type !== "dialogue" || !(talk.speed > 0) || !talk.chars?.length || !loop?.length) return "closed";
   if (!Number.isFinite(talk.startedAt)) return "closed";
   const { chars, times } = talk;
+  const gap = talk.gap > 0 ? talk.gap : talk.speed;
+  const mode = talk.mouth || "loop";
   const elapsed = now - talk.startedAt;
   if (!times || elapsed < times[0]) return "closed";
   let i = 0;
   while (i + 1 < times.length && times[i + 1] <= elapsed) i += 1;
-  if (i >= chars.length - 1 || SILENT.test(chars[i])) return "closed";
+  if (SILENT.test(chars[i])) return "closed";
+  const since = elapsed - times[i];
+  const last = i >= chars.length - 1;
+  if (last && since > gap) return "closed";
+  const next = last ? gap : times[i + 1] - times[i];
+  if (next > gap * 2.2 && since > gap) return "closed";
+  if (mode === "syllable") {
+    const slot = Math.max(next, 1);
+    return since < slot * 0.5 ? "open" : since < slot * 0.75 ? "half" : "closed";
+  }
   let start = i;
-  while (start > 0 && !SILENT.test(chars[start - 1])) start -= 1;
-  const factor = Math.min(1.4, Math.max(0.8, talk.speed / 35));
+  while (start > 0 && !SILENT.test(chars[start - 1]) && times[start] - times[start - 1] <= gap * 2.2) start -= 1;
+  const t = elapsed - times[start];
+  if (mode === "wide") return t < 40 ? "half" : "open";
+  const factor = Math.min(1.4, Math.max(0.8, gap / 35));
   const total = loop.reduce((s, x) => s + x.ms * factor, 0);
-  let r = (elapsed - times[start]) % total;
+  let r = t % total;
+  let state2 = loop[loop.length - 1].mouth;
   for (const step2 of loop) {
     const ms = step2.ms * factor;
-    if (r < ms) return step2.mouth;
+    if (r < ms) {
+      state2 = step2.mouth;
+      break;
+    }
     r -= ms;
   }
-  return loop[loop.length - 1].mouth;
+  return mode === "soft" && state2 === "open" ? "half" : state2;
+}
+var PACK_FILE = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\:*?"<>|\u0000-\u001f]{1,200}$/;
+var PART_STATE = /^[a-z_]{1,16}$/;
+var int = (v, lo, hi, what) => {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < lo || n > hi) throw new Error(`素材包的 ${what} 不对（要 ${lo}~${hi} 的整数，拿到 ${JSON.stringify(v)}）`);
+  return n;
+};
+var file = (v, what) => {
+  if (typeof v !== "string" || !PACK_FILE.test(v)) throw new Error(`素材包的 ${what} 文件名不对：${JSON.stringify(v)}`);
+  return v;
+};
+var list = (v, what) => {
+  if (!Array.isArray(v)) throw new Error(`素材包缺 ${what}`);
+  return v;
+};
+function cleanPack(raw) {
+  if (!raw || typeof raw !== "object") throw new Error("sprite.json 不是一个对象");
+  const size = list(raw.size, "size（宽、高）");
+  const w = int(size[0], 1, 8192, "宽"), h = int(size[1], 1, 8192, "高");
+  const frames = list(raw.breath?.frames, "breath.frames（呼吸帧）").map((f, i) => file(f, `第 ${i + 1} 张呼吸帧`));
+  if (!frames.length || frames.length > 12) throw new Error("呼吸帧要 1~12 张");
+  const lifts = frames.map((_, i) => int(raw.breath.lifts?.[i] ?? 0, -512, 512, `第 ${i + 1} 张呼吸帧的上移`));
+  const steps = (raw.breath.steps?.length ? raw.breath.steps : [{ frame: 0, ms: 1e3 }]).slice(0, 32).map((s, i) => ({ frame: int(s?.frame, 0, frames.length - 1, `呼吸第 ${i + 1} 步的帧号`), ms: int(s?.ms, 10, 6e4, `呼吸第 ${i + 1} 步的时长`) }));
+  const parts = {};
+  for (const part of ["eyes", "mouth"]) {
+    const states = raw.parts?.[part];
+    if (!states) continue;
+    parts[part] = {};
+    for (const [state2, p2] of Object.entries(states)) {
+      if (!PART_STATE.test(state2)) throw new Error(`素材包的 ${part} 差分名不对：${state2}`);
+      parts[part][state2] = { file: file(p2?.file, `${part}.${state2}`), x: int(p2?.x, -w, w, `${part}.${state2} 的 x`), y: int(p2?.y, -h, h, `${part}.${state2} 的 y`) };
+    }
+  }
+  const pack = { name: String(raw.name || "").slice(0, 60), size: [w, h], breath: { frames, lifts, steps }, parts };
+  if (raw.blink) {
+    pack.blink = {
+      sequence: list(raw.blink.sequence, "blink.sequence").slice(0, 16).map((s, i) => ({ eyes: String(s?.eyes || ""), ms: int(s?.ms, 1, 5e3, `眨眼第 ${i + 1} 步的时长`) })),
+      interval_ms: [int(raw.blink.interval_ms?.[0] ?? 2e3, 100, 6e4, "眨眼最短间隔"), int(raw.blink.interval_ms?.[1] ?? 5e3, 100, 6e4, "眨眼最长间隔")]
+    };
+  }
+  if (raw.talk?.mouth_loop) {
+    pack.talk = { mouth_loop: list(raw.talk.mouth_loop, "talk.mouth_loop").slice(0, 16).map((s, i) => ({ mouth: String(s?.mouth || ""), ms: int(s?.ms, 1, 5e3, `口型第 ${i + 1} 步的时长`) })) };
+  }
+  return pack;
+}
+function packFiles(pack) {
+  if (!pack) return [];
+  const parts = Object.values(pack.parts || {}).flatMap((states) => Object.values(states).map((p2) => p2.file));
+  return [.../* @__PURE__ */ new Set([...pack.breath?.frames || [], ...parts])];
 }
 
 // src/client/theater/AaSprite.jsx
@@ -1009,14 +1176,22 @@ var loadImage = (src) => new Promise((resolve, reject) => {
   img.onerror = () => reject(new Error("aa sprite image: " + src));
   img.src = src;
 });
-function loadAaPack(manifest) {
-  if (!packs.has(manifest)) {
+var packKey = (aa) => aa.pack ? "pack:" + JSON.stringify(aa.pack) : aa.manifest || "";
+function loadAaPack(aa) {
+  const key = packKey(aa);
+  if (!packs.has(key)) {
     const task = (async () => {
-      const base = new URL(manifest, location.href);
-      const res = await fetch(base);
-      if (!res.ok) throw new Error("aa sprite manifest: " + res.status);
-      const m = await res.json();
-      const at = (file) => new URL(file, base).href;
+      let m, at;
+      if (aa.pack) {
+        m = aa.pack;
+        at = assetUrl;
+      } else {
+        const base = new URL(aa.manifest, location.href);
+        const res = await fetch(base);
+        if (!res.ok) throw new Error("aa sprite manifest: " + res.status);
+        m = await res.json();
+        at = (file2) => new URL(file2, base).href;
+      }
       const frames = await Promise.all(m.breath.frames.map((f) => loadImage(at(f))));
       const parts = {};
       for (const [part, states] of Object.entries(m.parts || {})) {
@@ -1025,27 +1200,28 @@ function loadAaPack(manifest) {
       }
       return { m, frames, parts, w: m.size[0], h: m.size[1] };
     })();
-    task.catch(() => packs.delete(manifest));
-    packs.set(manifest, task);
+    task.catch(() => packs.delete(key));
+    packs.set(key, task);
   }
-  return packs.get(manifest);
+  return packs.get(key);
 }
 var reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-function AaSprite({ manifest, talk, fallback, className, label }) {
+function AaSprite({ aa, talk, fallback, className, label }) {
   const [pack, setPack] = import_react3.default.useState(null);
   const canvas = import_react3.default.useRef(null);
   const talkRef = import_react3.default.useRef(talk);
   talkRef.current = talk;
+  const key = packKey(aa);
   import_react3.default.useEffect(() => {
     let live = true;
-    loadAaPack(manifest).then((p) => {
-      if (live) setPack(p);
+    loadAaPack(aa).then((p2) => {
+      if (live) setPack(p2);
     }, () => {
     });
     return () => {
       live = false;
     };
-  }, [manifest]);
+  }, [key]);
   import_react3.default.useLayoutEffect(() => {
     const el = canvas.current;
     if (!pack || !el) return void 0;
@@ -1073,15 +1249,15 @@ function AaSprite({ manifest, talk, fallback, className, label }) {
         }
       }
       const mouth = mouthAt(m.talk?.mouth_loop, talkRef.current, now);
-      const key = `${b}|${eyes}|${mouth}`;
-      if (key === drawn) return;
-      drawn = key;
+      const key2 = `${b}|${eyes}|${mouth}`;
+      if (key2 === drawn) return;
+      drawn = key2;
       g.clearRect(0, 0, pack.w, pack.h);
       g.drawImage(pack.frames[b], 0, 0);
       const lift = m.breath.lifts?.[b] || 0;
       for (const [part, state2] of [["eyes", eyes], ["mouth", mouth]]) {
-        const p = pack.parts[part]?.[state2];
-        if (p) g.drawImage(p.img, p.x, p.y - lift);
+        const p2 = pack.parts[part]?.[state2];
+        if (p2) g.drawImage(p2.img, p2.x, p2.y - lift);
       }
     };
     draw(performance.now());
@@ -1093,6 +1269,416 @@ function AaSprite({ manifest, talk, fallback, className, label }) {
   }, [pack]);
   if (!pack) return fallback || null;
   return /* @__PURE__ */ import_react3.default.createElement("canvas", { ref: canvas, className, role: "img", "aria-label": label });
+}
+
+// lib/sounds.js
+var p = (wave, f, dur, gain, more = {}) => ({ wave, f, dur, gain, ...more });
+var VOICES = Object.freeze([
+  { id: "classic", label: "经典哔哔", desc: "逆转裁判式的三角波哔哔声", gender: "", parts: [p("triangle", 420, 0.05, 0.045, { attack: 4e-3 })] },
+  { id: "bell", label: "清亮铃音", desc: "干净透亮，带一点泛音", gender: "female", parts: [p("sine", 660, 0.07, 0.05, { attack: 3e-3 }), p("sine", 1320, 0.04, 0.015, { attack: 3e-3 })] },
+  { id: "chirp", label: "少女啾啾", desc: "每个字往上一挑，活泼", gender: "female", parts: [p("triangle", 520, 0.05, 0.045, { to: 640, attack: 4e-3 })] },
+  { id: "soft", label: "温柔气声", desc: "软一点、带气息", gender: "female", parts: [p("sine", 480, 0.07, 0.04, { attack: 0.012 }), p("noise", 2400, 0.05, 0.025, { q: 1.5, attack: 0.01 })] },
+  { id: "cool", label: "冷淡御姐", desc: "短促、偏方的音色，压着说", gender: "female", parts: [p("square", 400, 0.045, 0.02, { attack: 3e-3, lp: 1600 })] },
+  { id: "bubble", label: "元气泡泡", desc: "每个字往下一落，像吐泡泡", gender: "female", parts: [p("sine", 760, 0.06, 0.055, { to: 560, attack: 3e-3 })] },
+  { id: "boy", label: "少年清亮", desc: "中音，干脆", gender: "male", parts: [p("triangle", 330, 0.05, 0.05, { attack: 4e-3 }), p("sine", 660, 0.03, 0.012)] },
+  { id: "deep", label: "低沉男声", desc: "厚实的低音", gender: "male", parts: [p("sawtooth", 150, 0.06, 0.035, { attack: 5e-3, lp: 900 })] },
+  { id: "gruff", label: "粗犷大叔", desc: "更低、带点沙哑", gender: "male", parts: [p("square", 118, 0.06, 0.03, { attack: 4e-3, lp: 700 }), p("noise", 500, 0.04, 0.03, { q: 0.8 })] },
+  { id: "elder", label: "老者", desc: "低、慢慢往下沉，有点颤", gender: "male", parts: [p("triangle", 190, 0.07, 0.05, { to: 175, attack: 6e-3 }), p("triangle", 193, 0.07, 0.03, { to: 178, attack: 6e-3 })] },
+  { id: "kid", label: "孩童", desc: "很高、往上挑", gender: "", parts: [p("sine", 880, 0.045, 0.05, { to: 980, attack: 3e-3 })] },
+  { id: "wood", label: "木琴", desc: "敲击感，圆润", gender: "", parts: [p("sine", 520, 0.09, 0.06, { attack: 2e-3 }), p("sine", 2080, 0.02, 0.02, { attack: 1e-3 })] },
+  { id: "retro", label: "8-bit 掌机", desc: "老游戏机的方波", gender: "", parts: [p("square", 523, 0.04, 0.022, { attack: 2e-3 })] },
+  { id: "robot", label: "机械电子", desc: "金属感，像机器人", gender: "", parts: [p("sawtooth", 300, 0.05, 0.025, { attack: 2e-3, lp: 2200 }), p("square", 603, 0.05, 0.012, { attack: 2e-3 })] },
+  { id: "typewriter", label: "打字机", desc: "咔嗒咔嗒，适合旁白", gender: "", parts: [p("noise", 3200, 0.025, 0.09, { q: 2 }), p("square", 1800, 0.012, 0.01, { attack: 1e-3 })] },
+  { id: "whisper", label: "耳语", desc: "只有气声，像凑在耳边", gender: "", parts: [p("noise", 1800, 0.06, 0.05, { q: 3, attack: 0.01 })] }
+]);
+var VOICE_IDS = new Set(VOICES.map((v) => v.id));
+var voiceById = (id) => VOICES.find((v) => v.id === id) || null;
+var VOICE_POOLS = { female: ["bell", "chirp", "soft", "cool", "bubble"], male: ["boy", "deep", "gruff", "elder"], other: ["classic", "kid", "wood", "robot"], "": ["classic"] };
+var VOICE_PITCH_LIMIT = 6;
+var SOUND_SLOTS = Object.freeze([
+  {
+    id: "impact",
+    label: "重音落地",
+    hint: "重音字砸下来的那一下",
+    group: "stage",
+    presets: [
+      { id: "thud", label: "闷咚", parts: [p("sine", 150, 0.28, 0.22, { to: 52 }), p("noise", 900, 0.07, 0.08, { q: 0.8 })] },
+      { id: "boom", label: "低音炮", parts: [p("sine", 90, 0.5, 0.3, { to: 38 }), p("noise", 200, 0.15, 0.08, { q: 0.5 })] },
+      { id: "gavel", label: "法槌", parts: [p("triangle", 420, 0.09, 0.18, { to: 300, attack: 1e-3 }), p("noise", 2200, 0.05, 0.15, { q: 2 }), p("sine", 180, 0.2, 0.12, { to: 90 })] },
+      { id: "punch", label: "重拳", parts: [p("noise", 1200, 0.09, 0.22, { q: 0.5 }), p("sine", 110, 0.22, 0.25, { to: 45 })] },
+      { id: "taiko", label: "太鼓", parts: [p("sine", 120, 0.6, 0.28, { to: 80, attack: 2e-3 }), p("noise", 600, 0.05, 0.08, { q: 1 }), p("sine", 240, 0.15, 0.06, { to: 160 })] }
+    ]
+  },
+  {
+    id: "slam",
+    label: "怒吼拍桌",
+    hint: "吼出来的台词",
+    group: "stage",
+    presets: [
+      { id: "desk", label: "拍桌", parts: [p("triangle", 95, 0.35, 0.28, { to: 40 }), p("noise", 1600, 0.18, 0.2, { q: 0.6 }), p("noise", 300, 0.25, 0.18, { q: 0.7, at: 0.01 })] },
+      { id: "crash", label: "碎裂", parts: [p("noise", 3500, 0.5, 0.18, { q: 0.4 }), p("noise", 800, 0.3, 0.15, { q: 0.6 }), p("triangle", 80, 0.3, 0.2, { to: 40 })] },
+      { id: "thunder", label: "雷鸣", parts: [p("noise", 200, 1.1, 0.3, { q: 0.5, attack: 0.02 }), p("sine", 60, 0.9, 0.25, { to: 35 })] },
+      { id: "hammer", label: "重锤", parts: [p("square", 70, 0.3, 0.12, { to: 35, lp: 500 }), p("noise", 1e3, 0.12, 0.25, { q: 0.7 })] },
+      { id: "gong", label: "铜锣", parts: [p("sine", 180, 1.4, 0.12, { attack: 5e-3 }), p("sine", 267, 1.2, 0.08), p("sine", 413, 0.9, 0.05), p("noise", 1500, 0.08, 0.08, { q: 0.8 })] }
+    ]
+  },
+  {
+    id: "stab",
+    label: "刺中要害",
+    hint: "被戳中、崩溃的那一下",
+    group: "stage",
+    presets: [
+      { id: "stab", label: "尖刺", parts: [p("sawtooth", 1400, 0.32, 0.08, { to: 180 }), p("square", 700, 0.4, 0.05, { to: 90 }), p("noise", 2500, 0.12, 0.12, { q: 1.2 })] },
+      { id: "glass", label: "玻璃碎", parts: [p("noise", 5e3, 0.35, 0.12, { q: 1 }), p("sine", 2637, 0.3, 0.04), p("sine", 3520, 0.25, 0.03, { at: 0.02 })] },
+      { id: "zap", label: "电击", parts: [p("sawtooth", 2200, 0.25, 0.06, { to: 120 }), p("square", 60, 0.25, 0.04, { lp: 1200 }), p("noise", 4e3, 0.1, 0.06, { q: 1 })] },
+      { id: "strings", label: "惊愕弦乐", parts: [p("sawtooth", 622, 0.6, 0.03, { attack: 0.01, lp: 3e3 }), p("sawtooth", 659, 0.6, 0.03, { attack: 0.01, lp: 3e3 }), p("sawtooth", 932, 0.6, 0.025, { attack: 0.01, lp: 3e3 })] },
+      { id: "heart", label: "心跳骤停", parts: [p("sine", 70, 0.15, 0.3, { to: 50 }), p("sine", 70, 0.18, 0.3, { to: 50, at: 0.22 })] }
+    ]
+  },
+  {
+    id: "ding",
+    label: "灵光一闪",
+    hint: "漫画符号是灯泡时",
+    group: "stage",
+    presets: [
+      { id: "ding", label: "叮", parts: [p("sine", 1568, 0.6, 0.08), p("sine", 2093, 0.7, 0.07, { at: 0.07 })] },
+      { id: "sparkle", label: "闪光", parts: [p("sine", 2093, 0.25, 0.05), p("sine", 2637, 0.25, 0.045, { at: 0.05 }), p("sine", 3136, 0.35, 0.04, { at: 0.1 })] },
+      { id: "chime", label: "风铃", parts: [p("sine", 1760, 1, 0.05), p("sine", 2217, 0.9, 0.04, { at: 0.12 }), p("sine", 2637, 0.8, 0.035, { at: 0.24 })] },
+      { id: "pop", label: "啵", parts: [p("sine", 500, 0.09, 0.12, { to: 1500, attack: 2e-3 })] },
+      { id: "arp", label: "上行琶音", parts: [p("triangle", 784, 0.18, 0.06), p("triangle", 988, 0.18, 0.06, { at: 0.06 }), p("triangle", 1175, 0.18, 0.06, { at: 0.12 }), p("triangle", 1568, 0.4, 0.06, { at: 0.18 })] }
+    ]
+  },
+  {
+    id: "select",
+    label: "点按钮",
+    hint: "菜单、选项、快捷键",
+    group: "ui",
+    presets: [
+      { id: "pop", label: "双音", parts: [p("sine", 660, 0.18, 0.05, { attack: 0.01 }), p("sine", 990, 0.18, 0.05, { attack: 0.01, at: 0.06 })] },
+      { id: "click", label: "轻点", parts: [p("noise", 4e3, 0.02, 0.1, { q: 3 }), p("sine", 1200, 0.03, 0.02, { attack: 1e-3 })] },
+      { id: "wood", label: "木鱼", parts: [p("sine", 880, 0.08, 0.08, { to: 700, attack: 1e-3 })] },
+      { id: "bubble", label: "水泡", parts: [p("sine", 400, 0.07, 0.07, { to: 900, attack: 2e-3 })] },
+      { id: "retro", label: "8-bit", parts: [p("square", 988, 0.05, 0.025, { attack: 1e-3 }), p("square", 1319, 0.08, 0.025, { attack: 1e-3, at: 0.05 })] }
+    ]
+  },
+  {
+    id: "hover",
+    label: "指到按钮",
+    hint: "鼠标移到选项上",
+    group: "ui",
+    presets: [
+      { id: "tick", label: "轻响", parts: [p("sine", 880, 0.18, 0.018, { attack: 0.01 })] },
+      { id: "soft", label: "更轻", parts: [p("sine", 660, 0.12, 0.012, { attack: 0.02 })] },
+      { id: "wood", label: "木", parts: [p("sine", 1320, 0.04, 0.025, { to: 1100, attack: 1e-3 })] },
+      { id: "glass", label: "玻璃", parts: [p("sine", 2637, 0.12, 0.01, { attack: 2e-3 })] },
+      { id: "retro", label: "8-bit", parts: [p("square", 1760, 0.02, 0.01, { attack: 1e-3 })] }
+    ]
+  },
+  {
+    id: "page",
+    label: "翻页",
+    hint: "翻到下一句",
+    group: "ui",
+    presets: [
+      { id: "tone", label: "单音", parts: [p("sine", 520, 0.18, 0.05, { attack: 0.01 })] },
+      { id: "paper", label: "纸张沙沙", parts: [p("noise", 3e3, 0.16, 0.06, { q: 0.6, attack: 0.03 })] },
+      { id: "swish", label: "嗖", parts: [p("noise", 1200, 0.2, 0.07, { to: 4e3, q: 1.2, attack: 0.05 })] },
+      { id: "wood", label: "木", parts: [p("sine", 660, 0.1, 0.05, { to: 520, attack: 1e-3 })] },
+      { id: "retro", label: "8-bit", parts: [p("square", 660, 0.04, 0.02, { attack: 1e-3 }), p("square", 880, 0.04, 0.02, { attack: 1e-3, at: 0.04 })] }
+    ]
+  },
+  {
+    id: "open",
+    label: "开始 / 继续",
+    hint: "标题画面进入剧情",
+    group: "ui",
+    presets: [
+      { id: "arp", label: "三连音", parts: [p("sine", 440, 0.18, 0.05, { attack: 0.01 }), p("sine", 660, 0.18, 0.05, { attack: 0.01, at: 0.06 }), p("sine", 880, 0.18, 0.05, { attack: 0.01, at: 0.12 })] },
+      { id: "chime", label: "风铃", parts: [p("sine", 1047, 0.6, 0.04), p("sine", 1319, 0.6, 0.035, { at: 0.08 }), p("sine", 1568, 0.7, 0.03, { at: 0.16 })] },
+      { id: "swell", label: "渐起", parts: [p("triangle", 330, 0.4, 0.05, { to: 660, attack: 0.25 })] },
+      { id: "retro", label: "8-bit", parts: [p("square", 523, 0.06, 0.02), p("square", 659, 0.06, 0.02, { at: 0.06 }), p("square", 784, 0.06, 0.02, { at: 0.12 }), p("square", 1047, 0.12, 0.02, { at: 0.18 })] },
+      { id: "bell", label: "钟声", parts: [p("sine", 880, 1, 0.05, { attack: 2e-3 }), p("sine", 2200, 0.5, 0.015)] }
+    ]
+  }
+]);
+var SLOT_IDS = new Set(SOUND_SLOTS.map((s) => s.id));
+var slotById = (id) => SOUND_SLOTS.find((s) => s.id === id) || null;
+var DEFAULT_SOUNDS = Object.freeze(Object.fromEntries(SOUND_SLOTS.map((s) => [s.id, s.presets[0].id])));
+var MAX_SOUND_BYTES = 5 * 1024 * 1024;
+function soundFor(ui2, slot) {
+  const def = slotById(slot);
+  if (!def) return null;
+  const choice = ui2?.sounds?.[slot] || def.presets[0].id;
+  if (choice === "off") return null;
+  if (choice === "custom") return ui2?.customSounds?.[slot]?.assetId ? { assetId: ui2.customSounds[slot].assetId } : { parts: def.presets[0].parts };
+  return { parts: (def.presets.find((x) => x.id === choice) || def.presets[0]).parts };
+}
+var clamp = (v, lo, hi, d) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d;
+};
+var clampPitch = (v) => Math.round(clamp(v, -VOICE_PITCH_LIMIT, VOICE_PITCH_LIMIT, 0));
+function cleanVoice(value) {
+  const v = String(value ?? "").trim();
+  return v === "off" || VOICE_IDS.has(v) ? v : "";
+}
+function nameHash(name2) {
+  let h = 0;
+  for (const ch of String(name2 || "")) h = h * 31 + ch.codePointAt(0) >>> 0;
+  return h;
+}
+function poolOf(person, ui2) {
+  return VOICE_IDS.has(ui2?.voiceDefault) ? [ui2.voiceDefault] : VOICE_POOLS[person?.gender] || VOICE_POOLS[""];
+}
+function autoVoice(id, name2, pitch) {
+  const h = nameHash(name2);
+  const spread = id === "classic" ? 12 * Math.log2((420 + h % 7 * 38) / 420) : (h >>> 8) % 5 - 2;
+  return { id, pitch: pitch + spread, auto: true };
+}
+function resolveVoice(person, name2, ui2) {
+  const chosen = cleanVoice(person?.voice);
+  if (chosen === "off") return null;
+  const pitch = clampPitch(person?.voicePitch);
+  if (chosen) return { id: chosen, pitch, auto: false };
+  const pool = poolOf(person, ui2);
+  return autoVoice(pool[nameHash(name2) % pool.length], name2, pitch);
+}
+function castVoices(people, ui2) {
+  const list2 = [...people || []].sort((a, b) => (a.createdTurn ?? -1) - (b.createdTurn ?? -1) || String(a.name).localeCompare(String(b.name)));
+  const voices = new Map(list2.map((p2) => [p2.name, resolveVoice(p2, p2.name, ui2)]));
+  const taken = new Set([...voices.values()].filter((v) => v && !v.auto).map((v) => v.id));
+  for (const p2 of list2) {
+    const voice = voices.get(p2.name);
+    if (!voice || !voice.auto) continue;
+    const pool = poolOf(p2, ui2);
+    const start = pool.indexOf(voice.id);
+    const free = pool.map((_, i) => pool[(start + i) % pool.length]).find((id) => !taken.has(id));
+    if (free && free !== voice.id) voices.set(p2.name, autoVoice(free, p2.name, clampPitch(p2.voicePitch)));
+    taken.add(voices.get(p2.name).id);
+  }
+  return voices;
+}
+function lineVoice(type, speaker, voices, ui2) {
+  if (type === "narration" || !speaker) {
+    return ui2?.narrationVoice === "off" ? null : { id: VOICE_IDS.has(ui2?.narrationVoice) ? ui2.narrationVoice : "classic", pitch: clampPitch(ui2?.narrationPitch ?? -6), auto: false };
+  }
+  const voice = voices?.has?.(speaker) ? voices.get(speaker) : resolveVoice(null, speaker, ui2);
+  return voice && type === "thought" ? { ...voice, gain: 0.7 } : voice;
+}
+
+// src/client/theater/audio.js
+var bgm = null;
+var preview = null;
+var ctx = null;
+function audioCtx() {
+  if (!ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ctx = new AC();
+  }
+  if (ctx.state === "suspended") ctx.resume().catch(() => {
+  });
+  return ctx;
+}
+function fade(el, to, ms, done) {
+  const from = el.volume;
+  const start = performance.now();
+  const tick = (now) => {
+    const k = Math.min(1, (now - start) / ms);
+    el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
+    if (k < 1) requestAnimationFrame(tick);
+    else if (done) done();
+  };
+  requestAnimationFrame(tick);
+}
+function playBgm(track, volume = 0.45) {
+  if (!track) {
+    stopBgm();
+    return;
+  }
+  const audible = preview ? 0 : volume;
+  if (bgm && bgm.id === track.id) {
+    bgm.volume = volume;
+    bgm.el.volume = Math.min(bgm.el.volume, audible);
+    fade(bgm.el, audible, 400);
+    return;
+  }
+  const old = bgm;
+  const el = new Audio();
+  el.src = track.url;
+  el.loop = true;
+  el.volume = 0;
+  el.play().then(() => fade(el, preview ? 0 : volume, 1800)).catch(() => {
+  });
+  bgm = { el, id: track.id, volume };
+  if (old) fade(old.el, 0, 1400, () => {
+    old.el.pause();
+    old.el.src = "";
+  });
+}
+function stopBgm() {
+  if (!bgm) return;
+  const old = bgm;
+  bgm = null;
+  fade(old.el, 0, 900, () => {
+    old.el.pause();
+    old.el.src = "";
+  });
+}
+function previewTrack(track, onEnd) {
+  stopPreview();
+  if (!track) return;
+  const el = new Audio(track.url);
+  el.volume = bgm ? bgm.volume : 0.6;
+  preview = { el, id: track.id, onEnd };
+  el.onended = () => {
+    if (preview && preview.el === el) stopPreview();
+  };
+  if (bgm) fade(bgm.el, 0, 500);
+  el.play().catch(() => {
+    if (preview && preview.el === el) stopPreview();
+  });
+}
+function stopPreview() {
+  if (!preview) return;
+  const p2 = preview;
+  preview = null;
+  p2.el.pause();
+  p2.el.src = "";
+  if (bgm) fade(bgm.el, bgm.volume, 800);
+  if (p2.onEnd) p2.onEnd();
+}
+var sounds = { blipVolume: 1, sfx: true, sfxVolume: 1, sounds: DEFAULT_SOUNDS, customSounds: {} };
+function configureSounds(ui2) {
+  if (!ui2) return;
+  sounds = ui2;
+  for (const file2 of Object.values(ui2.customSounds || {})) fetchFile(file2.assetId).catch(() => {
+  });
+}
+var noiseBuffer = null;
+function noise(ac) {
+  if (!noiseBuffer) {
+    noiseBuffer = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.5), ac.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuffer;
+}
+function playParts(ac, parts, { rate = 1, volume = 1, at = ac.currentTime } = {}) {
+  if (!(volume > 0)) return;
+  for (const part of parts) {
+    const t = at + (part.at || 0);
+    const end = t + part.dur;
+    const g = ac.createGain();
+    const peak = Math.max(2e-4, part.gain * volume);
+    const attack = part.attack ?? (part.wave === "noise" ? 0 : 6e-3);
+    if (attack > 0) {
+      g.gain.setValueAtTime(1e-4, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + attack);
+    } else g.gain.setValueAtTime(peak, t);
+    g.gain.exponentialRampToValueAtTime(1e-4, end);
+    let src, head;
+    if (part.wave === "noise") {
+      src = ac.createBufferSource();
+      src.buffer = noise(ac);
+      src.loop = true;
+      head = ac.createBiquadFilter();
+      head.type = "bandpass";
+      head.Q.value = part.q ?? 1;
+      src.connect(head);
+    } else {
+      src = ac.createOscillator();
+      src.type = part.wave;
+      head = src;
+    }
+    const freq = part.wave === "noise" ? head.frequency : src.frequency;
+    freq.setValueAtTime(part.f * rate, t);
+    if (part.to && part.to !== part.f) freq.exponentialRampToValueAtTime(part.to * rate, end);
+    if (part.lp) {
+      const lp = ac.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = part.lp;
+      head.connect(lp);
+      head = lp;
+    }
+    head.connect(g).connect(ac.destination);
+    src.start(t);
+    src.stop(end + 0.02);
+  }
+}
+var MAX_FILE_SECONDS = 4;
+var files = /* @__PURE__ */ new Map();
+var buffers = /* @__PURE__ */ new Map();
+function fetchFile(id) {
+  if (!files.has(id)) {
+    const p2 = fetch(assetUrl(id)).then((r) => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.arrayBuffer();
+    });
+    p2.catch(() => files.delete(id));
+    files.set(id, p2);
+  }
+  return files.get(id);
+}
+function decoded(ac, id) {
+  if (!buffers.has(id)) {
+    const p2 = fetchFile(id).then((bytes) => ac.decodeAudioData(bytes.slice(0)));
+    p2.catch(() => buffers.delete(id));
+    buffers.set(id, p2);
+  }
+  return buffers.get(id);
+}
+function playFile(ac, id, volume) {
+  if (!(volume > 0)) return;
+  decoded(ac, id).then((buffer) => {
+    const src = ac.createBufferSource();
+    const g = ac.createGain();
+    const t = ac.currentTime;
+    src.buffer = buffer;
+    g.gain.setValueAtTime(volume, t);
+    src.connect(g).connect(ac.destination);
+    src.start(t);
+    if (buffer.duration > MAX_FILE_SECONDS) {
+      g.gain.setValueAtTime(volume, t + MAX_FILE_SECONDS - 0.3);
+      g.gain.linearRampToValueAtTime(0, t + MAX_FILE_SECONDS);
+      src.stop(t + MAX_FILE_SECONDS);
+    }
+  }).catch(() => {
+  });
+}
+function playSound(sound, volume) {
+  const ac = sound && audioCtx();
+  if (!ac) return;
+  if (sound.assetId) playFile(ac, sound.assetId, volume);
+  else playParts(ac, sound.parts, { volume });
+}
+function blip(voice, { pitch = 1, gain = 1 } = {}) {
+  const v = voice && voiceById(voice.id);
+  const ac = v && audioCtx();
+  if (!ac) return;
+  const rate = 2 ** ((voice.pitch || 0) / 12) * pitch * (0.96 + Math.random() * 0.08);
+  playParts(ac, v.parts, { rate, volume: (sounds.blipVolume ?? 1) * gain * (voice.gain ?? 1) });
+}
+function previewVoice(voice, ui2 = sounds) {
+  const v = voice && voiceById(voice.id);
+  const ac = v && audioCtx();
+  if (!ac) return;
+  const base = 2 ** ((voice.pitch || 0) / 12);
+  const t0 = ac.currentTime + 0.02;
+  for (const dt of [0, 0.09, 0.18, 0.42, 0.51, 0.6, 0.69]) playParts(ac, v.parts, { rate: base * (0.96 + Math.random() * 0.08), volume: ui2.blipVolume ?? 1, at: t0 + dt });
+}
+function stinger(kind) {
+  if (sounds.sfx !== false) playSound(soundFor(sounds, kind), sounds.sfxVolume ?? 1);
+}
+function sfx(kind = "select") {
+  stinger(kind === "back" ? "select" : kind);
+}
+function previewSound(slot, choice, ui2 = sounds) {
+  const def = slotById(slot);
+  if (!def || choice === "off") return;
+  const file2 = choice === "custom" && ui2.customSounds && ui2.customSounds[slot];
+  const sound = file2 ? { assetId: file2.assetId } : { parts: (def.presets.find((x) => x.id === choice) || def.presets[0]).parts };
+  playSound(sound, ui2.sfxVolume ?? 1);
 }
 
 // src/client/theater/Stage.jsx
@@ -1148,14 +1734,14 @@ function Backdrop({ scene, view, transition = "dissolve" }) {
   const id = bg.src || "sky:" + scene.time + ":" + scene.location;
   const [layers, setLayers] = import_react4.default.useState(() => [{ id, bg, scene, enter: false }]);
   import_react4.default.useEffect(() => {
-    setLayers((list) => {
-      if (list[list.length - 1].id === id) return list.map((l, i) => i === list.length - 1 ? { ...l, scene } : l);
-      return [...list.slice(-1).map((l) => ({ ...l, leaving: true })), { id, bg, scene, enter: true, tr: transition }];
+    setLayers((list2) => {
+      if (list2[list2.length - 1].id === id) return list2.map((l, i) => i === list2.length - 1 ? { ...l, scene } : l);
+      return [...list2.slice(-1).map((l) => ({ ...l, leaving: true })), { id, bg, scene, enter: true, tr: transition }];
     });
   }, [id, scene.time]);
   import_react4.default.useEffect(() => {
     if (layers.length < 2) return void 0;
-    const t = setTimeout(() => setLayers((list) => list.filter((l) => !l.leaving)), 1900);
+    const t = setTimeout(() => setLayers((list2) => list2.filter((l) => !l.leaving)), 1900);
     return () => clearTimeout(t);
   }, [layers]);
   return /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, layers.map((layer) => {
@@ -1246,9 +1832,9 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     return () => clearTimeout(t);
   }, [src]);
   const uploaded = Boolean(person && Object.values(person.sprites || {}).some((r) => r && r.assetId === sprite && r.uploaded));
-  const aa = (person && Object.values(person.sprites || {}).find((r) => r && r.assetId === sprite && r.aa?.manifest))?.aa.manifest || "";
+  const aa = (person && Object.values(person.sprites || {}).find((r) => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null;
   const still = shown ? /* @__PURE__ */ import_react4.default.createElement("img", { src: shown, alt: entry.name, className: swap ? "is-swap" : "", draggable: "false" }) : /* @__PURE__ */ import_react4.default.createElement(Silhouette, { name: entry.name, color, appearance: person && person.appearance, gender: person && person.gender });
-  return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-actor${speaking ? " is-speaking" : ""}${uploaded ? " is-upload" : ""}${leaving ? " is-leaving" : ""}${aa ? " is-aa" : ""}`, style: { "--x": actorX(entry.pos) + "%", "--side": SIDE[entry.pos] || "0%" }, "data-name": entry.name }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { manifest: aa, talk: speaking && talk && talk.key === beat.key ? talk : null, fallback: still, className: "fg-aa", label: entry.name }) : still), speaking && beat.sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: beat.sym })));
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-actor${speaking ? " is-speaking" : ""}${uploaded ? " is-upload" : ""}${leaving ? " is-leaving" : ""}${aa ? " is-aa" : ""}`, style: { "--x": actorX(entry.pos) + "%", "--side": SIDE[entry.pos] || "0%" }, "data-name": entry.name }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { aa, talk: speaking && talk && talk.key === beat.key ? talk : null, fallback: still, className: "fg-aa", label: entry.name }) : still), speaking && beat.sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: beat.sym })));
 }
 var LEAVE_MS = 450;
 function useLeaving(cast) {
@@ -1256,7 +1842,7 @@ function useLeaving(cast) {
   const leaving = import_react4.default.useRef(/* @__PURE__ */ new Map());
   const [, refresh] = import_react4.default.useReducer((n) => n + 1, 0);
   const now = Date.now();
-  for (const p of prev.current) if (!cast.some((c) => c.name === p.name) && !leaving.current.has(p.name)) leaving.current.set(p.name, { entry: p, at: now });
+  for (const p2 of prev.current) if (!cast.some((c) => c.name === p2.name) && !leaving.current.has(p2.name)) leaving.current.set(p2.name, { entry: p2, at: now });
   for (const c of cast) leaving.current.delete(c.name);
   prev.current = cast;
   const pending = leaving.current.size;
@@ -1272,7 +1858,7 @@ function useLeaving(cast) {
   return [...leaving.current.values()].map((l) => l.entry);
 }
 function Cast({ beat, view, talk }) {
-  const people = new Map((view && view.cast || []).map((p) => [p.name, p]));
+  const people = new Map((view && view.cast || []).map((p2) => [p2.name, p2]));
   let cast = beat.cast || [];
   if (!beat.directed && !cast.length && beat.speaker && beat.speaker !== "我" && people.has(beat.speaker)) cast = [{ name: beat.speaker, pos: "center" }];
   const leaving = useLeaving(cast);
@@ -1341,6 +1927,35 @@ function TitleCard({ beat }) {
   if (!beat.sceneEnter || !beat.scene.location) return null;
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-titlecard", key: beat.key }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-titlecard-line" }), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-titlecard-name" }, beat.scene.location), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-titlecard-sub" }, [TIME_LABEL[beat.scene.time], WEATHER_LABEL[beat.scene.weather]].filter(Boolean).join(" · "), " — Turn ", beat.turn), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-titlecard-line", style: { width: "14cqw", marginTop: "1cqw" } }));
 }
+var QUAKE = [[0, 0], [0.6, 300], [1.2, 420], [2, 560]];
+function quake(el, power) {
+  const [amp, ms] = QUAKE[power] || QUAKE[1];
+  const path = [0, -1, 0.8, -0.7, 0.5, -0.3, 0.15, 0];
+  el.animate(path.map((k, i) => ({ transform: `translate(${(k * amp).toFixed(3)}%, ${((i % 2 ? -0.6 : 0.6) * k * amp).toFixed(3)}%)` })), { duration: ms, easing: "linear" });
+}
+function useHits(stageRef, flashRef, soundOn) {
+  const sound = import_react4.default.useRef(soundOn);
+  sound.current = soundOn;
+  return import_react4.default.useCallback((f) => {
+    if (f.kind === "sound") {
+      if (sound.current) stinger(f.sound);
+      return;
+    }
+    if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const stage = stageRef.current;
+    if (!stage || typeof stage.animate !== "function") return;
+    if (f.kind === "shake") quake(stage, f.power);
+    else if (f.kind === "box") {
+      const box = stage.querySelector(".fg-dialog");
+      if (box) quake(box, f.power);
+    } else if (f.kind === "flash" || f.kind === "redflash") {
+      const el = flashRef.current;
+      if (!el) return;
+      el.classList.toggle("is-red", f.kind === "redflash");
+      el.animate([{ opacity: 0.25 + 0.25 * f.power }, { opacity: 0 }], { duration: 260 + 120 * f.power, easing: "ease-out" });
+    }
+  }, [stageRef, flashRef]);
+}
 function useCamera(beat) {
   const [cam, setCam] = import_react4.default.useState("");
   import_react4.default.useEffect(() => {
@@ -1362,161 +1977,64 @@ function Flash({ beat }) {
 
 // src/client/theater/Dialog.jsx
 var import_react5 = __toESM(require("react"), 1);
-
-// src/client/theater/audio.js
-var bgm = null;
-var preview = null;
-var ctx = null;
-function audioCtx() {
-  if (!ctx) {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
-    ctx = new AC();
-  }
-  if (ctx.state === "suspended") ctx.resume().catch(() => {
-  });
-  return ctx;
-}
-function fade(el, to, ms, done) {
-  const from = el.volume;
-  const start = performance.now();
-  const tick = (now) => {
-    const k = Math.min(1, (now - start) / ms);
-    el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
-    if (k < 1) requestAnimationFrame(tick);
-    else if (done) done();
-  };
-  requestAnimationFrame(tick);
-}
-function playBgm(track, volume = 0.45) {
-  if (!track) {
-    stopBgm();
-    return;
-  }
-  const audible = preview ? 0 : volume;
-  if (bgm && bgm.id === track.id) {
-    bgm.volume = volume;
-    bgm.el.volume = Math.min(bgm.el.volume, audible);
-    fade(bgm.el, audible, 400);
-    return;
-  }
-  const old = bgm;
-  const el = new Audio();
-  el.src = track.url;
-  el.loop = true;
-  el.volume = 0;
-  el.play().then(() => fade(el, preview ? 0 : volume, 1800)).catch(() => {
-  });
-  bgm = { el, id: track.id, volume };
-  if (old) fade(old.el, 0, 1400, () => {
-    old.el.pause();
-    old.el.src = "";
-  });
-}
-function stopBgm() {
-  if (!bgm) return;
-  const old = bgm;
-  bgm = null;
-  fade(old.el, 0, 900, () => {
-    old.el.pause();
-    old.el.src = "";
-  });
-}
-function previewTrack(track, onEnd) {
-  stopPreview();
-  if (!track) return;
-  const el = new Audio(track.url);
-  el.volume = bgm ? bgm.volume : 0.6;
-  preview = { el, id: track.id, onEnd };
-  el.onended = () => {
-    if (preview && preview.el === el) stopPreview();
-  };
-  if (bgm) fade(bgm.el, 0, 500);
-  el.play().catch(() => {
-    if (preview && preview.el === el) stopPreview();
-  });
-}
-function stopPreview() {
-  if (!preview) return;
-  const p = preview;
-  preview = null;
-  p.el.pause();
-  p.el.src = "";
-  if (bgm) fade(bgm.el, bgm.volume, 800);
-  if (p.onEnd) p.onEnd();
-}
-function blip(seed = "", type = "dialogue") {
-  const ac = audioCtx();
-  if (!ac) return;
-  let h = 0;
-  for (const ch of String(seed)) h = h * 31 + ch.codePointAt(0) >>> 0;
-  const base = type === "narration" ? 300 : 420 + h % 7 * 38;
-  const t = ac.currentTime;
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.type = type === "thought" ? "sine" : "triangle";
-  osc.frequency.setValueAtTime(base * (0.96 + Math.random() * 0.08), t);
-  gain.gain.setValueAtTime(1e-4, t);
-  gain.gain.exponentialRampToValueAtTime(0.045, t + 4e-3);
-  gain.gain.exponentialRampToValueAtTime(1e-4, t + 0.05);
-  osc.connect(gain).connect(ac.destination);
-  osc.start(t);
-  osc.stop(t + 0.06);
-}
-function sfx(kind = "select") {
-  const ac = audioCtx();
-  if (!ac) return;
-  const t = ac.currentTime;
-  const notes = { hover: [880], select: [660, 990], page: [520], open: [440, 660, 880], back: [660, 440] }[kind] || [660];
-  notes.forEach((f, i) => {
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(f, t + i * 0.06);
-    gain.gain.setValueAtTime(1e-4, t + i * 0.06);
-    gain.gain.exponentialRampToValueAtTime(kind === "hover" ? 0.018 : 0.05, t + i * 0.06 + 0.01);
-    gain.gain.exponentialRampToValueAtTime(1e-4, t + i * 0.06 + 0.18);
-    osc.connect(gain).connect(ac.destination);
-    osc.start(t + i * 0.06);
-    osc.stop(t + i * 0.06 + 0.2);
-  });
-}
-
-// src/client/theater/Dialog.jsx
 var CARD_HEAD = { sms: "新消息", letter: "", note: "", news: "号外", terminal: "> SYSTEM", notice: "告示", diary: "", scroll: "" };
-function useTypewriter(beat, speed, { sound = true, hold = false } = {}) {
+function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null } = {}) {
   const key = beat ? beat.key : "";
   const chars = import_react5.default.useMemo(() => Array.from(beat && beat.text || ""), [key, beat && beat.text]);
-  const times = import_react5.default.useMemo(() => typeTimes(chars, speed || 0), [chars, speed]);
+  const emo = beat && beat.speaker ? beat.emotions && beat.emotions[beat.speaker] || beat.emo : "";
+  const say = beat ? beat.say : "";
+  const stress = beat ? beat.stress : "";
+  const type = beat ? beat.type : "narration";
+  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key }), [chars, speed, say, stress, emo, type, key]);
   const [shown, setShown] = import_react5.default.useState({ key, done: false });
   const [start, setStart] = import_react5.default.useState({ key: "", at: NaN });
   if (shown.key !== key) setShown({ key, done: false });
   const done = !speed || !chars.length || shown.key === key && shown.done;
+  const fxRef = import_react5.default.useRef(onFx);
+  fxRef.current = onFx;
+  const voiceRef = import_react5.default.useRef(voice);
+  voiceRef.current = voice;
+  const pending = import_react5.default.useRef([]);
+  const dropPending = () => {
+    pending.current.forEach(clearTimeout);
+    pending.current = [];
+  };
   import_react5.default.useEffect(() => {
     if (!speed || !chars.length || hold) return void 0;
     const t0 = performance.now();
     setStart({ key, at: t0 });
+    const { times, blip: delivery, fx } = plan;
     const finish = setTimeout(() => setShown({ key, done: true }), times[times.length - 1] + speed + 220);
-    let next = 1;
+    pending.current = fx.map((f) => setTimeout(() => {
+      if (fxRef.current) fxRef.current(f);
+    }, f.at));
+    let next = 0;
     const tick = sound ? setInterval(() => {
       const now = performance.now() - t0;
       for (; next < chars.length && times[next] <= now; next += 1) {
-        if (next % 2 === 0 && !SILENT.test(chars[next])) blip(beat.speaker, beat.type);
+        const sameBurst = next > 0 && times[next] === times[next - 1];
+        if (next % delivery.every === 0 && !sameBurst && !SILENT.test(chars[next])) blip(voiceRef.current, delivery);
       }
       if (next >= chars.length) clearInterval(tick);
-    }, speed) : null;
+    }, Math.max(8, Math.min(speed, plan.gap))) : null;
     return () => {
       clearTimeout(finish);
+      dropPending();
       if (tick) clearInterval(tick);
     };
-  }, [key, chars, times, speed, sound, hold]);
-  return [done, chars, () => setShown({ key, done: true }), start.key === key ? start.at : NaN, times];
+  }, [key, chars, plan, speed, sound, hold]);
+  import_react5.default.useEffect(() => {
+    if (done) dropPending();
+  }, [done]);
+  return [done, chars, () => setShown({ key, done: true }), start.key === key ? start.at : NaN, plan];
 }
-function DialogBox({ beat, chars, times, done, waiting, color, quick, progress, status, hiddenText }) {
+function DialogBox({ beat, chars, plan, done, waiting, color, quick, progress, status, hiddenText }) {
   const speaker = beat.alias || beat.speaker;
   const showName = speaker && beat.type !== "narration";
   const speed = quick.speed;
-  return /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-dialog", style: { "--speaker": color || void 0 } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-box" }), showName && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name", key: beat.speaker + beat.alias }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-plate" }, speaker), beat.emo && quick.emoLabel && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-sub" }, quick.emoLabel)), hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-text is-cardhint" }, "〔 ", CARD_LABEL[beat.card] || "卡片", " 〕"), !hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: `fg-text is-${beat.type}${done ? " is-done" : waiting ? " is-wait" : ""}`, key: beat.key, "aria-live": "polite" }, chars.map((ch, i) => /* @__PURE__ */ import_react5.default.createElement("span", { key: i, className: "fg-char", style: { "--d": (times ? times[i] : i * speed) + "ms" } }, ch))), done && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-wait", "aria-hidden": "true" }), status && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-status" }, status), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-progress" }, /* @__PURE__ */ import_react5.default.createElement("i", { style: { width: Math.round(progress * 100) + "%" } })), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-quick", onClick: (e) => e.stopPropagation() }, quick.items.map((item) => /* @__PURE__ */ import_react5.default.createElement("button", { key: item.id, type: "button", className: item.on ? "is-on" : "", title: item.title, onClick: () => {
+  const times = plan ? plan.times : null;
+  const marks = plan ? plan.marks : [];
+  return /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-dialog", style: { "--speaker": color || void 0 } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-box" }), showName && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name", key: beat.speaker + beat.alias }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-plate" }, speaker), beat.emo && quick.emoLabel && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-sub" }, quick.emoLabel)), hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-text is-cardhint" }, "〔 ", CARD_LABEL[beat.card] || "卡片", " 〕"), !hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: `fg-text is-${beat.type}${plan && plan.say ? " say-" + plan.say : ""}${done ? " is-done" : waiting ? " is-wait" : ""}`, key: beat.key, "aria-live": "polite" }, chars.map((ch, i) => /* @__PURE__ */ import_react5.default.createElement("span", { key: i, className: marks[i] ? "fg-char is-" + marks[i] : "fg-char", style: { "--d": (times ? times[i] : i * speed) + "ms" } }, ch))), done && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-wait", "aria-hidden": "true" }), status && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-status" }, status), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-progress" }, /* @__PURE__ */ import_react5.default.createElement("i", { style: { width: Math.round(progress * 100) + "%" } })), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-quick", onClick: (e) => e.stopPropagation() }, quick.items.map((item) => /* @__PURE__ */ import_react5.default.createElement("button", { key: item.id, type: "button", className: item.on ? "is-on" : "", title: item.title, onClick: () => {
     sfx("select");
     item.run();
   }, onMouseEnter: () => sfx("hover") }, item.label))));
@@ -1527,17 +2045,17 @@ function SceneCard({ beat }) {
 }
 function Choices({ choices, onChoose, onBack, waiting }) {
   const [free, setFree] = import_react5.default.useState("");
-  const list = choices || [];
-  return /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-choices", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-choices-title" }, list.length ? "CHOICE" : waiting ? "TO BE CONTINUED" : "YOUR TURN"), list.map((text, i) => /* @__PURE__ */ import_react5.default.createElement("button", { key: text, type: "button", className: "fg-choice", "data-n": String(i + 1).padStart(2, "0"), style: { "--i": i }, onMouseEnter: () => sfx("hover"), onClick: () => {
+  const list2 = choices || [];
+  return /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-choices", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-choices-title" }, list2.length ? "CHOICE" : waiting ? "TO BE CONTINUED" : "YOUR TURN"), list2.map((text, i) => /* @__PURE__ */ import_react5.default.createElement("button", { key: text, type: "button", className: "fg-choice", "data-n": String(i + 1).padStart(2, "0"), style: { "--i": i }, onMouseEnter: () => sfx("hover"), onClick: () => {
     sfx("select");
     onChoose(text);
-  } }, text)), /* @__PURE__ */ import_react5.default.createElement("form", { className: "fg-free", style: { "--i": list.length }, onSubmit: (e) => {
+  } }, text)), /* @__PURE__ */ import_react5.default.createElement("form", { className: "fg-free", style: { "--i": list2.length }, onSubmit: (e) => {
     e.preventDefault();
     if (free.trim()) {
       sfx("select");
       onChoose(free.trim());
     }
-  } }, /* @__PURE__ */ import_react5.default.createElement("input", { value: free, onChange: (e) => setFree(e.target.value), placeholder: list.length ? "或者，自己写下一步……" : "写下你的下一步……", onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react5.default.createElement("button", { type: "submit" }, "GO")), /* @__PURE__ */ import_react5.default.createElement("button", { type: "button", className: "fg-btn", style: { marginTop: "1cqw" }, onClick: onBack }, "回到聊天"));
+  } }, /* @__PURE__ */ import_react5.default.createElement("input", { value: free, onChange: (e) => setFree(e.target.value), placeholder: list2.length ? "或者，自己写下一步……" : "写下你的下一步……", onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react5.default.createElement("button", { type: "submit" }, "GO")), /* @__PURE__ */ import_react5.default.createElement("button", { type: "button", className: "fg-btn", style: { marginTop: "1cqw" }, onClick: onBack }, "回到聊天"));
 }
 
 // src/client/theater/Panels.jsx
@@ -1568,8 +2086,8 @@ function loadSkinFonts(skinId, base) {
   const skin = SKINS.find((s) => s.id === skinId) || SKINS[0];
   if (!base) return Promise.resolve();
   const root = base.replace(/\/?$/, "/");
-  const pending = skin.fonts.flatMap((key) => FONT_PACKS[key].css.map((file) => {
-    const href = `${root}${FONT_PACKS[key].pkg}/${file}`;
+  const pending = skin.fonts.flatMap((key) => FONT_PACKS[key].css.map((file2) => {
+    const href = `${root}${FONT_PACKS[key].pkg}/${file2}`;
     if (!sheets.has(href)) {
       const link = document.createElement("link");
       link.rel = "stylesheet";
@@ -1780,7 +2298,7 @@ function Gallery({ view, gameId, onClose, focusId }) {
     },
     edit && /* @__PURE__ */ import_react6.default.createElement(ImageEditor, { key: edit.id, gameId, image: images.find((i) => i.id === edit.id) || edit, units: ((view && view.turns || []).find((t) => t.textVersion === edit.textVersion) || {}).units || [], onClose: () => setEdit(null) }),
     tab === "cg" && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-grid" }, images.map((img) => /* @__PURE__ */ import_react6.default.createElement(CgTile, { key: img.id, gameId, image: img, onOpen: setOpen, onEdit: setEdit })), !images.length && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "还没有插画。导演会在值得画的地方自动安排；也可以在聊天里点每条消息下方的「🎬 配一张」。")),
-    tab === "bg" && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-grid" }, places.map((p) => /* @__PURE__ */ import_react6.default.createElement("div", { key: p.key }, /* @__PURE__ */ import_react6.default.createElement("div", { className: `fg-thumb${p.assetId ? "" : " is-locked"}`, onClick: () => p.assetId && setOpen({ place: p }) }, p.assetId ? /* @__PURE__ */ import_react6.default.createElement("img", { src: assetUrl(p.assetId), alt: p.location, loading: "lazy" }) : /* @__PURE__ */ import_react6.default.createElement("span", null, STATUS_LABEL[p.status] || p.error || "未生成"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-thumb-cap" }, p.location, " · ", TIME_LABEL[p.time] || p.time)), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row", style: { marginTop: ".6cqw" } }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === p.key, onClick: () => run(p.key, () => api.place(gameId, p.key), "已加入出图队列") }, "重画背景")), p.status === "failed" && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note fg-err" }, p.error))), !places.length && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "新地点出现时会自动生成背景（设置里可关）；没有生成时用程序化天空（按时段、天气变化）。")),
+    tab === "bg" && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-grid" }, places.map((p2) => /* @__PURE__ */ import_react6.default.createElement("div", { key: p2.key }, /* @__PURE__ */ import_react6.default.createElement("div", { className: `fg-thumb${p2.assetId ? "" : " is-locked"}`, onClick: () => p2.assetId && setOpen({ place: p2 }) }, p2.assetId ? /* @__PURE__ */ import_react6.default.createElement("img", { src: assetUrl(p2.assetId), alt: p2.location, loading: "lazy" }) : /* @__PURE__ */ import_react6.default.createElement("span", null, STATUS_LABEL[p2.status] || p2.error || "未生成"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-thumb-cap" }, p2.location, " · ", TIME_LABEL[p2.time] || p2.time)), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row", style: { marginTop: ".6cqw" } }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === p2.key, onClick: () => run(p2.key, () => api.place(gameId, p2.key), "已加入出图队列") }, "重画背景")), p2.status === "failed" && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note fg-err" }, p2.error))), !places.length && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "新地点出现时会自动生成背景（设置里可关）；没有生成时用程序化天空（按时段、天气变化）。")),
     live && cgSrc(live, assetUrl) && /* @__PURE__ */ import_react6.default.createElement(Lightbox, { src: cgSrc(live, assetUrl), onClose: () => setOpen(null) }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: live.current <= 0, onClick: () => run("v", () => api.version(gameId, live.id, live.current - 1)) }, "‹ 上一版"), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-pill" }, live.current + 1, " / ", live.versions.length), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: live.current >= live.versions.length - 1, onClick: () => run("v", () => api.version(gameId, live.id, live.current + 1)) }, "下一版 ›"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
       setOpen(null);
       setEdit(live);
@@ -1792,13 +2310,37 @@ var SPRITE_STATUS = { writing: "写词中", queued: "排队中", running: "绘�
 var WRITER_LABEL = { ai: "立绘设计师写的", fallback: "按档案拼的（模型没写出来）", user: "你改的", upload: "你上传的" };
 var LOG_ACTION = { create: "AI 建档", change: "外貌变化", temp: "临时状态", edit: "手动修改", wear: "换装", states: "长期状态", outfit: "新衣服" };
 var GENDERS = [["", "未知"], ["female", "女"], ["male", "男"], ["other", "其他"]];
-function readFile(file) {
+function readFile(file2) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result);
     r.onerror = reject;
-    r.readAsDataURL(file);
+    r.readAsDataURL(file2);
   });
+}
+async function readAaFolder(files2) {
+  const path = (f) => f.webkitRelativePath || f.name;
+  const json = files2.filter((f) => f.name === "sprite.json").sort((a, b) => path(a).length - path(b).length)[0];
+  if (!json) throw new Error("这个文件夹里没有 sprite.json：选素材包所在的那个文件夹");
+  const dir = path(json).slice(0, -"sprite.json".length);
+  let manifest;
+  try {
+    manifest = JSON.parse(await json.text());
+  } catch {
+    throw new Error("sprite.json 不是合法的 JSON");
+  }
+  const pack = cleanPack(manifest);
+  const byPath = new Map(files2.map((f) => [path(f), f]));
+  const images = {};
+  let total = 0;
+  for (const name2 of packFiles(pack)) {
+    const file2 = byPath.get(dir + name2);
+    if (!file2) throw new Error("素材包缺文件：" + name2);
+    total += file2.size;
+    if (total > 11 * 1024 * 1024) throw new Error("素材包里的图片加起来超过 11MB，先压缩一下");
+    images[name2] = await readFile(file2);
+  }
+  return { manifest, files: images };
 }
 function lookGroups(person) {
   const now = lookAt(person.timeline, Infinity);
@@ -1809,17 +2351,26 @@ function lookGroups(person) {
   }
   return [...groups.values()];
 }
-function ProfileEditor({ gameId, person }) {
-  const pick = (p) => ({ appearance: p.appearance || "", gender: p.gender || "", note: p.note || "", negative: p.negative || "", seed: p.seedCustom ? String(p.seed) : "" });
+var VOICE_GROUPS = [["female", "女声"], ["male", "男声"], ["", "不分男女"]];
+var PITCHES = Array.from({ length: VOICE_PITCH_LIMIT * 2 + 1 }, (_, i) => i - VOICE_PITCH_LIMIT).map((n) => [String(n), n > 0 ? `音高 +${n}` : n < 0 ? `音高 ${n}` : "音高 原调"]);
+var voiceText = (voice) => voice ? voiceById(voice.id).label : "不出声";
+function ProfileEditor({ gameId, person, cast }) {
+  const pick = (p2) => ({ appearance: p2.appearance || "", gender: p2.gender || "", note: p2.note || "", negative: p2.negative || "", seed: p2.seedCustom ? String(p2.seed) : "", voice: p2.voice || "", voicePitch: String(p2.voicePitch || 0) });
   const [form, setForm] = import_react6.default.useState(() => pick(person));
   const [busy, run] = useBusy();
+  const cfg = useConfig();
+  const ui2 = cfg ? cfg.config.ui : null;
   import_react6.default.useEffect(() => {
     setForm(pick(person));
-  }, [person.appearance, person.gender, person.note, person.negative, person.seed, person.seedCustom]);
+  }, [person.appearance, person.gender, person.note, person.negative, person.seed, person.seedCustom, person.voice, person.voicePitch]);
   const dirty = JSON.stringify(form) !== JSON.stringify(pick(person));
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const save = () => run("save", () => api.cast(gameId, person.global ? "global-save" : "save", { name: person.name, patch: { ...form, seed: form.seed === "" ? null : Number(form.seed) } }), "档案已保存");
-  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-person-form" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react6.default.createElement("label", null, "固定外貌"), /* @__PURE__ */ import_react6.default.createElement("textarea", { className: "fg-textarea", value: form.appearance, onChange: set("appearance"), onKeyDown: (e) => e.stopPropagation(), placeholder: "1girl, long black hair, blue eyes（脸、发、瞳、体型，不含衣服）" })), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react6.default.createElement("label", null, "性别 / 种子"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.gender, onChange: set("gender") }, GENDERS.map(([v, l]) => /* @__PURE__ */ import_react6.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.seed, placeholder: `默认 ${person.seed}`, onChange: (e) => setForm({ ...form, seed: e.target.value.replace(/\D/g, "") }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", title: "换一个随机种子", onClick: () => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) }) }, "🎲"), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "所有立绘差分共用这个种子"))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react6.default.createElement("label", null, "立绘备注"), /* @__PURE__ */ import_react6.default.createElement("textarea", { className: "fg-textarea is-short", value: form.note, onChange: set("note"), onKeyDown: (e) => e.stopPropagation(), placeholder: "写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" })), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react6.default.createElement("label", null, "不要出现"), /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", value: form.negative, onChange: set("negative"), onKeyDown: (e) => e.stopPropagation(), placeholder: "glasses, ponytail（每张立绘都加进负面词）" })), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存档案")));
+  const save = () => run("save", () => api.cast(gameId, person.global ? "global-save" : "save", { name: person.name, patch: { ...form, seed: form.seed === "" ? null : Number(form.seed), voicePitch: Number(form.voicePitch) } }), "档案已保存");
+  const others = (cast || []).filter((p2) => p2.name !== person.name);
+  const draft = { ...person, gender: form.gender, voice: form.voice, voicePitch: Number(form.voicePitch) };
+  const voiceNow = castVoices([...others, draft], ui2).get(person.name);
+  const autoVoice2 = castVoices([...others, { ...draft, voice: "" }], ui2).get(person.name);
+  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-person-form" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react6.default.createElement("label", null, "固定外貌"), /* @__PURE__ */ import_react6.default.createElement("textarea", { className: "fg-textarea", value: form.appearance, onChange: set("appearance"), onKeyDown: (e) => e.stopPropagation(), placeholder: "1girl, long black hair, blue eyes（脸、发、瞳、体型，不含衣服）" })), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react6.default.createElement("label", null, "性别 / 种子"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.gender, onChange: set("gender") }, GENDERS.map(([v, l]) => /* @__PURE__ */ import_react6.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.seed, placeholder: `默认 ${person.seed}`, onChange: (e) => setForm({ ...form, seed: e.target.value.replace(/\D/g, "") }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", title: "换一个随机种子", onClick: () => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) }) }, "🎲"), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "所有立绘差分共用这个种子"))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react6.default.createElement("label", null, "声音"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voice, onChange: set("voice"), "aria-label": "打字音音色" }, /* @__PURE__ */ import_react6.default.createElement("option", { value: "" }, "自动（", voiceText(autoVoice2), "）"), /* @__PURE__ */ import_react6.default.createElement("option", { value: "off" }, "不出声"), VOICE_GROUPS.map(([g, label]) => /* @__PURE__ */ import_react6.default.createElement("optgroup", { key: g, label }, VOICES.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react6.default.createElement("option", { key: v.id, value: v.id }, v.label))))), /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voicePitch, onChange: set("voicePitch"), "aria-label": "音高", title: "升降几个半音" }, PITCHES.map(([v, l]) => /* @__PURE__ */ import_react6.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !voiceNow, onClick: () => previewVoice(voiceNow, ui2 || void 0) }, "▶ 试听"), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "这个角色说话时的打字音"))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react6.default.createElement("label", null, "立绘备注"), /* @__PURE__ */ import_react6.default.createElement("textarea", { className: "fg-textarea is-short", value: form.note, onChange: set("note"), onKeyDown: (e) => e.stopPropagation(), placeholder: "写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" })), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react6.default.createElement("label", null, "不要出现"), /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", value: form.negative, onChange: set("negative"), onKeyDown: (e) => e.stopPropagation(), placeholder: "glasses, ponytail（每张立绘都加进负面词）" })), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存档案")));
 }
 function WardrobeEditor({ gameId, person }) {
   const [, run] = useBusy();
@@ -1843,6 +2394,7 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
   const [tags, setTags] = import_react6.default.useState(record ? record.tags || "" : "");
   const [busy, run] = useBusy();
   const fileRef = import_react6.default.useRef(null);
+  const aaRef = import_react6.default.useRef(null);
   import_react6.default.useEffect(() => {
     setTags(record ? record.tags || "" : "");
   }, [key, record && record.tags]);
@@ -1851,14 +2403,21 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
   const at = group.current ? {} : { turn };
   const label = `${person.name} · ${lookLabel(group.look)} · ${entry.label}`;
   return /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-variant" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-variant-art" }, record && record.assetId ? /* @__PURE__ */ import_react6.default.createElement("img", { src: assetUrl(record.assetId), alt: label }) : /* @__PURE__ */ import_react6.default.createElement("span", null, st ? SPRITE_STATUS[st.status] : "还没画")), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-variant-body" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("b", null, label), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: onClose }, "收起")), entry.desc && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "情绪：", entry.desc, entry.base ? `（接近${emotionLabel(entry.base)}）` : ""), st && st.error && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note fg-err" }, st.error), /* @__PURE__ */ import_react6.default.createElement("textarea", { className: "fg-textarea", value: tags, onChange: (e) => setTags(e.target.value), onKeyDown: (e) => e.stopPropagation(), placeholder: "还没有提示词：点「让设计师写」，它会读完资料和剧情来写" }), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, record && record.writer ? WRITER_LABEL[record.writer] || record.writer : "", record && record.seed != null ? ` · 种子 ${record.seed}` : "", !reachable ? " · 这套样子在剧情里已经不会再出现（外貌改过），只能删除或上传" : ""), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !reachable || busy === "w", onClick: () => run("w", () => api.cast(gameId, "sprite", { name: person.name, emotion, rewrite: true, ...at }), "已交给立绘设计师：写好词就画") }, record && record.assetId ? "让设计师重写并重画" : "让设计师写并画"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !reachable || !tags.trim() || busy === "u", onClick: () => run("u", () => api.cast(gameId, "sprite", { name: person.name, emotion, tags, ...at }), "已排队：按这些词画") }, "按这些词画"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !reachable, onClick: () => fileRef.current && fileRef.current.click() }, "上传到这张"), record && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => run("d", () => api.cast(gameId, "sprite-delete", { name: person.name, key }), "已删除").then(onClose) }, "删除"), /* @__PURE__ */ import_react6.default.createElement("input", { ref: fileRef, type: "file", accept: "image/png,image/jpeg,image/webp", hidden: true, onChange: async (e) => {
-    const file = e.target.files && e.target.files[0];
+    const file2 = e.target.files && e.target.files[0];
     e.target.value = "";
-    if (!file) return;
-    const dataUrl = await readFile(file);
+    if (!file2) return;
+    const dataUrl = await readFile(file2);
     run("up", () => api.cast(gameId, "upload", { name: person.name, emotion, dataUrl, ...at }), "立绘已上传");
+  } })), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, record && record.aa ? `逆转式素材包${record.aa.pack && record.aa.pack.name ? `「${record.aa.pack.name}」` : ""}：会呼吸、眨眼，说话时动嘴` : "逆转式立绘：导入素材包文件夹（sprite.json 加图片），这张就会呼吸、眨眼、动嘴；图会换成素材包自带的那张"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !reachable || busy === "aa", onClick: () => aaRef.current && aaRef.current.click() }, busy === "aa" ? "导入中…" : record && record.aa ? "换素材包" : "导入素材包"), record && record.aa && record.aa.pack && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "aa-rm", onClick: () => run("aa-rm", () => api.cast(gameId, "aa-remove", { name: person.name, key }), "已取消动态，图留着") }, "取消动态"), /* @__PURE__ */ import_react6.default.createElement("input", { ref: aaRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
+    const files2 = [...e.target.files || []];
+    e.target.value = "";
+    if (files2.length) run("aa", async () => {
+      const { manifest, files: images } = await readAaFolder(files2);
+      await api.cast(gameId, "aa-pack", { name: person.name, emotion, manifest, files: images, ...at });
+    }, "素材包已导入：这张立绘会呼吸、眨眼、动嘴了");
   } }))));
 }
-function PersonCard({ gameId, person, emotions }) {
+function PersonCard({ gameId, person, emotions, cast, voice }) {
   const [busy, run] = useBusy();
   const groups = import_react6.default.useMemo(() => lookGroups(person), [person]);
   const [groupKey, setGroupKey] = import_react6.default.useState("");
@@ -1871,7 +2430,7 @@ function PersonCard({ gameId, person, emotions }) {
   const tiles = allEmotions(emotions).map((e) => ({ ...e, record: (person.sprites || {})[`${group.key}|${e.id}`], st: (person.spriteStatus || {})[`${group.key}|${e.id}`] }));
   tiles.sort((a, b) => Number(Boolean(b.record && b.record.assetId)) - Number(Boolean(a.record && a.record.assetId)));
   const drawn = tiles.filter((t) => t.record && t.record.assetId).length;
-  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-person", style: { "--c": person.color } }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-person-art" }, main ? /* @__PURE__ */ import_react6.default.createElement("img", { src: assetUrl(main), alt: person.name }) : /* @__PURE__ */ import_react6.default.createElement(Silhouette, { name: person.name, color: person.color, appearance: person.appearance, gender: person.gender })), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-person-main" }, /* @__PURE__ */ import_react6.default.createElement("h3", null, /* @__PURE__ */ import_react6.default.createElement("span", { style: { color: person.color } }, person.name), person.global ? /* @__PURE__ */ import_react6.default.createElement("small", null, "全局 · 外貌冻结") : /* @__PURE__ */ import_react6.default.createElement("small", null, "本局", person.createdTurn != null ? ` · 第 ${person.createdTurn} 轮登场` : ""), /* @__PURE__ */ import_react6.default.createElement("small", { title: "此刻的样子" }, lookLabel(now)), person.temp && /* @__PURE__ */ import_react6.default.createElement("small", { title: "临时状态，只进插画" }, "临时：", person.temp)), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-person-tags" }, person.appearance || "（还没有固定外貌）", person.outfitTags ? ` ／ ${person.outfitTags}` : ""), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row fg-person-folds" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: `fg-btn${fold === "profile" ? " is-on" : ""}`, onClick: () => setFold(fold === "profile" ? "" : "profile") }, "档案 · 种子 ", person.seed), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: `fg-btn${fold === "wardrobe" ? " is-on" : ""}`, onClick: () => setFold(fold === "wardrobe" ? "" : "wardrobe") }, "衣橱与状态 · ", Object.keys(person.timeline && person.timeline.outfits || {}).length, " 套")), fold === "profile" && /* @__PURE__ */ import_react6.default.createElement(ProfileEditor, { gameId, person }), fold === "wardrobe" && /* @__PURE__ */ import_react6.default.createElement(WardrobeEditor, { gameId, person }), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-looks" }, groups.map((g) => /* @__PURE__ */ import_react6.default.createElement("button", { key: g.key, type: "button", className: `fg-look${g.key === group.key ? " is-on" : ""}`, onClick: () => {
+  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-person", style: { "--c": person.color } }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-person-art" }, main ? /* @__PURE__ */ import_react6.default.createElement("img", { src: assetUrl(main), alt: person.name }) : /* @__PURE__ */ import_react6.default.createElement(Silhouette, { name: person.name, color: person.color, appearance: person.appearance, gender: person.gender })), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-person-main" }, /* @__PURE__ */ import_react6.default.createElement("h3", null, /* @__PURE__ */ import_react6.default.createElement("span", { style: { color: person.color } }, person.name), person.global ? /* @__PURE__ */ import_react6.default.createElement("small", null, "全局 · 外貌冻结") : /* @__PURE__ */ import_react6.default.createElement("small", null, "本局", person.createdTurn != null ? ` · 第 ${person.createdTurn} 轮登场` : ""), /* @__PURE__ */ import_react6.default.createElement("small", { title: "此刻的样子" }, lookLabel(now)), person.temp && /* @__PURE__ */ import_react6.default.createElement("small", { title: "临时状态，只进插画" }, "临时：", person.temp)), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-person-tags" }, person.appearance || "（还没有固定外貌）", person.outfitTags ? ` ／ ${person.outfitTags}` : ""), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row fg-person-folds" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: `fg-btn${fold === "profile" ? " is-on" : ""}`, onClick: () => setFold(fold === "profile" ? "" : "profile") }, "档案 · 种子 ", person.seed, " · 声音 ", voiceText(voice), voice && voice.auto ? "（自动）" : ""), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: `fg-btn${fold === "wardrobe" ? " is-on" : ""}`, onClick: () => setFold(fold === "wardrobe" ? "" : "wardrobe") }, "衣橱与状态 · ", Object.keys(person.timeline && person.timeline.outfits || {}).length, " 套")), fold === "profile" && /* @__PURE__ */ import_react6.default.createElement(ProfileEditor, { gameId, person, cast }), fold === "wardrobe" && /* @__PURE__ */ import_react6.default.createElement(WardrobeEditor, { gameId, person }), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-looks" }, groups.map((g) => /* @__PURE__ */ import_react6.default.createElement("button", { key: g.key, type: "button", className: `fg-look${g.key === group.key ? " is-on" : ""}`, onClick: () => {
     setGroupKey(g.key);
     setEmotion("");
   } }, lookLabel(g.look), g.current ? /* @__PURE__ */ import_react6.default.createElement("i", null, "现在") : null)), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "已画 ", drawn, " 种情绪")), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-emos" }, tiles.map((t) => /* @__PURE__ */ import_react6.default.createElement(
@@ -1884,7 +2443,7 @@ function PersonCard({ gameId, person, emotions }) {
       onClick: () => setEmotion(emotion === t.id ? "" : t.id)
     },
     t.record && t.record.assetId && /* @__PURE__ */ import_react6.default.createElement("img", { src: assetUrl(t.record.assetId), alt: "", loading: "lazy" }),
-    /* @__PURE__ */ import_react6.default.createElement("span", null, t.label, t.st && t.st.status === "failed" ? " ⚠" : "")
+    /* @__PURE__ */ import_react6.default.createElement("span", null, t.label, t.record && t.record.aa ? " · 动" : "", t.st && t.st.status === "failed" ? " ⚠" : "")
   ))), emotion && /* @__PURE__ */ import_react6.default.createElement(VariantEditor, { key: group.key + emotion, gameId, person, group, emotion, emotions, turn, onClose: () => setEmotion("") }), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "fill", onClick: () => run("fill", () => api.cast(gameId, "fill", { name: person.name }).then((r) => toast(fillText(r)))) }, "补齐剧情里用到的差分"), !person.global && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => run("g", () => api.cast(gameId, "promote", { name: person.name }), "已提升为全局角色：所有对局共用，AI 不再改它的固定外貌") }, "提升为全局"), person.global && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => run("l", () => api.cast(gameId, "copy-local", { name: person.name }), "已复制到本局，可单独修改") }, "复制到本局"), person.global && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
     if (window.confirm("从全局库移除？各对局里的副本不受影响。")) run("u", () => api.cast(gameId, "unglobal", { name: person.name }), "已移出全局库");
   } }, "移出全局"), !person.global && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
@@ -1910,6 +2469,8 @@ function CastPanel({ view, gameId, onClose }) {
   const cast = view && view.cast || [];
   const log = view && view.castLog || [];
   const emotions = view && view.emotions || [];
+  const cfg = useConfig();
+  const voices = castVoices(cast, cfg ? cfg.config.ui : null);
   return /* @__PURE__ */ import_react6.default.createElement(
     Panel,
     {
@@ -1924,7 +2485,7 @@ function CastPanel({ view, gameId, onClose }) {
         if (name2.trim()) run("new", () => api.cast(gameId, "save", { name: name2.trim(), patch: {} }), "已新建").then(() => setName(""));
       } }, /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { width: "14cqw" }, placeholder: "新人物名字", value: name2, onChange: (e) => setName(e.target.value), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "submit", className: "fg-btn" }, "新建")))
     },
-    tab === "people" && cast.map((p) => /* @__PURE__ */ import_react6.default.createElement(PersonCard, { key: p.name, gameId, person: p, emotions })),
+    tab === "people" && cast.map((p2) => /* @__PURE__ */ import_react6.default.createElement(PersonCard, { key: p2.name, gameId, person: p2, emotions, cast, voice: voices.get(p2.name) })),
     tab === "people" && !cast.length && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "有名字的角色第一次出场时，导演会自动给他建档：固定外貌、身上的衣服。之后插画里写 @名字 都会换成这份档案，长相不再漂移；立绘按「服装 × 长期状态 × 情绪」各画一套，同一个种子。"),
     tab === "emotions" && /* @__PURE__ */ import_react6.default.createElement(EmotionLibrary, { emotions }),
     tab === "log" && log.map((e) => /* @__PURE__ */ import_react6.default.createElement("div", { key: e.index, className: "fg-log-item", style: { gridTemplateColumns: "12cqw 1fr auto", cursor: "default" } }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-log-name" }, e.name), /* @__PURE__ */ import_react6.default.createElement("div", null, /* @__PURE__ */ import_react6.default.createElement("b", { style: { color: "var(--accent)" } }, LOG_ACTION[e.action] || e.action), e.turn != null ? ` · 第 ${e.turn} 轮` : "", e.source === "user" ? " · 手动" : "", /* @__PURE__ */ import_react6.default.createElement("br", null), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, e.action === "outfit" ? `${e.outfit}：` : "", e.before ? `${e.before} → ` : "", e.after || (e.action === "temp" || e.action === "states" ? "（解除）" : ""))), e.rolledBack ? /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "已回滚") : /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "rb" + e.index, onClick: () => run("rb" + e.index, () => api.cast(gameId, "rollback", { index: e.index }), "已回滚") }, "回滚"))),
@@ -1950,9 +2511,10 @@ function Text({ value, onCommit, type = "text", placeholder, style }) {
     if (e.key === "Enter") commit();
   } });
 }
-function Select({ value, options, onChange }) {
-  return /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", value, onChange: (e) => onChange(e.target.value) }, options.map(([v, l]) => /* @__PURE__ */ import_react6.default.createElement("option", { key: v, value: v }, l)));
+function Select({ value, options, onChange, style }) {
+  return /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", value, style, onChange: (e) => onChange(e.target.value) }, options.map(([v, l]) => /* @__PURE__ */ import_react6.default.createElement("option", { key: v, value: v }, l)));
 }
+var INLINE = { width: "auto" };
 function ModelField({ value, options, onCommit, placeholder, emptyLabel }) {
   const [manual, setManual] = import_react6.default.useState(false);
   if (manual || !options.length) {
@@ -1967,9 +2529,9 @@ function ModelField({ value, options, onCommit, placeholder, emptyLabel }) {
   ];
   return /* @__PURE__ */ import_react6.default.createElement(Select, { value, options: opts, onChange: (v) => v === "__manual" ? setManual(true) : onCommit(v) });
 }
-function listOptions(list, value, emptyLabel) {
-  const opts = (list || []).map((v) => [v, v]);
-  if (value && !(list || []).includes(value)) opts.unshift([value, value + "（当前）"]);
+function listOptions(list2, value, emptyLabel) {
+  const opts = (list2 || []).map((v) => [v, v]);
+  if (value && !(list2 || []).includes(value)) opts.unshift([value, value + "（当前）"]);
   if (emptyLabel) opts.unshift(["", emptyLabel]);
   return opts;
 }
@@ -1986,44 +2548,44 @@ function BackendSection({ data }) {
   const backend = cfg.images.backend;
   const [busy, run] = useBusy();
   const [test, setTest] = import_react6.default.useState(null);
-  const [list, setList] = import_react6.default.useState(null);
+  const [list2, setList] = import_react6.default.useState(null);
   const [relay, setRelay] = import_react6.default.useState({ name: "", baseURL: "" });
-  const p = (section, patch) => patchConfig({ [section]: patch }).catch((e) => toast(e.message, "error"));
+  const p2 = (section, patch) => patchConfig({ [section]: patch }).catch((e) => toast(e.message, "error"));
   const source = backend === "novelai" ? "" : [cfg[backend].baseURL, cfg[backend].authType, data.keys[backend]].join("|");
   const loadList = () => run("m", async () => setList(await api.models()));
   import_react6.default.useEffect(() => {
     setList(null);
     loadList();
   }, [backend, source]);
-  const models = list && list.backend === backend && list.models || [];
-  const samplers = list && list.backend === backend && list.samplers || [];
-  const schedulers = list && list.backend === backend && list.schedulers || [];
-  const modelHint = list ? list.note : "正在读取模型列表…";
+  const models = list2 && list2.backend === backend && list2.models || [];
+  const samplers = list2 && list2.backend === backend && list2.samplers || [];
+  const schedulers = list2 && list2.backend === backend && list2.schedulers || [];
+  const modelHint = list2 ? list2.note : "正在读取模型列表…";
   const refresh = /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "m", onClick: loadList }, busy === "m" ? "读取中…" : "刷新列表");
   const doTest = () => run("t", async () => {
     setTest(await api.test());
     if (backend !== "novelai") loadList();
   });
   const nai = naiModelInfo(cfg.novelai.model) || {};
-  const auth = (section) => /* @__PURE__ */ import_react6.default.createElement(Field, { label: "鉴权" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg[section].authType, onChange: (v) => p(section, { authType: v }), options: [["none", "无"], ["bearer", "Bearer Token"], ["basic", "Basic（用户名:密码）"]] }));
-  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "生图渠道"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "渠道" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: backend, onChange: (v) => p("images", { backend: v }), options: [["novelai", "NovelAI"], ["comfyui", "ComfyUI"], ["openai", "OpenAI 兼容（gpt-image / 聊天出图）"], ["webui", "SD WebUI / Forge"]] })), backend === "novelai" && /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "接入点", hint: "官方站与第三方中转站各存一条，各记各的 Key；换站不影响模型与画风。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.novelai.endpoint, onChange: (v) => p("novelai", { endpoint: v }), options: cfg.novelai.endpoints.map((e) => [e.id, e.name]) }), cfg.novelai.endpoint !== "official" && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => p("novelai", { endpoint: "official", endpoints: cfg.novelai.endpoints.filter((e) => e.id !== cfg.novelai.endpoint) }) }, "删除此站"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "添加中转站" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, placeholder: "名称", value: relay.name, onChange: (e) => setRelay((r) => ({ ...r, name: e.target.value })), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { flex: 1, width: "auto" }, placeholder: "https://…", value: relay.baseURL, onChange: (e) => setRelay((r) => ({ ...r, baseURL: e.target.value })), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !/^https?:\/\//.test(relay.baseURL), onClick: () => {
+  const auth = (section) => /* @__PURE__ */ import_react6.default.createElement(Field, { label: "鉴权" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg[section].authType, onChange: (v) => p2(section, { authType: v }), options: [["none", "无"], ["bearer", "Bearer Token"], ["basic", "Basic（用户名:密码）"]] }));
+  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "生图渠道"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "渠道" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: backend, onChange: (v) => p2("images", { backend: v }), options: [["novelai", "NovelAI"], ["comfyui", "ComfyUI"], ["openai", "OpenAI 兼容（gpt-image / 聊天出图）"], ["webui", "SD WebUI / Forge"]] })), backend === "novelai" && /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "接入点", hint: "官方站与第三方中转站各存一条，各记各的 Key；换站不影响模型与画风。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.novelai.endpoint, onChange: (v) => p2("novelai", { endpoint: v }), options: cfg.novelai.endpoints.map((e) => [e.id, e.name]) }), cfg.novelai.endpoint !== "official" && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => p2("novelai", { endpoint: "official", endpoints: cfg.novelai.endpoints.filter((e) => e.id !== cfg.novelai.endpoint) }) }, "删除此站"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "添加中转站" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, placeholder: "名称", value: relay.name, onChange: (e) => setRelay((r) => ({ ...r, name: e.target.value })), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { flex: 1, width: "auto" }, placeholder: "https://…", value: relay.baseURL, onChange: (e) => setRelay((r) => ({ ...r, baseURL: e.target.value })), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !/^https?:\/\//.test(relay.baseURL), onClick: () => {
     const id = "relay" + Date.now().toString(36).slice(-5);
-    p("novelai", { endpoints: [...cfg.novelai.endpoints, { id, name: relay.name || id, baseURL: relay.baseURL }], endpoint: id });
+    p2("novelai", { endpoints: [...cfg.novelai.endpoints, { id, name: relay.name || id, baseURL: relay.baseURL }], endpoint: id });
     setRelay({ name: "", baseURL: "" });
-  } }, "添加"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "Key" }, /* @__PURE__ */ import_react6.default.createElement(KeyInput, { backend: "novelai", endpoint: cfg.novelai.endpoint, has: data.keys["novelai:" + cfg.novelai.endpoint] })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "模型", hint: modelHint }, /* @__PURE__ */ import_react6.default.createElement(ModelField, { value: cfg.novelai.model, options: models, placeholder: "nai-diffusion-…", onCommit: (v) => p("novelai", { model: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "采样器" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.novelai.sampler, onChange: (v) => p("novelai", { sampler: v }), options: listOptions(samplers, cfg.novelai.sampler) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "步数 / 提示词引导" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.novelai.steps, onCommit: (v) => p("novelai", { steps: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.novelai.scale, onCommit: (v) => p("novelai", { scale: v }) }))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "引导缩放", hint: "Prompt Guidance Rescale，0–1。提示词引导调高后画面发灰、过饱和时往上加一点。" }, /* @__PURE__ */ import_react6.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.02", value: cfg.novelai.cfgRescale, onChange: (e) => p("novelai", { cfgRescale: Number(e.target.value) }), style: { width: "24cqw" } }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note", style: { marginLeft: "1cqw" } }, Number(cfg.novelai.cfgRescale).toFixed(2))), nai.v5 ? /* @__PURE__ */ import_react6.default.createElement(Field, { label: "透明底立绘", hint: "V5 才有：立绘按透明背景生成，站在场景里不会带一块白底。CG 和背景不受影响。" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.transparentSprites, onChange: (v) => p("images", { transparentSprites: v }) })) : /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "噪声调度" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.novelai.noiseSchedule, onChange: (v) => p("novelai", { noiseSchedule: v }), options: listOptions(schedulers, cfg.novelai.noiseSchedule) })), nai.v4 && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "Variety+", hint: "前几步不跟提示词，构图更多样；代价是没那么听话。" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.novelai.variety, onChange: (v) => p("novelai", { variety: v }) })))), backend === "comfyui" && /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "地址" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: cfg.comfyui.baseURL, onCommit: (v) => p("comfyui", { baseURL: v }) })), auth("comfyui"), cfg.comfyui.authType !== "none" && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "Token" }, /* @__PURE__ */ import_react6.default.createElement(KeyInput, { backend: "comfyui", has: data.keys.comfyui })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "模式" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.comfyui.mode, onChange: (v) => p("comfyui", { mode: v }), options: [["simple", "简单（只选底模）"], ["workflow", "导入工作流（API 格式 JSON）"]] })), cfg.comfyui.mode === "simple" ? /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "底模", hint: modelHint }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react6.default.createElement(ModelField, { value: cfg.comfyui.checkpoint, options: models, emptyLabel: "（请选择）", placeholder: "xxx.safetensors", onCommit: (v) => p("comfyui", { checkpoint: v }) })), refresh)), samplers.length > 0 && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "采样器 / 调度器" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.comfyui.sampler, onChange: (v) => p("comfyui", { sampler: v }), options: listOptions(samplers, cfg.comfyui.sampler) }), /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.comfyui.scheduler, onChange: (v) => p("comfyui", { scheduler: v }), options: listOptions(schedulers, cfg.comfyui.scheduler) }))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "步数 / CFG" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.comfyui.steps, onCommit: (v) => p("comfyui", { steps: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.comfyui.cfg, onCommit: (v) => p("comfyui", { cfg: v }) })))) : /* @__PURE__ */ import_react6.default.createElement(Field, { label: "工作流", hint: "支持 %prompt% %negative% %width% %height% %seed% %steps% %cfg% 占位符；没有占位符时自动找正负提示词、尺寸和采样节点。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, cfg.comfyui.workflows.length > 0 && /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.comfyui.workflow || cfg.comfyui.workflows[0].id, onChange: (v) => p("comfyui", { workflow: v }), options: cfg.comfyui.workflows.map((w) => [w.id, w.name]) }), /* @__PURE__ */ import_react6.default.createElement("label", { className: "fg-btn" }, "导入 JSON", /* @__PURE__ */ import_react6.default.createElement("input", { type: "file", accept: "application/json,.json", hidden: true, onChange: async (e) => {
-    const file = e.target.files && e.target.files[0];
+  } }, "添加"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "Key" }, /* @__PURE__ */ import_react6.default.createElement(KeyInput, { backend: "novelai", endpoint: cfg.novelai.endpoint, has: data.keys["novelai:" + cfg.novelai.endpoint] })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "模型", hint: modelHint }, /* @__PURE__ */ import_react6.default.createElement(ModelField, { value: cfg.novelai.model, options: models, placeholder: "nai-diffusion-…", onCommit: (v) => p2("novelai", { model: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "采样器" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.novelai.sampler, onChange: (v) => p2("novelai", { sampler: v }), options: listOptions(samplers, cfg.novelai.sampler) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "步数 / 提示词引导" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.novelai.steps, onCommit: (v) => p2("novelai", { steps: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.novelai.scale, onCommit: (v) => p2("novelai", { scale: v }) }))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "引导缩放", hint: "Prompt Guidance Rescale，0–1。提示词引导调高后画面发灰、过饱和时往上加一点。" }, /* @__PURE__ */ import_react6.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.02", value: cfg.novelai.cfgRescale, onChange: (e) => p2("novelai", { cfgRescale: Number(e.target.value) }), style: { width: "24cqw" } }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note", style: { marginLeft: "1cqw" } }, Number(cfg.novelai.cfgRescale).toFixed(2))), nai.v5 ? /* @__PURE__ */ import_react6.default.createElement(Field, { label: "透明底立绘", hint: "V5 才有：立绘按透明背景生成，站在场景里不会带一块白底。CG 和背景不受影响。" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.transparentSprites, onChange: (v) => p2("images", { transparentSprites: v }) })) : /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "噪声调度" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.novelai.noiseSchedule, onChange: (v) => p2("novelai", { noiseSchedule: v }), options: listOptions(schedulers, cfg.novelai.noiseSchedule) })), nai.v4 && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "Variety+", hint: "前几步不跟提示词，构图更多样；代价是没那么听话。" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.novelai.variety, onChange: (v) => p2("novelai", { variety: v }) })))), backend === "comfyui" && /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "地址" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: cfg.comfyui.baseURL, onCommit: (v) => p2("comfyui", { baseURL: v }) })), auth("comfyui"), cfg.comfyui.authType !== "none" && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "Token" }, /* @__PURE__ */ import_react6.default.createElement(KeyInput, { backend: "comfyui", has: data.keys.comfyui })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "模式" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.comfyui.mode, onChange: (v) => p2("comfyui", { mode: v }), options: [["simple", "简单（只选底模）"], ["workflow", "导入工作流（API 格式 JSON）"]] })), cfg.comfyui.mode === "simple" ? /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "底模", hint: modelHint }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react6.default.createElement(ModelField, { value: cfg.comfyui.checkpoint, options: models, emptyLabel: "（请选择）", placeholder: "xxx.safetensors", onCommit: (v) => p2("comfyui", { checkpoint: v }) })), refresh)), samplers.length > 0 && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "采样器 / 调度器" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.comfyui.sampler, onChange: (v) => p2("comfyui", { sampler: v }), options: listOptions(samplers, cfg.comfyui.sampler) }), /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.comfyui.scheduler, onChange: (v) => p2("comfyui", { scheduler: v }), options: listOptions(schedulers, cfg.comfyui.scheduler) }))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "步数 / CFG" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.comfyui.steps, onCommit: (v) => p2("comfyui", { steps: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.comfyui.cfg, onCommit: (v) => p2("comfyui", { cfg: v }) })))) : /* @__PURE__ */ import_react6.default.createElement(Field, { label: "工作流", hint: "支持 %prompt% %negative% %width% %height% %seed% %steps% %cfg% 占位符；没有占位符时自动找正负提示词、尺寸和采样节点。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, cfg.comfyui.workflows.length > 0 && /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.comfyui.workflow || cfg.comfyui.workflows[0].id, onChange: (v) => p2("comfyui", { workflow: v }), options: cfg.comfyui.workflows.map((w) => [w.id, w.name]) }), /* @__PURE__ */ import_react6.default.createElement("label", { className: "fg-btn" }, "导入 JSON", /* @__PURE__ */ import_react6.default.createElement("input", { type: "file", accept: "application/json,.json", hidden: true, onChange: async (e) => {
+    const file2 = e.target.files && e.target.files[0];
     e.target.value = "";
-    if (!file) return;
+    if (!file2) return;
     try {
-      const graph = JSON.parse(await file.text());
+      const graph = JSON.parse(await file2.text());
       if (!graph || typeof graph !== "object" || Array.isArray(graph) || graph.nodes) throw new Error("需要 ComfyUI「导出（API）」格式的 JSON");
       const id = "wf" + Date.now().toString(36);
-      await patchConfig({ comfyui: { workflows: [...cfg.comfyui.workflows, { id, name: file.name.replace(/\.json$/i, ""), graph }], workflow: id } });
+      await patchConfig({ comfyui: { workflows: [...cfg.comfyui.workflows, { id, name: file2.name.replace(/\.json$/i, ""), graph }], workflow: id } });
       toast("工作流已导入");
     } catch (err) {
       toast(String(err.message || err), "error");
     }
-  } })), cfg.comfyui.workflows.length > 0 && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => p("comfyui", { workflows: cfg.comfyui.workflows.filter((w) => w.id !== (cfg.comfyui.workflow || cfg.comfyui.workflows[0].id)), workflow: "" }) }, "删除当前")))), backend === "openai" && /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "API 地址" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: cfg.openai.baseURL, onCommit: (v) => p("openai", { baseURL: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "Key" }, /* @__PURE__ */ import_react6.default.createElement(KeyInput, { backend: "openai", has: data.keys.openai })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "接口" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.openai.mode, onChange: (v) => p("openai", { mode: v }), options: [["images", "/images/generations"], ["chat", "/chat/completions（回复里带图的模型）"]] })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "模型", hint: modelHint }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react6.default.createElement(ModelField, { value: cfg.openai.model, options: models, emptyLabel: "（请选择）", placeholder: "gpt-image-1", onCommit: (v) => p("openai", { model: v }) })), refresh)), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "横 / 竖 / 方尺寸" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Text, { style: { width: "10cqw" }, value: cfg.openai.landscapeSize, onCommit: (v) => p("openai", { landscapeSize: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { style: { width: "10cqw" }, value: cfg.openai.portraitSize, onCommit: (v) => p("openai", { portraitSize: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { style: { width: "10cqw" }, value: cfg.openai.squareSize, onCommit: (v) => p("openai", { squareSize: v }) })))), backend === "webui" && /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "地址" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: cfg.webui.baseURL, onCommit: (v) => p("webui", { baseURL: v }) })), auth("webui"), cfg.webui.authType !== "none" && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "凭据" }, /* @__PURE__ */ import_react6.default.createElement(KeyInput, { backend: "webui", has: data.keys.webui })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "底模", hint: modelHint }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react6.default.createElement(ModelField, { value: cfg.webui.model, options: models, emptyLabel: "跟随服务器当前底模", placeholder: "模型标题", onCommit: (v) => p("webui", { model: v }) })), refresh)), samplers.length > 0 && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "采样器 / 调度器" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.webui.sampler, onChange: (v) => p("webui", { sampler: v }), options: listOptions(samplers, cfg.webui.sampler) }), /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.webui.scheduler, onChange: (v) => p("webui", { scheduler: v }), options: listOptions(schedulers, cfg.webui.scheduler, "自动") }))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "步数 / CFG" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.webui.steps, onCommit: (v) => p("webui", { steps: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.webui.cfg, onCommit: (v) => p("webui", { cfg: v }) })))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "种子", hint: "-1 表示每张随机；填一个数字后所有图都用它，方便复现同一种构图。单张图可以在鉴赏的「改词」里另外指定。" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "16cqw" }, value: cfg.images.seed, onCommit: (v) => p("images", { seed: v === "" ? -1 : v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "连接" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "t", onClick: doTest }, busy === "t" ? "测试中…" : "测试连接"), test && /* @__PURE__ */ import_react6.default.createElement("span", { className: test.ok ? "fg-ok" : "fg-err" }, test.message), !test && /* @__PURE__ */ import_react6.default.createElement("span", { className: data.ready ? "fg-ok" : "fg-note" }, data.ready ? "✓ 可以出图" : data.readyReason))));
+  } })), cfg.comfyui.workflows.length > 0 && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => p2("comfyui", { workflows: cfg.comfyui.workflows.filter((w) => w.id !== (cfg.comfyui.workflow || cfg.comfyui.workflows[0].id)), workflow: "" }) }, "删除当前")))), backend === "openai" && /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "API 地址" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: cfg.openai.baseURL, onCommit: (v) => p2("openai", { baseURL: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "Key" }, /* @__PURE__ */ import_react6.default.createElement(KeyInput, { backend: "openai", has: data.keys.openai })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "接口" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.openai.mode, onChange: (v) => p2("openai", { mode: v }), options: [["images", "/images/generations"], ["chat", "/chat/completions（回复里带图的模型）"]] })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "模型", hint: modelHint }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react6.default.createElement(ModelField, { value: cfg.openai.model, options: models, emptyLabel: "（请选择）", placeholder: "gpt-image-1", onCommit: (v) => p2("openai", { model: v }) })), refresh)), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "横 / 竖 / 方尺寸" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Text, { style: { width: "10cqw" }, value: cfg.openai.landscapeSize, onCommit: (v) => p2("openai", { landscapeSize: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { style: { width: "10cqw" }, value: cfg.openai.portraitSize, onCommit: (v) => p2("openai", { portraitSize: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { style: { width: "10cqw" }, value: cfg.openai.squareSize, onCommit: (v) => p2("openai", { squareSize: v }) })))), backend === "webui" && /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(Field, { label: "地址" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: cfg.webui.baseURL, onCommit: (v) => p2("webui", { baseURL: v }) })), auth("webui"), cfg.webui.authType !== "none" && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "凭据" }, /* @__PURE__ */ import_react6.default.createElement(KeyInput, { backend: "webui", has: data.keys.webui })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "底模", hint: modelHint }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react6.default.createElement(ModelField, { value: cfg.webui.model, options: models, emptyLabel: "跟随服务器当前底模", placeholder: "模型标题", onCommit: (v) => p2("webui", { model: v }) })), refresh)), samplers.length > 0 && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "采样器 / 调度器" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.webui.sampler, onChange: (v) => p2("webui", { sampler: v }), options: listOptions(samplers, cfg.webui.sampler) }), /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.webui.scheduler, onChange: (v) => p2("webui", { scheduler: v }), options: listOptions(schedulers, cfg.webui.scheduler, "自动") }))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "步数 / CFG" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.webui.steps, onCommit: (v) => p2("webui", { steps: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "8cqw" }, value: cfg.webui.cfg, onCommit: (v) => p2("webui", { cfg: v }) })))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "种子", hint: "-1 表示每张随机；填一个数字后所有图都用它，方便复现同一种构图。单张图可以在鉴赏的「改词」里另外指定。" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "16cqw" }, value: cfg.images.seed, onCommit: (v) => p2("images", { seed: v === "" ? -1 : v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "连接" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "t", onClick: doTest }, busy === "t" ? "测试中…" : "测试连接"), test && /* @__PURE__ */ import_react6.default.createElement("span", { className: test.ok ? "fg-ok" : "fg-err" }, test.message), !test && /* @__PURE__ */ import_react6.default.createElement("span", { className: data.ready ? "fg-ok" : "fg-note" }, data.ready ? "✓ 可以出图" : data.readyReason))));
 }
 function StyleSection({ data }) {
   const cfg = data.config;
@@ -2032,14 +2594,14 @@ function StyleSection({ data }) {
   const current = artists.find((a) => a.id === cfg.style.artist);
   const [draft, setDraft] = import_react6.default.useState({ name: "", text: "" });
   const key = modelKey(cfg.images.backend, cfg);
-  const p = (patch) => patchConfig({ style: patch }).catch((e) => toast(e.message, "error"));
+  const p2 = (patch) => patchConfig({ style: patch }).catch((e) => toast(e.message, "error"));
   const quality = qualityFor(cfg.style, key);
   const negative = negativeFor(cfg.style, key);
-  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "画风"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "画师串", hint: current && current.text ? current.text : "不加画师串" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.style.artist, onChange: (v) => p({ artist: v }), options: artists.map((a) => [a.id, a.name]) }), (cfg.style.artists || []).some((a) => a.id === cfg.style.artist) && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => p({ artists: cfg.style.artists.filter((a) => a.id !== cfg.style.artist), artist: "galgame" }) }, "删除这套"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "存一套新的" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, placeholder: "名字", value: draft.name, onChange: (e) => setDraft((d) => ({ ...d, name: e.target.value })), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { flex: 1, width: "auto" }, placeholder: "artist:xxx, artist:yyy, …", value: draft.text, onChange: (e) => setDraft((d) => ({ ...d, text: e.target.value })), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !draft.text.trim(), onClick: () => {
+  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "画风"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "画师串", hint: current && current.text ? current.text : "不加画师串" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.style.artist, onChange: (v) => p2({ artist: v }), options: artists.map((a) => [a.id, a.name]) }), (cfg.style.artists || []).some((a) => a.id === cfg.style.artist) && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => p2({ artists: cfg.style.artists.filter((a) => a.id !== cfg.style.artist), artist: "galgame" }) }, "删除这套"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "存一套新的" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, placeholder: "名字", value: draft.name, onChange: (e) => setDraft((d) => ({ ...d, name: e.target.value })), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { flex: 1, width: "auto" }, placeholder: "artist:xxx, artist:yyy, …", value: draft.text, onChange: (e) => setDraft((d) => ({ ...d, text: e.target.value })), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !draft.text.trim(), onClick: () => {
     const id = "a" + Date.now().toString(36);
-    p({ artists: [...cfg.style.artists || [], { id, name: draft.name || "我的画风", text: draft.text.trim() }], artist: id });
+    p2({ artists: [...cfg.style.artists || [], { id, name: draft.name || "我的画风", text: draft.text.trim() }], artist: id });
     setDraft({ name: "", text: "" });
-  } }, "保存并使用"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "质量词" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.style.useQuality, onChange: (v) => p({ useQuality: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "当前模型：", key))), cfg.style.useQuality && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "质量词内容" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: quality, onCommit: (v) => p({ quality: { ...cfg.style.quality || {}, [key]: v } }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "负面词" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: negative, onCommit: (v) => p({ negative: { ...cfg.style.negative || {}, [key]: v } }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
+  } }, "保存并使用"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "质量词" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.style.useQuality, onChange: (v) => p2({ useQuality: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "当前模型：", key))), cfg.style.useQuality && /* @__PURE__ */ import_react6.default.createElement(Field, { label: "质量词内容" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: quality, onCommit: (v) => p2({ quality: { ...cfg.style.quality || {}, [key]: v } }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "负面词" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: negative, onCommit: (v) => p2({ negative: { ...cfg.style.negative || {}, [key]: v } }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
     const q = { ...cfg.style.quality || {} };
     const n = { ...cfg.style.negative || {} };
     delete q[key];
@@ -2054,24 +2616,59 @@ function DirectorSection({ data, onDirectorLog }) {
     api.llm(cfg.director.provider).then(setLlm).catch(() => {
     });
   }, [cfg.director.provider]);
-  const p = (patch) => patchConfig({ director: patch }).catch((e) => toast(e.message, "error"));
-  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "导演（后台整理）", onDirectorLog && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: onDirectorLog }, "查看导演日志")), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "自动整理", hint: "每轮正文写完后，后台模型把它整理成场景：说话人、表情、站位、镜头、天气、选项、插画分镜。正文一字不改。" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.director.auto, onChange: (v) => p({ auto: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "模型", hint: "留空跟随 Tavern 的后台模型。整理用的是便宜的小模型就够。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.director.provider, onChange: (v) => p({ provider: v, model: "" }), options: [["", "跟随 Tavern"], ...llm.providers.map((x) => [x.id, x.name])] }), cfg.director.provider && (llm.models.length ? /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.director.model, onChange: (v) => p({ model: v }), options: [["", "（请选择）"], ...llm.models.map((m) => [m.id, m.name])] }) : /* @__PURE__ */ import_react6.default.createElement(Text, { value: cfg.director.model, placeholder: "模型 ID", onCommit: (v) => p({ model: v }) })))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "最大输出 / 温度", hint: "默认 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "9cqw" }, value: cfg.director.maxTokens, onCommit: (v) => p({ maxTokens: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "7cqw" }, value: cfg.director.temperature, onCommit: (v) => p({ temperature: v }) }))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "资料长度", hint: "给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认 1000000，等于不截断；超出模型窗口时自动缩短。" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", value: cfg.director.contextChars, onCommit: (v) => p({ contextChars: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "自定义提示词", hint: "留空用内置导演提示词。可用 {{maxImages}} {{styleHint}}。情绪库、配乐曲库附在用户消息里，自定义时也生效。" }, /* @__PURE__ */ import_react6.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.systemPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
-    if (e.target.value !== cfg.director.systemPrompt) p({ systemPrompt: e.target.value });
+  const p2 = (patch) => patchConfig({ director: patch }).catch((e) => toast(e.message, "error"));
+  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "导演（后台整理）", onDirectorLog && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", onClick: onDirectorLog }, "查看导演日志")), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "自动整理", hint: "每轮正文写完后，后台模型把它整理成场景：说话人、表情、站位、镜头、天气、选项、插画分镜。正文一字不改。" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.director.auto, onChange: (v) => p2({ auto: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "模型", hint: "留空跟随 Tavern 的后台模型。整理用的是便宜的小模型就够。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.director.provider, onChange: (v) => p2({ provider: v, model: "" }), options: [["", "跟随 Tavern"], ...llm.providers.map((x) => [x.id, x.name])] }), cfg.director.provider && (llm.models.length ? /* @__PURE__ */ import_react6.default.createElement(Select, { value: cfg.director.model, onChange: (v) => p2({ model: v }), options: [["", "（请选择）"], ...llm.models.map((m) => [m.id, m.name])] }) : /* @__PURE__ */ import_react6.default.createElement(Text, { value: cfg.director.model, placeholder: "模型 ID", onCommit: (v) => p2({ model: v }) })))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "最大输出 / 温度", hint: "默认 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "9cqw" }, value: cfg.director.maxTokens, onCommit: (v) => p2({ maxTokens: v }) }), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "7cqw" }, value: cfg.director.temperature, onCommit: (v) => p2({ temperature: v }) }))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "资料长度", hint: "给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认 1000000，等于不截断；超出模型窗口时自动缩短。" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", value: cfg.director.contextChars, onCommit: (v) => p2({ contextChars: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "自定义提示词", hint: "留空用内置导演提示词。可用 {{maxImages}} {{styleHint}}。情绪库、配乐曲库附在用户消息里，自定义时也生效。" }, /* @__PURE__ */ import_react6.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.systemPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
+    if (e.target.value !== cfg.director.systemPrompt) p2({ systemPrompt: e.target.value });
   } })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "立绘设计师提示词", hint: '留空用内置的。可用 {{styleHint}}。输出格式必须是 {"sprites":[{"key","tags","negative"}]}。' }, /* @__PURE__ */ import_react6.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.spritePrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
-    if (e.target.value !== cfg.director.spritePrompt) p({ spritePrompt: e.target.value });
+    if (e.target.value !== cfg.director.spritePrompt) p2({ spritePrompt: e.target.value });
   } })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "插画分镜师提示词", hint: '留空用内置的（Base + 每人一个角色块的写法）。可用 {{styleHint}}。输出格式必须是 {"images":[{"key","tag","nl","characters":[{"name","tag","nl"}],"size"}]}。' }, /* @__PURE__ */ import_react6.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.cgPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
-    if (e.target.value !== cfg.director.cgPrompt) p({ cgPrompt: e.target.value });
+    if (e.target.value !== cfg.director.cgPrompt) p2({ cgPrompt: e.target.value });
   } })));
 }
 function ImagesSection({ data }) {
   const cfg = data.config;
-  const p = (patch) => patchConfig({ images: patch }).catch((e) => toast(e.message, "error"));
-  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "自动配图"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "自动插画", hint: "导演判断值得画的地方自动出 CG，挂在正文对应段落后。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.auto, onChange: (v) => p({ auto: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "每轮最多"), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "6cqw" }, value: cfg.images.maxPerTurn, onCommit: (v) => p({ maxPerTurn: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "张"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "新地点背景" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.backgrounds, onChange: (v) => p({ backgrounds: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "立绘", hint: "角色登场、换装、长期状态变化时，画这一套的平静立绘。" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.portraits, onChange: (v) => p({ portraits: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "情绪差分", hint: "导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.expressions, onChange: (v) => p({ expressions: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "每轮最多"), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "6cqw" }, value: cfg.images.expressionsPerTurn, onCommit: (v) => p({ expressionsPerTurn: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "张"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "立绘设计师", hint: "立绘提示词由后台模型读完人物卡、世界书和到这一轮为止的全部剧情来写，一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼。" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.spriteWriter, onChange: (v) => p({ spriteWriter: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "并发" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "6cqw" }, value: cfg.images.concurrency, onCommit: (v) => p({ concurrency: v }) })));
+  const p2 = (patch) => patchConfig({ images: patch }).catch((e) => toast(e.message, "error"));
+  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "自动配图"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "自动插画", hint: "导演判断值得画的地方自动出 CG，挂在正文对应段落后。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.auto, onChange: (v) => p2({ auto: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "每轮最多"), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "6cqw" }, value: cfg.images.maxPerTurn, onCommit: (v) => p2({ maxPerTurn: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "张"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "新地点背景" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.backgrounds, onChange: (v) => p2({ backgrounds: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "立绘", hint: "角色登场、换装、长期状态变化时，画这一套的平静立绘。" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.portraits, onChange: (v) => p2({ portraits: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "情绪差分", hint: "导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.expressions, onChange: (v) => p2({ expressions: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "每轮最多"), /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "6cqw" }, value: cfg.images.expressionsPerTurn, onCommit: (v) => p2({ expressionsPerTurn: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "张"))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "立绘设计师", hint: "立绘提示词由后台模型读完人物卡、世界书和到这一轮为止的全部剧情来写，一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼。" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.images.spriteWriter, onChange: (v) => p2({ spriteWriter: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "并发" }, /* @__PURE__ */ import_react6.default.createElement(Text, { type: "number", style: { width: "6cqw" }, value: cfg.images.concurrency, onCommit: (v) => p2({ concurrency: v }) })));
 }
 function LookSection({ data }) {
   const cfg = data.config;
-  const p = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
-  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "界面皮肤"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-skins" }, SKINS.map((s) => /* @__PURE__ */ import_react6.default.createElement("button", { key: s.id, type: "button", className: `fg-skin${cfg.ui.skin === s.id ? " is-on" : ""}`, onClick: () => p({ skin: s.id }) }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-skin-swatch", style: { background: s.swatch } }), /* @__PURE__ */ import_react6.default.createElement("b", null, s.name), /* @__PURE__ */ import_react6.default.createElement("span", null, s.desc)))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "演出"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "文字速度", hint: "每字毫秒，0 为瞬间显示。" }, /* @__PURE__ */ import_react6.default.createElement("input", { type: "range", min: "0", max: "80", value: cfg.ui.textSpeed, onChange: (e) => p({ textSpeed: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "自动播放间隔" }, /* @__PURE__ */ import_react6.default.createElement("input", { type: "range", min: "400", max: "4000", step: "100", value: cfg.ui.autoDelay, onChange: (e) => p({ autoDelay: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "天气粒子" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.ui.particles, onChange: (v) => p({ particles: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.ui.blip, onChange: (v) => p({ blip: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "写完自动打开剧场" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.ui.autoOpen, onChange: (v) => p({ autoOpen: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "字体地址", hint: "皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: cfg.ui.fontBase, onCommit: (v) => p({ fontBase: v }) })));
+  const p2 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
+  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "界面皮肤"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-skins" }, SKINS.map((s) => /* @__PURE__ */ import_react6.default.createElement("button", { key: s.id, type: "button", className: `fg-skin${cfg.ui.skin === s.id ? " is-on" : ""}`, onClick: () => p2({ skin: s.id }) }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-skin-swatch", style: { background: s.swatch } }), /* @__PURE__ */ import_react6.default.createElement("b", null, s.name), /* @__PURE__ */ import_react6.default.createElement("span", null, s.desc)))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "演出"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "文字速度", hint: "每字毫秒，0 为瞬间显示。" }, /* @__PURE__ */ import_react6.default.createElement("input", { type: "range", min: "0", max: "80", value: cfg.ui.textSpeed, onChange: (e) => p2({ textSpeed: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "自动播放间隔" }, /* @__PURE__ */ import_react6.default.createElement("input", { type: "range", min: "400", max: "4000", step: "100", value: cfg.ui.autoDelay, onChange: (e) => p2({ autoDelay: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "天气粒子" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.ui.particles, onChange: (v) => p2({ particles: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "写完自动打开剧场" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.ui.autoOpen, onChange: (v) => p2({ autoOpen: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "字体地址", hint: "皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。" }, /* @__PURE__ */ import_react6.default.createElement(Text, { value: cfg.ui.fontBase, onCommit: (v) => p2({ fontBase: v }) })));
+}
+var VOICE_GENDER = { female: "女声", male: "男声", "": "不分男女" };
+var SOUND_GROUPS = [["stage", "落字音效", "台词演出里的重音、怒吼、崩溃、灵光一闪"], ["ui", "界面音", "按钮、选项、翻页"]];
+function SoundSection({ data }) {
+  const ui2 = data.config.ui;
+  const p2 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
+  const [busy, run] = useBusy();
+  const fileRef = import_react6.default.useRef(null);
+  const slotRef = import_react6.default.useRef("");
+  const pick = (slot) => {
+    slotRef.current = slot;
+    if (fileRef.current) fileRef.current.click();
+  };
+  const upload = (file2) => {
+    const slot = slotRef.current;
+    run("up" + slot, async () => {
+      setConfig(await api.uploadSound(slot, file2));
+    }, "已换成你的音效");
+  };
+  const remove = (slot) => run("rm" + slot, async () => {
+    setConfig(await api.removeSound(slot));
+  }, "已删掉，退回默认的那个");
+  const narration = ui2.narrationVoice === "off" ? null : { id: ui2.narrationVoice, pitch: ui2.narrationPitch };
+  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p2({ blip: v }) }), /* @__PURE__ */ import_react6.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p2({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: ui2.voiceDefault, options: [["auto", "自动（按性别分）"], ...VOICES.map((v) => [v.id, `都用「${v.label}」`])], onChange: (v) => p2({ voiceDefault: v }) })), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES.map((v) => [v.id, v.label]), ["off", "不出声"]], style: INLINE, onChange: (v) => p2({ narrationVoice: v }) }), /* @__PURE__ */ import_react6.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p2({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES.length, " 个（点一下试听）"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES.map((v) => /* @__PURE__ */ import_react6.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react6.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react6.default.createElement("span", null, VOICE_GENDER[v.gender], " · ", v.desc)))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p2({ sfx: v }) }), /* @__PURE__ */ import_react6.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p2({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, { key: group }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
+    const mine = ui2.customSounds[slot.id];
+    const options = [...slot.presets.map((x, i) => [x.id, i ? x.label : `${x.label}（默认）`]), ...mine ? [["custom", `我的：${mine.name || "上传的文件"}`]] : [], ["off", "关掉"]];
+    return /* @__PURE__ */ import_react6.default.createElement(Field, { key: slot.id, label: slot.label, hint: slot.hint }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Select, { value: ui2.sounds[slot.id], options, style: INLINE, onChange: (v) => {
+      p2({ sounds: { [slot.id]: v } });
+      previewSound(slot.id, v, ui2);
+    } }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: ui2.sounds[slot.id] === "off", onClick: () => previewSound(slot.id, ui2.sounds[slot.id], ui2) }, "▶ 试听"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "up" + slot.id, onClick: () => pick(slot.id) }, busy === "up" + slot.id ? "上传中…" : mine ? "换文件" : "用自己的"), mine && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "rm" + slot.id, onClick: () => remove(slot.id) }, "删掉文件")));
+  }))), /* @__PURE__ */ import_react6.default.createElement("input", { ref: fileRef, type: "file", accept: "audio/*", hidden: true, onChange: (e) => {
+    const file2 = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (file2) upload(file2);
+  } }));
 }
 var sizeMB = (bytes) => (bytes / 1048576).toFixed(1) + " MB";
 function TrackCard({ track, playing, onPlay }) {
@@ -2103,7 +2700,7 @@ function MusicSection({ data }) {
   const [progress, setProgress] = import_react6.default.useState("");
   const folderRef = import_react6.default.useRef(null);
   const filesRef = import_react6.default.useRef(null);
-  const p = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
+  const p2 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
   import_react6.default.useEffect(() => () => stopPreview(), []);
   const play = (track) => {
     if (playing === track.id) {
@@ -2113,11 +2710,11 @@ function MusicSection({ data }) {
     previewTrack({ id: track.id, url: assetUrl(track.assetId) }, () => setPlaying((id) => id === track.id ? "" : id));
     setPlaying(track.id);
   };
-  const importFiles = async (list) => {
-    const files = [...list || []];
-    if (!files.length) return;
+  const importFiles = async (list2) => {
+    const files2 = [...list2 || []];
+    if (!files2.length) return;
     let meta = /* @__PURE__ */ new Map();
-    const sidecar = files.find((f) => f.name === MUSIC_SIDECAR);
+    const sidecar = files2.find((f) => f.name === MUSIC_SIDECAR);
     if (sidecar) {
       try {
         meta = readSidecar(await sidecar.text());
@@ -2125,7 +2722,7 @@ function MusicSection({ data }) {
         toast(`描述文件没读成：${e.message}。先只导入音频`, "error");
       }
     }
-    const audio = files.filter((f) => AUDIO_FILE.test(f.name)).sort((a, b) => a.name.localeCompare(b.name, "zh-CN", { numeric: true }));
+    const audio = files2.filter((f) => AUDIO_FILE.test(f.name)).sort((a, b) => a.name.localeCompare(b.name, "zh-CN", { numeric: true }));
     if (!audio.length) {
       toast("没找到音频文件（mp3、m4a、aac、ogg、opus、wav、flac）", "error");
       return;
@@ -2133,17 +2730,17 @@ function MusicSection({ data }) {
     const failed = [];
     let described = 0;
     for (let i = 0; i < audio.length; i++) {
-      const file = audio[i];
-      setProgress(`导入中 ${i + 1} / ${audio.length}：${file.name}`);
+      const file2 = audio[i];
+      setProgress(`导入中 ${i + 1} / ${audio.length}：${file2.name}`);
       try {
-        const track = await api.uploadTrack(file);
-        const m = meta.get(file.name);
+        const track = await api.uploadTrack(file2);
+        const m = meta.get(file2.name);
         if (m) {
           await api.updateTrack(track.id, m);
           described++;
         }
       } catch (e) {
-        failed.push(`${file.name}：${e.message}`);
+        failed.push(`${file2.name}：${e.message}`);
       }
     }
     setProgress("");
@@ -2160,7 +2757,7 @@ function MusicSection({ data }) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1e3);
   };
-  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "播放"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "配乐" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.ui.bgm, onChange: (v) => p({ bgm: v }) }), /* @__PURE__ */ import_react6.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.bgmVolume, onChange: (e) => p({ bgmVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "我的曲库", tracks ? ` · ${tracks.length} 首` : ""), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "后台导演整理每一轮时会读到下面每首的描述和标签，自己决定这一幕放哪首、哪句话换歌。描述随便写：听感、乐器、适合的场面和情绪都行，越具体导演选得越准。导演还没整理完的轮次会先按描述粗配一首。"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: Boolean(progress), onClick: () => filesRef.current && filesRef.current.click() }, "添加曲子"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !tracks || !tracks.some((t) => t.file), onClick: exportSidecar }, "导出描述"), progress && /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react6.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
+  return /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "播放"), /* @__PURE__ */ import_react6.default.createElement(Field, { label: "配乐" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement(Toggle, { value: cfg.ui.bgm, onChange: (v) => p2({ bgm: v }) }), /* @__PURE__ */ import_react6.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.bgmVolume, onChange: (e) => p2({ bgmVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-section" }, "我的曲库", tracks ? ` · ${tracks.length} 首` : ""), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "后台导演整理每一轮时会读到下面每首的描述和标签，自己决定这一幕放哪首、哪句话换歌。描述随便写：听感、乐器、适合的场面和情绪都行，越具体导演选得越准。导演还没整理完的轮次会先按描述粗配一首。"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: Boolean(progress), onClick: () => filesRef.current && filesRef.current.click() }, "添加曲子"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn", disabled: !tracks || !tracks.some((t) => t.file), onClick: exportSidecar }, "导出描述"), progress && /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react6.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
     importFiles(e.target.files);
     e.target.value = "";
   } }), /* @__PURE__ */ import_react6.default.createElement("input", { ref: filesRef, type: "file", accept: `audio/*,${MUSIC_SIDECAR}`, multiple: true, hidden: true, onChange: (e) => {
@@ -2185,13 +2782,14 @@ function Settings({ onClose, onDirectorLog = null, initialTab = "look" }) {
       title: "设置",
       en: "Config",
       onClose,
-      tabs: [{ id: "look", label: "外观与演出" }, { id: "music", label: "配乐" }, { id: "director", label: "导演" }, { id: "images", label: "生图渠道" }, { id: "style", label: "画风与配图" }, { id: "about", label: "版本与更新" }],
+      tabs: [{ id: "look", label: "外观与演出" }, { id: "sound", label: "声音" }, { id: "music", label: "配乐" }, { id: "director", label: "导演" }, { id: "images", label: "生图渠道" }, { id: "style", label: "画风与配图" }, { id: "about", label: "版本与更新" }],
       tab,
       onTab: setTab,
       actions: data && /* @__PURE__ */ import_react6.default.createElement("span", { className: `fg-pill${data.ready ? "" : " fg-err"}` }, data.ready ? "生图已就绪" : data.readyReason)
     },
     !data && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "读取设置中…"),
     data && tab === "look" && /* @__PURE__ */ import_react6.default.createElement(LookSection, { data }),
+    data && tab === "sound" && /* @__PURE__ */ import_react6.default.createElement(SoundSection, { data }),
     data && tab === "music" && /* @__PURE__ */ import_react6.default.createElement(MusicSection, { data }),
     data && tab === "director" && /* @__PURE__ */ import_react6.default.createElement(DirectorSection, { data, onDirectorLog }),
     data && tab === "images" && /* @__PURE__ */ import_react6.default.createElement(BackendSection, { data }),
@@ -2278,7 +2876,7 @@ function ScriptView({ script, units }) {
       l.exit && /* @__PURE__ */ import_react7.default.createElement(Chip, { key: "out", k: "退场" }, l.exit.join("、"))
     ].filter(Boolean);
     return /* @__PURE__ */ import_react7.default.createElement("div", { key: u.id, className: `fg-dlog-line${marks.length ? "" : " is-plain"}` }, /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-dlog-uid" }, u.id), /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-utext" }, u.type === "dialogue" ? `「${u.text}」` : u.type === "thought" ? `（${u.text}）` : u.text), /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-chips" }, marks.length ? marks : /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-note" }, "旁白 · 无演出")));
-  }))), script.choices.length > 0 && /* @__PURE__ */ import_react7.default.createElement(Block, { label: `选项 · ${script.choices.length}` }, /* @__PURE__ */ import_react7.default.createElement("ol", { className: "fg-dlog-list-plain" }, script.choices.map((c, i) => /* @__PURE__ */ import_react7.default.createElement("li", { key: i }, c)))), /* @__PURE__ */ import_react7.default.createElement(Block, { label: `插画分镜 · ${script.images.length}` }, script.images.map((img, i) => /* @__PURE__ */ import_react7.default.createElement("div", { key: i, className: "fg-dlog-card" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react7.default.createElement(Chip, { k: "标题" }, img.title || "—"), /* @__PURE__ */ import_react7.default.createElement(Chip, { k: "显示" }, img.after, img.until && img.until !== img.after ? ` → ${img.until}` : img.until ? "" : " → 本轮结束"), img.who && img.who.length ? /* @__PURE__ */ import_react7.default.createElement(Chip, { k: "入画" }, img.who.join("、")) : null, img.shape && /* @__PURE__ */ import_react7.default.createElement(Chip, { k: "画幅" }, SHAPE_LABEL[img.shape] || img.shape)), img.moment && /* @__PURE__ */ import_react7.default.createElement("div", null, img.moment), img.tags && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, img.tags), img.desc && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, img.desc))), !script.images.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, "导演觉得这一轮不需要插画（或设置里关了自动插画）。")), script.emotions && script.emotions.length > 0 && /* @__PURE__ */ import_react7.default.createElement(Block, { label: `新加进情绪库 · ${script.emotions.length}` }, script.emotions.map((e) => /* @__PURE__ */ import_react7.default.createElement("div", { key: e.name, className: "fg-dlog-card" }, /* @__PURE__ */ import_react7.default.createElement("b", null, e.name), e.base ? /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-note" }, " · 接近 ", emotionLabel(e.base)) : null, e.desc && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, e.desc)))), /* @__PURE__ */ import_react7.default.createElement(Block, { label: `角色档案更新 · ${script.people.length}` }, script.people.map((p, i) => /* @__PURE__ */ import_react7.default.createElement("div", { key: i, className: "fg-dlog-card" }, /* @__PURE__ */ import_react7.default.createElement("b", null, p.name), p.gender ? /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-note" }, " · ", p.gender) : null, p.appearance && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, "建档：", p.appearance), p.change && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, "永久变化：", p.change), p.outfit && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, "换装：", p.outfit, p.outfitTags ? `（${p.outfitTags}）` : ""), p.states && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, "长期状态：", p.states.length ? p.states.map((s2) => `${s2.name}${s2.tags ? `（${s2.tags}）` : ""}`).join("、") : "全部结束"), p.temp && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, "临时状态：", p.temp))), !script.people.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, "这一轮没有新建或修改档案。")));
+  }))), script.choices.length > 0 && /* @__PURE__ */ import_react7.default.createElement(Block, { label: `选项 · ${script.choices.length}` }, /* @__PURE__ */ import_react7.default.createElement("ol", { className: "fg-dlog-list-plain" }, script.choices.map((c, i) => /* @__PURE__ */ import_react7.default.createElement("li", { key: i }, c)))), /* @__PURE__ */ import_react7.default.createElement(Block, { label: `插画分镜 · ${script.images.length}` }, script.images.map((img, i) => /* @__PURE__ */ import_react7.default.createElement("div", { key: i, className: "fg-dlog-card" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react7.default.createElement(Chip, { k: "标题" }, img.title || "—"), /* @__PURE__ */ import_react7.default.createElement(Chip, { k: "显示" }, img.after, img.until && img.until !== img.after ? ` → ${img.until}` : img.until ? "" : " → 本轮结束"), img.who && img.who.length ? /* @__PURE__ */ import_react7.default.createElement(Chip, { k: "入画" }, img.who.join("、")) : null, img.shape && /* @__PURE__ */ import_react7.default.createElement(Chip, { k: "画幅" }, SHAPE_LABEL[img.shape] || img.shape)), img.moment && /* @__PURE__ */ import_react7.default.createElement("div", null, img.moment), img.tags && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, img.tags), img.desc && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, img.desc))), !script.images.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, "导演觉得这一轮不需要插画（或设置里关了自动插画）。")), script.emotions && script.emotions.length > 0 && /* @__PURE__ */ import_react7.default.createElement(Block, { label: `新加进情绪库 · ${script.emotions.length}` }, script.emotions.map((e) => /* @__PURE__ */ import_react7.default.createElement("div", { key: e.name, className: "fg-dlog-card" }, /* @__PURE__ */ import_react7.default.createElement("b", null, e.name), e.base ? /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-note" }, " · 接近 ", emotionLabel(e.base)) : null, e.desc && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, e.desc)))), /* @__PURE__ */ import_react7.default.createElement(Block, { label: `角色档案更新 · ${script.people.length}` }, script.people.map((p2, i) => /* @__PURE__ */ import_react7.default.createElement("div", { key: i, className: "fg-dlog-card" }, /* @__PURE__ */ import_react7.default.createElement("b", null, p2.name), p2.gender ? /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-note" }, " · ", p2.gender) : null, p2.appearance && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, "建档：", p2.appearance), p2.change && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, "永久变化：", p2.change), p2.outfit && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, "换装：", p2.outfit, p2.outfitTags ? `（${p2.outfitTags}）` : ""), p2.states && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, "长期状态：", p2.states.length ? p2.states.map((s2) => `${s2.name}${s2.tags ? `（${s2.tags}）` : ""}`).join("、") : "全部结束"), p2.temp && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-dlog-mono" }, "临时状态：", p2.temp))), !script.people.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, "这一轮没有新建或修改档案。")));
 }
 function SpritesView({ sprites }) {
   if (!sprites || !sprites.length) return /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, "这次没有写出提示词，看「原始输出」里模型回了什么。");
@@ -2374,9 +2972,9 @@ var writePos = (gameId, key) => {
 };
 var GLYPH_AHEAD = 12;
 var GLYPH_WAIT = 1200;
-var glyphsOf = (list) => ({
-  body: list.map((b) => b.text).join(""),
-  display: list.map((b) => (b.alias || b.speaker) + b.scene.location + (b.card ? b.text : "")).join("")
+var glyphsOf = (list2) => ({
+  body: list2.map((b) => b.text).join(""),
+  display: list2.map((b) => (b.alias || b.speaker) + b.scene.location + (b.card ? b.text : "")).join("")
 });
 function fillComposer(text) {
   try {
@@ -2478,10 +3076,23 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const speed = skip ? 0 : ui0.textSpeed;
   const holdText = Boolean(beat) && glyphKey !== beat.key;
   const typeSpeed = title || panel ? 0 : speed;
-  const [done, chars, finish, typedAt, typedTimes] = useTypewriter(beat, typeSpeed, { sound: ui0.blip && !skip && !title, hold: holdText });
-  const talk = import_react8.default.useMemo(() => beat ? { key: beat.key, type: beat.type, chars, times: typedTimes, speed: typeSpeed, startedAt: typedAt, done } : null, [beat, chars, typedTimes, typeSpeed, typedAt, done]);
+  const blipOn = Boolean(ui0.blip) && !skip && !title;
+  const sfxOn = ui0.sfx !== false && !skip && !title;
+  import_react8.default.useEffect(() => {
+    configureSounds(cfg && cfg.ui);
+  }, [cfg]);
+  const stageRef = import_react8.default.useRef(null);
+  const flashRef = import_react8.default.useRef(null);
+  const hit = useHits(stageRef, flashRef, sfxOn);
+  const people = import_react8.default.useMemo(() => new Map((view && view.cast || []).map((p2) => [p2.name, p2])), [view]);
+  const voices = import_react8.default.useMemo(() => castVoices(view && view.cast || [], ui0), [view, ui0]);
+  const voice = import_react8.default.useMemo(() => beat ? lineVoice(beat.type, beat.speaker, voices, ui0) : null, [beat && beat.type, beat && beat.speaker, voices, ui0]);
+  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : hit });
+  const talk = import_react8.default.useMemo(() => beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, speed: typeSpeed, startedAt: typedAt, done } : null, [beat, chars, typed, typeSpeed, typedAt, done]);
+  import_react8.default.useEffect(() => {
+    if (beat && beat.sym === "bulb" && sfxOn) stinger("ding");
+  }, [beat && beat.key]);
   const cam = useCamera(title ? null : beat);
-  const people = import_react8.default.useMemo(() => new Map((view && view.cast || []).map((p) => [p.name, p])), [view]);
   const atEnd = beat && index === beats.length - 1;
   import_react8.default.useEffect(() => {
     loadSkinFonts(ui0.skin, ui0.fontBase);
@@ -2666,6 +3277,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     "div",
     {
       className: "fg-stage",
+      ref: stageRef,
       onClick: () => {
         if (hidden) {
           setHidden(false);
@@ -2679,11 +3291,12 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     },
     /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-camera", "data-cam": cam }, /* @__PURE__ */ import_react8.default.createElement(Backdrop, { scene: stageScene, view, transition: stageBeat ? stageBeat.sceneEnter ? stageBeat.transition : "dissolve" : "dissolve" }), /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-grade", "data-time": stageScene.time }), stageBeat && /* @__PURE__ */ import_react8.default.createElement(Cast, { beat: title ? { ...stageBeat, speaker: "", sym: "" } : stageBeat, view, talk: title ? null : talk }), stageBeat && !title && /* @__PURE__ */ import_react8.default.createElement(CgLayer, { beat: stageBeat }), /* @__PURE__ */ import_react8.default.createElement(Particles, { weather: stageScene.weather, enabled: ui0.particles !== false }), /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-vignette" })),
     beat && !title && /* @__PURE__ */ import_react8.default.createElement(Flash, { beat }),
+    /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),
     beat && !title && /* @__PURE__ */ import_react8.default.createElement(TitleCard, { beat }),
     !title && beat && /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react8.default.createElement("div", null, /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-hud-place" }, beat.scene.location || `第 ${beat.turn} 轮`), /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-hud-meta" }, /* @__PURE__ */ import_react8.default.createElement("span", null, TIME_LABEL[beat.scene.time] || ""), beat.scene.weather && beat.scene.weather !== "clear" && /* @__PURE__ */ import_react8.default.createElement("span", null, WEATHER_LABEL[beat.scene.weather]), beat.scene.mood && /* @__PURE__ */ import_react8.default.createElement("span", null, "♪ ", MOOD_LABEL[beat.scene.mood])))),
     !title && /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, directing && /* @__PURE__ */ import_react8.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), drawing > 0 && /* @__PURE__ */ import_react8.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), track && /* @__PURE__ */ import_react8.default.createElement("span", { className: "fg-pill", title: track.name }, "♪ ", track.name), viewError && /* @__PURE__ */ import_react8.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react8.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
     beat && !title && beat.card && /* @__PURE__ */ import_react8.default.createElement(SceneCard, { beat }),
-    beat && !title && /* @__PURE__ */ import_react8.default.createElement(DialogBox, { beat, chars, times: typedTimes, done, waiting: holdText, color, quick, progress: progressInTurn, status, hiddenText: Boolean(beat.card) }),
+    beat && !title && /* @__PURE__ */ import_react8.default.createElement(DialogBox, { beat, chars, plan: typed, done, waiting: holdText, color, quick, progress: progressInTurn, status, hiddenText: Boolean(beat.card) }),
     !beat && !title && /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-choices" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-choices-title" }, view ? "这一局还没有可以演的内容" : "读取中")),
     choosing && beat && /* @__PURE__ */ import_react8.default.createElement(Choices, { choices: beat.choices, waiting: directing, onChoose: choose, onBack: close }),
     title && /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-title", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-title-kicker" }, "FlowGal · DSH Tavern"), /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-title-logo" }, cardTitle), /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-title-sub" }, latest ? `第 ${latest.turn} 轮 · ${latest.scene.location || "—"} · ${TIME_LABEL[latest.scene.time] || ""}` : gameId ? "开场白还没有整理" : "先在聊天里打开一局"), /* @__PURE__ */ import_react8.default.createElement("div", { className: "fg-title-menu" }, titleMenu.map((m, i) => /* @__PURE__ */ import_react8.default.createElement("button", { key: m.id, type: "button", className: m.badge ? "is-new" : void 0, style: { "--i": i }, onMouseEnter: () => sfx("hover"), onClick: () => {

@@ -2,12 +2,13 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, updateAvailable, toast, openTheater, assetUrl } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, emotionLabel, pickTrack } from './playback.js'
-import { Backdrop, Cast, CgLayer, TitleCard, Flash, Particles, useCamera } from './Stage.jsx'
+import { Backdrop, Cast, CgLayer, TitleCard, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
-import { playBgm, stopBgm, sfx } from './audio.js'
+import { playBgm, stopBgm, sfx, stinger, configureSounds } from './audio.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
+import { castVoices, lineVoice } from '../../../lib/sounds.js'
 
 // 读到哪一句：每局记在浏览器里。
 const POS_KEY = gameId => 'flowgal:pos:' + gameId
@@ -119,11 +120,22 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const speed = skip ? 0 : ui0.textSpeed
   const holdText = Boolean(beat) && glyphKey !== beat.key
   const typeSpeed = title || panel ? 0 : speed
-  const [done, chars, finish, typedAt, typedTimes] = useTypewriter(beat, typeSpeed, { sound: ui0.blip && !skip && !title, hold: holdText })
-  // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
-  const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typedTimes, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typedTimes, typeSpeed, typedAt, done])
-  const cam = useCamera(title ? null : beat)
+  const blipOn = Boolean(ui0.blip) && !skip && !title
+  const sfxOn = ui0.sfx !== false && !skip && !title
+  React.useEffect(() => { configureSounds(cfg && cfg.ui) }, [cfg])
+  const stageRef = React.useRef(null)
+  const flashRef = React.useRef(null)
+  const hit = useHits(stageRef, flashRef, sfxOn)
   const people = React.useMemo(() => new Map(((view && view.cast) || []).map(p => [p.name, p])), [view])
+  // 这句用谁的声音念：旁白按设置，台词和心声按说话人档案里的声音（没指定时按性别自动分，一局里尽量不撞）
+  const voices = React.useMemo(() => castVoices((view && view.cast) || [], ui0), [view, ui0])
+  const voice = React.useMemo(() => (beat ? lineVoice(beat.type, beat.speaker, voices, ui0) : null), [beat && beat.type, beat && beat.speaker, voices, ui0])
+  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : hit })
+  // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
+  const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])
+  // 灵光一闪（漫画符号是灯泡）：逆转裁判那一声「叮」
+  React.useEffect(() => { if (beat && beat.sym === 'bulb' && sfxOn) stinger('ding') }, [beat && beat.key])
+  const cam = useCamera(title ? null : beat)
   const atEnd = beat && index === beats.length - 1
 
   React.useEffect(() => { loadSkinFonts(ui0.skin, ui0.fontBase) }, [ui0.skin, ui0.fontBase])
@@ -255,7 +267,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
   return (
     <div ref={rootRef} className={`fg-theater${closing ? ' is-closing' : ''}${hidden ? ' fg-ui-hidden' : ''}`} data-skin={ui0.skin} role="dialog" aria-label="FlowGal 剧场">
-      <div className="fg-stage" onClick={() => { if (hidden) { setHidden(false); return } if (!title && !panel && !choosing) advance() }}
+      <div className="fg-stage" ref={stageRef} onClick={() => { if (hidden) { setHidden(false); return } if (!title && !panel && !choosing) advance() }}
         onWheel={e => { if (!title && !panel && e.deltaY < -30) setPanel('log') }}>
         <div className="fg-camera" data-cam={cam}>
           <Backdrop scene={stageScene} view={view} transition={stageBeat ? (stageBeat.sceneEnter ? stageBeat.transition : 'dissolve') : 'dissolve'} />
@@ -266,6 +278,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
           <div className="fg-vignette" />
         </div>
         {beat && !title && <Flash beat={beat} />}
+        <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
         {beat && !title && <TitleCard beat={beat} />}
 
         {!title && beat && (
@@ -293,7 +306,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
         {beat && !title && beat.card && <SceneCard beat={beat} />}
         {beat && !title && (
-          <DialogBox beat={beat} chars={chars} times={typedTimes} done={done} waiting={holdText} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)} />
+          <DialogBox beat={beat} chars={chars} plan={typed} done={done} waiting={holdText} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)} />
         )}
         {!beat && !title && (
           <div className="fg-choices"><div className="fg-choices-title">{view ? '这一局还没有可以演的内容' : '读取中'}</div></div>

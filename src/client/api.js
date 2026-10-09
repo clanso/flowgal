@@ -52,12 +52,19 @@ export const api = {
   removeTrack: id => call('/music', { action: 'remove', id }),
   /** 上传一首配乐：请求体直接是文件字节（最大 50 MB），不走 JSON。 */
   async uploadTrack(file) {
-    const res = await fetch(`${API}/music/upload?name=${encodeURIComponent(file.name || '')}`, { method: 'POST', cache: 'no-store', headers: { 'x-flowgal-request': '1', 'content-type': file.type || 'application/octet-stream' }, body: file })
-    let data = null
-    try { data = await res.json() } catch {}
-    if (!res.ok || !data || data.ok === false) throw new Error((data && data.error) || `HTTP ${res.status}`)
-    return data.track
+    return (await uploadFile(`/music/upload?name=${encodeURIComponent(file.name || '')}`, file)).track
   },
+  /** 某一种音效换成自己的文件（最大 5 MB）；返回最新设置。 */
+  uploadSound: (slot, file) => uploadFile(`/sound/upload?slot=${encodeURIComponent(slot)}&name=${encodeURIComponent(file.name || '')}`, file),
+  removeSound: slot => call('/sound', { action: 'remove', slot }),
+}
+
+async function uploadFile(path, file) {
+  const res = await fetch(API + path, { method: 'POST', cache: 'no-store', headers: { 'x-flowgal-request': '1', 'content-type': file.type || 'application/octet-stream' }, body: file })
+  let data = null
+  try { data = await res.json() } catch {}
+  if (!res.ok || !data || data.ok === false) throw new Error((data && data.error) || `HTTP ${res.status}`)
+  return data
 }
 
 /** 补图结果的一句话说明。 */

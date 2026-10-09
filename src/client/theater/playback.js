@@ -76,6 +76,8 @@ export function buildBeats(view) {
         emo: line.emo || '',
         sym: line.sym || '',
         cam: line.cam || '',
+        say: line.say || '',
+        stress: line.stress || '',
         card: line.card || '',
         scene,
         bgm,

@@ -2,6 +2,8 @@
 // 第 2 轮导演自创一个复合情绪「害羞地强装镇定」，第 4 轮林岚换上冬季制服，用来演示立绘差分。
 // 第 1 轮的插画是竖版，用来演示剧场里竖图的摇镜；第 2 轮的插画显示三句就收起。
 // 登场 / 退场：第 2、3 轮苏晴中途跑进来，第 3 轮又冒雨跑走；第 4 轮林岚在说话那一句才出现。
+// 台词演法与重音：威压（不许走神）、迟疑（抱歉……）、激动（苏晴喊人）、重音（很可疑）、低语（信封那两句），
+// 第 3 轮苏晴的怒吼、说说停停和崩溃（旧校舍的事）。
 export const CARD = { id: 'preview-card', name: '放学后的约定' }
 
 export const TURNS = [
@@ -33,6 +35,9 @@ export const TURNS = [
 明天放学后，旧校舍的音乐教室。有件事，只想告诉你。——林岚
 苏晴不知什么时候凑了过来，看清字的那一瞬间，表情一下子变了。
 “旧校舍……那里不是三年前就封起来了吗？”
+“不行！你绝对不能去那里！”
+“……为什么？”
+“因为三年前……那、那间教室里……”她的声音一下子乱了，“有人从窗口……掉下去了……”
 一道闪电劈开夜空，路灯跟着闪了两下。
 苏晴咬了咬嘴唇，什么也没说，撑开伞跑进了雨里。
 （林岚学姐，你到底想告诉我什么？）`,
@@ -62,12 +67,12 @@ export function directorReply(turn, units) {
     lines: [
       L('林岚坐在琴凳上', { sp: '林岚', emo: 'thinking' }),
       L('你终于来了', { sp: '林岚', emo: 'smile', sym: 'sparkle', cam: 'zoom' }),
-      L('抱歉，社团活动', { sp: '我', emo: 'neutral', sym: 'sweat' }),
+      L('抱歉，社团活动', { sp: '我', emo: 'neutral', sym: 'sweat', say: 'hesitant' }),
       L('好像有点不一样', { sp: '我' }),
       L('林岚回过头', { sp: '林岚', emo: 'smile' }),
       L('那就罚你', { sp: '林岚', emo: 'teasing', sym: 'heart' }),
       L('她把一缕头发', { sp: '林岚', emo: 'shy' }),
-      L('不许走神', { sp: '林岚', emo: 'pout', sym: 'anger' }),
+      L('不许走神', { sp: '林岚', emo: 'pout', sym: 'anger', say: 'menace' }),
     ],
     choices: [],
     images: [{ after: find(units, '那就罚你'), title: '午后的琴房', moment: '林岚坐在琴凳上回过头，带着捉弄人的笑，要罚我听她弹完这一首', who: ['林岚'] }],
@@ -80,14 +85,14 @@ export function directorReply(turn, units) {
     scene: { location: '竹林小径', time: 'dusk', weather: 'fireflies', mood: 'calm', transition: 'dissolve', bg: 'bamboo forest path, dusk, fireflies, scenery, no humans' },
     cast: [{ name: '林岚', pos: 'left' }, { name: '苏晴', pos: 'right' }],
     lines: [
-      L('你们俩在这儿啊', { sp: '苏晴', emo: 'happy', sym: 'surprise', cam: 'shake' }),
+      L('你们俩在这儿啊', { sp: '苏晴', emo: 'happy', sym: 'surprise', say: 'excited' }),
       L('好巧啊', { sp: '苏晴', emo: 'teasing', sym: 'note' }),
-      L('这句话本身就很可疑', { sp: '我', sym: 'sweat' }),
+      L('这句话本身就很可疑', { sp: '我', sym: 'sweat', stress: '很可疑' }),
       L('苏晴从小路另一头', { sp: '苏晴', emo: 'tired', sym: 'sweat', enter: [{ name: '苏晴', pos: 'right' }] }),
       L('不过我可不是跟踪', { sp: '苏晴', emo: 'smug' }),
       L('悄悄把一个小信封', { sp: '林岚', emo: '害羞地强装镇定' }),
-      L('回家以后再看', { sp: '林岚', emo: 'blush', sym: 'blush' }),
-      L('只给你一个人', { sp: '林岚', emo: 'love', sym: 'heart' }),
+      L('回家以后再看', { sp: '林岚', emo: 'blush', sym: 'blush', say: 'whisper' }),
+      L('只给你一个人', { sp: '林岚', emo: 'love', sym: 'heart', say: 'whisper', stress: '只给你' }),
     ],
     choices: [],
     emotions: [{ name: '害羞地强装镇定', desc: '脸颊泛红却板着脸，目光移开，嘴唇抿紧，手指捏着衣角', base: 'shy' }],
@@ -104,7 +109,12 @@ export function directorReply(turn, units) {
     lines: [
       L('明天放学后', { sp: '林岚', card: 'note' }),
       L('不知什么时候凑了过来', { sp: '苏晴', emo: 'surprised', enter: [{ name: '苏晴' }] }),
-      L('旧校舍……那里', { sp: '苏晴', emo: 'scared', sym: 'surprise', cam: 'zoom' }),
+      L('旧校舍……那里', { sp: '苏晴', emo: 'scared', sym: 'surprise', cam: 'zoom', say: 'hesitant', stress: '三年前' }),
+      L('你绝对不能去那里', { sp: '苏晴', emo: 'angry', sym: 'anger', say: 'shout' }),
+      L('……为什么', { sp: '我', emo: 'confused' }),
+      L('那、那间教室里', { sp: '苏晴', emo: 'scared', sym: 'sweat' }),
+      L('她的声音一下子乱了', { sp: '苏晴', emo: 'scared' }),
+      L('有人从窗口', { sp: '苏晴', emo: 'cry', say: 'breakdown', stress: '掉下去了' }),
       L('一道闪电', { cam: 'flash' }),
       L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: ['苏晴'] }),
       L('到底想告诉我什么', { sp: '我', sym: 'gloom' }),

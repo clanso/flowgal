@@ -1,4 +1,4 @@
-// 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含「我的配乐」）。导演日志在 DirectorLog.jsx。
+// 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含声音、「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
 import { api, assetUrl, toast, fillText, useConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic } from '../api.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, cgSrc } from './playback.js'
@@ -6,7 +6,9 @@ import { allEmotions, emotionEntry } from '../../../lib/emotions.js'
 import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn } from '../../../lib/look.js'
 import { Silhouette } from './Stage.jsx'
 import { SKINS } from './skins.js'
-import { previewTrack, stopPreview } from './audio.js'
+import { previewTrack, stopPreview, previewVoice, previewSound } from './audio.js'
+import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, voiceById, castVoices } from '../../../lib/sounds.js'
+import { cleanPack, packFiles } from '../../../lib/aa-sprite.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
 import { modelKey, qualityFor, negativeFor } from '../../../lib/image/style.js'
 import { naiModelInfo } from '../../../lib/image/nai-models.js'
@@ -272,6 +274,28 @@ function readFile(file) {
   return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file) })
 }
 
+/** 读一个逆转式素材包文件夹：找到 sprite.json（选了上一层文件夹也行），先检查格式，再按它收齐要用的图片（data URL）。 */
+async function readAaFolder(files) {
+  const path = f => f.webkitRelativePath || f.name
+  const json = files.filter(f => f.name === 'sprite.json').sort((a, b) => path(a).length - path(b).length)[0]
+  if (!json) throw new Error('这个文件夹里没有 sprite.json：选素材包所在的那个文件夹')
+  const dir = path(json).slice(0, -'sprite.json'.length)
+  let manifest
+  try { manifest = JSON.parse(await json.text()) } catch { throw new Error('sprite.json 不是合法的 JSON') }
+  const pack = cleanPack(manifest)
+  const byPath = new Map(files.map(f => [path(f), f]))
+  const images = {}
+  let total = 0
+  for (const name of packFiles(pack)) {
+    const file = byPath.get(dir + name)
+    if (!file) throw new Error('素材包缺文件：' + name)
+    total += file.size
+    if (total > 11 * 1024 * 1024) throw new Error('素材包里的图片加起来超过 11MB，先压缩一下')
+    images[name] = await readFile(file)
+  }
+  return { manifest, files: images }
+}
+
 /** 一个人的各套样子：当前这套在最前，其余是已经有立绘的。 */
 function lookGroups(person) {
   const now = lookAt(person.timeline, Infinity)
@@ -283,15 +307,27 @@ function lookGroups(person) {
   return [...groups.values()]
 }
 
-/** 档案：固定外貌、性别、种子、给立绘设计师的备注和负面词。全局角色改的是全局库。 */
-function ProfileEditor({ gameId, person }) {
-  const pick = p => ({ appearance: p.appearance || '', gender: p.gender || '', note: p.note || '', negative: p.negative || '', seed: p.seedCustom ? String(p.seed) : '' })
+// 声音：音色按男女分组；音高上下各几个半音。
+const VOICE_GROUPS = [['female', '女声'], ['male', '男声'], ['', '不分男女']]
+const PITCHES = Array.from({ length: VOICE_PITCH_LIMIT * 2 + 1 }, (_, i) => i - VOICE_PITCH_LIMIT).map(n => [String(n), n > 0 ? `音高 +${n}` : n < 0 ? `音高 ${n}` : '音高 原调'])
+const voiceText = voice => (voice ? voiceById(voice.id).label : '不出声')
+
+/** 档案：固定外貌、性别、种子、声音、给立绘设计师的备注和负面词。全局角色改的是全局库。cast 是这一局的全部人物（自动分声音时避开别人）。 */
+function ProfileEditor({ gameId, person, cast }) {
+  const pick = p => ({ appearance: p.appearance || '', gender: p.gender || '', note: p.note || '', negative: p.negative || '', seed: p.seedCustom ? String(p.seed) : '', voice: p.voice || '', voicePitch: String(p.voicePitch || 0) })
   const [form, setForm] = React.useState(() => pick(person))
   const [busy, run] = useBusy()
-  React.useEffect(() => { setForm(pick(person)) }, [person.appearance, person.gender, person.note, person.negative, person.seed, person.seedCustom])
+  const cfg = useConfig()
+  const ui = cfg ? cfg.config.ui : null
+  React.useEffect(() => { setForm(pick(person)) }, [person.appearance, person.gender, person.note, person.negative, person.seed, person.seedCustom, person.voice, person.voicePitch])
   const dirty = JSON.stringify(form) !== JSON.stringify(pick(person))
   const set = k => e => setForm({ ...form, [k]: e.target.value })
-  const save = () => run('save', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { ...form, seed: form.seed === '' ? null : Number(form.seed) } }), '档案已保存')
+  const save = () => run('save', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { ...form, seed: form.seed === '' ? null : Number(form.seed), voicePitch: Number(form.voicePitch) } }), '档案已保存')
+  // 按表单里还没保存的选择试听；「自动」显示实际会分到哪个音色（跟着表单里的性别变）。
+  const others = (cast || []).filter(p => p.name !== person.name)
+  const draft = { ...person, gender: form.gender, voice: form.voice, voicePitch: Number(form.voicePitch) }
+  const voiceNow = castVoices([...others, draft], ui).get(person.name)
+  const autoVoice = castVoices([...others, { ...draft, voice: '' }], ui).get(person.name)
   return (
     <div className="fg-person-form">
       <div className="fg-field"><label>固定外貌</label><textarea className="fg-textarea" value={form.appearance} onChange={set('appearance')} onKeyDown={e => e.stopPropagation()} placeholder="1girl, long black hair, blue eyes（脸、发、瞳、体型，不含衣服）" /></div>
@@ -301,6 +337,18 @@ function ProfileEditor({ gameId, person }) {
           <input className="fg-input" style={{ width: '12cqw' }} inputMode="numeric" value={form.seed} placeholder={`默认 ${person.seed}`} onChange={e => setForm({ ...form, seed: e.target.value.replace(/\D/g, '') })} onKeyDown={e => e.stopPropagation()} />
           <button type="button" className="fg-btn" title="换一个随机种子" onClick={() => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) })}>🎲</button>
           <span className="fg-note">所有立绘差分共用这个种子</span>
+        </div>
+      </div>
+      <div className="fg-field"><label>声音</label>
+        <div className="fg-row">
+          <select className="fg-select" style={{ width: 'auto' }} value={form.voice} onChange={set('voice')} aria-label="打字音音色">
+            <option value="">自动（{voiceText(autoVoice)}）</option>
+            <option value="off">不出声</option>
+            {VOICE_GROUPS.map(([g, label]) => <optgroup key={g} label={label}>{VOICES.filter(v => v.gender === g).map(v => <option key={v.id} value={v.id}>{v.label}</option>)}</optgroup>)}
+          </select>
+          <select className="fg-select" style={{ width: 'auto' }} value={form.voicePitch} onChange={set('voicePitch')} aria-label="音高" title="升降几个半音">{PITCHES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          <button type="button" className="fg-btn" disabled={!voiceNow} onClick={() => previewVoice(voiceNow, ui || undefined)}>▶ 试听</button>
+          <span className="fg-note">这个角色说话时的打字音</span>
         </div>
       </div>
       <div className="fg-field"><label>立绘备注</label><textarea className="fg-textarea is-short" value={form.note} onChange={set('note')} onKeyDown={e => e.stopPropagation()} placeholder="写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" /></div>
@@ -363,6 +411,7 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
   const [tags, setTags] = React.useState(record ? record.tags || '' : '')
   const [busy, run] = useBusy()
   const fileRef = React.useRef(null)
+  const aaRef = React.useRef(null)
   React.useEffect(() => { setTags(record ? record.tags || '' : '') }, [key, record && record.tags])
   const entry = emotionEntry(emotion, emotions)
   const reachable = group.current || turn != null
@@ -390,12 +439,22 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
             run('up', () => api.cast(gameId, 'upload', { name: person.name, emotion, dataUrl, ...at }), '立绘已上传')
           }} />
         </div>
+        <div className="fg-row">
+          <span className="fg-note">{record && record.aa ? `逆转式素材包${record.aa.pack && record.aa.pack.name ? `「${record.aa.pack.name}」` : ''}：会呼吸、眨眼，说话时动嘴` : '逆转式立绘：导入素材包文件夹（sprite.json 加图片），这张就会呼吸、眨眼、动嘴；图会换成素材包自带的那张'}</span>
+          <button type="button" className="fg-btn" disabled={!reachable || busy === 'aa'} onClick={() => aaRef.current && aaRef.current.click()}>{busy === 'aa' ? '导入中…' : record && record.aa ? '换素材包' : '导入素材包'}</button>
+          {record && record.aa && record.aa.pack && <button type="button" className="fg-btn" disabled={busy === 'aa-rm'} onClick={() => run('aa-rm', () => api.cast(gameId, 'aa-remove', { name: person.name, key }), '已取消动态，图留着')}>取消动态</button>}
+          <input ref={aaRef} type="file" webkitdirectory="" multiple hidden onChange={e => {
+            const files = [...(e.target.files || [])]
+            e.target.value = ''
+            if (files.length) run('aa', async () => { const { manifest, files: images } = await readAaFolder(files); await api.cast(gameId, 'aa-pack', { name: person.name, emotion, manifest, files: images, ...at }) }, '素材包已导入：这张立绘会呼吸、眨眼、动嘴了')
+          }} />
+        </div>
       </div>
     </div>
   )
 }
 
-function PersonCard({ gameId, person, emotions }) {
+function PersonCard({ gameId, person, emotions, cast, voice }) {
   const [busy, run] = useBusy()
   const groups = React.useMemo(() => lookGroups(person), [person])
   const [groupKey, setGroupKey] = React.useState('')
@@ -421,10 +480,10 @@ function PersonCard({ gameId, person, emotions }) {
         </h3>
         <div className="fg-person-tags">{person.appearance || '（还没有固定外貌）'}{person.outfitTags ? ` ／ ${person.outfitTags}` : ''}</div>
         <div className="fg-row fg-person-folds">
-          <button type="button" className={`fg-btn${fold === 'profile' ? ' is-on' : ''}`} onClick={() => setFold(fold === 'profile' ? '' : 'profile')}>档案 · 种子 {person.seed}</button>
+          <button type="button" className={`fg-btn${fold === 'profile' ? ' is-on' : ''}`} onClick={() => setFold(fold === 'profile' ? '' : 'profile')}>档案 · 种子 {person.seed} · 声音 {voiceText(voice)}{voice && voice.auto ? '（自动）' : ''}</button>
           <button type="button" className={`fg-btn${fold === 'wardrobe' ? ' is-on' : ''}`} onClick={() => setFold(fold === 'wardrobe' ? '' : 'wardrobe')}>衣橱与状态 · {Object.keys((person.timeline && person.timeline.outfits) || {}).length} 套</button>
         </div>
-        {fold === 'profile' && <ProfileEditor gameId={gameId} person={person} />}
+        {fold === 'profile' && <ProfileEditor gameId={gameId} person={person} cast={cast} />}
         {fold === 'wardrobe' && <WardrobeEditor gameId={gameId} person={person} />}
         <div className="fg-looks">
           {groups.map(g => (
@@ -440,7 +499,7 @@ function PersonCard({ gameId, person, emotions }) {
               className={`fg-emo${t.st && ['writing', 'queued', 'running'].includes(t.st.status) ? ' is-busy' : ''}${emotion === t.id ? ' is-on' : ''}${t.builtin ? '' : ' is-custom'}`}
               onClick={() => setEmotion(emotion === t.id ? '' : t.id)}>
               {t.record && t.record.assetId && <img src={assetUrl(t.record.assetId)} alt="" loading="lazy" />}
-              <span>{t.label}{t.st && t.st.status === 'failed' ? ' ⚠' : ''}</span>
+              <span>{t.label}{t.record && t.record.aa ? ' · 动' : ''}{t.st && t.st.status === 'failed' ? ' ⚠' : ''}</span>
             </button>
           ))}
         </div>
@@ -503,6 +562,8 @@ export function CastPanel({ view, gameId, onClose }) {
   const cast = (view && view.cast) || []
   const log = (view && view.castLog) || []
   const emotions = (view && view.emotions) || []
+  const cfg = useConfig()
+  const voices = castVoices(cast, cfg ? cfg.config.ui : null)
   return (
     <Panel title="人物志" en="Characters" onClose={onClose} tabs={[{ id: 'people', label: `人物 · ${cast.length}` }, { id: 'emotions', label: `情绪库 · ${allEmotions(emotions).length}` }, { id: 'log', label: `档案变更 · ${log.length}` }]} tab={tab} onTab={setTab}
       actions={tab === 'people' && (
@@ -514,7 +575,7 @@ export function CastPanel({ view, gameId, onClose }) {
           </form>
         </div>
       )}>
-      {tab === 'people' && cast.map(p => <PersonCard key={p.name} gameId={gameId} person={p} emotions={emotions} />)}
+      {tab === 'people' && cast.map(p => <PersonCard key={p.name} gameId={gameId} person={p} emotions={emotions} cast={cast} voice={voices.get(p.name)} />)}
       {tab === 'people' && !cast.length && <div className="fg-note">有名字的角色第一次出场时，导演会自动给他建档：固定外貌、身上的衣服。之后插画里写 @名字 都会换成这份档案，长相不再漂移；立绘按「服装 × 长期状态 × 情绪」各画一套，同一个种子。</div>}
       {tab === 'emotions' && <EmotionLibrary emotions={emotions} />}
       {tab === 'log' && log.map(e => (
@@ -548,9 +609,11 @@ function Text({ value, onCommit, type = 'text', placeholder, style }) {
   const commit = () => { if (String(v) !== String(value ?? '')) onCommit(type === 'number' ? Number(v) : v) }
   return <input className="fg-input" type={type} value={v} placeholder={placeholder} style={style} onChange={e => setV(e.target.value)} onBlur={commit} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commit() }} />
 }
-function Select({ value, options, onChange }) {
-  return <select className="fg-select" value={value} onChange={e => onChange(e.target.value)}>{options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+function Select({ value, options, onChange, style }) {
+  return <select className="fg-select" value={value} style={style} onChange={e => onChange(e.target.value)}>{options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
 }
+// 和按钮排在同一行的下拉框：按内容宽，不占满一行。
+const INLINE = { width: 'auto' }
 
 /** 模型选择：有列表时下拉选（列表里没有的当前值也保留），随时可以切到手动填写。 */
 function ModelField({ value, options, onCommit, placeholder, emptyLabel }) {
@@ -835,9 +898,72 @@ export function LookSection({ data }) {
       <Field label="文字速度" hint="每字毫秒，0 为瞬间显示。"><input type="range" min="0" max="80" value={cfg.ui.textSpeed} onChange={e => p({ textSpeed: Number(e.target.value) })} style={{ width: '100%' }} /></Field>
       <Field label="自动播放间隔"><input type="range" min="400" max="4000" step="100" value={cfg.ui.autoDelay} onChange={e => p({ autoDelay: Number(e.target.value) })} style={{ width: '100%' }} /></Field>
       <Field label="天气粒子"><Toggle value={cfg.ui.particles} onChange={v => p({ particles: v })} /></Field>
-      <Field label="打字音"><Toggle value={cfg.ui.blip} onChange={v => p({ blip: v })} /></Field>
       <Field label="写完自动打开剧场"><Toggle value={cfg.ui.autoOpen} onChange={v => p({ autoOpen: v })} /></Field>
       <Field label="字体地址" hint="皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。"><Text value={cfg.ui.fontBase} onCommit={v => p({ fontBase: v })} /></Field>
+    </>
+  )
+}
+
+// ───────────────────────── 声音 ─────────────────────────
+const VOICE_GENDER = { female: '女声', male: '男声', '': '不分男女' }
+const SOUND_GROUPS = [['stage', '落字音效', '台词演出里的重音、怒吼、崩溃、灵光一闪'], ['ui', '界面音', '按钮、选项、翻页']]
+
+/** 打字音和音效：试听每个音色、定没指定声音的角色怎么分、旁白用什么；每种音效选版本、试听、换成自己的文件。 */
+function SoundSection({ data }) {
+  const ui = data.config.ui
+  const p = patch => patchConfig({ ui: patch }).catch(e => toast(e.message, 'error'))
+  const [busy, run] = useBusy()
+  const fileRef = React.useRef(null)
+  const slotRef = React.useRef('')
+  const pick = slot => { slotRef.current = slot; if (fileRef.current) fileRef.current.click() }
+  const upload = file => { const slot = slotRef.current; run('up' + slot, async () => { setConfig(await api.uploadSound(slot, file)) }, '已换成你的音效') }
+  const remove = slot => run('rm' + slot, async () => { setConfig(await api.removeSound(slot)) }, '已删掉，退回默认的那个')
+  const narration = ui.narrationVoice === 'off' ? null : { id: ui.narrationVoice, pitch: ui.narrationPitch }
+  return (
+    <>
+      <div className="fg-section">打字音</div>
+      <Field label="打字音"><div className="fg-row"><Toggle value={ui.blip} onChange={v => p({ blip: v })} /><input type="range" min="0" max="2" step="0.1" value={ui.blipVolume} aria-label="打字音音量" onChange={e => p({ blipVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
+      <Field label="没指定的角色" hint="每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。">
+        <Select value={ui.voiceDefault} options={[['auto', '自动（按性别分）'], ...VOICES.map(v => [v.id, `都用「${v.label}」`])]} onChange={v => p({ voiceDefault: v })} />
+      </Field>
+      <Field label="旁白">
+        <div className="fg-row">
+          <Select value={ui.narrationVoice} options={[...VOICES.map(v => [v.id, v.label]), ['off', '不出声']]} style={INLINE} onChange={v => p({ narrationVoice: v })} />
+          <Select value={String(ui.narrationPitch)} options={PITCHES} style={INLINE} onChange={v => p({ narrationPitch: Number(v) })} />
+          <button type="button" className="fg-btn" disabled={!narration} onClick={() => previewVoice(narration, ui)}>▶ 试听</button>
+        </div>
+      </Field>
+      <div className="fg-section">音色一览 · {VOICES.length} 个（点一下试听）</div>
+      <div className="fg-skins fg-voices">
+        {VOICES.map(v => (
+          <button key={v.id} type="button" className="fg-skin" onClick={() => previewVoice({ id: v.id, pitch: 0 }, ui)}>
+            <b>▶ {v.label}</b><span>{VOICE_GENDER[v.gender]} · {v.desc}</span>
+          </button>
+        ))}
+      </div>
+      <div className="fg-section">音效</div>
+      <Field label="音效"><div className="fg-row"><Toggle value={ui.sfx} onChange={v => p({ sfx: v })} /><input type="range" min="0" max="2" step="0.1" value={ui.sfxVolume} aria-label="音效音量" onChange={e => p({ sfxVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
+      {SOUND_GROUPS.map(([group, title, note]) => (
+        <React.Fragment key={group}>
+          <div className="fg-section">{title}</div>
+          <div className="fg-note">{note}。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）。</div>
+          {SOUND_SLOTS.filter(s => s.group === group).map(slot => {
+            const mine = ui.customSounds[slot.id]
+            const options = [...slot.presets.map((x, i) => [x.id, i ? x.label : `${x.label}（默认）`]), ...(mine ? [['custom', `我的：${mine.name || '上传的文件'}`]] : []), ['off', '关掉']]
+            return (
+              <Field key={slot.id} label={slot.label} hint={slot.hint}>
+                <div className="fg-row">
+                  <Select value={ui.sounds[slot.id]} options={options} style={INLINE} onChange={v => { p({ sounds: { [slot.id]: v } }); previewSound(slot.id, v, ui) }} />
+                  <button type="button" className="fg-btn" disabled={ui.sounds[slot.id] === 'off'} onClick={() => previewSound(slot.id, ui.sounds[slot.id], ui)}>▶ 试听</button>
+                  <button type="button" className="fg-btn" disabled={busy === 'up' + slot.id} onClick={() => pick(slot.id)}>{busy === 'up' + slot.id ? '上传中…' : mine ? '换文件' : '用自己的'}</button>
+                  {mine && <button type="button" className="fg-btn" disabled={busy === 'rm' + slot.id} onClick={() => remove(slot.id)}>删掉文件</button>}
+                </div>
+              </Field>
+            )
+          })}
+        </React.Fragment>
+      ))}
+      <input ref={fileRef} type="file" accept="audio/*" hidden onChange={e => { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) upload(file) }} />
     </>
   )
 }
@@ -1002,10 +1128,11 @@ export function Settings({ onClose, onDirectorLog = null, initialTab = 'look' })
   const data = useConfig()
   const [tab, setTab] = React.useState(initialTab)
   return (
-    <Panel title="设置" en="Config" onClose={onClose} tabs={[{ id: 'look', label: '外观与演出' }, { id: 'music', label: '配乐' }, { id: 'director', label: '导演' }, { id: 'images', label: '生图渠道' }, { id: 'style', label: '画风与配图' }, { id: 'about', label: '版本与更新' }]} tab={tab} onTab={setTab}
+    <Panel title="设置" en="Config" onClose={onClose} tabs={[{ id: 'look', label: '外观与演出' }, { id: 'sound', label: '声音' }, { id: 'music', label: '配乐' }, { id: 'director', label: '导演' }, { id: 'images', label: '生图渠道' }, { id: 'style', label: '画风与配图' }, { id: 'about', label: '版本与更新' }]} tab={tab} onTab={setTab}
       actions={data && <span className={`fg-pill${data.ready ? '' : ' fg-err'}`}>{data.ready ? '生图已就绪' : data.readyReason}</span>}>
       {!data && <div className="fg-note">读取设置中…</div>}
       {data && tab === 'look' && <LookSection data={data} />}
+      {data && tab === 'sound' && <SoundSection data={data} />}
       {data && tab === 'music' && <MusicSection data={data} />}
       {data && tab === 'director' && <DirectorSection data={data} onDirectorLog={onDirectorLog} />}
       {data && tab === 'images' && <BackendSection data={data} />}

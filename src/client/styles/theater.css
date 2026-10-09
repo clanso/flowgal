@@ -207,6 +207,9 @@
 .fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }
 .fg-flash.is-black { background: #000; animation: fg-black 1.6s ease both; }
 @keyframes fg-flash { from { opacity: .95; } to { opacity: 0; } }
+/* 落字特效的闪光层：平时透明，由演出计划在某个字上点亮（Stage.jsx 的 useHits） */
+.fg-hitflash { position: absolute; inset: 0; z-index: 41; pointer-events: none; opacity: 0; background: #fff; }
+.fg-hitflash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .25), rgba(160, 0, 20, .8)); }
 @keyframes fg-black { 0% { opacity: 0; } 35%, 60% { opacity: 1; } 100% { opacity: 0; } }
 
 /* ── 地点标题卡 ── */
@@ -251,6 +254,24 @@
 .fg-text.is-done .fg-char { animation: none; opacity: 1; }
 .fg-text.is-wait .fg-char { animation: none; }
 @keyframes fg-char-in { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: none; } }
+/* ── 台词演法与重音（lib/typing.js）：字的样子。要做位移、缩放的字改成 inline-block，空格照样占位 ── */
+.fg-text[class*="say-"] .fg-char, .fg-char.is-stress { display: inline-block; white-space: pre; }
+.fg-text.say-menace .fg-char { animation-name: fg-char-stamp; animation-duration: .2s; }
+.fg-text.say-excited .fg-char { animation-name: fg-char-hop; animation-duration: .14s; }
+.fg-text.say-shout .fg-char { animation-name: fg-char-pop; animation-duration: .28s; font-size: 1.16em; font-weight: 700; }
+.fg-text.say-hesitant .fg-char { animation-duration: .32s; }
+.fg-text.say-whisper { opacity: .8; }
+.fg-text.say-whisper .fg-char { font-size: .9em; animation-duration: .45s; }
+.fg-text.say-breakdown .fg-char { color: color-mix(in oklab, var(--ink) 72%, #ff3b5c); animation: fg-char-in .12s ease forwards var(--d), fg-char-quake .2s linear infinite var(--d); }
+.fg-char.is-stress { color: var(--stress, #ff4d5e); font-weight: 700; font-size: 1.1em; text-shadow: 0 0 .6cqw rgba(255, 60, 80, .45); animation-name: fg-char-stamp; animation-duration: .24s; }
+/* 点一下打完 / 等字体时：和普通台词一样立刻全显示、或先不动（要比上面的演法规则更具体才压得住） */
+.fg-text.is-done[class*="say-"] .fg-char, .fg-text.is-done .fg-char.is-stress { animation: none; opacity: 1; }
+.fg-text.is-wait[class*="say-"] .fg-char, .fg-text.is-wait .fg-char.is-stress { animation: none; }
+.fg-text.is-done.say-breakdown .fg-char { animation: fg-char-quake .2s linear infinite; opacity: 1; }
+@keyframes fg-char-stamp { from { opacity: 0; transform: translateY(-.35em) scale(1.4); } 60% { opacity: 1; transform: translateY(0) scale(.95); } to { opacity: 1; transform: none; } }
+@keyframes fg-char-pop { from { opacity: 0; transform: scale(1.9); } 55% { opacity: 1; transform: scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes fg-char-hop { from { opacity: 0; transform: translateY(.3em); } to { opacity: 1; transform: none; } }
+@keyframes fg-char-quake { 0%, 100% { opacity: 1; transform: translate(0, 0); } 25% { opacity: 1; transform: translate(.05em, -.04em); } 50% { opacity: 1; transform: translate(-.04em, .05em); } 75% { opacity: 1; transform: translate(.04em, .03em); } }
 .fg-wait { position: absolute; right: 2.6%; bottom: 20%; font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }
 .fg-wait::before { content: var(--wait-glyph); }
 @keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }
@@ -483,6 +504,9 @@
 @media (prefers-reduced-motion: reduce) {
   .fg-bg, .fg-cg-img, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-symbol-art, .fg-symbol-art svg { animation: none !important; }
   .fg-cg-pan { animation: none !important; transform: scale(var(--r)); }
+  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress { animation: fg-char-in .22s ease forwards var(--d) !important; }
+  .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }
+  .fg-text.is-wait .fg-char { animation: none !important; }
 }
 @container stage (max-aspect-ratio: 4/5) {
   .fg-actor { width: 60%; height: 60%; bottom: 23%; }
