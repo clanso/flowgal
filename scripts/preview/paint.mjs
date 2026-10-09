@@ -105,6 +105,10 @@ function canvas() {
         }
       }
     },
+    /** 逐像素调色：fn([r, g, b]) 返回新的颜色。 */
+    tone(fn) {
+      for (let i = 0; i < px.length; i += 3) { const [r, g, b] = fn([px[i], px[i + 1], px[i + 2]]); px[i] = r; px[i + 1] = g; px[i + 2] = b }
+    },
     /** 暗角 + 轻微颗粒，让占位图看起来像一张画。 */
     finish(seed) {
       const r = rng(seed)
@@ -293,6 +297,17 @@ function rooftop(c, r) {
   })
 }
 
+/** 画风关键词给占位图调个色：几套画风的「试画」样图放在一起看得出差别。 */
+const luma = ([r, g, b]) => 0.3 * r + 0.59 * g + 0.11 * b
+const GRADES = [
+  // 水彩：褪色、提亮，偏纸色。
+  [/watercolor|pastel/, c => { const l = luma(c); return c.map((v, i) => 0.24 + 0.76 * (l + (v - l) * 0.8) + [0.02, 0.03, 0.05][i]) }],
+  // 电影感：拉对比，暗部偏青、亮部偏橙。
+  [/cinematic|dramatic lighting/, c => { const l = luma(c); return c.map((v, i) => (v - 0.5) * 1.35 + 0.5 + (l - 0.45) * [0.14, 0.02, -0.16][i]) }],
+  // 90 年代：泛黄褪色。
+  [/1990s|retro/, c => { const l = luma(c); const sepia = [l * 1.06 + 0.06, l * 0.94 + 0.03, l * 0.72]; return c.map((v, i) => sepia[i] * 0.6 + v * 0.4) }],
+]
+
 const SCENES = [
   [/firefl|bamboo/, bambooDusk],
   [/piano|music room/, musicRoom],
@@ -318,6 +333,8 @@ export function paintPlaceholder(prompt, { width = 1216, height = 832, figures =
     const cx = (W * (i + 0.5)) / figures.length
     c.layer(f, Math.round(cx - (f.width * scale) / 2), Math.round(H - f.height * scale), scale)
   })
+  const grade = GRADES.find(([re]) => re.test(text))
+  if (grade) c.tone(grade[1])
   c.finish(seed)
   return c.png()
 }

@@ -1,6 +1,6 @@
 // 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含声音、「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
-import { api, assetUrl, toast, fillText, useConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic } from '../api.js'
+import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic } from '../api.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry } from '../../../lib/emotions.js'
@@ -11,7 +11,7 @@ import { previewTrack, stopPreview, previewVoice, previewSound } from './audio.j
 import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, voiceById, castVoices } from '../../../lib/sounds.js'
 import { cleanPack, packFiles } from '../../../lib/aa-sprite.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
-import { modelKey, qualityFor, negativeFor, sizeFor } from '../../../lib/image/style.js'
+import { modelKey, qualityFor, negativeFor, sizeFor, MAX_STYLES } from '../../../lib/image/style.js'
 import { naiModelInfo } from '../../../lib/image/nai-models.js'
 import { CG_MAX_CHARACTERS } from '../../../lib/vocab.js'
 
@@ -93,7 +93,10 @@ const blankCharacter = () => ({ name: '', tag: '', nl: '' })
 
 /** 改词：Base（画面）+ 每人一个角色块（柏宝绘的 NovelAI V4.5 分人写法）。名字只是标签，出图前换成档案外貌并删掉。 */
 function ImageEditor({ gameId, image, units = [], onClose }) {
-  const pick = img => ({ tags: img.tags || '', desc: img.desc || '', characters: (img.characters || []).map(c => ({ ...c })), negativeExtra: img.negativeExtra || '', shape: img.shape || 'landscape', seed: '' })
+  const pick = img => ({ tags: img.tags || '', desc: img.desc || '', characters: (img.characters || []).map(c => ({ ...c })), negativeExtra: img.negativeExtra || '', shape: img.shape || 'landscape', seed: '', style: img.style || '' })
+  const data = useConfig()
+  const styles = data ? data.config.style.presets : []
+  const currentName = (styles.find(x => x.id === (data && data.config.style.current)) || {}).name || ''
   const [draft, setDraft] = React.useState(() => pick(image))
   const [instruction, setInstruction] = React.useState('')
   const [busy, run] = useBusy()
@@ -135,6 +138,15 @@ function ImageEditor({ gameId, image, units = [], onClose }) {
           {version && <button type="button" className="fg-btn" onClick={() => set({ seed: String(version.seed ?? '') })}>沿用当前种子</button>}
         </div>
       </div>
+      <div className="fg-field"><label>画风</label>
+        <div className="fg-row">
+          <select className="fg-select" style={{ width: 'auto' }} value={styles.some(x => x.id === draft.style) ? draft.style : ''} onChange={e => set({ style: e.target.value })}>
+            <option value="">跟着当前画风（{currentName}）</option>
+            {styles.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+          <span className="fg-note">只换这一张；画师串、正负面词、CFG 都按选的那套。</span>
+        </div>
+      </div>
       <div className="fg-field"><label>AI 改写</label>
         <div className="fg-row">
           <input className="fg-input" style={{ flex: 1, width: 'auto' }} placeholder="例如：改成雨夜、她在哭、镜头拉远……留空则让分镜师重读正文" value={instruction} onChange={e => setInstruction(e.target.value)} />
@@ -151,14 +163,14 @@ function ImageEditor({ gameId, image, units = [], onClose }) {
             <div>＋ {version.positive}</div>
             {(version.characters || []).map((c, i) => <div key={i}>角色 {i + 1}：{c}</div>)}
             <div>－ {version.negative}</div>
-            <div>{version.backend} · {version.model} · seed {version.seed}{version.width ? ` · ${version.width}×${version.height}` : ''}</div>
+            <div>{version.backend} · {version.model}{version.style ? ` · 画风 ${version.style}` : ''} · seed {version.seed}{version.width ? ` · ${version.width}×${version.height}` : ''}</div>
           </div>
         </details>
       )}
       <div className="fg-row" style={{ justifyContent: 'flex-end' }}>
         <button type="button" className="fg-btn" onClick={onClose}>取消</button>
         <button type="button" className="fg-btn is-primary" onClick={() => run('go', async () => {
-          await api.render(gameId, image.id, { tags: draft.tags, desc: draft.desc, characters: draft.characters, negativeExtra: draft.negativeExtra, shape: draft.shape, ...(draft.seed ? { seed: Number(draft.seed) } : {}) })
+          await api.render(gameId, image.id, { tags: draft.tags, desc: draft.desc, characters: draft.characters, negativeExtra: draft.negativeExtra, shape: draft.shape, style: styles.some(x => x.id === draft.style) ? draft.style : '', ...(draft.seed ? { seed: Number(draft.seed) } : {}) })
           onClose()
         }, '已加入出图队列')}>按此重画</button>
       </div>
@@ -723,10 +735,10 @@ function BackendSection({ data }) {
           <Field label="Key"><KeyInput backend="novelai" endpoint={cfg.novelai.endpoint} has={data.keys['novelai:' + cfg.novelai.endpoint]} /></Field>
           <Field label="模型" hint={modelHint}><ModelField value={cfg.novelai.model} options={models} placeholder="nai-diffusion-…" onCommit={v => p('novelai', { model: v })} /></Field>
           <Field label="采样器"><Select value={cfg.novelai.sampler} onChange={v => p('novelai', { sampler: v })} options={listOptions(samplers, cfg.novelai.sampler)} /></Field>
-          <Field label="步数 / 提示词引导">
+          <Field label="步数 / 提示词引导" hint="当前画风里填了 CFG 时，以画风的为准。">
             <div className="fg-row"><Text type="number" style={{ width: '8cqw' }} value={cfg.novelai.steps} onCommit={v => p('novelai', { steps: v })} /><Text type="number" style={{ width: '8cqw' }} value={cfg.novelai.scale} onCommit={v => p('novelai', { scale: v })} /></div>
           </Field>
-          <Field label="引导缩放" hint="Prompt Guidance Rescale，0–1。提示词引导调高后画面发灰、过饱和时往上加一点。">
+          <Field label="引导缩放" hint="Prompt Guidance Rescale，0–1。提示词引导调高后画面发灰、过饱和时往上加一点。当前画风里填了 CFG Rescale 时，以画风的为准。">
             <input type="range" min="0" max="1" step="0.02" value={cfg.novelai.cfgRescale} onChange={e => p('novelai', { cfgRescale: Number(e.target.value) })} style={{ width: '24cqw' }} /><span className="fg-note" style={{ marginLeft: '1cqw' }}>{Number(cfg.novelai.cfgRescale).toFixed(2)}</span>
           </Field>
           {nai.v5 ? (
@@ -751,7 +763,7 @@ function BackendSection({ data }) {
                 <div className="fg-row"><div style={{ flex: 1 }}><ModelField value={cfg.comfyui.checkpoint} options={models} emptyLabel="（请选择）" placeholder="xxx.safetensors" onCommit={v => p('comfyui', { checkpoint: v })} /></div>{refresh}</div>
               </Field>
               {samplers.length > 0 && <Field label="采样器 / 调度器"><div className="fg-row"><Select value={cfg.comfyui.sampler} onChange={v => p('comfyui', { sampler: v })} options={listOptions(samplers, cfg.comfyui.sampler)} /><Select value={cfg.comfyui.scheduler} onChange={v => p('comfyui', { scheduler: v })} options={listOptions(schedulers, cfg.comfyui.scheduler)} /></div></Field>}
-              <Field label="步数 / CFG"><div className="fg-row"><Text type="number" style={{ width: '8cqw' }} value={cfg.comfyui.steps} onCommit={v => p('comfyui', { steps: v })} /><Text type="number" style={{ width: '8cqw' }} value={cfg.comfyui.cfg} onCommit={v => p('comfyui', { cfg: v })} /></div></Field>
+              <Field label="步数 / CFG" hint="当前画风里填了 CFG 时，以画风的为准。"><div className="fg-row"><Text type="number" style={{ width: '8cqw' }} value={cfg.comfyui.steps} onCommit={v => p('comfyui', { steps: v })} /><Text type="number" style={{ width: '8cqw' }} value={cfg.comfyui.cfg} onCommit={v => p('comfyui', { cfg: v })} /></div></Field>
             </>
           ) : (
             <Field label="工作流" hint="支持 %prompt% %negative% %width% %height% %seed% %steps% %cfg% 占位符；没有占位符时自动找正负提示词、尺寸和采样节点。">
@@ -795,7 +807,7 @@ function BackendSection({ data }) {
             <div className="fg-row"><div style={{ flex: 1 }}><ModelField value={cfg.webui.model} options={models} emptyLabel="跟随服务器当前底模" placeholder="模型标题" onCommit={v => p('webui', { model: v })} /></div>{refresh}</div>
           </Field>
           {samplers.length > 0 && <Field label="采样器 / 调度器"><div className="fg-row"><Select value={cfg.webui.sampler} onChange={v => p('webui', { sampler: v })} options={listOptions(samplers, cfg.webui.sampler)} /><Select value={cfg.webui.scheduler} onChange={v => p('webui', { scheduler: v })} options={listOptions(schedulers, cfg.webui.scheduler, '自动')} /></div></Field>}
-          <Field label="步数 / CFG"><div className="fg-row"><Text type="number" style={{ width: '8cqw' }} value={cfg.webui.steps} onCommit={v => p('webui', { steps: v })} /><Text type="number" style={{ width: '8cqw' }} value={cfg.webui.cfg} onCommit={v => p('webui', { cfg: v })} /></div></Field>
+          <Field label="步数 / CFG" hint="当前画风里填了 CFG 时，以画风的为准。"><div className="fg-row"><Text type="number" style={{ width: '8cqw' }} value={cfg.webui.steps} onCommit={v => p('webui', { steps: v })} /><Text type="number" style={{ width: '8cqw' }} value={cfg.webui.cfg} onCommit={v => p('webui', { cfg: v })} /></div></Field>
         </>
       )}
       <Field label="种子" hint="-1 表示每张随机；填一个数字后所有图都用它，方便复现同一种构图。单张图可以在鉴赏的「改词」里另外指定。">
@@ -812,38 +824,157 @@ function BackendSection({ data }) {
   )
 }
 
+const newStyleId = () => 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+/** 导出、导入用的样子：不带 id 和样图。 */
+const exportStyle = st => ({ name: st.name, artist: st.artist, positive: st.positive, negative: st.negative, cfg: st.cfg, cfgRescale: st.cfgRescale })
+/** 粘贴进来的：一套或几套画风的 JSON；不是 JSON 就当成一串画师串。 */
+function parseStyles(text) {
+  const raw = String(text || '').trim()
+  if (!raw) return []
+  try {
+    const data = JSON.parse(raw)
+    const list = Array.isArray(data) ? data : Array.isArray(data?.styles) ? data.styles : [data]
+    return list.filter(x => x && typeof x === 'object').map(x => ({ ...exportStyle(x), artist: String(x.artist ?? x.text ?? ''), name: String(x.name || '导入的画风') }))
+  } catch {
+    return [{ name: '导入的画风', artist: raw, positive: null, negative: null, cfg: null, cfgRescale: null }]
+  }
+}
+/** 空着 = 跟随渠道（null）；填了数字就用数字。 */
+const blankNumber = v => (String(v).trim() === '' || !Number.isFinite(Number(v)) ? null : Number(v))
+/** 渠道自己的 CFG / CFG Rescale（画风里没填时用它）。 */
+function backendGuidance(cfg) {
+  const b = cfg.images.backend
+  if (b === 'novelai') return { cfg: cfg.novelai.scale, rescale: cfg.novelai.cfgRescale }
+  if (b === 'comfyui' || b === 'webui') return { cfg: cfg[b].cfg, rescale: null }
+  return { cfg: null, rescale: null }
+}
+
+let styleQueue = Promise.resolve()
+/** 画风的修改一个接一个发，每次都在最新的设置上改（连着改两处不会互相盖掉）。make(最新的 style) 返回要改的部分。 */
+function saveStyle(make, msg) {
+  styleQueue = styleQueue.then(async () => {
+    const latest = (await loadConfig()).config.style
+    const patch = make(latest)
+    if (!patch) return
+    await patchConfig({ style: patch })
+    if (msg) toast(msg)
+  }).catch(e => toast(e.message, 'error'))
+  return styleQueue
+}
+
+/** 多行文字，离开输入框时保存。 */
+function Area({ value, onCommit, placeholder, disabled, short }) {
+  const [v, setV] = React.useState(value ?? '')
+  React.useEffect(() => { setV(value ?? '') }, [value])
+  return <textarea className={`fg-textarea${short ? ' is-short' : ''}`} value={v} placeholder={placeholder} disabled={disabled} onChange={e => setV(e.target.value)} onBlur={() => { if (v !== (value ?? '')) onCommit(v) }} onKeyDown={e => e.stopPropagation()} />
+}
+
+/** 画风：一套 = 画师串 + 正面词 + 负面词 + CFG + CFG Rescale。点卡片切换，下面编辑正在用的这套。 */
 function StyleSection({ data }) {
   const cfg = data.config
-  const presets = data.presets || {}
-  const artists = [...(presets.artists || []), ...(cfg.style.artists || [])]
-  const current = artists.find(a => a.id === cfg.style.artist)
-  const [draft, setDraft] = React.useState({ name: '', text: '' })
+  const styles = cfg.style.presets
+  const st = styles.find(x => x.id === cfg.style.current) || styles[0]
   const key = modelKey(cfg.images.backend, cfg)
-  const p = patch => patchConfig({ style: patch }).catch(e => toast(e.message, 'error'))
-  const quality = qualityFor(cfg.style, key)
-  const negative = negativeFor(cfg.style, key)
+  const own = backendGuidance(cfg)
+  const [importText, setImportText] = React.useState(null)
+  const [busy, run] = useBusy()
+  // 打开这一页时拿一次最新的（别处试画完的样图）。
+  React.useEffect(() => { loadConfig(true).catch(() => {}) }, [])
+  const id = st.id
+  const edit = patch => saveStyle(s => ({ presets: s.presets.map(x => (x.id === id ? { ...x, ...patch } : x)) }))
+  /** 加几套（新建、复制、导入）：插在正在编辑的这套后面，并切到第一套新的。 */
+  const add = (list, msg) => saveStyle(s => {
+    const fresh = list.slice(0, MAX_STYLES - s.presets.length).map(x => ({ ...x, id: newStyleId() }))
+    if (!fresh.length) { toast(`画风最多存 ${MAX_STYLES} 套`, 'error'); return null }
+    const at = s.presets.findIndex(x => x.id === id) + 1
+    return { presets: [...s.presets.slice(0, at), ...fresh, ...s.presets.slice(at)], current: fresh[0].id }
+  }, msg)
+  const remove = () => {
+    if (styles.length <= 1 || !window.confirm(`删除画风「${st.name}」？`)) return
+    saveStyle(s => {
+      const at = s.presets.findIndex(x => x.id === id)
+      const rest = s.presets.filter(x => x.id !== id)
+      return rest.length ? { presets: rest, current: rest[Math.min(Math.max(at, 0), rest.length - 1)].id } : null
+    }, '已删除')
+  }
+  const builtins = data.presets?.styles || []
+  const missing = builtins.filter(b => !styles.some(x => x.id === b.id))
+  const copy = text => { try { navigator.clipboard.writeText(text).then(() => toast('已复制到剪贴板'), () => toast('复制失败', 'error')) } catch { toast('复制失败', 'error') } }
+  const artistPreview = st.artist ? st.artist : '（不加画师串）'
+  const positive = qualityFor(cfg.style, key)
   return (
     <>
       <div className="fg-section">画风</div>
-      <Field label="画师串" hint={current && current.text ? current.text : '不加画师串'}>
+      <div className="fg-skins fg-styles">
+        {styles.map(x => (
+          <button key={x.id} type="button" className={`fg-skin fg-style${x.id === st.id ? ' is-on' : ''}`} onClick={() => x.id !== st.id && saveStyle(() => ({ current: x.id }))} title={x.artist || '不加画师串'}>
+            <div className="fg-style-cover" style={x.cover ? { backgroundImage: `url(${assetUrl(x.cover)})` } : undefined}>{!x.cover && <span>还没试画</span>}</div>
+            <b>{x.name}</b><span>{x.artist || '不加画师串'}</span>
+          </button>
+        ))}
+        <button type="button" className="fg-skin fg-style is-new" onClick={() => add([{ name: '新画风', artist: '', positive: null, negative: null, cfg: null, cfgRescale: null }], '已新建，下面填画师串')}>
+          <div className="fg-style-cover"><span>＋</span></div><b>新建画风</b><span>从空白开始</span>
+        </button>
+      </div>
+
+      <div className="fg-section">编辑「{st.name}」</div>
+      <Field label="名字">
         <div className="fg-row">
-          <Select value={cfg.style.artist} onChange={v => p({ artist: v })} options={artists.map(a => [a.id, a.name])} />
-          {(cfg.style.artists || []).some(a => a.id === cfg.style.artist) && <button type="button" className="fg-btn" onClick={() => p({ artists: cfg.style.artists.filter(a => a.id !== cfg.style.artist), artist: 'galgame' })}>删除这套</button>}
+          <Text value={st.name} style={{ width: '18cqw' }} onCommit={v => edit({ name: v })} />
+          <button type="button" className="fg-btn" onClick={() => add([{ ...exportStyle(st), name: st.name.slice(0, 36) + ' 副本' }], '已复制一份')}>复制一份</button>
+          <button type="button" className="fg-btn" disabled={styles.length <= 1} onClick={remove}>删除</button>
         </div>
       </Field>
-      <Field label="存一套新的">
+      <Field label="画师串" hint="放在提示词最前面。NovelAI 写 artist:xxx，权重写 1.2::artist:xxx::（发给 SD 时自动换成括号写法）。">
+        <Area value={st.artist} placeholder="artist:xxx, artist:yyy, 1.2::artist:zzz::, …" onCommit={v => edit({ artist: v })} />
+      </Field>
+      <Field label="正面词" hint={st.positive === null ? `跟着当前模型（${key}）用默认质量词，放在提示词最后。` : '放在提示词最后。留空就是不加。'}>
+        <div className="fg-row" style={{ marginBottom: '.5cqw' }}><Toggle value={st.positive === null} onChange={v => edit({ positive: v ? null : positive })} /><span className="fg-note">用模型默认的质量词</span></div>
+        <Area short value={positive} disabled={st.positive === null} onCommit={v => edit({ positive: v })} />
+      </Field>
+      <Field label="负面词" hint={st.negative === null ? `跟着当前模型（${key}）用默认负面词。` : '每张图都带上。'}>
+        <div className="fg-row" style={{ marginBottom: '.5cqw' }}><Toggle value={st.negative === null} onChange={v => edit({ negative: v ? null : negativeFor(cfg.style, key) })} /><span className="fg-note">用模型默认的负面词</span></div>
+        <Area short value={negativeFor(cfg.style, key)} disabled={st.negative === null} onCommit={v => edit({ negative: v })} />
+      </Field>
+      <Field label="CFG" hint="留空就用「生图渠道」里的设置。CFG Rescale 只有 NovelAI 用（0～1）；OpenAI 渠道两个都不用。">
         <div className="fg-row">
-          <input className="fg-input" style={{ width: '12cqw' }} placeholder="名字" value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} onKeyDown={e => e.stopPropagation()} />
-          <input className="fg-input" style={{ flex: 1, width: 'auto' }} placeholder="artist:xxx, artist:yyy, …" value={draft.text} onChange={e => setDraft(d => ({ ...d, text: e.target.value }))} onKeyDown={e => e.stopPropagation()} />
-          <button type="button" className="fg-btn" disabled={!draft.text.trim()} onClick={() => { const id = 'a' + Date.now().toString(36); p({ artists: [...(cfg.style.artists || []), { id, name: draft.name || '我的画风', text: draft.text.trim() }], artist: id }); setDraft({ name: '', text: '' }) }}>保存并使用</button>
+          <Text style={{ width: '11cqw' }} value={st.cfg ?? ''} placeholder={own.cfg != null ? `跟随渠道（${own.cfg}）` : '跟随渠道'} onCommit={v => edit({ cfg: blankNumber(v) })} />
+          <span className="fg-note">CFG Rescale</span>
+          <Text style={{ width: '11cqw' }} value={st.cfgRescale ?? ''} placeholder={own.rescale != null ? `跟随渠道（${own.rescale}）` : '跟随渠道'} onCommit={v => edit({ cfgRescale: blankNumber(v) })} />
+          {(st.cfg !== null || st.cfgRescale !== null) && <button type="button" className="fg-btn" onClick={() => edit({ cfg: null, cfgRescale: null })}>都跟随渠道</button>}
         </div>
       </Field>
-      <Field label="质量词"><div className="fg-row"><Toggle value={cfg.style.useQuality} onChange={v => p({ useQuality: v })} /><span className="fg-note">当前模型：{key}</span></div></Field>
-      {cfg.style.useQuality && <Field label="质量词内容"><Text value={quality} onCommit={v => p({ quality: { ...(cfg.style.quality || {}), [key]: v } })} /></Field>}
-      <Field label="负面词"><Text value={negative} onCommit={v => p({ negative: { ...(cfg.style.negative || {}), [key]: v } })} /></Field>
-      <Field label="">
-        <button type="button" className="fg-btn" onClick={() => { const q = { ...(cfg.style.quality || {}) }; const n = { ...(cfg.style.negative || {}) }; delete q[key]; delete n[key]; patchConfig({ style: { quality: q, negative: n } }) }}>恢复这个模型的默认质量词与负面词</button>
+      <Field label="发出去的样子" hint="插画、背景、立绘都按这个顺序拼。">
+        <div className="fg-sent fg-note">
+          <div>＋ {artistPreview}, <i>画面内容……</i>{positive ? ', ' + positive : ''}</div>
+          <div>－ {negativeFor(cfg.style, key) || '（无）'}</div>
+          <div>CFG {st.cfg ?? own.cfg ?? '—'}{cfg.images.backend === 'novelai' ? ` · CFG Rescale ${st.cfgRescale ?? own.rescale ?? 0}` : ''}</div>
+        </div>
       </Field>
+      <Field label="试画" hint="用下面的「试画内容」和固定种子画一张竖版样图，当这套画风卡片的封面。几套都试画过，放在一起就好比较。">
+        <div className="fg-row">
+          <button type="button" className="fg-btn is-primary" disabled={busy === 'sample:' + id || !data.ready} onClick={() => run('sample:' + id, () => api.sampleStyle(id).then(() => loadConfig(true)), '样图画好了')}>{busy === 'sample:' + id ? '正在画…' : st.cover ? '重新试画' : '试画一张'}</button>
+          {!data.ready && <span className="fg-note">{data.readyReason}</span>}
+        </div>
+      </Field>
+      <Field label="试画内容"><Text value={cfg.style.sample} onCommit={v => saveStyle(() => ({ sample: v }))} /></Field>
+      <Field label="分享">
+        <div className="fg-row">
+          <button type="button" className="fg-btn" onClick={() => copy(JSON.stringify(exportStyle(st), null, 1))}>导出这套</button>
+          <button type="button" className="fg-btn" onClick={() => copy(JSON.stringify({ styles: styles.map(exportStyle) }, null, 1))}>导出全部</button>
+          <button type="button" className="fg-btn" onClick={() => setImportText(importText === null ? '' : null)}>导入</button>
+          {missing.length > 0 && <button type="button" className="fg-btn" onClick={() => saveStyle(s => ({ presets: [...s.presets, ...builtins.filter(b => !s.presets.some(x => x.id === b.id))] }), '已加回内置画风')}>加回内置画风（{missing.length}）</button>}
+        </div>
+      </Field>
+      {importText !== null && (
+        <Field label="" hint="粘贴导出的画风（一套或几套），也可以直接粘贴一串画师串。">
+          <textarea className="fg-textarea" value={importText} placeholder='{"name": "…", "artist": "artist:xxx, …"}' onChange={e => setImportText(e.target.value)} onKeyDown={e => e.stopPropagation()} />
+          <div className="fg-row" style={{ justifyContent: 'flex-end', marginTop: '.5cqw' }}>
+            <button type="button" className="fg-btn" onClick={() => setImportText(null)}>取消</button>
+            <button type="button" className="fg-btn is-primary" disabled={!importText.trim()} onClick={() => { const list = parseStyles(importText); if (list.length) { add(list, `已导入 ${list.length} 套`); setImportText(null) } }}>导入并使用</button>
+          </div>
+        </Field>
+      )}
     </>
   )
 }

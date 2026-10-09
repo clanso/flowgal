@@ -121,7 +121,18 @@ try {
   await click('.fg-tab:has-text("档案变更")', 700); await shot('14-cast-log'); await page.keyboard.press('Escape'); await sleep(300)
   await click('.fg-quick button:has-text("CONFIG")', 1000); await shot('15-settings-look')
   await click('.fg-tab:has-text("生图渠道")', 800); await shot('16-settings-backend')
-  await click('.fg-tab:has-text("画风")', 800); await shot('17-settings-style')
+  // 等几套画风的试画样图都画好（画风页每次打开时拿一次最新的设置）。
+  for (let i = 0; ; i++) {
+    await click('.fg-tab:has-text("画风")', 800)
+    const covers = await page.locator('.fg-style-cover[style*="background-image"]').count()
+    if (covers >= 5) break
+    if (i > 40) throw new Error('试画样图一直没画好：' + covers)
+    await click('.fg-tab:has-text("生图渠道")', 1200)
+  }
+  await sleep(600); await shot('17-settings-style')
+  await click('.fg-style:has-text("夜景厚涂")', 900)
+  await page.locator('.fg-field', { hasText: '发出去的样子' }).scrollIntoViewIfNeeded(); await sleep(300); await shot('45-style-editor')
+  await page.locator('.fg-section', { hasText: '画风' }).first().scrollIntoViewIfNeeded(); await click('.fg-style:has-text("Galgame")', 900)
   await page.locator('.fg-section', { hasText: '图片文件夹' }).scrollIntoViewIfNeeded(); await sleep(300); await shot('44-image-folder')
   await click('.fg-tab:has-text("配乐")', 900); await shot('29-settings-music')
 

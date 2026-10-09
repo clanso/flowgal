@@ -485,6 +485,14 @@
 .fg-skin.is-on { box-shadow: 0 0 0 2px var(--accent); }
 .fg-skin-swatch { height: 4cqw; border-radius: .6cqw; margin-bottom: .6cqw; }
 .fg-skin b { display: block; font-size: 1.1cqw; letter-spacing: .1em; } .fg-skin span { font-size: .85cqw; color: var(--ink-dim); }
+.fg-style { display: flex; flex-direction: column; min-width: 0; }
+.fg-style > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all; }
+.fg-styles { grid-template-columns: repeat(auto-fill, minmax(12cqw, 1fr)); }
+/* 样图是竖版（试画按竖版尺寸画），卡片封面也竖着放。 */
+.fg-style-cover { display: grid; place-items: center; aspect-ratio: 832 / 1216; margin-bottom: .6cqw; border-radius: .6cqw; background: linear-gradient(160deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .02)) center top / cover no-repeat; font-size: .85cqw; color: var(--ink-dim); }
+.fg-style-cover span { font-size: inherit; color: inherit; }
+.fg-style.is-new .fg-style-cover { font-size: 3cqw; border: 1px dashed var(--box-border); background: none; }
+.fg-sent i { opacity: .7; }
 
 .fg-update-done { margin: .8cqw 0; padding: .9cqw 1.2cqw; border-radius: .8cqw; font-size: 1.05cqw; line-height: 1.6; color: #6ef0a8; background: rgba(110, 240, 168, .08); border: 1px solid rgba(110, 240, 168, .3); }
 .fg-changes { margin: .4cqw 0 0 15.2cqw; border-radius: .8cqw; border: 1px solid var(--box-border); overflow: hidden; }

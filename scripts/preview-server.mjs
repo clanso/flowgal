@@ -140,6 +140,9 @@ const llm = {
 }
 
 // ───────── 假生图：立绘（白底 / 透明底的单人）画半身像；插画和背景按请求尺寸画风景，角色块画成人物叠上去 ─────────
+/** 插画的每个角色块画一个人；没有角色块的单人图（画风的试画样图）按整段提示词画一个。 */
+const figuresFor = (prompt, captions) => (captions.length ? captions.map(c => spriteLayer(c.char_caption)) : /\b1(girl|boy)\b/.test(prompt) ? [spriteLayer(prompt)] : [])
+
 async function fakeFetch(url, init = {}) {
   const body = typeof init.body === 'string' ? init.body : ''
   if (/novelai/.test(String(url)) && /subscription/.test(String(url))) return new Response(JSON.stringify({ tier: 3 }), { status: 200 })
@@ -155,7 +158,7 @@ async function fakeFetch(url, init = {}) {
     : paintPlaceholder(prompt, {
       width: json.parameters?.width || 1216,
       height: json.parameters?.height || 832,
-      figures: (json.parameters?.v4_prompt?.caption?.char_captions || []).map(c => spriteLayer(c.char_caption)),
+      figures: figuresFor(prompt, json.parameters?.v4_prompt?.caption?.char_captions || []),
     })
   return new Response(png, { status: 200, headers: { 'content-type': 'image/png' } })
 }
@@ -182,6 +185,10 @@ async function settle(t) {
   return engine.onTurnSettled({ gameId: GAME, turn: t.turn, textVersion, text: t.text, rawText: t.raw || t.text, card: CARD })
 }
 for (const t of TURNS) await settle(t)
+// 画风：内置几套之外加一套自己调过的，几套都试画一张样图（排在剧情的图后面）。
+const MY_STYLE = { id: 'mynight', name: '夜景厚涂（自己调的）', artist: 'cinematic lighting, 1.2::dramatic lighting::, depth of field, thick painting, painterly', positive: 'masterpiece, best quality, very aesthetic', negative: 'lowres, bad anatomy, bad hands, blurry, watermark, text', cfg: 6, cfgRescale: 0.2 }
+await engine.patchConfig({ style: { presets: [...(await engine.publicConfig()).config.style.presets, MY_STYLE] } })
+for (const id of ['galgame', 'watercolor', 'cinematic', 'retro90s', MY_STYLE.id]) engine.sampleStyle(id).catch(error => console.warn('试画失败：' + error.message))
 
 // ───────── HTTP ─────────
 // ───────── 假更新器：演示「有新版本」→「已下载，待重启」，不碰真的 git ─────────
