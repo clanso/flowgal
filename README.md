@@ -26,13 +26,15 @@
 
 ## 安装
 
-需要 DSH Tavern（插件接口 v1，`dsh >=0.1.0-rc.8`）和 git。下面的命令都在 **DSH 终端**里执行（DSH 设置 → 通用设置 →「打开 DSH 终端」；Windows 上是 PowerShell），Tavern 用的 profile 叫 `tavern`。
+需要 DSH Tavern（插件接口 v1，`dsh >=0.1.0-rc.8`）和 git。下面的命令都在 **DSH 终端**里执行（DSH 设置 → 通用设置 →「打开 DSH 终端」），Tavern 用的 profile 叫 `tavern`。
 
 ```sh
 cd ~
 git clone https://github.com/clanso/flowgal.git
 dsh plugin --profile tavern add "$HOME/flowgal"
 ```
+
+Windows 的终端是 cmd 时不认 `$HOME`，最后一条写完整路径，比如 `dsh plugin --profile tavern add "C:\Users\你的用户名\flowgal"`。
 
 然后**完全退出 DSH 再打开**（只刷新网页不够，插件的后台部分要重启才加载），刷新 Tavern 页面。
 
