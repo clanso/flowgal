@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { storyText } from '../lib/clean.js'
+import { cleanTurnText } from '../lib/clean.js'
 import { segmentTurn } from '../lib/segment.js'
 import { normalizeScript } from '../lib/director.js'
 import { playedUnits } from '../lib/staging.js'
@@ -52,7 +52,7 @@ const WIKI = `<thinking>用户想看回想剧本，用 wiki 样式输出。</thi
 const tavernText = raw => raw.replaceAll('{{user}}', '阿哲').replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '').replace(/<[^>]+>/g, '').trim()
 
 test('gate: 网页式正文按结构拆成一行一行，导航、页脚、思考、变量更新整块去掉，{{user}} 换成名字', () => {
-  const text = storyText({ text: tavernText(WIKI), rawText: WIKI, card: { name: '林岚' } })
+  const text = cleanTurnText({ text: tavernText(WIKI), rawText: WIKI, card: { name: '林岚' } })
   const lines = text.split('\n')
   for (const junk of ['用户想看', 'DOCTYPE', '```', '星屑Wiki', 'color:red', '首页 · 角色', '最后编辑', '好感度.林岚', '&nbsp;']) assert.ok(!text.includes(junk), junk)
   assert.ok(lines.includes('林岚「你来了啊，阿哲。」'))
@@ -64,18 +64,18 @@ test('gate: 网页式正文按结构拆成一行一行，导航、页脚、思�
 
 test('gate: 原文有对不上的宏时用 Tavern 的 text，并把思考、变量更新、页面外壳的字删掉', () => {
   const raw = WIKI.replace('{{user}}', '{{getvar::name}}')
-  const text = storyText({ text: tavernText(raw).replace('{{getvar::name}}', '阿哲'), rawText: raw })
+  const text = cleanTurnText({ text: tavernText(raw).replace('{{getvar::name}}', '阿哲'), rawText: raw })
   for (const junk of ['用户想看', '星屑Wiki', '最后编辑', '好感度.林岚', '```']) assert.ok(!text.includes(junk), junk)
   assert.ok(text.includes('林岚「你来了啊，阿哲。」'))
   // 原文比 text 多出一大截：Tavern 的正则把东西藏起来了，跟 Tavern 走。
   const hidden = '<p>正文。</p>\n' + '<div class="secret">' + '藏起来的设定。'.repeat(40) + '</div>'
-  assert.equal(storyText({ text: '正文。', rawText: hidden }), '正文。')
+  assert.equal(cleanTurnText({ text: '正文。', rawText: hidden }), '正文。')
 })
 
 test('gate: 分隔线、代码块标记、Markdown 记号和 HTML 实体收拾干净，没有正文时为空', () => {
-  const text = storyText({ text: '# 第一章\n**她**回过头&hellip;\n————————\n```\n- 林岚：你好。\n|---|---|\n> 苏晴：嗯。\n“……”\n...\n[链接](https://x.example)' })
+  const text = cleanTurnText({ text: '# 第一章\n**她**回过头&hellip;\n————————\n```\n- 林岚：你好。\n|---|---|\n> 苏晴：嗯。\n“……”\n...\n[链接](https://x.example)' })
   assert.deepEqual(text.split('\n'), ['第一章', '她回过头…', '林岚：你好。', '苏晴：嗯。', '“……”', '...', '链接'])
-  assert.equal(storyText({ text: '  ', rawText: '<div>x</div>' }), '')
+  assert.equal(cleanTurnText({ text: '  ', rawText: '<div>x</div>' }), '')
 })
 
 test('gate: 切单元认得【名字】和表格一行；引号前只有名字的不再单独演一句；一行几项的状态栏不当台词', () => {

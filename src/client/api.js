@@ -30,6 +30,7 @@ export const api = {
   rewrite: (gameId, imageId, instruction) => call('/image/rewrite', { gameId, imageId, instruction }),
   version: (gameId, imageId, index) => call('/image/version', { gameId, imageId, index }),
   until: (gameId, imageId, until) => call('/image/until', { gameId, imageId, until }),
+  openLibrary: gameId => call('/library/open', { gameId }),
   deleteImage: (gameId, imageId) => call('/image/delete', { gameId, imageId }),
   addImage: (gameId, turn, after, plan) => call('/image/add', { gameId, turn, after, plan }),
   cancel: (gameId, kind, id) => call('/cancel', { gameId, kind, id }),

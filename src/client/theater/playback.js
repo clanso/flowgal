@@ -4,6 +4,7 @@
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
 import { placeKey } from '../../../lib/vocab.js'
 import { stageSteps, playedUnits } from '../../../lib/staging.js'
+import { sizeFor } from '../../../lib/image/style.js'
 
 export { placeKey }
 export { emotionLabel } from '../../../lib/emotions.js'
@@ -51,7 +52,7 @@ export function buildBeats(view) {
       return -1
     }
     const turnImages = images
-      .filter(img => img.turn === t.turn && img.textVersion === t.textVersion)
+      .filter(img => img.turn === t.turn && img.textVersion === t.textVersion && !img.retired)
       .map(img => {
         const at = img.after && all.some(u => u.id === img.after) ? Math.max(0, indexOf(img.after)) : units.length - 1
         const end = img.until && all.some(u => u.id === img.until) ? Math.max(at, indexOf(img.until)) : units.length - 1
@@ -110,6 +111,14 @@ export function buildBeats(view) {
 }
 
 export function actorX(pos) { return POS_X[pos] ?? 50 }
+
+/** 舞台的宽高比：默认跟横版插画一样（NovelAI 常用的 1216×832），插画正好铺满；也可以选 16:9。 */
+export function stageRatio(cfg) {
+  if (cfg && cfg.ui && cfg.ui.ratio === 'wide') return 16 / 9
+  const { width, height } = sizeFor(cfg, 'landscape')
+  const ratio = width / height
+  return ratio >= 1 && ratio <= 2.5 ? ratio : 16 / 9
+}
 
 export function cgSrc(img, assetUrl) {
   return imageReady(img) ? assetUrl(img.versions[img.current].assetId) : ''

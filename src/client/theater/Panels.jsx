@@ -11,7 +11,7 @@ import { previewTrack, stopPreview, previewVoice, previewSound } from './audio.j
 import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, voiceById, castVoices } from '../../../lib/sounds.js'
 import { cleanPack, packFiles } from '../../../lib/aa-sprite.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
-import { modelKey, qualityFor, negativeFor } from '../../../lib/image/style.js'
+import { modelKey, qualityFor, negativeFor, sizeFor } from '../../../lib/image/style.js'
 import { naiModelInfo } from '../../../lib/image/nai-models.js'
 import { CG_MAX_CHARACTERS } from '../../../lib/vocab.js'
 
@@ -193,6 +193,16 @@ export function Lightbox({ src, onClose, children }) {
   )
 }
 
+/** 打开图片文件夹；插件跑在别的机器上打不开时，把路径复制下来告诉玩家。 */
+function openLibrary(gameId) {
+  return api.openLibrary(gameId).then(r => {
+    const added = r.added ? `，补存了 ${r.added} 张` : ''
+    if (r.opened) return toast(`已打开图片文件夹${added}`)
+    try { navigator.clipboard.writeText(r.path).catch(() => {}) } catch {}
+    toast(`图片在 ${r.path}${added}（路径已复制）`)
+  })
+}
+
 function CgTile({ gameId, image, onOpen, onEdit }) {
   const [busy, run] = useBusy()
   const src = cgSrc(image, assetUrl)
@@ -202,14 +212,14 @@ function CgTile({ gameId, image, onOpen, onEdit }) {
       <div className={`fg-thumb${src ? '' : ' is-locked'}`} onClick={() => src && onOpen(image)}>
         {src ? <img src={src} alt={image.title} loading="lazy" /> : <span>{pending ? (image.status === 'writing' ? '✍ ' : '🎨 ') + STATUS_LABEL[image.status] : image.status === 'failed' ? '⚠ ' + (image.error || '失败') : '未生成'}</span>}
         {pending && src && <span className="fg-pill is-busy" style={{ position: 'absolute', right: '.6cqw', top: '.6cqw' }}>{image.status === 'writing' ? '分镜中' : '重画中'}</span>}
-        <div className="fg-thumb-cap">{image.title || '第 ' + image.turn + ' 轮插画'}{image.versions.length > 1 ? ` · ${image.current + 1}/${image.versions.length}` : ''}</div>
+        <div className="fg-thumb-cap">{image.title || '第 ' + image.turn + ' 轮插画'}{image.versions.length > 1 ? ` · ${image.current + 1}/${image.versions.length}` : ''}{image.retired ? ' · 重新整理前的' : ''}</div>
       </div>
       <div className="fg-row" style={{ marginTop: '.6cqw' }}>
         {pending
           ? <button type="button" className="fg-btn" onClick={() => run('c', () => api.cancel(gameId, 'cg', image.id), '已取消')}>取消</button>
           : <button type="button" className="fg-btn" disabled={busy === 'r'} onClick={() => run('r', () => api.render(gameId, image.id, {}), '已加入出图队列')}>重画</button>}
         <button type="button" className="fg-btn" onClick={() => onEdit(image)}>改词</button>
-        <button type="button" className="fg-btn" onClick={() => { if (window.confirm('删除这张插画和它的所有版本？')) run('d', () => api.deleteImage(gameId, image.id), '已删除') }}>删除</button>
+        <button type="button" className="fg-btn" onClick={() => { if (window.confirm('删除这张插画和它的所有版本？图片文件夹里另存的那份不会删。')) run('d', () => api.deleteImage(gameId, image.id), '已删除') }}>删除</button>
       </div>
       {image.status === 'failed' && image.error && <div className="fg-note fg-err" style={{ marginTop: '.4cqw' }}>{image.error}</div>}
     </div>
@@ -227,11 +237,15 @@ export function Gallery({ view, gameId, onClose, focusId }) {
   const editTurn = edit && ((view && view.turns) || []).find(t => t.textVersion === edit.textVersion)
   return (
     <Panel title="鉴赏" en="Gallery" onClose={onClose} tabs={[{ id: 'cg', label: `插画 CG · ${images.length}` }, { id: 'bg', label: `背景 · ${places.length}` }]} tab={tab} onTab={setTab}
-      actions={<button type="button" className="fg-btn" title="当时没填 Key、关着自动出图、出图失败或被中断的插画、背景和立绘差分，一次补上" disabled={busy === 'fill'} onClick={() => run('fill', () => api.fill(gameId).then(r => toast(fillText(r))))}>补齐缺的图</button>}>
+      actions={<>
+        <button type="button" className="fg-btn" title="画好的图按「卡名 / 插画 / 第几轮 标题」另存在这里，在文件夹里改图、删图不影响剧场" disabled={busy === 'lib'} onClick={() => run('lib', () => openLibrary(gameId))}>打开图片文件夹</button>
+        <button type="button" className="fg-btn" title="当时没填 Key、关着自动出图、出图失败或被中断的插画、背景和立绘差分，一次补上" disabled={busy === 'fill'} onClick={() => run('fill', () => api.fill(gameId).then(r => toast(fillText(r))))}>补齐缺的图</button>
+      </>}>
       {edit && <ImageEditor key={edit.id} gameId={gameId} image={images.find(i => i.id === edit.id) || edit} units={editTurn ? playedUnits(editTurn.units, editTurn.script) : []} onClose={() => setEdit(null)} />}
       {tab === 'cg' && (
         <div className="fg-grid">
-          {images.map(img => <CgTile key={img.id} gameId={gameId} image={img} onOpen={setOpen} onEdit={setEdit} />)}
+          {/* 重新整理前的插画排在后面：聊天和剧场里已经撤下了，文件还在。 */}
+          {[...images].sort((a, b) => Number(a.retired) - Number(b.retired)).map(img => <CgTile key={img.id} gameId={gameId} image={img} onOpen={setOpen} onEdit={setEdit} />)}
           {!images.length && <div className="fg-note">还没有插画。导演会在值得画的地方自动安排；也可以在聊天里点每条消息下方的「🎬 配一张」。</div>}
         </div>
       )}
@@ -866,6 +880,10 @@ function DirectorSection({ data, onDirectorLog }) {
   )
 }
 
+const SIZE_SHAPES = [['landscape', '横版'], ['portrait', '竖版'], ['square', '方形']]
+/** 「1216×832」「1216x832」「1216 832」都认。 */
+const parseSize = text => { const m = /^\s*(\d{3,4})\s*[×xX*，, ]\s*(\d{3,4})\s*$/.exec(String(text)); return m ? [Number(m[1]), Number(m[2])] : null }
+
 function ImagesSection({ data }) {
   const cfg = data.config
   const p = patch => patchConfig({ images: patch }).catch(e => toast(e.message, 'error'))
@@ -878,9 +896,26 @@ function ImagesSection({ data }) {
       <Field label="情绪差分" hint="导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。"><div className="fg-row"><Toggle value={cfg.images.expressions} onChange={v => p({ expressions: v })} /><span className="fg-note">每轮最多</span><Text type="number" style={{ width: '6cqw' }} value={cfg.images.expressionsPerTurn} onCommit={v => p({ expressionsPerTurn: v })} /><span className="fg-note">张</span></div></Field>
       <Field label="立绘设计师" hint="立绘提示词由后台模型读完人物卡、世界书和到这一轮为止的全部剧情来写，一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼。"><Toggle value={cfg.images.spriteWriter} onChange={v => p({ spriteWriter: v })} /></Field>
       <Field label="并发"><Text type="number" style={{ width: '6cqw' }} value={cfg.images.concurrency} onCommit={v => p({ concurrency: v })} /></Field>
+      <div className="fg-section">尺寸</div>
+      <Field label="插画、背景、立绘" hint="宽×高，按 64 取整。默认是 NovelAI 常用的三种；超过 1024×1024 面积的尺寸在 NovelAI 上要扣点数。剧场画面默认跟横版一样的比例。">
+        <div className="fg-row">
+          {SIZE_SHAPES.map(([shape, label]) => (
+            <label key={shape} className="fg-row" style={{ gap: '.4em' }}><span className="fg-note">{label}</span>
+              <Text style={{ width: '9cqw' }} value={cfg.images.sizes[shape].join('×')} onCommit={v => { const size = parseSize(v); if (size) p({ sizes: { ...cfg.images.sizes, [shape]: size } }); else toast('写成「宽×高」，比如 1216×832', 'error') }} />
+            </label>
+          ))}
+        </div>
+      </Field>
+      <div className="fg-section">图片文件夹</div>
+      <Field label="另存一份" hint="画好的插画、背景、立绘按「卡名 / 插画 / 第 3 轮 标题」这样的名字复制一份，方便在文件夹里找。那里的图改了、删了都不影响剧场；删局、重新整理也不会删它们。"><Toggle value={cfg.images.library} onChange={v => p({ library: v })} /></Field>
+      <Field label="位置" hint={`现在是 ${(data.paths && data.paths.library) || '数据目录下的「图片」'}。留空用数据目录下的「图片」；要换地方就填绝对路径，比如 D:\\Pictures\\FlowGal。`}>
+        <div className="fg-row"><Text value={cfg.images.libraryDir} placeholder="留空用默认位置" style={{ flex: 1 }} onCommit={v => p({ libraryDir: v })} /><button type="button" className="fg-btn" onClick={() => openLibrary('').catch(e => toast(e.message, 'error'))}>打开</button></div>
+      </Field>
     </>
   )
 }
+
+const landscapeSize = cfg => { const { width, height } = sizeFor(cfg, 'landscape'); return `${width}×${height}` }
 
 export function LookSection({ data }) {
   const cfg = data.config
@@ -896,6 +931,13 @@ export function LookSection({ data }) {
           </button>
         ))}
       </div>
+      <div className="fg-section">画面</div>
+      <Field label="画面比例" hint="跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。">
+        <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.ratio} onChange={e => p({ ratio: e.target.value })}>
+          <option value="cg">跟横版插画一样（{landscapeSize(data.config)}）</option>
+          <option value="wide">16:9 宽屏</option>
+        </select>
+      </Field>
       <div className="fg-section">演出</div>
       <Field label="文字速度" hint="每字毫秒，0 为瞬间显示。"><input type="range" min="0" max="80" value={cfg.ui.textSpeed} onChange={e => p({ textSpeed: Number(e.target.value) })} style={{ width: '100%' }} /></Field>
       <Field label="自动播放间隔"><input type="range" min="400" max="4000" step="100" value={cfg.ui.autoDelay} onChange={e => p({ autoDelay: Number(e.target.value) })} style={{ width: '100%' }} /></Field>

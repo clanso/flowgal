@@ -19,7 +19,7 @@ import { createEngine } from '../lib/engine.js'
 import { createRoutes } from '../lib/routes.js'
 import { createMusic } from '../lib/music.js'
 import { segmentTurn } from '../lib/segment.js'
-import { storyText } from '../lib/clean.js'
+import { cleanTurnText } from '../lib/clean.js'
 import { CARD, TURNS, LATE_TURN, directorReply, CG_DRAFTS } from './preview/story.mjs'
 import { paintPlaceholder } from './preview/paint.mjs'
 import { paintSprite, spriteLayer } from './preview/sprite.mjs'
@@ -128,7 +128,7 @@ const llm = {
     return (async function* () {
       if (!turnInfo) { yield { type: 'text-delta', text: '{}' }; yield { type: 'finish', reason: { kind: 'stop' } }; return }
       const slow = turnInfo.turn === 4
-      const units = segmentTurn(storyText({ text: turnInfo.text, rawText: turnInfo.raw || turnInfo.text, card: CARD }))
+      const units = segmentTurn(cleanTurnText({ text: turnInfo.text, rawText: turnInfo.raw || turnInfo.text, card: CARD }))
       const reply = JSON.stringify(withMusic(turnInfo.turn, units, directorReply(turnInfo.turn, units)), null, 1)
       for (let i = 0; i < THINKING.length; i += 12) { yield { type: 'reasoning-delta', text: THINKING.slice(i, i + 12) }; await sleep(slow ? 90 : 4) }
       const step = 12

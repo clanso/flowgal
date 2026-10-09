@@ -30,7 +30,8 @@
 
 .fg-stage {
   position: relative; overflow: hidden; overflow: clip;
-  width: min(100vw, calc(100vh * 16 / 9)); height: min(100vh, calc(100vw * 9 / 16));
+  /* 宽高比由剧场根节点的 --stage-ar 给（默认跟横版插画一样，NovelAI 的 1216×832）。 */
+  width: min(100vw, calc(100vh * var(--stage-ar, 1.4615))); height: min(100vh, calc(100vw / var(--stage-ar, 1.4615)));
   container-type: size; container-name: stage;
   background: #000;
   box-shadow: 0 0 120px rgba(0, 0, 0, .8);

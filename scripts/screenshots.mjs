@@ -34,7 +34,7 @@ await mkdir(out, { recursive: true })
 const server = await startServer()
 const browser = await chromium.launch()
 try {
-  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } })
+  const page = await browser.newPage({ viewport: { width: 1520, height: 1040 } }) // 和默认的舞台比例（1216×832）一样，截图里没有黑边
   page.on('pageerror', e => console.warn('页面错误：', e.message))
   const shot = async name => { await page.screenshot({ path: join(out, name + '.png') }); console.log('✓', name) }
   const click = async (selector, wait = 900) => { await page.locator(selector).first().click(); await sleep(wait) }
@@ -113,7 +113,7 @@ try {
   // 面板
   await page.keyboard.press('l'); await sleep(900); await shot('09-backlog'); await page.keyboard.press('Escape'); await sleep(300)
   await click('.fg-quick button:has-text("CG")', 1400); await shot('10-gallery')
-  await click('.fg-thumb-cap', 900); await shot('11-gallery-lightbox'); await page.mouse.click(30, 30); await sleep(400)
+  await click('.fg-thumb-cap', 900); await shot('11-gallery-lightbox'); await page.locator('.fg-lightbox').click({ position: { x: 8, y: 8 } }); await sleep(400)
   await page.locator('.fg-btn:has-text("改词")').nth(1).click(); await sleep(900); await shot('12-prompt-editor')
   await page.locator('.fg-cg-chars').scrollIntoViewIfNeeded(); await sleep(300); await shot('37-prompt-editor-characters')
   await page.locator('.fg-field', { hasText: '剧场里显示' }).scrollIntoViewIfNeeded(); await sleep(300); await shot('39-cg-span'); await page.keyboard.press('Escape'); await sleep(300)
@@ -122,6 +122,7 @@ try {
   await click('.fg-quick button:has-text("CONFIG")', 1000); await shot('15-settings-look')
   await click('.fg-tab:has-text("生图渠道")', 800); await shot('16-settings-backend')
   await click('.fg-tab:has-text("画风")', 800); await shot('17-settings-style')
+  await page.locator('.fg-section', { hasText: '图片文件夹' }).scrollIntoViewIfNeeded(); await sleep(300); await shot('44-image-folder')
   await click('.fg-tab:has-text("配乐")', 900); await shot('29-settings-music')
 
   // 皮肤
