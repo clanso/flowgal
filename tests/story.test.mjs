@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { cleanTurnText } from '../lib/clean.js'
 import { segmentTurn } from '../lib/segment.js'
-import { normalizeScript } from '../lib/director.js'
+import { normalizeScript, rawSection } from '../lib/director.js'
 import { playedUnits } from '../lib/staging.js'
 import { buildBeats } from '../src/client/theater/playback.js'
 import { createStore } from '../lib/store.js'
@@ -78,24 +78,18 @@ test('gate: 分隔线、代码块标记、Markdown 记号和 HTML 实体收拾�
   assert.equal(cleanTurnText({ text: '  ', rawText: '<div>x</div>' }), '')
 })
 
-test('gate: 自定义标签包好的状态栏整块去掉，连里面像心里话的字段也不演；包正文的标签、普通网页、单个自定义标签留着', () => {
+test('gate: 切单元不替导演判断状态栏：标签包着的状态栏照样切出来，导演读带标签的完整原文自己判断；中文名的标签不原样留在字里', () => {
   // 角色卡的状态栏：一个标签套着几个字段，最后一个字段写得像心里话（卡片上默认被盖住的「未归档记录」）。
   const story = '江行止看见了。他当时想，戴在这只手腕上，宽度刚好。\n\n他等你的回答。'
-  const panel = '<江行止状态>\n<位置>老城区，无名法餐厅。</位置>\n<体征>右手持杯时间偏长。</体征>\n<暗流>\n宽度刚好。\n（删除。）\n覆盆子太红了。\n</暗流>\n</江行止状态>'
+  const panel = '<江行止状态>\n<位置>老城区，无名法餐厅。</位置>\n<暗流>\n宽度刚好。\n（删除。）\n覆盆子太红了。\n</暗流>\n</江行止状态>'
   const raw = story + '\n\n' + panel
   const lines = cleanTurnText({ text: tavernText(raw), rawText: raw }).split('\n')
-  assert.deepEqual(lines, ['江行止看见了。他当时想，戴在这只手腕上，宽度刚好。', '他等你的回答。'], '状态栏的字一行不留，正文里同样的话不误删')
-  assert.equal(segmentTurn(lines.join('\n')).length, 2)
-  // 标签名就叫状态 / status 的，里面没有字段也去掉。
-  const named = '“你来了。”\n<StatusBlock>时间：19:40 地点：屋檐下</StatusBlock>'
-  assert.equal(cleanTurnText({ text: tavernText(named), rawText: named }), '“你来了。”')
-  // 正文包在 <content> 里，里面夹着状态栏：正文留下，状态栏去掉。
-  const wrapped = '<content>\n雨下大了。\n“进来吧。”\n<角色状态><位置>屋檐下</位置><心情>平静</心情></角色状态>\n</content>'
-  assert.deepEqual(cleanTurnText({ text: tavernText(wrapped), rawText: wrapped }).split('\n'), ['雨下大了。', '“进来吧。”'])
-  // 原文里同时有网页标签时走按结构拆的那条路，状态栏一样去掉；普通网页的状态栏还是交给导演。
-  const html = '<p>“你来了。”</p>\n<角色状态><位置>屋檐下</位置><心情>平静</心情></角色状态>\n<div class="status">时间：19:40</div>'
-  assert.deepEqual(cleanTurnText({ text: tavernText(html), rawText: html }).split('\n'), ['“你来了。”', '时间：19:40'])
-  // 用 HTML 写的正文、只有一个字段的自定义标签：都是故事，不动。
+  assert.ok(lines.includes('老城区，无名法餐厅。') && lines.includes('覆盆子太红了。'), '状态栏的字照样切成单元，演不演由导演定')
+  const section = rawSection(raw)
+  assert.ok(section.startsWith('【本轮原文'))
+  assert.ok(section.includes('<江行止状态>') && section.includes('<暗流>') && section.includes(story), '导演看到的是带标签的原样')
+  assert.equal(rawSection('  '), '', '没有原文时不附这一节')
+  // 原文里同时有网页标签时按结构拆：<旁白> 这种中文名的标签也去掉符号，字留下。
   const prose = '<div><p>她回过头。</p><p>“走吧。”</p></div><旁白>雨停了。</旁白>'
   assert.deepEqual(cleanTurnText({ text: tavernText(prose), rawText: prose }).split('\n'), ['她回过头。', '“走吧。”', '雨停了。'])
 })
@@ -179,7 +173,10 @@ test('gate: 引擎按原文切单元，导演看得到状态栏并标成不演�
     let view = await engine.gameView('g')
     assert.deepEqual(view.turns[0].units.map(u => u.text), ['时间：19:40 ｜ 地点：屋檐下', '你来了。'])
     assert.deepEqual(view.turns[0].script.skip, ['U1'])
-    assert.ok(llm.calls[0].messages[0].content[0].text.includes('[U1|旁白] 时间：19:40'), '导演看得到状态栏，自己判断不演')
+    const prompt = llm.calls[0].messages[0].content[0].text
+    assert.ok(prompt.includes('[U1|旁白] 时间：19:40'), '导演看得到状态栏，自己判断不演')
+    assert.ok(prompt.includes('【本轮原文') && prompt.includes(rawText), '导演同时读到带标签的完整原文')
+    assert.ok(prompt.indexOf(rawText) < prompt.indexOf('[U1|旁白]'), '原文在单元前面')
     // 同一轮再来一次（比如重新载入）：不重切，脚本里的编号还对得上。
     await engine.onTurnSettled({ ...turn, rawText: '<p>开场白。</p>' + rawText })
     view = await engine.gameView('g')
