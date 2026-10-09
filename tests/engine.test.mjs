@@ -1,7 +1,7 @@
 // 用假的 Tavern / llm / 生图服务跑通一整轮：正文 → 场景卡占位 → 导演 → 角色档案 / 情绪库 → 立绘设计师 / 插画分镜师写词 → CG / 背景 / 立绘 → 挂回正文。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, open, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createStore } from '../lib/store.js'
@@ -97,13 +97,19 @@ test('gate: 一整轮的后台整理与出图', async () => {
     assert.equal(scene.data.location, '学园天台')
     const look = { appearance: '1girl, long black hair, blue eyes', outfit: '校服', states: [] }
     const neutralKey = variantKey(look, 'neutral'), smileKey = variantKey(look, 'smile')
-    // 等出图队列跑完。
-    for (let i = 0; i < 500; i++) {
-      const view = await engine.gameView('g1')
-      if (view.images[0]?.status === 'ready' && view.places['学园天台|dusk']?.assetId && view.cast[0]?.sprites?.[neutralKey]?.assetId && view.cast[0]?.sprites?.[smileKey]?.assetId) break
-      await new Promise(r => setTimeout(r, 20))
+    // 等出图队列跑完：插画（存档和正文占位都到 ready）、背景、平静立绘、微笑差分四样都到位；超时就报出哪一样卡在什么状态。
+    const missing = view => {
+      const image = view.images[0], place = view.places['学园天台|dusk'], person = view.cast[0]
+      const cg = [...tavern.items.values()].find(i => i.kind === KIND_CG)
+      const sprite = key => person?.spriteStatus?.[key]
+      return [
+        !(image?.status === 'ready' && cg?.status === 'ready') && `插画：存档里 ${stateOf(image)}，正文占位 ${stateOf(cg)}`,
+        !place?.assetId && `背景「学园天台|dusk」：${stateOf(place)}`,
+        !person?.sprites?.[neutralKey]?.assetId && `平静立绘：${stateOf(sprite(neutralKey))}`,
+        !person?.sprites?.[smileKey]?.assetId && `微笑差分：${stateOf(sprite(smileKey))}`,
+      ].filter(Boolean)
     }
-    const view = await engine.gameView('g1')
+    const view = await settle(engine, 'g1', v => !missing(v).length, 10000, missing)
     assert.equal(view.turns.length, 1)
     assert.equal(view.turns[0].script.lines.U2.sp, '林岚')
     const cg = [...tavern.items.values()].find(i => i.kind === KIND_CG)
@@ -310,15 +316,38 @@ test('gate: 导演整理到一半可以停止，场景按原文演，日志记�
   }
 })
 
-async function settle(engine, gameId, done, ms = 4000) {
+/** 反复读对局视图直到 done(view) 成立；超时报错。给了 missing(view)（还没好的各项说明）就把卡住的写进报错。 */
+async function settle(engine, gameId, done, ms = 4000, missing) {
   const end = Date.now() + ms
   for (;;) {
     const view = await engine.gameView(gameId)
     if (done(view)) return view
-    if (Date.now() > end) throw new Error('等出图超时')
+    if (Date.now() > end) throw new Error('等出图超时' + (missing ? `（${ms}ms）：` + missing(view).join('；') : ''))
     await new Promise(r => setTimeout(r, 20))
   }
 }
+
+/** 一项东西现在的状态和错误，报超时用。 */
+function stateOf(thing) {
+  return thing ? (thing.status || '没有状态') + (thing.error ? `（${thing.error}）` : '') : '还没有'
+}
+
+test('gate: 存档正被别处读着（Windows 上改名覆盖会被拒）时，写入稍等重试，不丢这一笔', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
+  try {
+    const store = createStore(dir)
+    await store.updateGame('g', g => { g.places.a = { status: 'ready' } })
+    // 像前端轮询那样把存档开着读，过一会儿才放开。
+    const reader = await open(join(dir, 'games', 'g.json'), 'r')
+    const release = new Promise(r => setTimeout(r, 100)).then(() => reader.close())
+    await store.updateGame('g', g => { g.places.b = { status: 'ready' } })
+    await release
+    assert.deepEqual(Object.keys((await store.readGame('g')).places), ['a', 'b'])
+    assert.deepEqual((await readdir(join(dir, 'games'))).filter(f => f.endsWith('.tmp')), [], '不留临时文件')
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
+})
 
 test('gate: 导演新造的复合情绪进情绪库，按这身衣服和长期状态画差分', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
