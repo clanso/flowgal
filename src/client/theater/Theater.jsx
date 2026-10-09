@@ -4,7 +4,7 @@ import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, updateAvai
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, emotionLabel, pickTrack, stageRatio } from './playback.js'
 import { Backdrop, Cast, CgLayer, TitleCard, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
-import { Backlog, Gallery, CastPanel, Settings } from './Panels.jsx'
+import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
 import { playBgm, stopBgm, sfx, stinger, configureSounds } from './audio.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
@@ -279,6 +279,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         </div>
         {beat && !title && <Flash beat={beat} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
+        {!panel && <RestartNotice floating />}
         {beat && !title && <TitleCard beat={beat} />}
 
         {!title && beat && (

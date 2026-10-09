@@ -18,6 +18,20 @@ import { CG_MAX_CHARACTERS } from '../../../lib/vocab.js'
 
 const STATUS_LABEL = { writing: '分镜中', queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消', ready: '' }
 
+/**
+ * 插件文件已经更新、DSH 还没重启时的提示：这时网页是新的、后台还是旧的，新加的字段旧后台不认，
+ * 保存时会悄悄丢掉（比如分格的固定外貌）。光刷新网页不够，要关掉 DSH 再打开。
+ */
+export function RestartNotice({ floating = false }) {
+  const u = useUpdate()
+  if (!u || !u.restartRequired) return null
+  return (
+    <div className={`fg-restart${floating ? ' is-floating' : ''}`} role="alert" onClick={e => e.stopPropagation()}>
+      FlowGal 已经更新，但 DSH 还在用旧的后台：<b>关掉 DSH 再打开</b>（光刷新网页不够）。重启前改的设置和档案，有的会存不上。
+    </div>
+  )
+}
+
 export function Panel({ title, en, onClose, tabs, tab, onTab, children, actions }) {
   return (
     <div className="fg-panel" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
@@ -28,6 +42,7 @@ export function Panel({ title, en, onClose, tabs, tab, onTab, children, actions 
         {actions}
         <button type="button" className="fg-iconbtn" title="返回" onClick={onClose}>✕</button>
       </div>
+      <RestartNotice />
       {tabs && (
         <div className="fg-tabs">
           {tabs.map(t => <button key={t.id} type="button" className={`fg-tab${tab === t.id ? ' is-on' : ''}`} onClick={() => onTab(t.id)}>{t.label}</button>)}
@@ -369,7 +384,8 @@ function ProfileEditor({ gameId, person, cast }) {
   const setLook = f => e => setForm({ ...form, look: { ...form.look, [f]: e.target.value } })
   const save = () => {
     const { look, ...rest } = form
-    return run('save', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { ...rest, appearanceFields: look, seed: form.seed === '' ? null : Number(form.seed), voicePitch: Number(form.voicePitch) } }), '档案已保存')
+    // 一整串（appearance）也带上：后台按分格存；碰上还没重启、不认分格的旧后台时，至少这一串能存下，不会悄悄丢
+    return run('save', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { ...rest, appearanceFields: look, appearance: lookTags(look, person.appearance), seed: form.seed === '' ? null : Number(form.seed), voicePitch: Number(form.voicePitch) } }), '档案已保存')
   }
   // 按表单里还没保存的选择试听；「自动」显示实际会分到哪个音色（跟着表单里的性别变）。
   const others = (cast || []).filter(p => p.name !== person.name)

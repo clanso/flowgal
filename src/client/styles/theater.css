@@ -533,6 +533,10 @@
 .fg-sent i { opacity: .7; }
 
 .fg-update-done { margin: .8cqw 0; padding: .9cqw 1.2cqw; border-radius: .8cqw; font-size: 1.05cqw; line-height: 1.6; color: #6ef0a8; background: rgba(110, 240, 168, .08); border: 1px solid rgba(110, 240, 168, .3); }
+/* 文件更新了、DSH 还没重启：网页新、后台旧，提醒重启 */
+.fg-restart { margin: 0 3cqw .8cqw; padding: .7cqw 1.1cqw; border-radius: .8cqw; font-size: 1cqw; line-height: 1.55; color: #ffd59a; background: rgba(217, 130, 43, .14); border: 1px solid rgba(217, 130, 43, .55); }
+.fg-restart b { color: #fff0d6; }
+.fg-restart.is-floating { position: absolute; top: 1.2cqw; left: 50%; transform: translateX(-50%); z-index: 40; width: max-content; max-width: 70cqw; margin: 0; background: rgba(40, 24, 8, .86); backdrop-filter: blur(6px); }
 .fg-changes { margin: .4cqw 0 0 15.2cqw; border-radius: .8cqw; border: 1px solid var(--box-border); overflow: hidden; }
 .fg-changes > div { display: grid; grid-template-columns: 6cqw 1fr auto; gap: 1cqw; padding: .6cqw 1cqw; font-size: 1cqw; line-height: 1.5; border-bottom: 1px solid rgba(255, 255, 255, .06); }
 .fg-changes > div:last-child { border-bottom: 0; }
