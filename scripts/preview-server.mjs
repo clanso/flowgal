@@ -7,6 +7,8 @@
 // 「我的配乐」里放三段程序合成的示例曲（scripts/preview/synth.mjs），假导演每轮从里面选曲。
 // 环境变量：FLOWGAL_SKIN 初始皮肤；FLOWGAL_FONT_DIR 本地字体镜像目录（结构同 jsDelivr 的 /npm/ 路径，
 // 例如 <目录>/@fontsource/noto-sans-sc@5.3.0/400.css），不设时字体照常从 jsDelivr 读。
+// 逆转式立绘演示：--aa-demo <素材包目录>（或 FLOWGAL_AA_DEMO），把林岚的立绘换成这个素材包（呼吸 + 眨眼 + 口型），
+// 素材包格式见 lib/aa-sprite.js；FLOWGAL_AA_DEMO_NAME 换演示的人物，FLOWGAL_AA_DEMO_MARK 是认出这个人立绘请求的外貌 tag。
 import { createServer } from 'node:http'
 import { readFile, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -28,6 +30,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const fontDir = process.env.FLOWGAL_FONT_DIR ? resolve(process.env.FLOWGAL_FONT_DIR) : ''
 const portArg = process.argv.indexOf('--port')
 const PORT = Number(portArg > 0 ? process.argv[portArg + 1] : process.env.PORT || 5178)
+const aaArg = process.argv.indexOf('--aa-demo')
+const aaDir = (aaArg > 0 ? process.argv[aaArg + 1] : process.env.FLOWGAL_AA_DEMO) ? resolve(aaArg > 0 ? process.argv[aaArg + 1] : process.env.FLOWGAL_AA_DEMO) : ''
+const AA_NAME = process.env.FLOWGAL_AA_DEMO_NAME || '林岚'
+const AA_MARK = process.env.FLOWGAL_AA_DEMO_MARK || 'long black hair'
+const aaManifest = aaDir ? JSON.parse(await readFile(join(aaDir, 'sprite.json'), 'utf8')) : null
+const aaStill = aaDir ? await readFile(join(aaDir, aaManifest.breath.frames[0])) : null
 const GAME = 'preview-game'
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
@@ -137,6 +145,10 @@ async function fakeFetch(url, init = {}) {
   await sleep(1200 + Math.random() * 800)
   const json = (() => { try { return JSON.parse(body) } catch { return {} } })()
   const prompt = json.input || body
+  // 逆转式立绘演示：这个人的立绘一律用素材包的第一张呼吸帧（剧场里实际按素材包分层画）
+  if (aaStill && /white background|simple background/.test(prompt) && prompt.includes(AA_MARK)) {
+    return new Response(aaStill, { status: 200, headers: { 'content-type': 'image/webp' } })
+  }
   const png = /white background|simple background/.test(prompt)
     ? paintSprite(prompt)
     : paintPlaceholder(prompt, {
@@ -186,7 +198,21 @@ const updater = {
   apply: async () => { await sleep(1200); Object.assign(update, { restartRequired: true, last: { ...update.last, behind: 0, commits: [], checkedAt: Date.now() } }); return update },
   switchToFallback: async () => update,
 }
-const routes = new Map(createRoutes({ engine, music, updater, logger }).map(r => [r.path, r.handler]))
+// 逆转式立绘演示：发给剧场的局面里给演示人物的立绘记录挂上素材包（复制一份再改，不动引擎里的数据）
+const routeEngine = !aaDir ? engine : new Proxy(engine, {
+  get(target, key) {
+    if (key !== 'gameView') return Reflect.get(target, key)
+    return async (...args) => {
+      const view = structuredClone(await target.gameView(...args))
+      for (const person of view?.cast || []) {
+        if (person.name !== AA_NAME) continue
+        for (const record of Object.values(person.sprites || {})) if (record?.assetId) record.aa = { manifest: '/aa-demo/sprite.json' }
+      }
+      return view
+    }
+  },
+})
+const routes = new Map(createRoutes({ engine: routeEngine, music, updater, logger }).map(r => [r.path, r.handler]))
 const TYPES = { '.js': 'text/javascript; charset=utf-8', '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.json': 'application/json' }
 async function sendFile(res, file) {
   try {
@@ -208,6 +234,11 @@ const server = createServer(async (req, res) => {
   if (fontDir && url.pathname.startsWith('/fonts/')) {
     const file = resolve(fontDir, '.' + decodeURIComponent(url.pathname.slice(6)))
     if (!file.startsWith(fontDir + sep)) { res.writeHead(403); return res.end() }
+    return sendFile(res, file)
+  }
+  if (aaDir && url.pathname.startsWith('/aa-demo/')) {
+    const file = resolve(aaDir, '.' + decodeURIComponent(url.pathname.slice(8)))
+    if (!file.startsWith(aaDir + sep)) { res.writeHead(403); return res.end() }
     return sendFile(res, file)
   }
   if (url.pathname === '/preview/chat') {

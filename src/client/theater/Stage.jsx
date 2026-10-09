@@ -5,6 +5,7 @@ import { Particles } from './particles.js'
 import { SKY, placeKey, actorX, cgSrc, TIME_LABEL, WEATHER_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite } from '../../../lib/look.js'
+import { AaSprite } from './AaSprite.jsx'
 
 const TRANSITION = {
   dissolve: ['fg-dissolve', '1.1s'], cinematic: ['fg-cinematic', '1.5s'], wipe: ['fg-wipe', '1s'], iris: ['fg-iris', '1.2s'],
@@ -191,7 +192,7 @@ function spriteFor(person, turn, emo, emotions) {
 /** 登场从靠近的那一侧滑进来，退场往同一侧淡出。 */
 const SIDE = { farleft: '-40%', left: '-28%', center: '0%', right: '28%', farright: '40%' }
 
-function Actor({ entry, person, beat, emo, emotions, leaving = false }) {
+function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && beat.speaker === entry.name
   const sprite = spriteFor(person, beat.turn, emo, emotions)
   const src = sprite ? assetUrl(sprite) : ''
@@ -209,10 +210,13 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false }) {
     return () => clearTimeout(t)
   }, [src])
   const uploaded = Boolean(person && Object.values(person.sprites || {}).some(r => r && r.assetId === sprite && r.uploaded))
+  // 立绘记录带逆转式素材包时，用分层画布（呼吸帧 + 眨眼 + 口型），原图作读包前的后备
+  const aa = (person && Object.values(person.sprites || {}).find(r => r && r.assetId === sprite && r.aa?.manifest))?.aa.manifest || ''
+  const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
   return (
-    <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}`} style={{ '--x': actorX(entry.pos) + '%', '--side': SIDE[entry.pos] || '0%' }} data-name={entry.name}>
+    <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}${aa ? ' is-aa' : ''}`} style={{ '--x': actorX(entry.pos) + '%', '--side': SIDE[entry.pos] || '0%' }} data-name={entry.name}>
       <div className="fg-actor-body">
-        {shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />}
+        {aa ? <AaSprite manifest={aa} talk={speaking && talk && talk.key === beat.key ? talk : null} fallback={still} className="fg-aa" label={entry.name} /> : still}
       </div>
       {speaking && beat.sym && (
         <div className="fg-symbol-anchor"><MangaSymbol key={beat.key} kind={beat.sym} /></div>
@@ -245,7 +249,7 @@ function useLeaving(cast) {
   return [...leaving.current.values()].map(l => l.entry)
 }
 
-export function Cast({ beat, view }) {
+export function Cast({ beat, view, talk }) {
   const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
   let cast = beat.cast || []
   // 导演还没整理、也没有上一幕站位时：说话的已知人物临时站到中间。整理过的轮次台上没人就是没人（便条、画外音）。
@@ -255,7 +259,7 @@ export function Cast({ beat, view }) {
   return (
     <div className="fg-cast">
       {cast.map(entry => (
-        <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} />
+        <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={talk} />
       ))}
       {leaving.map(entry => (
         <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} leaving />

@@ -100,10 +100,13 @@
 .fg-actor.is-leaving { animation: fg-actor-out .45s ease both; }
 .fg-actor-body { position: absolute; inset: 0; transform-origin: 50% 100%; animation: fg-breathe 4.8s ease-in-out infinite; }
 .fg-actor.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1), fg-breathe 4.8s ease-in-out .42s infinite; }
-.fg-actor img { position: absolute; left: 50%; bottom: 0; height: 100%; width: auto; max-width: none; transform: translateX(-50%);
+/* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */
+.fg-actor.is-aa .fg-actor-body { animation: none; }
+.fg-actor.is-aa.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }
+.fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: 0; height: 100%; width: auto; max-width: none; transform: translateX(-50%);
   -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 99%), radial-gradient(120% 100% at 50% 40%, #000 62%, transparent 82%);
   -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, #000 78%, transparent 99%); }
-.fg-actor.is-upload img { -webkit-mask-image: none; mask-image: none; }
+.fg-actor.is-upload img, .fg-actor.is-upload .fg-aa { -webkit-mask-image: none; mask-image: none; }
 .fg-actor img.is-swap { animation: fg-expr-swap .25s ease; }
 /* 登场从靠近的一侧滑进来，退场往同一侧淡出（--side 由站位决定）。 */
 @keyframes fg-actor-in { from { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(3%); } }

@@ -2,34 +2,43 @@
 import React from 'react'
 import { blip, sfx } from './audio.js'
 import { CARD_LABEL } from './playback.js'
+import { SILENT, typeTimes } from '../../../lib/typing.js'
 
 const CARD_HEAD = { sms: '新消息', letter: '', note: '', news: '号外', terminal: '> SYSTEM', notice: '告示', diary: '', scroll: '' }
 
 /**
- * 逐字显现：返回 [是否打完, 字, 立即打完]。hold 为真时先不开始（等字体分片下载完）。
+ * 逐字显现：返回 [是否打完, 字, 立即打完, 开始显现的时刻, 每个字出现的时刻]。hold 为真时先不开始（等字体分片下载完）。
  * 「打完」跟着这一拍的 key 走、在渲染时就复位：要是等 effect 再复位，新一句第一帧会带着上一句的「打完」整句露出来再消失。
+ * 字按 lib/typing.js 的时间轴出现：匀速，标点后停一拍。开始时刻是 performance.now()，还没开始时是 NaN（逆转式立绘的口型按它对齐）。
  */
 export function useTypewriter(beat, speed, { sound = true, hold = false } = {}) {
   const key = beat ? beat.key : ''
   const chars = React.useMemo(() => Array.from((beat && beat.text) || ''), [key, beat && beat.text])
+  const times = React.useMemo(() => typeTimes(chars, speed || 0), [chars, speed])
   const [shown, setShown] = React.useState({ key, done: false })
+  const [start, setStart] = React.useState({ key: '', at: NaN })
   if (shown.key !== key) setShown({ key, done: false })
   const done = !speed || !chars.length || (shown.key === key && shown.done)
   React.useEffect(() => {
     if (!speed || !chars.length || hold) return undefined
-    const finish = setTimeout(() => setShown({ key, done: true }), chars.length * speed + 220)
-    let i = 0
+    const t0 = performance.now()
+    setStart({ key, at: t0 })
+    const finish = setTimeout(() => setShown({ key, done: true }), times[times.length - 1] + speed + 220)
+    // 打字音跟着时间轴：每隔一个字响一下，标点、空白不响，停顿时自然静下来
+    let next = 1
     const tick = sound ? setInterval(() => {
-      i += 2
-      if (i >= chars.length) { clearInterval(tick); return }
-      if (!/[\s，。、…！？,.!?]/.test(chars[i])) blip(beat.speaker, beat.type)
-    }, speed * 2) : null
+      const now = performance.now() - t0
+      for (; next < chars.length && times[next] <= now; next += 1) {
+        if (next % 2 === 0 && !SILENT.test(chars[next])) blip(beat.speaker, beat.type)
+      }
+      if (next >= chars.length) clearInterval(tick)
+    }, speed) : null
     return () => { clearTimeout(finish); if (tick) clearInterval(tick) }
-  }, [key, chars, speed, sound, hold])
-  return [done, chars, () => setShown({ key, done: true })]
+  }, [key, chars, times, speed, sound, hold])
+  return [done, chars, () => setShown({ key, done: true }), start.key === key ? start.at : NaN, times]
 }
 
-export function DialogBox({ beat, chars, done, waiting, color, quick, progress, status, hiddenText }) {
+export function DialogBox({ beat, chars, times, done, waiting, color, quick, progress, status, hiddenText }) {
   const speaker = beat.alias || beat.speaker
   const showName = speaker && beat.type !== 'narration'
   const speed = quick.speed
@@ -45,7 +54,7 @@ export function DialogBox({ beat, chars, done, waiting, color, quick, progress, 
       {hiddenText && <div className="fg-text is-cardhint">〔 {CARD_LABEL[beat.card] || '卡片'} 〕</div>}
       {!hiddenText && (
         <div className={`fg-text is-${beat.type}${done ? ' is-done' : waiting ? ' is-wait' : ''}`} key={beat.key} aria-live="polite">
-          {chars.map((ch, i) => <span key={i} className="fg-char" style={{ '--d': (i * speed) + 'ms' }}>{ch}</span>)}
+          {chars.map((ch, i) => <span key={i} className="fg-char" style={{ '--d': (times ? times[i] : i * speed) + 'ms' }}>{ch}</span>)}
         </div>
       )}
       {done && <div className="fg-wait" aria-hidden="true" />}

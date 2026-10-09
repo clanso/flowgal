@@ -118,7 +118,10 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const beat = index >= 0 ? beats[index] : null
   const speed = skip ? 0 : ui0.textSpeed
   const holdText = Boolean(beat) && glyphKey !== beat.key
-  const [done, chars, finish] = useTypewriter(beat, title || panel ? 0 : speed, { sound: ui0.blip && !skip && !title, hold: holdText })
+  const typeSpeed = title || panel ? 0 : speed
+  const [done, chars, finish, typedAt, typedTimes] = useTypewriter(beat, typeSpeed, { sound: ui0.blip && !skip && !title, hold: holdText })
+  // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
+  const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typedTimes, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typedTimes, typeSpeed, typedAt, done])
   const cam = useCamera(title ? null : beat)
   const people = React.useMemo(() => new Map(((view && view.cast) || []).map(p => [p.name, p])), [view])
   const atEnd = beat && index === beats.length - 1
@@ -257,7 +260,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         <div className="fg-camera" data-cam={cam}>
           <Backdrop scene={stageScene} view={view} transition={stageBeat ? (stageBeat.sceneEnter ? stageBeat.transition : 'dissolve') : 'dissolve'} />
           <div className="fg-grade" data-time={stageScene.time} />
-          {stageBeat && <Cast beat={title ? { ...stageBeat, speaker: '', sym: '' } : stageBeat} view={view} />}
+          {stageBeat && <Cast beat={title ? { ...stageBeat, speaker: '', sym: '' } : stageBeat} view={view} talk={title ? null : talk} />}
           {stageBeat && !title && <CgLayer beat={stageBeat} />}
           <Particles weather={stageScene.weather} enabled={ui0.particles !== false} />
           <div className="fg-vignette" />
@@ -290,7 +293,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
         {beat && !title && beat.card && <SceneCard beat={beat} />}
         {beat && !title && (
-          <DialogBox beat={beat} chars={chars} done={done} waiting={holdText} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)} />
+          <DialogBox beat={beat} chars={chars} times={typedTimes} done={done} waiting={holdText} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)} />
         )}
         {!beat && !title && (
           <div className="fg-choices"><div className="fg-choices-title">{view ? '这一局还没有可以演的内容' : '读取中'}</div></div>
