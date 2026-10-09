@@ -149,10 +149,14 @@ async function fakeFetch(url, init = {}) {
   if (/novelai/.test(String(url)) && /subscription/.test(String(url))) return new Response(JSON.stringify({ tier: 3 }), { status: 200 })
   await sleep(1200 + Math.random() * 800)
   const json = (() => { try { return JSON.parse(body) } catch { return {} } })()
-  const prompt = json.input || body
+  // 立绘照柏宝绘的写法分了角色块：外貌、衣服、表情在角色块里，假画师要连 Base 带角色块一起看
+  const chars = (json.parameters?.v4_prompt?.caption?.char_captions || []).map(c => c.char_caption).filter(Boolean)
+  const sprite = chars.length && /transparent background|white background|simple background/.test(json.input || '')
+  const prompt = sprite ? [json.input, ...chars].join(', ') : json.input || body
   // 逆转式立绘工作台的局部重绘：按状态回一张不同深浅的灰图（框里贴上去就看得出眨眼、张嘴在动）
   if (json.action === 'infill') {
-    const shade = /^closed eyes/.test(prompt) ? 30 : /^half-closed eyes/.test(prompt) ? 120 : /^open mouth/.test(prompt) ? 70 : 170
+    const face = chars[0] || prompt // 状态 tag 写在角色块最前（老记录在 Base 最前）
+    const shade = /^closed eyes/.test(face) ? 30 : /^half-closed eyes/.test(face) ? 120 : /^open mouth/.test(face) ? 70 : 170
     return new Response(grayPng(json.parameters.width, json.parameters.height, () => shade), { status: 200, headers: { 'content-type': 'image/png' } })
   }
   // 逆转式立绘演示：这个人的立绘一律用素材包的第一张呼吸帧（剧场里实际按素材包分层画）

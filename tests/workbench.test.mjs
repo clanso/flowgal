@@ -133,6 +133,30 @@ test('gate: 工作台局部重绘：用画这张时的提示词和种子，按�
   }
 })
 
+test('gate: 按柏宝绘写法画的差分（有角色块）：眨眼口型改在角色块里，Base 不动，角色块负面也补上反面', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
+  try {
+    const { engine, key, requests, store } = await setup(dir)
+    await store.updateGame('g', g => Object.assign(g.looks['林岚'].sprites[key], {
+      positive: '<artist>a</artist>, transparent background, cowboy shot, solo, looking at viewer',
+      negativePrompt: 'lowres, outdoors',
+      characters: ['girl, long black hair, blue eyes, light smile, looking at viewer, cowboy shot'],
+      characterNegatives: ['glasses, full body'],
+    }))
+    const rects = { eyes: [[320, 216, 392, 280]], mouth: [[392, 312, 432, 328]] }
+    await engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects, image: dataUrl(grayPng(832, 1216, () => 255)) })
+    const q = requests.at(-1).body.parameters
+    assert.equal(requests.at(-1).body.input, '<artist>a</artist>, transparent background, cowboy shot, solo, looking at viewer', 'Base 原样')
+    assert.equal(q.v4_prompt.caption.char_captions[0].char_caption, 'closed eyes, girl, long black hair, light smile, cowboy shot')
+    assert.equal(q.v4_negative_prompt.caption.char_captions[0].char_caption, 'glasses, full body, open eyes, eyelashes up')
+    assert.equal(q.negative_prompt, 'lowres, outdoors')
+    assert.equal(q.use_coords, true)
+    engine.dispose()
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
+})
+
 test('gate: 局部重绘只走 NovelAI，别的渠道说清楚', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
   try {

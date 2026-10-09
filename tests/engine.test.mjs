@@ -129,10 +129,16 @@ test('gate: 一整轮的后台整理与出图', async () => {
     assert.match(writerUser, /放学铃响了/)
     assert.match(writerUser, /你终于来了/)
     assert.match(writerUser, /校服：school uniform, sailor collar, red ribbon/)
-    // 两张差分用写好的词、同一个种子（按名字算的固定种子）。
-    const spriteReqs = requests.filter(r => r.body?.input?.includes('written-s'))
+    // 内置情绪带「演到全身」的动作参考（微笑：嘴角轻轻上扬……）
+    assert.match(writerUser, /情绪「微笑」；动作参考：嘴角轻轻上扬/)
+    // 两张差分用写好的词、同一个种子（按名字算的固定种子）。写好的词进这个人的角色块（照柏宝绘的立绘写法），Base 只有画风和构图。
+    const charOf = r => r.body?.parameters?.v4_prompt?.caption?.char_captions?.[0]?.char_caption || ''
+    const spriteReqs = requests.filter(r => charOf(r).includes('written-s'))
     assert.equal(spriteReqs.length, 2)
     assert.deepEqual(spriteReqs.map(r => r.body.parameters.seed), [nameSeed('林岚'), nameSeed('林岚')])
+    assert.match(charOf(spriteReqs[0]), /^girl, long black hair, blue eyes, school uniform, sailor collar, written-s\d, cowboy shot, standing, facing forward, eye-level, facing viewer, straight-on$/)
+    assert.doesNotMatch(spriteReqs[0].body.input, /written-s|long black hair/)
+    assert.equal(spriteReqs[0].body.parameters.v4_prompt.use_coords, true)
     assert.equal(person.seed, nameSeed('林岚'))
     // 写词过程记进导演日志。
     const log = await engine.directorLog('g1')
@@ -149,7 +155,8 @@ test('gate: 一整轮的后台整理与出图', async () => {
     assert.equal(view.images[0].shape, 'portrait')
     assert.equal(view.images[0].characters[0].name, '林岚')
     // NovelAI V4+：Base 进 base_caption（补了人数），角色块进 char_captions（补了固定外貌）；人名一个字都不发。Key 只发给 NovelAI。
-    const cgReq = requests.find(r => r.body?.parameters?.v4_prompt?.caption?.char_captions?.length)
+    // 立绘也有角色块了：插画按「有角色块、Base 是天台」认（背景也是天台，但没有角色块）
+    const cgReq = requests.find(r => r.body?.parameters?.v4_prompt?.caption?.char_captions?.length && /school rooftop/.test(r.body.parameters.v4_prompt.caption.base_caption))
     const caption = cgReq.body.parameters.v4_prompt.caption
     assert.match(caption.base_caption, /^1girl, /)
     assert.match(caption.base_caption, /school rooftop, sunset/)
@@ -422,7 +429,7 @@ test('gate: 当时没填 Key 错过的插画、背景、立绘差分可以一键
     await engine.castAction('g', 'save', { name: '林岚', patch: { seed: 42 } })
     await engine.castAction('g', 'sprite', { name: '林岚', emotion: 'smile', tags: '1girl, my own tags' })
     view = await settle(engine, 'g', v => v.cast[0].sprites[smile]?.writer === 'user' && !v.cast[0].spriteStatus[smile])
-    assert.match(requests.at(-1).input, /my own tags/)
+    assert.match(requests.at(-1).parameters.v4_prompt.caption.char_captions[0].char_caption, /my own tags/)
     assert.equal(requests.at(-1).parameters.seed, 42)
     await engine.castAction('g', 'upload', { name: '林岚', emotion: '偷笑', dataUrl: 'data:image/png;base64,' + PNG.toString('base64') })
     view = await engine.gameView('g')
