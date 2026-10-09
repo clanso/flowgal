@@ -1,0 +1,4 @@
+# 插入一条加载项：宿主半边是 lib/index.js，浏览器半边由 dsh-client-modules 按 package.json 的 dsh.client 声明加载 client.js。
+- insert:
+    - id: flowgal
+      name: flowgal
