@@ -23,6 +23,7 @@ import { cleanTurnText } from '../lib/clean.js'
 import { CARD, TURNS, LATE_TURN, directorReply, CG_DRAFTS } from './preview/story.mjs'
 import { paintPlaceholder } from './preview/paint.mjs'
 import { paintSprite, spriteLayer } from './preview/sprite.mjs'
+import { grayPng } from '../lib/image/png.js'
 import { emotionId } from '../lib/emotions.js'
 import { EMOTION_TAGS } from '../lib/vocab.js'
 import { demoTracks } from './preview/synth.mjs'
@@ -149,6 +150,11 @@ async function fakeFetch(url, init = {}) {
   await sleep(1200 + Math.random() * 800)
   const json = (() => { try { return JSON.parse(body) } catch { return {} } })()
   const prompt = json.input || body
+  // 逆转式立绘工作台的局部重绘：按状态回一张不同深浅的灰图（框里贴上去就看得出眨眼、张嘴在动）
+  if (json.action === 'infill') {
+    const shade = /^closed eyes/.test(prompt) ? 30 : /^half-closed eyes/.test(prompt) ? 120 : /^open mouth/.test(prompt) ? 70 : 170
+    return new Response(grayPng(json.parameters.width, json.parameters.height, () => shade), { status: 200, headers: { 'content-type': 'image/png' } })
+  }
   // 逆转式立绘演示：这个人的立绘一律用素材包的第一张呼吸帧（剧场里实际按素材包分层画）
   if (aaStill && /white background|simple background/.test(prompt) && prompt.includes(AA_MARK)) {
     return new Response(aaStill, { status: 200, headers: { 'content-type': 'image/webp' } })

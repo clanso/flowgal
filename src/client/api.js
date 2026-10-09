@@ -39,6 +39,8 @@ export const api = {
   directorEntry: (gameId, id) => call(`/director-log?gameId=${encodeURIComponent(gameId)}&id=${encodeURIComponent(id)}`),
   place: (gameId, key) => call('/place/render', { gameId, key }),
   cast: (gameId, action, input) => call('/cast', { gameId, action, ...input }),
+  /** 逆转式立绘工作台：一次局部重绘，回 { image: 重画后的整张图 data URL, seed }。 */
+  aaInpaint: input => call('/aa/inpaint', input),
   fill: (gameId, opts = {}) => call('/fill', { gameId, ...opts }),
   emotion: (action, input) => call('/emotions', { action, ...input }),
   config: () => call('/config'),
