@@ -2,6 +2,7 @@
 import React from 'react'
 import { api, assetUrl, toast, fillText, useConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic } from '../api.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, cgSrc } from './playback.js'
+import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry } from '../../../lib/emotions.js'
 import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn } from '../../../lib/look.js'
 import { Silhouette } from './Stage.jsx'
@@ -223,10 +224,11 @@ export function Gallery({ view, gameId, onClose, focusId }) {
   const images = (view && view.images) || []
   const places = Object.values((view && view.places) || {})
   const live = open && images.find(i => i.id === open.id)
+  const editTurn = edit && ((view && view.turns) || []).find(t => t.textVersion === edit.textVersion)
   return (
     <Panel title="鉴赏" en="Gallery" onClose={onClose} tabs={[{ id: 'cg', label: `插画 CG · ${images.length}` }, { id: 'bg', label: `背景 · ${places.length}` }]} tab={tab} onTab={setTab}
       actions={<button type="button" className="fg-btn" title="当时没填 Key、关着自动出图、出图失败或被中断的插画、背景和立绘差分，一次补上" disabled={busy === 'fill'} onClick={() => run('fill', () => api.fill(gameId).then(r => toast(fillText(r))))}>补齐缺的图</button>}>
-      {edit && <ImageEditor key={edit.id} gameId={gameId} image={images.find(i => i.id === edit.id) || edit} units={(((view && view.turns) || []).find(t => t.textVersion === edit.textVersion) || {}).units || []} onClose={() => setEdit(null)} />}
+      {edit && <ImageEditor key={edit.id} gameId={gameId} image={images.find(i => i.id === edit.id) || edit} units={editTurn ? playedUnits(editTurn.units, editTurn.script) : []} onClose={() => setEdit(null)} />}
       {tab === 'cg' && (
         <div className="fg-grid">
           {images.map(img => <CgTile key={img.id} gameId={gameId} image={img} onOpen={setOpen} onEdit={setEdit} />)}

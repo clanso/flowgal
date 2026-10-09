@@ -1,8 +1,9 @@
 // 把宿主给的视图（每轮的单元 + 导演脚本 + 插画）摊平成一拍一拍的「演出节拍」。
 // 导演还没整理完的轮次也能演：用切分时猜出的说话人，沿用上一轮的地点和站位（前台先文本）。
 // 立绘按导演标的登场 / 退场逐句增减；插画从 after 那一句显示到 until 那一句（没写就到这一轮结束）。
+// 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
 import { placeKey } from '../../../lib/vocab.js'
-import { stageSteps } from '../../../lib/staging.js'
+import { stageSteps, playedUnits } from '../../../lib/staging.js'
 
 export { placeKey }
 export { emotionLabel } from '../../../lib/emotions.js'
@@ -39,15 +40,21 @@ export function buildBeats(view) {
     const prevKey = placeKey(scene)
     if (script) scene = { ...EMPTY_SCENE, ...script.scene }
     const changed = beats.length === 0 || placeKey(scene) !== prevKey
-    const units = t.units || []
+    const all = t.units || []
+    const units = playedUnits(all, script)
     const steps = stageSteps(script, units, cast)
     if (steps.length) cast = steps[steps.length - 1].cast
     const unitIndex = new Map(units.map((u, i) => [u.id, i]))
+    // 挂在不演的单元上的插画（导演整理前就有的、手动配的）：算到它前面最近一个要演的单元。
+    const indexOf = id => {
+      for (let i = all.findIndex(u => u.id === id); i >= 0; i--) if (unitIndex.has(all[i].id)) return unitIndex.get(all[i].id)
+      return -1
+    }
     const turnImages = images
       .filter(img => img.turn === t.turn && img.textVersion === t.textVersion)
       .map(img => {
-        const at = unitIndex.has(img.after) ? unitIndex.get(img.after) : units.length - 1
-        const end = unitIndex.has(img.until) ? Math.max(at, unitIndex.get(img.until)) : units.length - 1
+        const at = img.after && all.some(u => u.id === img.after) ? Math.max(0, indexOf(img.after)) : units.length - 1
+        const end = img.until && all.some(u => u.id === img.until) ? Math.max(at, indexOf(img.until)) : units.length - 1
         return { img, at, end }
       })
       .sort((a, b) => a.at - b.at)
@@ -56,9 +63,10 @@ export function buildBeats(view) {
       const line = (script && script.lines && script.lines[unit.id]) || {}
       if (line.bgm) bgm = line.bgm
       let speaker = ''
+      const type = line.type || unit.type
       // 导演只给换人那一句写说话人：同一人连续说话沿用上一位。旁白写了 sp 表示描写的是谁（立绘高亮、换表情，不显示名牌）。
-      if (unit.type === 'dialogue') { speaker = line.sp || unit.hint || lastSpeaker; lastSpeaker = speaker }
-      else if (unit.type === 'thought') speaker = line.sp || '我'
+      if (type === 'dialogue') { speaker = line.sp || (line.type ? '' : unit.hint) || lastSpeaker; lastSpeaker = speaker }
+      else if (type === 'thought') speaker = line.sp || '我'
       else if (line.sp) speaker = line.sp
       if (speaker && line.emo) emotions[speaker] = line.emo
       // 同时有几张在显示时，后出现的盖住先出现的。
@@ -69,7 +77,7 @@ export function buildBeats(view) {
         turn: t.turn,
         textVersion: t.textVersion,
         unitId: unit.id,
-        type: unit.type,
+        type,
         text: unit.text,
         speaker,
         alias: line.as || '',

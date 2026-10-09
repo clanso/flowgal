@@ -157,6 +157,11 @@ try {
   await shot('23-director-result')
   await click('.fg-dlog-tabs .fg-tab:has-text("提示词")', 700)
   await shot('24-director-prompt')
+  // 第 3 轮：状态栏和章节尾巴被导演标成不演
+  await click('.fg-dlog-tabs .fg-tab:has-text("整理结果")', 500)
+  await page.locator('.fg-dlog-row', { hasText: '第 3 轮' }).first().click(); await sleep(800)
+  await page.locator('.fg-dlog-line.is-skipped').first().scrollIntoViewIfNeeded(); await sleep(400)
+  await shot('43-director-skip')
   await page.keyboard.press('Escape'); await sleep(300)
   // 立绘差分：第 4 轮林岚换了冬季制服；回到校服这套，补齐剧情里用到的情绪（含导演自创的复合情绪）
   await click('.fg-quick button:has-text("CAST")', 1200)

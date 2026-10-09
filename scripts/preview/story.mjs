@@ -4,6 +4,7 @@
 // 登场 / 退场：第 2、3 轮苏晴中途跑进来，第 3 轮又冒雨跑走；第 4 轮林岚在说话那一句才出现。
 // 台词演法与重音：威压（不许走神）、迟疑（抱歉……）、激动（苏晴喊人）、重音（很可疑）、低语（信封那两句），
 // 第 3 轮苏晴的怒吼、说说停停和崩溃（旧校舍的事）。
+// 第 3 轮的原文像很多角色卡那样夹着状态栏、变量更新和章节尾巴（raw），导演把它们标成不演。
 export const CARD = { id: 'preview-card', name: '放学后的约定' }
 
 export const TURNS = [
@@ -31,7 +32,12 @@ export const TURNS = [
   {
     turn: 3,
     user: '（回到街上，忍不住拆开了信封）',
-    text: `走到路口，雨忽然大了起来。我躲到便利店的屋檐下，还是忍不住拆开了信封。
+    sig: '走到路口，雨忽然大了起来',
+    raw: `<details class="status"><summary>状态栏</summary>
+时间：第 3 天 19:40 ｜ 地点：便利店屋檐下 ｜ 天气：暴雨
+好感度：林岚 52 ｜ 苏晴 47
+</details>
+走到路口，雨忽然大了起来。我躲到便利店的屋檐下，还是忍不住拆开了信封。
 明天放学后，旧校舍的音乐教室。有件事，只想告诉你。——林岚
 苏晴不知什么时候凑了过来，看清字的那一瞬间，表情一下子变了。
 “旧校舍……那里不是三年前就封起来了吗？”
@@ -40,9 +46,16 @@ export const TURNS = [
 “因为三年前……那、那间教室里……”她的声音一下子乱了，“有人从窗口……掉下去了……”
 一道闪电劈开夜空，路灯跟着闪了两下。
 苏晴咬了咬嘴唇，什么也没说，撑开伞跑进了雨里。
-（林岚学姐，你到底想告诉我什么？）`,
+（林岚学姐，你到底想告诉我什么？）
+<hr>
+<p class="tail">—— 第三章 · 完 —— 本轮 312 字</p>
+<UpdateVariable>_.set('好感度.苏晴', 47)</UpdateVariable>`,
   },
 ]
+
+/** Tavern 给插件的 text：去掉 script / style 和全部标签（宏这里没有）。 */
+export const tavernText = raw => raw.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '').replace(/<[^>]+>/g, '').trim()
+for (const t of TURNS) if (t.raw) t.text = tavernText(t.raw)
 
 // 演示「前台先文本」：截图时临时追加这一轮，导演故意慢一点。
 export const LATE_TURN = {
@@ -119,6 +132,7 @@ export function directorReply(turn, units) {
       L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: ['苏晴'] }),
       L('到底想告诉我什么', { sp: '我', sym: 'gloom' }),
     ],
+    skip: [find(units, '状态栏'), find(units, '19:40'), find(units, '林岚 52'), find(units, '第三章 · 完')],
     choices: ['答应赴约，一个人去旧校舍', '拉上苏晴一起去', '先打电话问林岚本人'],
     images: [],
     people: [{ name: '林岚', temp: 'none' }],

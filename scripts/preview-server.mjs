@@ -19,6 +19,7 @@ import { createEngine } from '../lib/engine.js'
 import { createRoutes } from '../lib/routes.js'
 import { createMusic } from '../lib/music.js'
 import { segmentTurn } from '../lib/segment.js'
+import { storyText } from '../lib/clean.js'
 import { CARD, TURNS, LATE_TURN, directorReply, CG_DRAFTS } from './preview/story.mjs'
 import { paintPlaceholder } from './preview/paint.mjs'
 import { paintSprite, spriteLayer } from './preview/sprite.mjs'
@@ -49,7 +50,7 @@ const tavern = {
   async update(id, changes) { const item = items.get(id); if (item) Object.assign(item, changes); return item },
   async remove(id) { return items.delete(id) },
   async list({ gameId }) { return [...items.values()].filter(i => i.gameId === gameId) },
-  async getTurn({ gameId, turn }) { const t = turns.get(turn); return t ? { gameId, turn, textVersion: t.textVersion, text: t.text, card: CARD } : null },
+  async getTurn({ gameId, turn }) { const t = turns.get(turn); return t ? { gameId, turn, textVersion: t.textVersion, text: t.text, rawText: t.raw || t.text, card: CARD } : null },
   async getCardContext() { return { description: '林岚：高三学姐，钢琴社社长。苏晴：我的同班同学，元气。', personality: '', scenario: '', lore: [] } },
   async backgroundModel() { return { provider: 'preview', model: 'scripted-director' } },
 }
@@ -123,11 +124,11 @@ const llm = {
         yield { type: 'finish', reason: { kind: 'stop' } }
       })()
     }
-    const turnInfo = isDirector ? [...TURNS, LATE_TURN].find(t => prompt.includes(t.text.split('\n')[0].slice(0, 12))) : null
+    const turnInfo = isDirector ? [...TURNS, LATE_TURN].find(t => prompt.includes(t.sig || t.text.split('\n')[0].slice(0, 12))) : null
     return (async function* () {
       if (!turnInfo) { yield { type: 'text-delta', text: '{}' }; yield { type: 'finish', reason: { kind: 'stop' } }; return }
       const slow = turnInfo.turn === 4
-      const units = segmentTurn(turnInfo.text)
+      const units = segmentTurn(storyText({ text: turnInfo.text, rawText: turnInfo.raw || turnInfo.text, card: CARD }))
       const reply = JSON.stringify(withMusic(turnInfo.turn, units, directorReply(turnInfo.turn, units)), null, 1)
       for (let i = 0; i < THINKING.length; i += 12) { yield { type: 'reasoning-delta', text: THINKING.slice(i, i + 12) }; await sleep(slow ? 90 : 4) }
       const step = 12
@@ -178,7 +179,7 @@ for (const t of demoTracks()) {
 async function settle(t) {
   const textVersion = `v${t.turn}-${Date.now().toString(36)}`
   turns.set(t.turn, { ...t, textVersion })
-  return engine.onTurnSettled({ gameId: GAME, turn: t.turn, textVersion, text: t.text, card: CARD })
+  return engine.onTurnSettled({ gameId: GAME, turn: t.turn, textVersion, text: t.text, rawText: t.raw || t.text, card: CARD })
 }
 for (const t of TURNS) await settle(t)
 

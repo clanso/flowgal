@@ -387,6 +387,8 @@
 .fg-dlog-line { display: grid; grid-template-columns: 4cqw minmax(0, 1fr) minmax(0, 24cqw); gap: 1.2cqw; align-items: start; padding: .7cqw 1cqw; border-bottom: 1px solid rgba(255, 255, 255, .06); font-size: 1cqw; line-height: 1.6; }
 .fg-dlog-line:last-child { border-bottom: 0; }
 .fg-dlog-line.is-plain { opacity: .6; }
+.fg-dlog-line.is-skipped { opacity: .42; }
+.fg-dlog-line.is-skipped .fg-dlog-utext { text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, .35); }
 .fg-dlog-uid { padding-top: .15cqw; font-family: var(--font-latin); font-size: .85cqw; letter-spacing: .1em; color: var(--accent); }
 .fg-dlog-card { margin-bottom: .6cqw; padding: .8cqw 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); font-size: 1cqw; line-height: 1.6; }
 .fg-dlog-mono { margin-top: .4cqw; font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; word-break: break-word; }

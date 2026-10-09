@@ -78,6 +78,8 @@ function LogRow({ e, on, onClick }) {
   )
 }
 
+const TYPE_LABEL = { dialogue: '台词', narration: '旁白', thought: '心声' }
+
 function Chip({ k, children }) {
   return <span className="fg-dlog-chip">{k && <i>{k}</i>}{children}</span>
 }
@@ -87,6 +89,7 @@ function ScriptView({ script, units }) {
   if (!script) return <div className="fg-note">这次没有得到可用的脚本，看「原始输出」里模型回了什么。</div>
   const s = script.scene
   const tagged = units.filter(u => script.lines[u.id] && Object.keys(script.lines[u.id]).length).length
+  const skipped = new Set(script.skip || [])
   return (
     <>
       <Block label="场景">
@@ -105,11 +108,19 @@ function ScriptView({ script, units }) {
           {!script.cast.length && <span className="fg-note">没有人物上场</span>}
         </div>
       </Block>
-      <Block label={`逐句标注 · ${tagged} / ${units.length} 句`}>
+      <Block label={`逐句标注 · ${tagged} / ${units.length - skipped.size} 句${skipped.size ? ` · 不演 ${skipped.size} 句` : ''}`}>
         <div className="fg-dlog-lines">
           {units.map(u => {
             const l = script.lines[u.id] || {}
+            if (skipped.has(u.id)) return (
+              <div key={u.id} className="fg-dlog-line is-skipped">
+                <span className="fg-dlog-uid">{u.id}</span>
+                <div className="fg-dlog-utext">{u.text}</div>
+                <div className="fg-dlog-chips"><span className="fg-note">不是故事 · 不演</span></div>
+              </div>
+            )
             const marks = [
+              l.type && <Chip key="type" k="改判">{TYPE_LABEL[l.type] || l.type}</Chip>,
               l.sp && <Chip key="sp" k="说话">{l.sp}{l.as ? `（显示为 ${l.as}）` : ''}</Chip>,
               l.emo && <Chip key="emo" k="情绪">{emotionLabel(l.emo)}</Chip>,
               l.sym && <Chip key="sym" k="符号">{SYMBOL_LABEL[l.sym] || l.sym}</Chip>,
@@ -121,7 +132,7 @@ function ScriptView({ script, units }) {
             return (
               <div key={u.id} className={`fg-dlog-line${marks.length ? '' : ' is-plain'}`}>
                 <span className="fg-dlog-uid">{u.id}</span>
-                <div className="fg-dlog-utext">{u.type === 'dialogue' ? `「${u.text}」` : u.type === 'thought' ? `（${u.text}）` : u.text}</div>
+                <div className="fg-dlog-utext">{(l.type || u.type) === 'dialogue' ? `「${u.text}」` : (l.type || u.type) === 'thought' ? `（${u.text}）` : u.text}</div>
                 <div className="fg-dlog-chips">{marks.length ? marks : <span className="fg-note">旁白 · 无演出</span>}</div>
               </div>
             )
