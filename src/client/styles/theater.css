@@ -433,6 +433,13 @@
 .fg-person-form { margin: .8cqw 0; padding: 1cqw 1.2cqw; border-radius: .9cqw; background: rgba(0, 0, 0, .22); border: 1px solid var(--box-border); }
 .fg-person-form .fg-field { grid-template-columns: 9cqw 1fr; }
 .fg-textarea.is-short { min-height: 4cqw; }
+/* 固定外貌按字段：两列格子，「其他」占一整行；人物卡片上每个字段一个小标签 */
+.fg-look-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6cqw .9cqw; }
+.fg-look-field { display: flex; flex-direction: column; gap: .25cqw; }
+.fg-look-field > span { font-size: .85cqw; color: var(--ink-dim); letter-spacing: .08em; }
+.fg-look-field.is-wide { grid-column: 1 / -1; }
+.fg-look-chip { display: inline-flex; gap: .35em; margin: 0 .35cqw .35cqw 0; padding: .1cqw .55cqw; border-radius: 99px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .1); }
+.fg-look-chip i { font-style: normal; opacity: .55; }
 .fg-cg-chars { display: grid; gap: .9cqw; margin: .9cqw 0 .9cqw 15.2cqw; }
 .fg-cg-char { display: grid; gap: .6cqw; padding: 1cqw; border-radius: .9cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .18); }
 .fg-sent { user-select: text; margin-top: .4cqw; display: grid; gap: .3cqw; word-break: break-word; }
@@ -551,6 +558,7 @@
   .fg-person-art { height: 50cqw; }
   .fg-person h3 { font-size: 5cqw; flex-wrap: wrap; } .fg-person h3 small { font-size: 2.6cqw; }
   .fg-person-tags, .fg-note { font-size: 2.8cqw; }
+  .fg-look-grid { grid-template-columns: 1fr; } .fg-look-field > span { font-size: 2.6cqw; }
   .fg-btn, .fg-look, .fg-state { font-size: 3cqw; padding: 1cqw 2.4cqw; }
   .fg-emo { width: 15cqw; height: 18cqw; font-size: 2.4cqw; }
   .fg-field, .fg-person-form .fg-field { grid-template-columns: 1fr; font-size: 3cqw; }

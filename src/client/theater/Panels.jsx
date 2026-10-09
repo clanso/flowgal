@@ -4,7 +4,7 @@ import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, set
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry } from '../../../lib/emotions.js'
-import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn } from '../../../lib/look.js'
+import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn, LOOK_FIELDS, LOOK_FIELD_LABELS, lookTags } from '../../../lib/look.js'
 import { Silhouette } from './Stage.jsx'
 import { SKINS } from './skins.js'
 import { previewTrack, stopPreview, previewVoice, previewSound } from './audio.js'
@@ -340,17 +340,36 @@ const VOICE_GROUPS = [['female', '女声'], ['male', '男声'], ['', '不分男�
 const PITCHES = Array.from({ length: VOICE_PITCH_LIMIT * 2 + 1 }, (_, i) => i - VOICE_PITCH_LIMIT).map(n => [String(n), n > 0 ? `音高 +${n}` : n < 0 ? `音高 ${n}` : '音高 原调'])
 const voiceText = voice => (voice ? voiceById(voice.id).label : '不出声')
 
-/** 档案：固定外貌、性别、种子、声音、给立绘设计师的备注和负面词。全局角色改的是全局库。cast 是这一局的全部人物（自动分声音时避开别人）。 */
+// 固定外貌各字段的提示（照柏宝绘的写法）。
+const LOOK_HINTS = {
+  fandom: '同人角色填 character name (copyright)；原创留空',
+  sex: '1girl / 1boy',
+  hair: 'long black hair, ponytail',
+  eyes: 'blue eyes',
+  skin: 'pale skin（普通的不填）',
+  body: 'slender, petite',
+  extra: 'glasses, mole under eye（可不填）',
+  other: '分不进上面各格的 tag。旧档案的一整串在这里，照常出图；想整理就挪进上面各格，tag 没变的话已经画好的立绘不用重画',
+}
+
+/** 档案：固定外貌（按字段）、性别、种子、声音、给立绘设计师的备注和负面词。全局角色改的是全局库。cast 是这一局的全部人物（自动分声音时避开别人）。 */
 function ProfileEditor({ gameId, person, cast }) {
-  const pick = p => ({ appearance: p.appearance || '', gender: p.gender || '', note: p.note || '', negative: p.negative || '', seed: p.seedCustom ? String(p.seed) : '', voice: p.voice || '', voicePitch: String(p.voicePitch || 0) })
+  const pick = p => ({
+    look: Object.fromEntries(LOOK_FIELDS.map(f => [f, (p.appearanceFields || {})[f] || ''])),
+    gender: p.gender || '', note: p.note || '', negative: p.negative || '', seed: p.seedCustom ? String(p.seed) : '', voice: p.voice || '', voicePitch: String(p.voicePitch || 0),
+  })
   const [form, setForm] = React.useState(() => pick(person))
   const [busy, run] = useBusy()
   const cfg = useConfig()
   const ui = cfg ? cfg.config.ui : null
-  React.useEffect(() => { setForm(pick(person)) }, [person.appearance, person.gender, person.note, person.negative, person.seed, person.seedCustom, person.voice, person.voicePitch])
+  React.useEffect(() => { setForm(pick(person)) }, [person.appearance, JSON.stringify(person.appearanceFields || {}), person.gender, person.note, person.negative, person.seed, person.seedCustom, person.voice, person.voicePitch])
   const dirty = JSON.stringify(form) !== JSON.stringify(pick(person))
   const set = k => e => setForm({ ...form, [k]: e.target.value })
-  const save = () => run('save', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { ...form, seed: form.seed === '' ? null : Number(form.seed), voicePitch: Number(form.voicePitch) } }), '档案已保存')
+  const setLook = f => e => setForm({ ...form, look: { ...form.look, [f]: e.target.value } })
+  const save = () => {
+    const { look, ...rest } = form
+    return run('save', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { ...rest, appearanceFields: look, seed: form.seed === '' ? null : Number(form.seed), voicePitch: Number(form.voicePitch) } }), '档案已保存')
+  }
   // 按表单里还没保存的选择试听；「自动」显示实际会分到哪个音色（跟着表单里的性别变）。
   const others = (cast || []).filter(p => p.name !== person.name)
   const draft = { ...person, gender: form.gender, voice: form.voice, voicePitch: Number(form.voicePitch) }
@@ -358,7 +377,21 @@ function ProfileEditor({ gameId, person, cast }) {
   const autoVoice = castVoices([...others, { ...draft, voice: '' }], ui).get(person.name)
   return (
     <div className="fg-person-form">
-      <div className="fg-field"><label>固定外貌</label><textarea className="fg-textarea" value={form.appearance} onChange={set('appearance')} onKeyDown={e => e.stopPropagation()} placeholder="1girl, long black hair, blue eyes（脸、发、瞳、体型，不含衣服）" /></div>
+      <div className="fg-field"><label>固定外貌</label>
+        <div>
+          <div className="fg-look-grid">
+            {LOOK_FIELDS.map(f => (
+              <label key={f} className={`fg-look-field${f === 'other' ? ' is-wide' : ''}`}>
+                <span>{LOOK_FIELD_LABELS[f]}</span>
+                {f === 'other'
+                  ? <textarea className="fg-textarea is-short" value={form.look[f]} onChange={setLook(f)} onKeyDown={e => e.stopPropagation()} placeholder={LOOK_HINTS[f]} />
+                  : <input className="fg-input" value={form.look[f]} onChange={setLook(f)} onKeyDown={e => e.stopPropagation()} placeholder={LOOK_HINTS[f]} />}
+              </label>
+            ))}
+          </div>
+          <div className="fg-note" style={{ marginTop: '.5cqw' }}>出图时用：{lookTags(form.look, person.appearance) || '（空）'}{person.appearance && lookTags(form.look, person.appearance) === person.appearance ? '（tag 没变，已画好的立绘照用）' : ''}　衣服不写在这里，走「衣橱与状态」。</div>
+        </div>
+      </div>
       <div className="fg-field"><label>性别 / 种子</label>
         <div className="fg-row">
           <select className="fg-select" style={{ width: 'auto' }} value={form.gender} onChange={set('gender')}>{GENDERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
@@ -506,7 +539,12 @@ function PersonCard({ gameId, person, emotions, cast, voice }) {
           <small title="此刻的样子">{lookLabel(now)}</small>
           {person.temp && <small title="临时状态，只进插画">临时：{person.temp}</small>}
         </h3>
-        <div className="fg-person-tags">{person.appearance || '（还没有固定外貌）'}{person.outfitTags ? ` ／ ${person.outfitTags}` : ''}</div>
+        <div className="fg-person-tags">
+          {person.appearance ? LOOK_FIELDS.filter(f => (person.appearanceFields || {})[f]).map(f => (
+            <span key={f} className="fg-look-chip" title={LOOK_FIELD_LABELS[f]}>{f === 'other' ? null : <i>{LOOK_FIELD_LABELS[f]}</i>}{person.appearanceFields[f]}</span>
+          )) : '（还没有固定外貌）'}
+          {person.outfitTags ? <span className="fg-look-chip" title="这身衣服"><i>{person.outfit || '衣服'}</i>{person.outfitTags}</span> : null}
+        </div>
         <div className="fg-row fg-person-folds">
           <button type="button" className={`fg-btn${fold === 'profile' ? ' is-on' : ''}`} onClick={() => setFold(fold === 'profile' ? '' : 'profile')}>档案 · 种子 {person.seed} · 声音 {voiceText(voice)}{voice && voice.auto ? '（自动）' : ''}</button>
           <button type="button" className={`fg-btn${fold === 'wardrobe' ? ' is-on' : ''}`} onClick={() => setFold(fold === 'wardrobe' ? '' : 'wardrobe')}>衣橱与状态 · {Object.keys((person.timeline && person.timeline.outfits) || {}).length} 套</button>

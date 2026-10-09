@@ -4,7 +4,11 @@
 import React from 'react'
 import { api, toast, useDirectorLog } from '../api.js'
 import { Panel } from './Panels.jsx'
+import { formatLook } from '../../../lib/look.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL } from './playback.js'
+
+/** 导演写的外貌：新版是字段，老日志里是一整串。 */
+const lookText = v => (typeof v === 'string' ? v : v ? formatLook(v) : '')
 
 const STATUS = { running: ['进行中', 'is-running'], ok: ['完成', 'is-ok'], failed: ['失败', 'is-failed'], cancelled: ['已停止', 'is-cancelled'] }
 const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词', cg: '写插画提示词' }
@@ -169,8 +173,8 @@ function ScriptView({ script, units }) {
         {script.people.map((p, i) => (
           <div key={i} className="fg-dlog-card">
             <b>{p.name}</b>{p.gender ? <span className="fg-note"> · {p.gender}</span> : null}
-            {p.appearance && <div className="fg-dlog-mono">建档：{p.appearance}</div>}
-            {p.change && <div className="fg-dlog-mono">永久变化：{p.change}</div>}
+            {lookText(p.appearance) && <div className="fg-dlog-mono">建档：{lookText(p.appearance)}</div>}
+            {lookText(p.change) && <div className="fg-dlog-mono">永久变化：{lookText(p.change)}</div>}
             {p.outfit && <div className="fg-dlog-mono">换装：{p.outfit}{p.outfitTags ? `（${p.outfitTags}）` : ''}</div>}
             {p.states && <div className="fg-dlog-mono">长期状态：{p.states.length ? p.states.map(s => `${s.name}${s.tags ? `（${s.tags}）` : ''}`).join('、') : '全部结束'}</div>}
             {p.temp && <div className="fg-dlog-mono">临时状态：{p.temp}</div>}

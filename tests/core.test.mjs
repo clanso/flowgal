@@ -2,9 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { deflateRawSync } from 'node:zlib'
 import { segmentTurn, unitsForPrompt, anchorFor } from '../lib/segment.js'
-import { extractJson, normalizeScript, direct, retryMaxTokens } from '../lib/director.js'
+import { extractJson, normalizeScript, direct, retryMaxTokens, castBrief } from '../lib/director.js'
 import { applyPeople, effectivePerson, expandMentions, rollback, allNames, editPerson, editLook } from '../lib/cast.js'
-import { variantKey, lookAt, pickSprite, nameSeed } from '../lib/look.js'
+import { variantKey, lookAt, pickSprite, nameSeed, cleanLookFields, joinLook, lookTags, formatLook } from '../lib/look.js'
 import { emotionId } from '../lib/emotions.js'
 import { fillWorkflow, locateNodes, simpleWorkflow, comfyModels } from '../lib/image/comfyui.js'
 import { webuiModels, generateWebUI } from '../lib/image/webui.js'
@@ -149,6 +149,59 @@ test('gate: 外貌档案按剧情位置生效，可回滚，全局冻结', () =>
   assert.equal(effectivePerson(game, global, '林岚', 0).appearance, '1girl, silver hair')
 })
 
+test('gate: 固定外貌按字段：导演按字段建档、按顺序拼成一串出图；旧整串放进「其他」原样不动；只挪格子时立绘编号不变；回滚连字段一起还原', () => {
+  const game = { cast: {}, castLog: [] }
+  // 导演按字段写；none 和空字段不要；出图的一串按 同人身份 → 性别 → 头发 → 眼睛 → 肤色 → 体型 → 标志特征 → 其他 拼。
+  const fields = cleanLookFields({ body: 'slender', hair: 'long twintails, aqua hair', sex: '1girl', fandom: 'hatsune miku (vocaloid)', eyes: 'aqua eyes', skin: 'none', extra: ' ', nope: 'x' })
+  assert.deepEqual(fields, { fandom: 'hatsune miku (vocaloid)', sex: '1girl', hair: 'long twintails, aqua hair', eyes: 'aqua eyes', body: 'slender' })
+  applyPeople(game, null, [{ name: '初音', gender: 'female', appearance: fields }], 1)
+  const miku = effectivePerson(game, null, '初音', 1)
+  assert.equal(miku.appearance, 'hatsune miku (vocaloid), 1girl, long twintails, aqua hair, aqua eyes, slender')
+  assert.deepEqual(miku.appearanceFields, fields)
+  assert.match(castBrief([miku]), /固定外貌：同人身份 hatsune miku \(vocaloid\)；性别人数 1girl；头发 long twintails, aqua hair；眼睛 aqua eyes；体型 slender/)
+
+  // 导演还按老写法给一整串：整串原样放进「其他」，一个字不改（立绘编号是按这串算的）。
+  applyPeople(game, null, [{ name: '林岚', appearance: '1girl,  long black hair，blue eyes' }], 1)
+  const old = effectivePerson(game, null, '林岚', 1)
+  assert.equal(old.appearance, '1girl,  long black hair，blue eyes')
+  assert.deepEqual(old.appearanceFields, { other: '1girl,  long black hair，blue eyes' })
+  assert.equal(castBrief([old]), '- 林岚：固定外貌：1girl,  long black hair，blue eyes', '只有整串时给导演看的就是那一串')
+  const key = variantKey(old, 'smile')
+
+  // 玩家把整串挪进各格：tag 没变，出图的那串和立绘编号都不变；字段记下了。
+  editPerson(game, '林岚', { appearanceFields: { sex: '1girl', hair: 'long black hair', eyes: 'blue eyes', other: '' } })
+  const sorted = effectivePerson(game, null, '林岚', 1)
+  assert.equal(sorted.appearance, '1girl,  long black hair，blue eyes')
+  assert.equal(variantKey(sorted, 'smile'), key)
+  assert.deepEqual(sorted.appearanceFields, { sex: '1girl', hair: 'long black hair', eyes: 'blue eyes' })
+  // 真加了 tag：出图的那串换成按字段拼的，编号跟着变（要画新差分）。
+  editPerson(game, '林岚', { appearanceFields: { ...sorted.appearanceFields, extra: 'glasses' } })
+  const glasses = effectivePerson(game, null, '林岚', 1)
+  assert.equal(glasses.appearance, '1girl, long black hair, blue eyes, glasses')
+  assert.notEqual(variantKey(glasses, 'smile'), key)
+  // 回滚这一步：字段和那一串一起回到挪完格子的样子。
+  rollback(game, game.castLog.length - 1)
+  assert.deepEqual(effectivePerson(game, null, '林岚', 1).appearanceFields, { sex: '1girl', hair: 'long black hair', eyes: 'blue eyes' })
+  assert.equal(effectivePerson(game, null, '林岚', 1).appearance, '1girl,  long black hair，blue eyes')
+
+  // 导演写外貌变化：变化后的完整字段，从那一轮起生效；之前的轮次还是旧外貌。
+  applyPeople(game, null, [{ name: '林岚', change: { sex: '1girl', hair: 'short black hair', eyes: 'blue eyes' } }], 5)
+  assert.equal(effectivePerson(game, null, '林岚', 4).appearance, '1girl,  long black hair，blue eyes')
+  assert.equal(effectivePerson(game, null, '林岚', 6).appearance, '1girl, short black hair, blue eyes')
+  assert.equal(effectivePerson(game, null, '林岚', 6).appearanceFields.hair, 'short black hair')
+  // 拿 tag 一样、只是顺序不同的字段重写一遍，不算变化，不记日志。
+  const logs = game.castLog.length
+  applyPeople(game, null, [{ name: '林岚', change: { other: 'blue eyes, short black hair, 1girl' } }], 7)
+  assert.equal(game.castLog.length, logs)
+
+  // 工具函数：沿用原串只在 tag 一样时；给人看的写法。
+  assert.equal(lookTags({ other: 'b, a' }, 'a, b'), 'a, b')
+  assert.equal(lookTags({ other: 'b, a, c' }, 'a, b'), 'b, a, c')
+  assert.equal(joinLook({ other: 'x', sex: '1boy' }), '1boy, x')
+  assert.equal(formatLook({ other: 'x' }), 'x')
+  assert.equal(formatLook({ hair: 'red hair', other: 'x' }), '头发 red hair；其他 x')
+})
+
 test('gate: 换装和长期状态按剧情位置生效，差分编号跟着变，可回滚；全局角色也能按剧情换装', () => {
   const game = { cast: {}, castLog: [] }
   const global = { cast: { 主角: { name: '主角', tags: '1boy, short black hair', outfits: { 便服: { tags: 'hoodie' } }, outfit: '便服' } } }
@@ -166,7 +219,7 @@ test('gate: 换装和长期状态按剧情位置生效，差分编号跟着变�
   editPerson(game, '林岚', { seed: 7 })
   assert.equal(at(6).seed, 7)
   // 前端按时间线算出同样的样子。
-  assert.deepEqual(lookAt(at(Infinity).timeline, 6), { appearance: '1girl, long black hair', outfit: '睡衣', outfitTags: 'pajamas', states: [{ name: '怀孕', tags: 'pregnant' }] })
+  assert.deepEqual(lookAt(at(Infinity).timeline, 6), { appearance: '1girl, long black hair', appearanceFields: { other: '1girl, long black hair' }, outfit: '睡衣', outfitTags: 'pajamas', states: [{ name: '怀孕', tags: 'pregnant' }] })
   // @名字 展开带上衣服和长期状态。
   const { text } = expandMentions('@林岚, sitting', n => effectivePerson(game, global, n, 6), allNames(game, global))
   assert.equal(text, '1girl, long black hair, pajamas, pregnant, sitting')

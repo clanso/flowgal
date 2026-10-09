@@ -432,3 +432,26 @@ test('gate: 当时没填 Key 错过的插画、背景、立绘差分可以一键
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
   }
 })
+
+test('gate: 全局角色的外貌也按字段改；只挪格子不改 tag，复制回本局后出图那串和立绘编号不变', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
+  try {
+    const engine = createEngine({ store: createStore(dir), services: {}, logger: { warn() {}, info() {} } })
+    await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair, blue eyes' } })
+    const before = (await engine.gameView('g')).cast.find(p => p.name === '林岚')
+    const key = variantKey(before, 'smile')
+    await engine.castAction('g', 'promote', { name: '林岚' })
+    await engine.castAction('g', 'global-save', { name: '林岚', patch: { appearanceFields: { sex: '1girl', eyes: 'blue eyes', hair: 'long black hair' } } })
+    let lin = (await engine.gameView('g')).cast.find(p => p.name === '林岚')
+    assert.equal(lin.global, true)
+    assert.equal(lin.appearance, '1girl, long black hair, blue eyes', '只挪了格子：沿用原来那串')
+    assert.deepEqual(lin.appearanceFields, { sex: '1girl', hair: 'long black hair', eyes: 'blue eyes' })
+    await engine.castAction('g', 'copy-local', { name: '林岚' })
+    lin = (await engine.gameView('g')).cast.find(p => p.name === '林岚')
+    assert.deepEqual([lin.global, lin.appearance, variantKey(lin, 'smile')], [false, '1girl, long black hair, blue eyes', key])
+    assert.deepEqual(lin.appearanceFields, { sex: '1girl', hair: 'long black hair', eyes: 'blue eyes' })
+    engine.dispose()
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
+})
