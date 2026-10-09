@@ -31,7 +31,7 @@
 ```sh
 cd ~
 git clone https://github.com/clanso/flowgal.git
-dsh plugin --profile tavern add ~/flowgal
+dsh plugin --profile tavern add "$HOME/flowgal"
 ```
 
 然后**完全退出 DSH 再打开**（只刷新网页不够，插件的后台部分要重启才加载），刷新 Tavern 页面。
