@@ -1,6 +1,8 @@
 // 把宿主给的视图（每轮的单元 + 导演脚本 + 插画）摊平成一拍一拍的「演出节拍」。
 // 导演还没整理完的轮次也能演：用切分时猜出的说话人，沿用上一轮的地点和站位（前台先文本）。
+// 立绘按导演标的登场 / 退场逐句增减；插画从 after 那一句显示到 until 那一句（没写就到这一轮结束）。
 import { placeKey } from '../../../lib/vocab.js'
+import { stageSteps } from '../../../lib/staging.js'
 
 export { placeKey }
 export { emotionLabel } from '../../../lib/emotions.js'
@@ -26,7 +28,7 @@ export function buildBeats(view) {
   const beats = []
   if (!view) return { beats, byKey: new Map() }
   let scene = EMPTY_SCENE
-  let cast = []
+  let cast = [] // 上一轮结束时在场的人：导演还没整理的轮次沿用
   const emotions = {}
   const turns = view.turns || []
   const images = view.images || []
@@ -35,13 +37,19 @@ export function buildBeats(view) {
     const script = t.script
     if (script && script.scene && script.scene.bgm) bgm = script.scene.bgm
     const prevKey = placeKey(scene)
-    if (script) { scene = { ...EMPTY_SCENE, ...script.scene }; cast = script.cast || [] }
+    if (script) scene = { ...EMPTY_SCENE, ...script.scene }
     const changed = beats.length === 0 || placeKey(scene) !== prevKey
     const units = t.units || []
+    const steps = stageSteps(script, units, cast)
+    if (steps.length) cast = steps[steps.length - 1].cast
     const unitIndex = new Map(units.map((u, i) => [u.id, i]))
     const turnImages = images
       .filter(img => img.turn === t.turn && img.textVersion === t.textVersion)
-      .map(img => ({ img, at: unitIndex.has(img.after) ? unitIndex.get(img.after) : units.length - 1 }))
+      .map(img => {
+        const at = unitIndex.has(img.after) ? unitIndex.get(img.after) : units.length - 1
+        const end = unitIndex.has(img.until) ? Math.max(at, unitIndex.get(img.until)) : units.length - 1
+        return { img, at, end }
+      })
       .sort((a, b) => a.at - b.at)
     let lastSpeaker = ''
     units.forEach((unit, ui) => {
@@ -53,7 +61,8 @@ export function buildBeats(view) {
       else if (unit.type === 'thought') speaker = line.sp || '我'
       else if (line.sp) speaker = line.sp
       if (speaker && line.emo) emotions[speaker] = line.emo
-      const cgEntry = [...turnImages].reverse().find(e => e.at <= ui)
+      // 同时有几张在显示时，后出现的盖住先出现的。
+      const cgEntry = [...turnImages].reverse().find(e => e.at <= ui && ui <= e.end)
       const cg = cgEntry ? cgEntry.img : null
       beats.push({
         key: `${t.turn}:${unit.id}`,
@@ -72,10 +81,13 @@ export function buildBeats(view) {
         bgm,
         sceneEnter: ui === 0 && changed,
         transition: ui === 0 && changed ? scene.transition || 'dissolve' : 'none',
-        cast,
+        cast: steps[ui].cast,
+        entered: steps[ui].entered,
+        left: steps[ui].left,
         emotions: { ...emotions },
         cg,
         cgAnchor: Boolean(cgEntry && cgEntry.at === ui),
+        directed: Boolean(script),
         status: t.status,
         error: t.error,
         lastOfTurn: ui === units.length - 1,

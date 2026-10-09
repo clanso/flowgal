@@ -188,8 +188,11 @@ function spriteFor(person, turn, emo, emotions) {
   return pickSprite(person.sprites, lookAt(person.timeline, turn), emo, custom ? custom.base : '')
 }
 
-function Actor({ entry, person, beat, emo, emotions }) {
-  const speaking = beat.speaker === entry.name
+/** 登场从靠近的那一侧滑进来，退场往同一侧淡出。 */
+const SIDE = { farleft: '-40%', left: '-28%', center: '0%', right: '28%', farright: '40%' }
+
+function Actor({ entry, person, beat, emo, emotions, leaving = false }) {
+  const speaking = !leaving && beat.speaker === entry.name
   const sprite = spriteFor(person, beat.turn, emo, emotions)
   const src = sprite ? assetUrl(sprite) : ''
   const color = (person && person.color) || '#9b7bff'
@@ -207,7 +210,7 @@ function Actor({ entry, person, beat, emo, emotions }) {
   }, [src])
   const uploaded = Boolean(person && Object.values(person.sprites || {}).some(r => r && r.assetId === sprite && r.uploaded))
   return (
-    <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}`} style={{ '--x': actorX(entry.pos) + '%' }} data-name={entry.name}>
+    <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}`} style={{ '--x': actorX(entry.pos) + '%', '--side': SIDE[entry.pos] || '0%' }} data-name={entry.name}>
       <div className="fg-actor-body">
         {shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />}
       </div>
@@ -218,17 +221,44 @@ function Actor({ entry, person, beat, emo, emotions }) {
   )
 }
 
+const LEAVE_MS = 450
+
+/** 刚离开舞台的人：再留 LEAVE_MS 毫秒演完退场动画。渲染时就算好，避免先消失一帧再淡出。 */
+function useLeaving(cast) {
+  const prev = React.useRef([])
+  const leaving = React.useRef(new Map())
+  const [, refresh] = React.useReducer(n => n + 1, 0)
+  const now = Date.now()
+  for (const p of prev.current) if (!cast.some(c => c.name === p.name) && !leaving.current.has(p.name)) leaving.current.set(p.name, { entry: p, at: now })
+  for (const c of cast) leaving.current.delete(c.name)
+  prev.current = cast
+  const pending = leaving.current.size
+  React.useEffect(() => {
+    if (!pending) return undefined
+    const t = setTimeout(() => {
+      const cut = Date.now() - LEAVE_MS
+      for (const [name, l] of leaving.current) if (l.at <= cut) leaving.current.delete(name)
+      refresh()
+    }, LEAVE_MS)
+    return () => clearTimeout(t)
+  })
+  return [...leaving.current.values()].map(l => l.entry)
+}
+
 export function Cast({ beat, view }) {
   const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
   let cast = beat.cast || []
-  // 导演还没整理、也没有上一幕站位时：说话的已知人物临时站到中间。
-  if (!cast.length && beat.speaker && beat.speaker !== '我' && people.has(beat.speaker)) cast = [{ name: beat.speaker, pos: 'center' }]
-  const hideForCg = Boolean(beat.cg && cgSrc(beat.cg, assetUrl))
-  if (hideForCg) return null
+  // 导演还没整理、也没有上一幕站位时：说话的已知人物临时站到中间。整理过的轮次台上没人就是没人（便条、画外音）。
+  if (!beat.directed && !cast.length && beat.speaker && beat.speaker !== '我' && people.has(beat.speaker)) cast = [{ name: beat.speaker, pos: 'center' }]
+  const leaving = useLeaving(cast)
+  // 插画全屏盖住舞台：立绘照常在下面，插画收起时直接露出来。
   return (
     <div className="fg-cast">
       {cast.map(entry => (
         <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} />
+      ))}
+      {leaving.map(entry => (
+        <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} leaving />
       ))}
     </div>
   )
@@ -264,24 +294,36 @@ function usePanRatio(ref, src, version) {
   return state.src === src ? state.ratio : 0
 }
 
+const CG_LEAVE_MS = 800
+
 export function CgLayer({ beat }) {
   const img = beat.cg
   const src = cgSrc(img, assetUrl)
+  // 插画收起时淡出：同一个元素留着演完，不是直接消失。渲染时就记好上一张，免得先空一帧。
+  const last = React.useRef(null)
+  const [, refresh] = React.useReducer(n => n + 1, 0)
+  if (src) last.current = { img, src }
+  const shown = src ? { img, src } : last.current
+  React.useEffect(() => {
+    if (src || !last.current) return undefined
+    const t = setTimeout(() => { last.current = null; refresh() }, CG_LEAVE_MS)
+    return () => clearTimeout(t)
+  }, [src])
   const box = React.useRef(null)
-  const ratio = usePanRatio(box, src, img && img.versions && img.versions[img.current])
-  if (!img) return null
-  if (!src) {
-    if (img.status === 'failed' || img.status === 'cancelled') return null
+  const ratio = usePanRatio(box, shown ? shown.src : '', shown && shown.img.versions && shown.img.versions[shown.img.current])
+  if (!shown) {
+    if (!img || img.status === 'failed' || img.status === 'cancelled') return null
     return <div className="fg-cg-wait"><i />{img.status === 'writing' ? '插画分镜中' : '插画绘制中'}{img.title ? `「${img.title}」` : ''}</div>
   }
   // 竖版：停在顶上 → 慢慢摇到底 → 拉远露出全貌 → 倒着放回去；越长摇得越久。横版照旧缓慢推拉。
   const pan = ratio ? { '--r': ratio.toFixed(4), '--pan': `${Math.round(16 + (1 - ratio) * 16)}s` } : null
+  const title = shown.img.title
   return (
-    <div className={`fg-cg${ratio ? ' is-tall' : ''}`} key={img.id + ':' + img.current} ref={box} style={pan}>
+    <div className={`fg-cg${ratio ? ' is-tall' : ''}${src ? '' : ' is-leaving'}`} key={shown.img.id + ':' + shown.img.current} ref={box} style={pan}>
       {ratio
-        ? <><div className="fg-cg-back" style={{ backgroundImage: `url("${src}")` }} /><img className="fg-cg-pan" src={src} alt="" draggable={false} /></>
-        : <div className="fg-cg-img" style={{ backgroundImage: `url("${src}")` }} />}
-      {img.title && <div className="fg-cg-caption"><i /><span>CG</span><b>{img.title}</b></div>}
+        ? <><div className="fg-cg-back" style={{ backgroundImage: `url("${shown.src}")` }} /><img className="fg-cg-pan" src={shown.src} alt="" draggable={false} /></>
+        : <div className="fg-cg-img" style={{ backgroundImage: `url("${shown.src}")` }} />}
+      {title && <div className="fg-cg-caption"><i /><span>CG</span><b>{title}</b></div>}
     </div>
   )
 }

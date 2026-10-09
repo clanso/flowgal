@@ -1,6 +1,7 @@
 // 预览用的一小段原创剧情（三轮 + 一轮演示「先文本后整理」），以及每轮对应的导演输出和插画分镜。
 // 第 2 轮导演自创一个复合情绪「害羞地强装镇定」，第 4 轮林岚换上冬季制服，用来演示立绘差分。
-// 第 1 轮的插画是竖版，用来演示剧场里竖图的摇镜。
+// 第 1 轮的插画是竖版，用来演示剧场里竖图的摇镜；第 2 轮的插画显示三句就收起。
+// 登场 / 退场：第 2、3 轮苏晴中途跑进来，第 3 轮又冒雨跑走；第 4 轮林岚在说话那一句才出现。
 export const CARD = { id: 'preview-card', name: '放学后的约定' }
 
 export const TURNS = [
@@ -33,6 +34,7 @@ export const TURNS = [
 苏晴不知什么时候凑了过来，看清字的那一瞬间，表情一下子变了。
 “旧校舍……那里不是三年前就封起来了吗？”
 一道闪电劈开夜空，路灯跟着闪了两下。
+苏晴咬了咬嘴唇，什么也没说，撑开伞跑进了雨里。
 （林岚学姐，你到底想告诉我什么？）`,
   },
 ]
@@ -81,7 +83,7 @@ export function directorReply(turn, units) {
       L('你们俩在这儿啊', { sp: '苏晴', emo: 'happy', sym: 'surprise', cam: 'shake' }),
       L('好巧啊', { sp: '苏晴', emo: 'teasing', sym: 'note' }),
       L('这句话本身就很可疑', { sp: '我', sym: 'sweat' }),
-      L('苏晴从小路另一头', { sp: '苏晴', emo: 'tired', sym: 'sweat' }),
+      L('苏晴从小路另一头', { sp: '苏晴', emo: 'tired', sym: 'sweat', enter: [{ name: '苏晴', pos: 'right' }] }),
       L('不过我可不是跟踪', { sp: '苏晴', emo: 'smug' }),
       L('悄悄把一个小信封', { sp: '林岚', emo: '害羞地强装镇定' }),
       L('回家以后再看', { sp: '林岚', emo: 'blush', sym: 'blush' }),
@@ -89,7 +91,7 @@ export function directorReply(turn, units) {
     ],
     choices: [],
     emotions: [{ name: '害羞地强装镇定', desc: '脸颊泛红却板着脸，目光移开，嘴唇抿紧，手指捏着衣角', base: 'shy' }],
-    images: [{ after: find(units, '悄悄把一个小信封'), title: '萤火与信封', moment: '萤火虫飞舞的竹林小径，林岚别过脸把信封递过来，苏晴还扶着膝盖喘气，惊讶地看着', who: ['林岚', '苏晴'] }],
+    images: [{ after: find(units, '悄悄把一个小信封'), until: find(units, '她小声说'), title: '萤火与信封', moment: '萤火虫飞舞的竹林小径，林岚别过脸把信封递过来，苏晴还扶着膝盖喘气，惊讶地看着', who: ['林岚', '苏晴'] }],
     people: [
       { name: '林岚', temp: 'holding small envelope' },
       { name: '苏晴', gender: 'female', appearance: '1girl, short brown hair, side ponytail, amber eyes', outfit: '开衫校服', outfitTags: 'school uniform, beige cardigan, white shirt, red ribbon' },
@@ -101,9 +103,10 @@ export function directorReply(turn, units) {
     cast: [{ name: '苏晴', pos: 'right' }],
     lines: [
       L('明天放学后', { sp: '林岚', card: 'note' }),
-      L('不知什么时候凑了过来', { sp: '苏晴', emo: 'surprised' }),
+      L('不知什么时候凑了过来', { sp: '苏晴', emo: 'surprised', enter: [{ name: '苏晴' }] }),
       L('旧校舍……那里', { sp: '苏晴', emo: 'scared', sym: 'surprise', cam: 'zoom' }),
       L('一道闪电', { cam: 'flash' }),
+      L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: ['苏晴'] }),
       L('到底想告诉我什么', { sp: '我', sym: 'gloom' }),
     ],
     choices: ['答应赴约，一个人去旧校舍', '拉上苏晴一起去', '先打电话问林岚本人'],
@@ -114,7 +117,7 @@ export function directorReply(turn, units) {
   return {
     scene: { location: '旧校舍走廊', time: 'dusk', weather: 'dust', mood: 'eerie', transition: 'iris', bg: 'abandoned school corridor, dusk, dust, scenery, no humans' },
     cast: [{ name: '林岚', pos: 'center' }],
-    lines: [L('你来了', { sp: '林岚', emo: 'serious', cam: 'zoom' })],
+    lines: [L('你来了', { sp: '林岚', emo: 'serious', cam: 'zoom', enter: [{ name: '林岚' }] })],
     choices: ['走进音乐教室', '先在门口叫她的名字'],
     images: [],
     people: [{ name: '林岚', outfit: '冬季制服', outfitTags: 'winter school uniform, brown duffel coat, red checkered scarf, black pantyhose' }],

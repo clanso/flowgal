@@ -77,10 +77,27 @@ try {
   await panTo(0.4); await shot('35-cg-pan')
   await panTo(0.97); await shot('36-cg-pan-whole')
 
-  // 第 2 轮：竹林、两人同框、萤火
+  // 第 2 轮：苏晴先在画外喊（只有名牌），下一句才从右边跑进来（把入场动画停在半路）
+  await jumpTo('你们俩在这儿啊')
+  await sleep(2200)
+  await shot('40-offstage-voice')
+  await page.keyboard.press('Space')
+  await sleep(80)
+  await page.evaluate(() => { for (const a of document.querySelector('.fg-actor[data-name="苏晴"]')?.getAnimations() || []) { a.pause(); a.currentTime = 130 } })
+  await sleep(1400)
+  await shot('41-actor-enter')
+  await page.evaluate(() => { for (const a of document.querySelector('.fg-actor[data-name="苏晴"]')?.getAnimations() || []) a.play() })
+
+  // 竹林、两人同框、萤火
   await jumpTo('好巧啊')
   await sleep(1800)
   await shot('06-two-actors')
+  // 插画显示到「她小声说」，下一句收起，回到立绘
+  await jumpTo('她小声说')
+  await sleep(2600)
+  await page.keyboard.press('Space')
+  await sleep(1800)
+  await shot('42-cg-closed')
 
   // 第 3 轮：便条卡片、暴雨
   await jumpTo('明天放学后')
@@ -98,7 +115,8 @@ try {
   await click('.fg-quick button:has-text("CG")', 1400); await shot('10-gallery')
   await click('.fg-thumb-cap', 900); await shot('11-gallery-lightbox'); await page.mouse.click(30, 30); await sleep(400)
   await page.locator('.fg-btn:has-text("改词")').nth(1).click(); await sleep(900); await shot('12-prompt-editor')
-  await page.locator('.fg-cg-chars').scrollIntoViewIfNeeded(); await sleep(300); await shot('37-prompt-editor-characters'); await page.keyboard.press('Escape'); await sleep(300)
+  await page.locator('.fg-cg-chars').scrollIntoViewIfNeeded(); await sleep(300); await shot('37-prompt-editor-characters')
+  await page.locator('.fg-field', { hasText: '剧场里显示' }).scrollIntoViewIfNeeded(); await sleep(300); await shot('39-cg-span'); await page.keyboard.press('Escape'); await sleep(300)
   await click('.fg-quick button:has-text("CAST")', 1200); await shot('13-cast')
   await click('.fg-tab:has-text("档案变更")', 700); await shot('14-cast-log'); await page.keyboard.press('Escape'); await sleep(300)
   await click('.fg-quick button:has-text("CONFIG")', 1000); await shot('15-settings-look')

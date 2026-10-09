@@ -99,7 +99,7 @@ function ScriptView({ script, units }) {
         </div>
         {s.bg && <div className="fg-note">背景提示词：{s.bg}</div>}
       </Block>
-      <Block label={`在场 · ${script.cast.length}`}>
+      <Block label={`出场 · ${script.cast.length}`}>
         <div className="fg-dlog-chips">
           {script.cast.map(c => <Chip key={c.name} k={POS_LABEL[c.pos] || c.pos}>{c.name}</Chip>)}
           {!script.cast.length && <span className="fg-note">没有人物上场</span>}
@@ -115,6 +115,8 @@ function ScriptView({ script, units }) {
               l.sym && <Chip key="sym" k="符号">{SYMBOL_LABEL[l.sym] || l.sym}</Chip>,
               l.cam && <Chip key="cam" k="镜头">{CAMERA_LABEL[l.cam] || l.cam}</Chip>,
               l.card && <Chip key="card" k="卡片">{CARD_LABEL[l.card] || l.card}</Chip>,
+              l.enter && <Chip key="in" k="登场">{l.enter.map(e => e.name + (e.pos ? `（${POS_LABEL[e.pos] || e.pos}）` : '')).join('、')}</Chip>,
+              l.exit && <Chip key="out" k="退场">{l.exit.join('、')}</Chip>,
             ].filter(Boolean)
             return (
               <div key={u.id} className={`fg-dlog-line${marks.length ? '' : ' is-plain'}`}>
@@ -134,7 +136,7 @@ function ScriptView({ script, units }) {
       <Block label={`插画分镜 · ${script.images.length}`}>
         {script.images.map((img, i) => (
           <div key={i} className="fg-dlog-card">
-            <div className="fg-dlog-chips"><Chip k="标题">{img.title || '—'}</Chip><Chip k="位置">{img.after} 之后</Chip>{img.who && img.who.length ? <Chip k="入画">{img.who.join('、')}</Chip> : null}{img.shape && <Chip k="画幅">{SHAPE_LABEL[img.shape] || img.shape}</Chip>}</div>
+            <div className="fg-dlog-chips"><Chip k="标题">{img.title || '—'}</Chip><Chip k="显示">{img.after}{img.until && img.until !== img.after ? ` → ${img.until}` : img.until ? '' : ' → 本轮结束'}</Chip>{img.who && img.who.length ? <Chip k="入画">{img.who.join('、')}</Chip> : null}{img.shape && <Chip k="画幅">{SHAPE_LABEL[img.shape] || img.shape}</Chip>}</div>
             {img.moment && <div>{img.moment}</div>}
             {img.tags && <div className="fg-dlog-mono">{img.tags}</div>}
             {img.desc && <div className="fg-note">{img.desc}</div>}
@@ -295,6 +297,8 @@ export function DirectorLog({ gameId, onClose, focusTurn = null }) {
   const [selected, setSelected] = React.useState('')
   const items = log ? [...log.running, ...log.entries] : []
   const current = items.find(e => e.id === selected) || (focusTurn != null && items.find(e => e.turn === focusTurn && (e.kind || 'director') === 'director')) || items[0]
+  // 打开时看的那一条就钉住：之后立绘设计师、插画分镜师开跑排到最上面，也不会把正在看的那条换掉。
+  React.useEffect(() => { if (!selected && current) setSelected(current.id) }, [current && current.id])
   return (
     <Panel title="导演日志" en="Director" onClose={onClose}
       actions={log && <span className="fg-pill">{log.running.length ? `${log.running.length} 个整理中 · ` : ''}保留最近 {log.keep} 次</span>}>

@@ -13,6 +13,8 @@ import { BACKENDS, generateImage } from '../lib/image/index.js'
 import { firstImageFromZip } from '../lib/image/http.js'
 import { composePrompt, qualityFor, applyWeights } from '../lib/image/style.js'
 import { resolveCgPrompt, girlify, fallbackCg } from '../lib/illustrator.js'
+import { stageSteps, castAtEnd } from '../lib/staging.js'
+import { buildBeats } from '../src/client/theater/playback.js'
 import { resolveConfig, applyPatch } from '../lib/config.js'
 import { imageFromChat, openaiModels } from '../lib/image/openai.js'
 
@@ -311,6 +313,53 @@ test('gate: 提示词组合：画师串在前、质量词在后、人数 tag 置
   assert.match(bg.negative, /1girl/)
   const sprite = composePrompt({ kind: 'sprite', person: { gender: 'female', appearance: 'silver hair' }, emotion: 'shy', backend: 'openai', config })
   assert.match(sprite.positive, /character sprite/)
+})
+
+test('gate: 立绘按导演标的登场 / 退场逐句增减，插画从 after 显示到 until 再收起', () => {
+  const units = ['推门进去，学姐在弹琴。', '“我来了！”苏晴从走廊跑进来。', '三个人一起笑了。', '林岚说要去拿乐谱，先出去了。', '过了一会儿，她抱着乐谱回来。', '苏晴凑过去看。']
+    .map((text, i) => ({ id: 'U' + (i + 1), type: 'narration', text }))
+  const script = normalizeScript({
+    scene: { location: '琴房' },
+    cast: [{ name: '林岚', pos: 'left' }],
+    lines: [
+      { u: 'U2', enter: [{ name: '苏晴', pos: 'right' }] },
+      { u: 'U4', exit: ['林岚', '没这个人'] },
+      { u: 'U5', enter: ['林岚'] },
+      { u: 'U6', enter: [{ name: '', pos: 'left' }], exit: 'nobody' },
+    ],
+    images: [
+      { after: 'U2', until: 'U3', moment: '苏晴跑进琴房' },
+      { after: 'U5', until: 'U1', moment: '林岚抱着乐谱回来' },
+    ],
+  }, units, { maxImages: 2 })
+  // 登场的人补进 cast；退场只收名字；until 早于 after 的当作没写（显示到这一轮结束）。
+  assert.deepEqual(script.cast, [{ name: '林岚', pos: 'left' }, { name: '苏晴', pos: 'right' }])
+  assert.deepEqual(script.lines.U2.enter, [{ name: '苏晴', pos: 'right' }])
+  assert.deepEqual(script.lines.U5.enter, [{ name: '林岚' }])
+  assert.deepEqual(script.lines.U6, { exit: ['nobody'] })
+  assert.equal(script.images[0].until, 'U3')
+  assert.equal(script.images[1].until, undefined)
+
+  // 林岚一开场就在（她这一轮先退场再回来），苏晴到 U2 才上场。
+  const names = stageSteps(script, units).map(s => s.cast.map(c => c.name).join('+'))
+  assert.deepEqual(names, ['林岚', '林岚+苏晴', '林岚+苏晴', '苏晴', '苏晴+林岚', '苏晴+林岚'])
+  const steps = stageSteps(script, units)
+  assert.deepEqual([steps[1].entered, steps[3].left, steps[4].entered], [['苏晴'], ['林岚'], ['林岚']])
+  assert.equal(steps[4].cast.find(c => c.name === '林岚').pos, 'left', '回来站回原位')
+  assert.deepEqual(castAtEnd(script).map(c => c.name), ['苏晴', '林岚'])
+
+  // 剧场：插画在 U2～U3 全屏，U4 收起；第二张从 U5 显示到这一轮结束。没整理的下一轮沿用上一轮结束时在场的人。
+  const ready = (id, after, until) => ({ id, turn: 1, textVersion: 'v1', after, until, current: 0, versions: [{ assetId: id }] })
+  const view = {
+    turns: [
+      { turn: 1, textVersion: 'v1', status: 'ready', units, script: { ...script, choices: [] } },
+      { turn: 2, textVersion: 'v2', status: 'raw', units: [{ id: 'U1', type: 'narration', text: '第二天。' }], script: null },
+    ],
+    images: [ready('a', 'U2', 'U3'), ready('b', 'U5', '')],
+  }
+  const { beats } = buildBeats(view)
+  assert.deepEqual(beats.map(b => (b.cg ? b.cg.id : '-')), ['-', 'a', 'a', '-', 'b', 'b', '-'])
+  assert.deepEqual(beats.map(b => b.cast.map(c => c.name).join('+')), [...names, '苏晴+林岚'])
 })
 
 test('gate: 插画提示词：人名不发出去，固定外貌补进角色块，Base 补人数，权重按渠道换写法', () => {

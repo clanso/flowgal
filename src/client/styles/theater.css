@@ -105,8 +105,9 @@
   -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, #000 78%, transparent 99%); }
 .fg-actor.is-upload img { -webkit-mask-image: none; mask-image: none; }
 .fg-actor img.is-swap { animation: fg-expr-swap .25s ease; }
-@keyframes fg-actor-in { from { opacity: 0; transform: translateX(-50%) translateY(4%); } }
-@keyframes fg-actor-out { to { opacity: 0; transform: translateX(-50%) translateY(3%); } }
+/* 登场从靠近的一侧滑进来，退场往同一侧淡出（--side 由站位决定）。 */
+@keyframes fg-actor-in { from { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(3%); } }
+@keyframes fg-actor-out { to { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(2%); } }
 @keyframes fg-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.008) translateY(-.25%); } }
 @keyframes fg-speak-hop { 0% { transform: translateY(0); } 40% { transform: translateY(-1.6%); } 100% { transform: translateY(0); } }
 @keyframes fg-expr-swap { from { opacity: .4; filter: brightness(1.4); } }
@@ -166,6 +167,8 @@
 
 /* ── CG ── */
 .fg-cg { position: absolute; inset: 0; z-index: 6; background-size: cover; background-position: center; animation: fg-cg-in 1.2s cubic-bezier(.5, 0, .2, 1) both; }
+.fg-cg.is-leaving { animation: fg-cg-out .8s ease both; pointer-events: none; }
+@keyframes fg-cg-out { from { opacity: 1; } to { opacity: 0; filter: brightness(1.15); } }
 .fg-cg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, .45)); }
 .fg-cg-img { position: absolute; inset: -2%; background-size: cover; background-position: center; animation: fg-kenburns 30s ease-in-out infinite alternate; }
 /* 竖版插画：模糊的同图垫底，前景铺满宽度，顶 → 底 → 拉远看全貌，再倒放回来。 */

@@ -89,7 +89,7 @@ const CG_WRITER_LABEL = { ai: '插画分镜师写的', fallback: '按档案拼�
 const blankCharacter = () => ({ name: '', tag: '', nl: '' })
 
 /** 改词：Base（画面）+ 每人一个角色块（柏宝绘的 NovelAI V4.5 分人写法）。名字只是标签，出图前换成档案外貌并删掉。 */
-function ImageEditor({ gameId, image, onClose }) {
+function ImageEditor({ gameId, image, units = [], onClose }) {
   const pick = img => ({ tags: img.tags || '', desc: img.desc || '', characters: (img.characters || []).map(c => ({ ...c })), negativeExtra: img.negativeExtra || '', shape: img.shape || 'landscape', seed: '' })
   const [draft, setDraft] = React.useState(() => pick(image))
   const [instruction, setInstruction] = React.useState('')
@@ -122,6 +122,7 @@ function ImageEditor({ gameId, image, onClose }) {
         </div>
       </div>
       <div className="fg-field"><label>额外负面</label><input className="fg-input" value={draft.negativeExtra} onChange={e => set({ negativeExtra: e.target.value })} /></div>
+      {units.length > 0 && <CgSpan gameId={gameId} image={image} units={units} />}
       <div className="fg-field"><label>画幅 / 种子</label>
         <div className="fg-row">
           <select className="fg-select" style={{ width: 'auto' }} value={draft.shape} onChange={e => set({ shape: e.target.value })}>
@@ -157,6 +158,24 @@ function ImageEditor({ gameId, image, onClose }) {
           await api.render(gameId, image.id, { tags: draft.tags, desc: draft.desc, characters: draft.characters, negativeExtra: draft.negativeExtra, shape: draft.shape, ...(draft.seed ? { seed: Number(draft.seed) } : {}) })
           onClose()
         }, '已加入出图队列')}>按此重画</button>
+      </div>
+    </div>
+  )
+}
+
+/** 剧场里这张插画从哪一句显示到哪一句。改了马上生效，不用重画。 */
+function CgSpan({ gameId, image, units }) {
+  const [busy, run] = useBusy()
+  const from = Math.max(0, units.findIndex(u => u.id === image.after))
+  const label = u => `${u.id} · ${u.text.length > 26 ? u.text.slice(0, 26) + '…' : u.text}`
+  return (
+    <div className="fg-field"><label>剧场里显示</label>
+      <div className="fg-row">
+        <span className="fg-note">从「{units[from] ? label(units[from]) : image.after}」到</span>
+        <select className="fg-select" style={{ flex: 1, width: 'auto' }} disabled={busy === 'u'} value={image.until || ''} onChange={e => run('u', () => api.until(gameId, image.id, e.target.value), '已改好，剧场里马上生效')}>
+          <option value="">这一轮结束</option>
+          {units.slice(from).map(u => <option key={u.id} value={u.id}>{label(u)}</option>)}
+        </select>
       </div>
     </div>
   )
@@ -205,7 +224,7 @@ export function Gallery({ view, gameId, onClose, focusId }) {
   return (
     <Panel title="鉴赏" en="Gallery" onClose={onClose} tabs={[{ id: 'cg', label: `插画 CG · ${images.length}` }, { id: 'bg', label: `背景 · ${places.length}` }]} tab={tab} onTab={setTab}
       actions={<button type="button" className="fg-btn" title="当时没填 Key、关着自动出图、出图失败或被中断的插画、背景和立绘差分，一次补上" disabled={busy === 'fill'} onClick={() => run('fill', () => api.fill(gameId).then(r => toast(fillText(r))))}>补齐缺的图</button>}>
-      {edit && <ImageEditor key={edit.id} gameId={gameId} image={images.find(i => i.id === edit.id) || edit} onClose={() => setEdit(null)} />}
+      {edit && <ImageEditor key={edit.id} gameId={gameId} image={images.find(i => i.id === edit.id) || edit} units={(((view && view.turns) || []).find(t => t.textVersion === edit.textVersion) || {}).units || []} onClose={() => setEdit(null)} />}
       {tab === 'cg' && (
         <div className="fg-grid">
           {images.map(img => <CgTile key={img.id} gameId={gameId} image={img} onOpen={setOpen} onEdit={setEdit} />)}
