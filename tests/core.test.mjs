@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import { deflateRawSync } from 'node:zlib'
 import { segmentTurn, unitsForPrompt, anchorFor } from '../lib/segment.js'
 import { extractJson, normalizeScript, direct, retryMaxTokens } from '../lib/director.js'
-import { applyPeople, effectivePerson, expandMentions, rollback, allNames, editPerson } from '../lib/cast.js'
+import { applyPeople, effectivePerson, expandMentions, rollback, allNames, editPerson, editLook } from '../lib/cast.js'
+import { variantKey, lookAt, pickSprite, nameSeed } from '../lib/look.js'
+import { emotionId } from '../lib/emotions.js'
 import { fillWorkflow, locateNodes, simpleWorkflow, comfyModels } from '../lib/image/comfyui.js'
 import { webuiModels, generateWebUI } from '../lib/image/webui.js'
 import { buildNaiBody } from '../lib/image/novelai.js'
@@ -142,6 +144,57 @@ test('gate: 外貌档案按剧情位置生效，可回滚，全局冻结', () =>
   assert.equal(effectivePerson(game, global, '林岚', 9).appearance, '1girl, long black hair, blue eyes')
   editPerson(game, '林岚', { appearance: '1girl, silver hair' })
   assert.equal(effectivePerson(game, global, '林岚', 0).appearance, '1girl, silver hair')
+})
+
+test('gate: 换装和长期状态按剧情位置生效，差分编号跟着变，可回滚；全局角色也能按剧情换装', () => {
+  const game = { cast: {}, castLog: [] }
+  const global = { cast: { 主角: { name: '主角', tags: '1boy, short black hair', outfits: { 便服: { tags: 'hoodie' } }, outfit: '便服' } } }
+  applyPeople(game, global, [{ name: '林岚', gender: 'female', appearance: '1girl, long black hair', outfit: '校服', outfitTags: 'school uniform' }], 1)
+  applyPeople(game, global, [{ name: '林岚', outfit: '睡衣', outfitTags: 'pajamas', states: [{ name: '怀孕', tags: 'pregnant' }] }, { name: '主角', outfit: '西装', outfitTags: 'black suit' }], 5)
+  applyPeople(game, global, [{ name: '林岚', outfit: '校服', states: [] }], 9)
+  const at = t => effectivePerson(game, global, '林岚', t)
+  assert.deepEqual([at(2).outfit, at(2).outfitTags, at(2).states], ['校服', 'school uniform', []])
+  assert.deepEqual([at(6).outfit, at(6).outfitTags, at(6).states.map(s => s.name)], ['睡衣', 'pajamas', ['怀孕']])
+  assert.deepEqual([at(9).outfit, at(9).states], ['校服', []])
+  assert.notEqual(variantKey(at(2), 'smile'), variantKey(at(6), 'smile'))
+  assert.equal(variantKey(at(2), 'smile'), variantKey(at(9), 'smile'), '换回校服、状态结束后用回原来那套差分')
+  // 同一个种子：按名字算，玩家可以改。
+  assert.equal(at(6).seed, nameSeed('林岚'))
+  editPerson(game, '林岚', { seed: 7 })
+  assert.equal(at(6).seed, 7)
+  // 前端按时间线算出同样的样子。
+  assert.deepEqual(lookAt(at(Infinity).timeline, 6), { appearance: '1girl, long black hair', outfit: '睡衣', outfitTags: 'pajamas', states: [{ name: '怀孕', tags: 'pregnant' }] })
+  // @名字 展开带上衣服和长期状态。
+  const { text } = expandMentions('@林岚, sitting', n => effectivePerson(game, global, n, 6), allNames(game, global))
+  assert.equal(text, '1girl, long black hair, pajamas, pregnant, sitting')
+  // 全局角色：固定外貌冻结，衣服按本局剧情换。
+  assert.equal(game.cast.主角, undefined)
+  assert.deepEqual([effectivePerson(game, global, '主角', 2).outfitTags, effectivePerson(game, global, '主角', 6).outfitTags], ['hoodie', 'black suit'])
+  // 回滚第 5 轮的换装。
+  rollback(game, game.castLog.findIndex(e => e.action === 'wear' && e.name === '林岚' && e.turn === 5))
+  assert.equal(at(6).outfit, '校服')
+  // 玩家手动改：从第 12 轮起穿泳装（衣橱里新加），带上新的长期状态。
+  editLook(game, '林岚', { outfits: { 泳装: 'swimsuit' }, wear: '泳装', states: [{ name: '右臂骨折', tags: 'arm cast' }] }, 12)
+  assert.deepEqual([at(12).outfitTags, at(12).states[0].tags], ['swimsuit', 'arm cast'])
+})
+
+test('gate: 立绘按「同一套样子」退：基础情绪 → 平静 → 任意表情 → 同身衣服；不跨服装借图', () => {
+  const school = { appearance: 'a', outfit: '校服', states: [] }
+  const pregnant = { appearance: 'a', outfit: '校服', states: [{ name: '怀孕' }] }
+  const pajamas = { appearance: 'a', outfit: '睡衣', states: [] }
+  const sprites = {
+    [variantKey(school, 'neutral')]: { assetId: 'n' },
+    [variantKey(school, 'thinking')]: { assetId: 't' },
+    [variantKey(pregnant, 'smile')]: { assetId: 'p' },
+  }
+  assert.equal(pickSprite(sprites, school, 'thinking'), 't')
+  assert.equal(pickSprite(sprites, school, '带着烦躁思考', 'thinking'), 't')
+  assert.equal(pickSprite(sprites, school, 'angry'), 'n')
+  assert.equal(pickSprite(sprites, pregnant, 'angry'), 'p')
+  assert.equal(pickSprite({ [variantKey(school, 'neutral')]: { assetId: 'n' } }, pregnant, 'angry'), 'n', '状态不同时退到同身衣服的平静立绘')
+  assert.equal(pickSprite(sprites, pajamas, 'smile'), '', '睡衣还没画时不拿校服顶替')
+  assert.equal(emotionId('微笑'), 'smile')
+  assert.equal(emotionId('  苦闷地表白|"'), '苦闷地表白')
 })
 
 test('gate: ComfyUI 占位符与自动定位', () => {

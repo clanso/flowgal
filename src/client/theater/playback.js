@@ -1,9 +1,9 @@
 // 把宿主给的视图（每轮的单元 + 导演脚本 + 插画）摊平成一拍一拍的「演出节拍」。
 // 导演还没整理完的轮次也能演：用切分时猜出的说话人，沿用上一轮的地点和站位（前台先文本）。
-import { EMOTIONS, placeKey } from '../../../lib/vocab.js'
+import { placeKey } from '../../../lib/vocab.js'
 
 export { placeKey }
-export const EMOTION_LABEL = EMOTIONS
+export { emotionLabel } from '../../../lib/emotions.js'
 
 export const TIME_LABEL = { dawn: '黎明', morning: '清晨', noon: '正午', afternoon: '午后', dusk: '黄昏', evening: '傍晚', night: '夜', midnight: '深夜' }
 export const WEATHER_LABEL = { clear: '晴', rain: '雨', storm: '暴雨', snow: '雪', sakura: '樱吹雪', leaves: '落叶', fireflies: '萤火', fog: '雾', embers: '余烬', dust: '浮尘', bokeh: '光斑', stars: '星空' }

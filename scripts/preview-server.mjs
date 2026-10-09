@@ -1,7 +1,8 @@
 // 本地预览：真实的宿主半边（导演 / 档案 / 出图队列 / 接口）+ 假的 Tavern、假的模型、假的生图服务，
 // 外加一个模拟 Tavern 聊天页的壳子，用来开发和截图。不需要 DSH，也不需要任何 Key。
 //   node scripts/preview-server.mjs [--port 5178]
-// 生图请求由假服务按提示词程序化画一张占位风景（scripts/preview/paint.mjs）；立绘不生成（显示剪影占位）。
+// 生图请求由假服务按提示词程序化画占位图：插画 / 背景画风景（scripts/preview/paint.mjs），
+// 立绘画透明底半身像，衣服和表情按立绘设计师写的 tag 变（scripts/preview/sprite.mjs）。
 // 「我的配乐」里放三段程序合成的示例曲（scripts/preview/synth.mjs），假导演每轮从里面选曲。
 // 环境变量：FLOWGAL_SKIN 初始皮肤；FLOWGAL_FONT_DIR 本地字体镜像目录（结构同 jsDelivr 的 /npm/ 路径，
 // 例如 <目录>/@fontsource/noto-sans-sc@5.3.0/400.css），不设时字体照常从 jsDelivr 读。
@@ -17,6 +18,9 @@ import { createMusic } from '../lib/music.js'
 import { segmentTurn } from '../lib/segment.js'
 import { CARD, TURNS, LATE_TURN, directorReply } from './preview/story.mjs'
 import { paintPlaceholder } from './preview/paint.mjs'
+import { paintSprite } from './preview/sprite.mjs'
+import { emotionId } from '../lib/emotions.js'
+import { EMOTION_TAGS } from '../lib/vocab.js'
 import { demoTracks } from './preview/synth.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -56,12 +60,46 @@ function withMusic(turn, units, reply) {
   }
   return reply
 }
+// 假立绘设计师：读请求里的角色档案和差分清单，按固定外貌 + 衣服 + 情绪拼 tag（真模型会结合剧情写得更细）。
+const EXPRESSIONS = {
+  thinking: 'thinking, hand on own chin, looking down, closed mouth',
+  smile: 'gentle smile, closed mouth, light blush',
+  teasing: 'teasing smile, one eye closed, smirk',
+  shy: 'shy, light blush, looking away, small smile',
+  pout: 'pout, puffed cheeks, annoyed, furrowed brow',
+  love: 'blush, heart-shaped pupils, smile',
+  serious: 'serious, closed mouth, straight face',
+  '害羞地强装镇定': 'blush, embarrassed, looking away, pursed lips, straight face, hand on own chest',
+}
+function spriteWriterReply(prompt) {
+  const person = prompt.slice(prompt.lastIndexOf('【角色档案】'))
+  const appearance = (person.match(/固定外貌：(.*)/) || [])[1] || '1girl'
+  const sprites = []
+  for (const m of prompt.matchAll(/^- (s\d+)：(.*)$/gm)) {
+    const outfit = (m[2].match(/「[^」]*」（([^）]*)）/) || [])[1] || ''
+    const states = [...(m[2].match(/长期状态 ([^；]*)/) || [])[1]?.matchAll(/（([^）]*)）/g) || []].map(x => x[1])
+    const id = emotionId((m[2].match(/情绪「([^」]+)」/) || [])[1])
+    const base = emotionId((m[2].match(/接近 (\S+)$/) || [])[1])
+    const face = EXPRESSIONS[id] || EMOTION_TAGS[id] || EMOTION_TAGS[base] || EMOTION_TAGS.neutral
+    sprites.push({ key: m[1], tags: [appearance, outfit, ...states, face].filter(Boolean).join(', ') })
+  }
+  return JSON.stringify({ sprites }, null, 1)
+}
+
 const THINKING = '先看这一轮的地点和时段，沿用上一幕的站位；说话人按引号前后的名字认，旁白里写到谁的动作就给谁换表情。值得画的只有一处，放在情绪最满的那句后面。'
 const llm = {
   resolveModelInfo: async () => ({ context: { contextWindow: 1000000 }, defaultMaxTokens: 128000 }),
   stream(request) {
     const prompt = request.messages[0].content[0].text
     const isDirector = String(request.system || '').includes('后台导演')
+    if (String(request.system || '').includes('立绘设计师')) {
+      const reply = spriteWriterReply(prompt)
+      return (async function* () {
+        for (let i = 0; i < reply.length; i += 24) { yield { type: 'text-delta', text: reply.slice(i, i + 24) }; await sleep(6) }
+        yield { type: 'usage', usage: { inputTokens: Math.ceil(prompt.length * 0.9), outputTokens: Math.ceil(reply.length / 3) } }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      })()
+    }
     const turnInfo = isDirector ? [...TURNS, LATE_TURN].find(t => prompt.includes(t.text.split('\n')[0].slice(0, 12))) : null
     return (async function* () {
       if (!turnInfo) { yield { type: 'text-delta', text: JSON.stringify({ tags: '@林岚, 1girl, smile, upper body', desc: 'a smiling girl' }) }; yield { type: 'finish', reason: { kind: 'stop' } }; return }
@@ -77,13 +115,15 @@ const llm = {
   },
 }
 
-// ───────── 假生图：按提示词关键词程序化画一张占位风景 ─────────
+// ───────── 假生图：竖图（立绘）画半身像，其余画风景 ─────────
 async function fakeFetch(url, init = {}) {
   const body = typeof init.body === 'string' ? init.body : ''
   if (/novelai/.test(String(url)) && /subscription/.test(String(url))) return new Response(JSON.stringify({ tier: 3 }), { status: 200 })
   await sleep(1200 + Math.random() * 800)
-  const prompt = (() => { try { return JSON.parse(body).input || body } catch { return body } })()
-  return new Response(paintPlaceholder(prompt), { status: 200, headers: { 'content-type': 'image/png' } })
+  const json = (() => { try { return JSON.parse(body) } catch { return {} } })()
+  const prompt = json.input || body
+  const portrait = json.parameters?.height > json.parameters?.width
+  return new Response(portrait ? paintSprite(prompt) : paintPlaceholder(prompt), { status: 200, headers: { 'content-type': 'image/png' } })
 }
 
 const dataDir = await mkdtemp(join(tmpdir(), 'flowgal-preview-'))
@@ -91,7 +131,7 @@ const store = createStore(dataDir)
 const logger = { info: () => {}, warn: m => console.warn(m) }
 const engine = createEngine({ store, services: { tavern, llm, credentials: null }, fetchImpl: fakeFetch, logger })
 await engine.patchConfig({
-  images: { backend: 'novelai', auto: true, maxPerTurn: 1, backgrounds: false, portraits: false, expressions: false },
+  images: { backend: 'novelai', auto: true, maxPerTurn: 1, backgrounds: false, portraits: true, expressions: true, expressionsPerTurn: 4 },
   ui: { skin: process.env.FLOWGAL_SKIN || 'stellar', bgm: true, bgmVolume: 0.3, blip: false, textSpeed: 26, ...(fontDir ? { fontBase: `http://localhost:${PORT}/fonts/` } : {}) },
 })
 await engine.setSecret('novelai', 'official', 'preview-not-a-real-key')

@@ -1,6 +1,6 @@
 // Tavern 正文下方：每轮一张「场景卡」（导演整理结果的缩影 + 进入剧场），以及插画（版本切换 / 重画 / 改词）。
 import React from 'react'
-import { api, assetUrl, openTheater, rememberGame, toast } from '../api.js'
+import { api, assetUrl, openTheater, rememberGame, toast, fillText } from '../api.js'
 import { TIME_LABEL, WEATHER_LABEL, MOOD_LABEL } from '../theater/playback.js'
 import { nameColor } from '../../../lib/cast.js'
 const CLOCK = { dawn: '05:40', morning: '07:30', noon: '12:00', afternoon: '15:20', dusk: '17:50', evening: '19:30', night: '22:10', midnight: '00:40' }
@@ -15,6 +15,11 @@ export function SceneCardInline({ item, gameId, turn }) {
   const retry = async () => {
     setBusy(true)
     try { await api.direct(gameId, t, true); toast('已重新整理') } catch (e) { toast(String(e.message || e), 'error') } finally { setBusy(false) }
+  }
+  const [filling, setFilling] = React.useState(false)
+  const fill = async () => {
+    setFilling(true)
+    try { toast(fillText(await api.fill(gameId, { turn: t }))) } catch (e) { toast(String(e.message || e), 'error') } finally { setFilling(false) }
   }
   return (
     <div className="fg-chat">
@@ -55,6 +60,7 @@ export function SceneCardInline({ item, gameId, turn }) {
                 <button type="button" className="fg-play" onClick={() => openTheater(gameId, { turn: t })}>进入剧场</button>
                 <button type="button" className="fg-ghost" onClick={() => openTheater(gameId, { panel: 'cast' })}>人物志</button>
                 <button type="button" className="fg-ghost" disabled={busy} onClick={retry}>{busy ? '整理中…' : '重新整理'}</button>
+                <button type="button" className="fg-ghost" title="这一轮错过的插画、背景、立绘差分补上" disabled={filling} onClick={fill}>{filling ? '补图中…' : '补图'}</button>
               </div>
             </>
           )}

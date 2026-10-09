@@ -1,4 +1,5 @@
 // 预览用的一小段原创剧情（三轮 + 一轮演示「先文本后整理」），以及每轮对应的导演输出。
+// 第 2 轮导演自创一个复合情绪「害羞地强装镇定」，第 4 轮林岚换上冬季制服，用来演示立绘差分。
 export const CARD = { id: 'preview-card', name: '放学后的约定' }
 
 export const TURNS = [
@@ -68,7 +69,7 @@ export function directorReply(turn, units) {
     choices: [],
     images: [{ after: find(units, '那就罚你'), title: '午后的琴房', tags: '1girl, @林岚, sitting, playing piano, looking back, smile, sunlight, dust particles', desc: 'a girl at a piano looking back with a teasing smile', shape: 'landscape' }],
     people: [
-      { name: '林岚', gender: 'female', appearance: '1girl, long black hair, blue eyes, hair ornament, school uniform, black pantyhose' },
+      { name: '林岚', gender: 'female', appearance: '1girl, long black hair, blue eyes, hair ornament, slender', outfit: '校服', outfitTags: 'sailor school uniform, navy serafuku, red neckerchief, black pantyhose' },
     ],
     summary: '林岚在琴房等我，罚我听她弹完一首。',
   }
@@ -81,15 +82,16 @@ export function directorReply(turn, units) {
       L('这句话本身就很可疑', { sp: '我', sym: 'sweat' }),
       L('苏晴从小路另一头', { sp: '苏晴', emo: 'tired', sym: 'sweat' }),
       L('不过我可不是跟踪', { sp: '苏晴', emo: 'smug' }),
-      L('悄悄把一个小信封', { sp: '林岚', emo: 'shy' }),
+      L('悄悄把一个小信封', { sp: '林岚', emo: '害羞地强装镇定' }),
       L('回家以后再看', { sp: '林岚', emo: 'blush', sym: 'blush' }),
       L('只给你一个人', { sp: '林岚', emo: 'love', sym: 'heart' }),
     ],
     choices: [],
+    emotions: [{ name: '害羞地强装镇定', desc: '脸颊泛红却板着脸，目光移开，嘴唇抿紧，手指捏着衣角', base: 'shy' }],
     images: [{ after: find(units, '悄悄把一个小信封'), title: '萤火与信封', tags: '@林岚, @苏晴, 2girls, bamboo forest, fireflies, dusk, holding envelope', desc: 'two girls on a bamboo path among fireflies at dusk', shape: 'landscape' }],
     people: [
       { name: '林岚', temp: 'holding small envelope' },
-      { name: '苏晴', gender: 'female', appearance: '1girl, short brown hair, side ponytail, amber eyes, school uniform, cardigan' },
+      { name: '苏晴', gender: 'female', appearance: '1girl, short brown hair, side ponytail, amber eyes', outfit: '开衫校服', outfitTags: 'school uniform, beige cardigan, white shirt, red ribbon' },
     ],
     summary: '回家路上苏晴追了上来，林岚偷偷塞给我一封信。',
   }
@@ -114,7 +116,7 @@ export function directorReply(turn, units) {
     lines: [L('你来了', { sp: '林岚', emo: 'serious', cam: 'zoom' })],
     choices: ['走进音乐教室', '先在门口叫她的名字'],
     images: [],
-    people: [],
+    people: [{ name: '林岚', outfit: '冬季制服', outfitTags: 'winter school uniform, brown duffel coat, red checkered scarf, black pantyhose' }],
     summary: '旧校舍里传来琴声。',
   }
 }

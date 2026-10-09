@@ -1,7 +1,7 @@
 // 剧场：全屏 galgame 播放器。读宿主整理好的场景脚本，逐拍演出；导演没整理完的部分先按原文演。
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, updateAvailable, toast, openTheater, assetUrl } from '../api.js'
-import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, EMOTION_LABEL, pickTrack } from './playback.js'
+import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, emotionLabel, pickTrack } from './playback.js'
 import { Backdrop, Cast, CgLayer, TitleCard, Flash, Particles, useCamera } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings } from './Panels.jsx'
@@ -217,7 +217,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const status = beat ? (beat.status === 'directing' ? `第 ${beat.turn} 轮 · 导演整理中，先按原文演` : beat.status === 'failed' ? `第 ${beat.turn} 轮 · 没整理好，按原文演` : '') : ''
   const quick = {
     speed,
-    emoLabel: beat && beat.emo ? EMOTION_LABEL[beat.emo] : '',
+    emoLabel: beat && beat.emo ? emotionLabel(beat.emo) : '',
     items: [
       { id: 'auto', label: 'AUTO', title: '自动播放（A）', on: auto, run: () => { setAuto(v => !v); setSkip(false) } },
       { id: 'skip', label: 'SKIP', title: '快进（按住 Ctrl）', on: skip, run: () => { setSkip(v => !v); setAuto(false) } },

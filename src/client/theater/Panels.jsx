@@ -1,7 +1,9 @@
-// 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词）、人物志（外貌档案）、设置（含「我的配乐」）。导演日志在 DirectorLog.jsx。
+// 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
-import { api, assetUrl, toast, useConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic } from '../api.js'
-import { EMOTION_LABEL, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, cgSrc } from './playback.js'
+import { api, assetUrl, toast, fillText, useConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic } from '../api.js'
+import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, cgSrc } from './playback.js'
+import { allEmotions, emotionEntry } from '../../../lib/emotions.js'
+import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn } from '../../../lib/look.js'
 import { Silhouette } from './Stage.jsx'
 import { SKINS } from './skins.js'
 import { previewTrack, stopPreview } from './audio.js'
@@ -168,7 +170,8 @@ export function Gallery({ view, gameId, onClose, focusId }) {
   const places = Object.values((view && view.places) || {})
   const live = open && images.find(i => i.id === open.id)
   return (
-    <Panel title="鉴赏" en="Gallery" onClose={onClose} tabs={[{ id: 'cg', label: `插画 CG · ${images.length}` }, { id: 'bg', label: `背景 · ${places.length}` }]} tab={tab} onTab={setTab}>
+    <Panel title="鉴赏" en="Gallery" onClose={onClose} tabs={[{ id: 'cg', label: `插画 CG · ${images.length}` }, { id: 'bg', label: `背景 · ${places.length}` }]} tab={tab} onTab={setTab}
+      actions={<button type="button" className="fg-btn" title="当时没填 Key、关着自动出图、出图失败或被中断的插画、背景和立绘差分，一次补上" disabled={busy === 'fill'} onClick={() => run('fill', () => api.fill(gameId).then(r => toast(fillText(r))))}>补齐缺的图</button>}>
       {edit && <ImageEditor key={edit.id} gameId={gameId} image={images.find(i => i.id === edit.id) || edit} onClose={() => setEdit(null)} />}
       {tab === 'cg' && (
         <div className="fg-grid">
@@ -208,65 +211,194 @@ export function Gallery({ view, gameId, onClose, focusId }) {
 }
 
 // ───────────────────────── 人物志 ─────────────────────────
-const EMO_KEYS = Object.keys(EMOTION_LABEL)
+const SPRITE_STATUS = { writing: '写词中', queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消' }
+const WRITER_LABEL = { ai: '立绘设计师写的', fallback: '按档案拼的（模型没写出来）', user: '你改的', upload: '你上传的' }
+const LOG_ACTION = { create: 'AI 建档', change: '外貌变化', temp: '临时状态', edit: '手动修改', wear: '换装', states: '长期状态', outfit: '新衣服' }
+const GENDERS = [['', '未知'], ['female', '女'], ['male', '男'], ['other', '其他']]
 
 function readFile(file) {
   return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file) })
 }
 
-function PersonCard({ gameId, person }) {
-  const [appearance, setAppearance] = React.useState(person.appearance || '')
-  const [gender, setGender] = React.useState(person.gender || '')
-  const [uploadEmo, setUploadEmo] = React.useState('neutral')
+/** 一个人的各套样子：当前这套在最前，其余是已经有立绘的。 */
+function lookGroups(person) {
+  const now = lookAt(person.timeline, Infinity)
+  const groups = new Map([[lookKey(now), { key: lookKey(now), look: now, current: true }]])
+  for (const [key, r] of Object.entries(person.sprites || {})) {
+    const prefix = key.split('|').slice(0, 3).join('|')
+    if (!groups.has(prefix)) groups.set(prefix, { key: prefix, look: { outfit: r.outfit || '', states: (r.states || []).map(name => ({ name })) }, current: false })
+  }
+  return [...groups.values()]
+}
+
+/** 档案：固定外貌、性别、种子、给立绘设计师的备注和负面词。全局角色改的是全局库。 */
+function ProfileEditor({ gameId, person }) {
+  const pick = p => ({ appearance: p.appearance || '', gender: p.gender || '', note: p.note || '', negative: p.negative || '', seed: p.seedCustom ? String(p.seed) : '' })
+  const [form, setForm] = React.useState(() => pick(person))
+  const [busy, run] = useBusy()
+  React.useEffect(() => { setForm(pick(person)) }, [person.appearance, person.gender, person.note, person.negative, person.seed, person.seedCustom])
+  const dirty = JSON.stringify(form) !== JSON.stringify(pick(person))
+  const set = k => e => setForm({ ...form, [k]: e.target.value })
+  const save = () => run('save', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { ...form, seed: form.seed === '' ? null : Number(form.seed) } }), '档案已保存')
+  return (
+    <div className="fg-person-form">
+      <div className="fg-field"><label>固定外貌</label><textarea className="fg-textarea" value={form.appearance} onChange={set('appearance')} onKeyDown={e => e.stopPropagation()} placeholder="1girl, long black hair, blue eyes（脸、发、瞳、体型，不含衣服）" /></div>
+      <div className="fg-field"><label>性别 / 种子</label>
+        <div className="fg-row">
+          <select className="fg-select" style={{ width: 'auto' }} value={form.gender} onChange={set('gender')}>{GENDERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          <input className="fg-input" style={{ width: '12cqw' }} inputMode="numeric" value={form.seed} placeholder={`默认 ${person.seed}`} onChange={e => setForm({ ...form, seed: e.target.value.replace(/\D/g, '') })} onKeyDown={e => e.stopPropagation()} />
+          <button type="button" className="fg-btn" title="换一个随机种子" onClick={() => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) })}>🎲</button>
+          <span className="fg-note">所有立绘差分共用这个种子</span>
+        </div>
+      </div>
+      <div className="fg-field"><label>立绘备注</label><textarea className="fg-textarea is-short" value={form.note} onChange={set('note')} onKeyDown={e => e.stopPropagation()} placeholder="写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" /></div>
+      <div className="fg-field"><label>不要出现</label><input className="fg-input" value={form.negative} onChange={set('negative')} onKeyDown={e => e.stopPropagation()} placeholder="glasses, ponytail（每张立绘都加进负面词）" /></div>
+      <div className="fg-row" style={{ justifyContent: 'flex-end' }}><button type="button" className="fg-btn is-primary" disabled={!dirty || busy === 'save'} onClick={save}>保存档案</button></div>
+    </div>
+  )
+}
+
+/** 衣橱与状态：衣服的 tag、现在穿哪套、长期状态、临时状态。从最新一轮起生效；全局角色写在本局。 */
+function WardrobeEditor({ gameId, person }) {
+  const [busy, run] = useBusy()
+  const [draft, setDraft] = React.useState({ name: '', tags: '' })
+  const [stateDraft, setStateDraft] = React.useState({ name: '', tags: '' })
+  const look = patch => api.cast(gameId, 'look', { name: person.name, patch })
+  const outfits = Object.entries((person.timeline && person.timeline.outfits) || {})
+  const states = person.states || []
+  return (
+    <div className="fg-person-form">
+      <div className="fg-wardrobe">
+        {outfits.map(([name, o]) => (
+          <div key={name} className={`fg-outfit${person.outfit === name ? ' is-on' : ''}`}>
+            <b>{name}</b>
+            <Text value={o.tags || ''} placeholder="这套衣服的英文 tag" onCommit={v => run('o' + name, () => look({ outfits: { [name]: v } }), '已保存')} />
+            {person.outfit === name ? <span className="fg-pill">正在穿</span> : <button type="button" className="fg-btn" onClick={() => run('w' + name, () => look({ wear: name }), `${person.name} 换上了${name}`)}>穿上</button>}
+            <button type="button" className="fg-btn" title="从衣橱删掉" onClick={() => run('d' + name, () => look({ outfits: { [name]: null } }))}>✕</button>
+          </div>
+        ))}
+        {!outfits.length && <div className="fg-note">衣橱还是空的。导演会在角色登场、换衣服时记下来；也可以自己加。</div>}
+        <form className="fg-outfit is-new" onSubmit={e => { e.preventDefault(); if (draft.name.trim()) run('add', () => look({ outfits: { [draft.name.trim()]: draft.tags } }), '已加进衣橱').then(() => setDraft({ name: '', tags: '' })) }}>
+          <input className="fg-input" placeholder="新衣服名" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} onKeyDown={e => e.stopPropagation()} />
+          <input className="fg-input" placeholder="pajamas, striped" value={draft.tags} onChange={e => setDraft({ ...draft, tags: e.target.value })} onKeyDown={e => e.stopPropagation()} />
+          <button type="submit" className="fg-btn">加进衣橱</button>
+        </form>
+      </div>
+      <div className="fg-field"><label>长期状态</label>
+        <div className="fg-row">
+          {states.map(st => (
+            <span key={st.name} className="fg-state" title={st.tags}>{st.name}<button type="button" onClick={() => run('s' + st.name, () => look({ states: states.filter(x => x.name !== st.name) }), `${st.name} 结束了`)}>✕</button></span>
+          ))}
+          {!states.length && <span className="fg-note">无</span>}
+          <form className="fg-row" onSubmit={e => { e.preventDefault(); if (stateDraft.name.trim()) run('sa', () => look({ states: [...states, { name: stateDraft.name.trim(), tags: stateDraft.tags }] }), '已加上').then(() => setStateDraft({ name: '', tags: '' })) }}>
+            <input className="fg-input" style={{ width: '10cqw' }} placeholder="怀孕" value={stateDraft.name} onChange={e => setStateDraft({ ...stateDraft, name: e.target.value })} onKeyDown={e => e.stopPropagation()} />
+            <input className="fg-input" style={{ width: '16cqw' }} placeholder="pregnant, round belly" value={stateDraft.tags} onChange={e => setStateDraft({ ...stateDraft, tags: e.target.value })} onKeyDown={e => e.stopPropagation()} />
+            <button type="submit" className="fg-btn">加上</button>
+          </form>
+        </div>
+      </div>
+      <div className="fg-field"><label>临时状态</label><Text value={person.temp || ''} placeholder="wet hair, bandaged arm（只影响插画）" onCommit={v => run('t', () => look({ temp: v }), '已保存')} /></div>
+      <div className="fg-note">长期状态和换装从最新一轮起生效，立绘按「服装 × 长期状态 × 情绪」各画一套；临时状态只进插画。</div>
+    </div>
+  )
+}
+
+/** 选中的一张差分：看 / 改提示词，让立绘设计师重写，按自己的词画，上传，删除。 */
+function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose }) {
+  const key = `${group.key}|${emotion}`
+  const record = (person.sprites || {})[key] || null
+  const st = (person.spriteStatus || {})[key]
+  const [tags, setTags] = React.useState(record ? record.tags || '' : '')
   const [busy, run] = useBusy()
   const fileRef = React.useRef(null)
-  React.useEffect(() => { setAppearance(person.appearance || ''); setGender(person.gender || '') }, [person.appearance, person.gender])
-  const main = person.sprites && (person.sprites.neutral || Object.values(person.sprites).find(Boolean))
-  const dirty = appearance !== (person.appearance || '') || gender !== (person.gender || '')
-  const save = () => run('save', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { appearance, gender } }), '档案已保存')
+  React.useEffect(() => { setTags(record ? record.tags || '' : '') }, [key, record && record.tags])
+  const entry = emotionEntry(emotion, emotions)
+  const reachable = group.current || turn != null
+  const at = group.current ? {} : { turn }
+  const label = `${person.name} · ${lookLabel(group.look)} · ${entry.label}`
   return (
-    <div className="fg-person" style={{ '--c': person.color }}>
-      <div className="fg-person-art">{main ? <img src={assetUrl(main)} alt={person.name} /> : <Silhouette name={person.name} color={person.color} appearance={person.appearance} gender={person.gender} />}</div>
-      <div>
-        <h3>
-          <span style={{ color: person.color }}>{person.name}</span>
-          {person.global ? <small>全局 · 冻结</small> : <small>本局{person.createdTurn != null ? ` · 第 ${person.createdTurn} 轮登场` : ''}</small>}
-          {person.temp && <small title="临时状态，不写进档案">临时：{person.temp}</small>}
-        </h3>
-        <div className="fg-field" style={{ gridTemplateColumns: '8cqw 1fr' }}><label>外貌</label><textarea className="fg-textarea" value={appearance} onChange={e => setAppearance(e.target.value)} placeholder="1girl, long black hair, blue eyes, school uniform" /></div>
-        <div className="fg-field" style={{ gridTemplateColumns: '8cqw 1fr' }}><label>性别</label>
-          <div className="fg-row">
-            <select className="fg-select" style={{ width: 'auto' }} value={gender} onChange={e => setGender(e.target.value)}><option value="">未知</option><option value="female">女</option><option value="male">男</option><option value="other">其他</option></select>
-            <button type="button" className="fg-btn is-primary" disabled={!dirty || busy === 'save'} onClick={save}>保存档案</button>
-          </div>
-        </div>
-        <div className="fg-emos">
-          {EMO_KEYS.map(emo => {
-            const id = person.sprites && person.sprites[emo]
-            const st = person.spriteStatus && person.spriteStatus[emo]
-            return (
-              <button key={emo} type="button" className={`fg-emo${st && (st.status === 'queued' || st.status === 'running') ? ' is-busy' : ''}`} title={st && st.error ? st.error : id ? '点击重画' : '点击生成这个表情'}
-                onClick={() => run('e' + emo, () => api.cast(gameId, 'sprite', { name: person.name, emotion: emo }), `已排队：${person.name}·${EMOTION_LABEL[emo]}`)}>
-                {id && <img src={assetUrl(id)} alt="" loading="lazy" />}
-                <span>{EMOTION_LABEL[emo]}{st && st.status === 'failed' ? ' ⚠' : ''}</span>
-              </button>
-            )
-          })}
-        </div>
+    <div className="fg-variant">
+      <div className="fg-variant-art">{record && record.assetId ? <img src={assetUrl(record.assetId)} alt={label} /> : <span>{st ? SPRITE_STATUS[st.status] : '还没画'}</span>}</div>
+      <div className="fg-variant-body">
+        <div className="fg-row"><b>{label}</b><span className="fg-spacer" /><button type="button" className="fg-btn is-mini" onClick={onClose}>收起</button></div>
+        {entry.desc && <div className="fg-note">情绪：{entry.desc}{entry.base ? `（接近${emotionLabel(entry.base)}）` : ''}</div>}
+        {st && st.error && <div className="fg-note fg-err">{st.error}</div>}
+        <textarea className="fg-textarea" value={tags} onChange={e => setTags(e.target.value)} onKeyDown={e => e.stopPropagation()} placeholder="还没有提示词：点「让设计师写」，它会读完资料和剧情来写" />
+        <div className="fg-note">{record && record.writer ? WRITER_LABEL[record.writer] || record.writer : ''}{record && record.seed != null ? ` · 种子 ${record.seed}` : ''}{!reachable ? ' · 这套样子在剧情里已经不会再出现（外貌改过），只能删除或上传' : ''}</div>
         <div className="fg-row">
-          <select className="fg-select" style={{ width: 'auto' }} value={uploadEmo} onChange={e => setUploadEmo(e.target.value)}>{EMO_KEYS.map(e => <option key={e} value={e}>{EMOTION_LABEL[e]}</option>)}</select>
-          <button type="button" className="fg-btn" onClick={() => fileRef.current && fileRef.current.click()}>上传立绘</button>
+          <button type="button" className="fg-btn is-primary" disabled={!reachable || busy === 'w'} onClick={() => run('w', () => api.cast(gameId, 'sprite', { name: person.name, emotion, rewrite: true, ...at }), '已交给立绘设计师：写好词就画')}>{record && record.assetId ? '让设计师重写并重画' : '让设计师写并画'}</button>
+          <button type="button" className="fg-btn" disabled={!reachable || !tags.trim() || busy === 'u'} onClick={() => run('u', () => api.cast(gameId, 'sprite', { name: person.name, emotion, tags, ...at }), '已排队：按这些词画')}>按这些词画</button>
+          <button type="button" className="fg-btn" disabled={!reachable} onClick={() => fileRef.current && fileRef.current.click()}>上传到这张</button>
+          {record && <button type="button" className="fg-btn" onClick={() => run('d', () => api.cast(gameId, 'sprite-delete', { name: person.name, key }), '已删除').then(onClose)}>删除</button>}
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={async e => {
             const file = e.target.files && e.target.files[0]
             e.target.value = ''
             if (!file) return
             const dataUrl = await readFile(file)
-            run('up', () => api.cast(gameId, 'upload', { name: person.name, emotion: uploadEmo, dataUrl }), '立绘已上传')
+            run('up', () => api.cast(gameId, 'upload', { name: person.name, emotion, dataUrl, ...at }), '立绘已上传')
           }} />
-          {!person.global && <button type="button" className="fg-btn" onClick={() => run('g', () => api.cast(gameId, 'promote', { name: person.name }), '已提升为全局角色：所有对局共用，AI 不再改它')}>提升为全局</button>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PersonCard({ gameId, person, emotions }) {
+  const [busy, run] = useBusy()
+  const groups = React.useMemo(() => lookGroups(person), [person])
+  const [groupKey, setGroupKey] = React.useState('')
+  const [emotion, setEmotion] = React.useState('')
+  const [fold, setFold] = React.useState('')
+  const group = groups.find(g => g.key === groupKey) || groups[0]
+  const turn = group.current ? null : findLookTurn(person.timeline, group.key)
+  const now = lookAt(person.timeline, Infinity)
+  const main = pickSprite(person.sprites, now, 'neutral')
+  // 情绪格子：这套样子已经有图的排前面，其余按情绪库顺序。
+  const tiles = allEmotions(emotions).map(e => ({ ...e, record: (person.sprites || {})[`${group.key}|${e.id}`], st: (person.spriteStatus || {})[`${group.key}|${e.id}`] }))
+  tiles.sort((a, b) => Number(Boolean(b.record && b.record.assetId)) - Number(Boolean(a.record && a.record.assetId)))
+  const drawn = tiles.filter(t => t.record && t.record.assetId).length
+  return (
+    <div className="fg-person" style={{ '--c': person.color }}>
+      <div className="fg-person-art">{main ? <img src={assetUrl(main)} alt={person.name} /> : <Silhouette name={person.name} color={person.color} appearance={person.appearance} gender={person.gender} />}</div>
+      <div className="fg-person-main">
+        <h3>
+          <span style={{ color: person.color }}>{person.name}</span>
+          {person.global ? <small>全局 · 外貌冻结</small> : <small>本局{person.createdTurn != null ? ` · 第 ${person.createdTurn} 轮登场` : ''}</small>}
+          <small title="此刻的样子">{lookLabel(now)}</small>
+          {person.temp && <small title="临时状态，只进插画">临时：{person.temp}</small>}
+        </h3>
+        <div className="fg-person-tags">{person.appearance || '（还没有固定外貌）'}{person.outfitTags ? ` ／ ${person.outfitTags}` : ''}</div>
+        <div className="fg-row fg-person-folds">
+          <button type="button" className={`fg-btn${fold === 'profile' ? ' is-on' : ''}`} onClick={() => setFold(fold === 'profile' ? '' : 'profile')}>档案 · 种子 {person.seed}</button>
+          <button type="button" className={`fg-btn${fold === 'wardrobe' ? ' is-on' : ''}`} onClick={() => setFold(fold === 'wardrobe' ? '' : 'wardrobe')}>衣橱与状态 · {Object.keys((person.timeline && person.timeline.outfits) || {}).length} 套</button>
+        </div>
+        {fold === 'profile' && <ProfileEditor gameId={gameId} person={person} />}
+        {fold === 'wardrobe' && <WardrobeEditor gameId={gameId} person={person} />}
+        <div className="fg-looks">
+          {groups.map(g => (
+            <button key={g.key} type="button" className={`fg-look${g.key === group.key ? ' is-on' : ''}`} onClick={() => { setGroupKey(g.key); setEmotion('') }}>
+              {lookLabel(g.look)}{g.current ? <i>现在</i> : null}
+            </button>
+          ))}
+          <span className="fg-note">已画 {drawn} 种情绪</span>
+        </div>
+        <div className="fg-emos">
+          {tiles.map(t => (
+            <button key={t.id} type="button" title={t.st && t.st.error ? t.st.error : t.desc || t.label}
+              className={`fg-emo${t.st && ['writing', 'queued', 'running'].includes(t.st.status) ? ' is-busy' : ''}${emotion === t.id ? ' is-on' : ''}${t.builtin ? '' : ' is-custom'}`}
+              onClick={() => setEmotion(emotion === t.id ? '' : t.id)}>
+              {t.record && t.record.assetId && <img src={assetUrl(t.record.assetId)} alt="" loading="lazy" />}
+              <span>{t.label}{t.st && t.st.status === 'failed' ? ' ⚠' : ''}</span>
+            </button>
+          ))}
+        </div>
+        {emotion && <VariantEditor key={group.key + emotion} gameId={gameId} person={person} group={group} emotion={emotion} emotions={emotions} turn={turn} onClose={() => setEmotion('')} />}
+        <div className="fg-row">
+          <button type="button" className="fg-btn" disabled={busy === 'fill'} onClick={() => run('fill', () => api.cast(gameId, 'fill', { name: person.name }).then(r => toast(fillText(r))))}>补齐剧情里用到的差分</button>
+          {!person.global && <button type="button" className="fg-btn" onClick={() => run('g', () => api.cast(gameId, 'promote', { name: person.name }), '已提升为全局角色：所有对局共用，AI 不再改它的固定外貌')}>提升为全局</button>}
           {person.global && <button type="button" className="fg-btn" onClick={() => run('l', () => api.cast(gameId, 'copy-local', { name: person.name }), '已复制到本局，可单独修改')}>复制到本局</button>}
           {person.global && <button type="button" className="fg-btn" onClick={() => { if (window.confirm('从全局库移除？各对局里的副本不受影响。')) run('u', () => api.cast(gameId, 'unglobal', { name: person.name }), '已移出全局库') }}>移出全局</button>}
-          {!person.global && <button type="button" className="fg-btn" onClick={() => { if (window.confirm(`删除 ${person.name} 的本局档案？`)) run('d', () => api.cast(gameId, 'delete', { name: person.name }), '已删除') }}>删除</button>}
+          {!person.global && <button type="button" className="fg-btn" onClick={() => { if (window.confirm(`删除 ${person.name} 的本局档案和立绘记录？`)) run('d', () => api.cast(gameId, 'delete', { name: person.name }), '已删除') }}>删除</button>}
         </div>
         {person.versions && person.versions.length > 1 && (
           <div className="fg-note" style={{ marginTop: '.6cqw' }}>
@@ -278,31 +410,69 @@ function PersonCard({ gameId, person }) {
   )
 }
 
+/** 情绪库：内置情绪 + 导演自创的、你加的。新情绪写一句神情姿态，立绘设计师照着画。 */
+function EmotionLibrary({ emotions }) {
+  const [busy, run] = useBusy()
+  const [draft, setDraft] = React.useState({ id: '', desc: '', base: '' })
+  const builtin = allEmotions([]).filter(e => e.builtin)
+  const custom = (emotions || [])
+  const baseOptions = [['', '（无）'], ...builtin.map(e => [e.id, e.label])]
+  const save = (id, patch) => run('e' + id, () => api.emotion('save', { id, ...patch }), '已保存')
+  return (
+    <>
+      <div className="fg-note">导演给每句台词标情绪；库里没有贴切的词时，它会自创一个（可以是复合情绪，比如「带着烦躁思考」），写一句神情姿态，加进这里。之后每个角色、每身衣服都按这些情绪画差分。所有对局共用。</div>
+      <div className="fg-section">新加的情绪 · {custom.length}</div>
+      {custom.map(e => (
+        <div key={e.id} className="fg-emotion-row">
+          <b>{e.id}</b>
+          <Text value={e.desc || ''} placeholder="神情与姿态：眉眼、嘴角、脸色、手和身体" onCommit={v => save(e.id, { desc: v })} />
+          <Select value={e.base || ''} options={baseOptions} onChange={v => save(e.id, { base: v })} />
+          <span className="fg-note">{e.source === 'user' ? '你加的' : `导演加的${e.turn != null ? ` · 第 ${e.turn} 轮` : ''}`}</span>
+          <button type="button" className="fg-btn" disabled={busy === 'x' + e.id} onClick={() => run('x' + e.id, () => api.emotion('delete', { id: e.id }), '已删除（画好的立绘还在）')}>删除</button>
+        </div>
+      ))}
+      {!custom.length && <div className="fg-note">还没有。导演遇到内置情绪表达不了的瞬间时会自己加。</div>}
+      <form className="fg-emotion-row is-new" onSubmit={e => { e.preventDefault(); if (draft.id.trim()) run('add', () => api.emotion('save', draft), '已加进情绪库').then(() => setDraft({ id: '', desc: '', base: '' })) }}>
+        <input className="fg-input" placeholder="苦闷地表白" value={draft.id} onChange={e => setDraft({ ...draft, id: e.target.value })} onKeyDown={e => e.stopPropagation()} />
+        <input className="fg-input" placeholder="眉头紧锁却脸红，攥着衣角，视线躲开" value={draft.desc} onChange={e => setDraft({ ...draft, desc: e.target.value })} onKeyDown={e => e.stopPropagation()} />
+        <Select value={draft.base} options={baseOptions} onChange={v => setDraft({ ...draft, base: v })} />
+        <button type="submit" className="fg-btn is-primary">加进情绪库</button>
+      </form>
+      <div className="fg-section">内置 · {builtin.length}</div>
+      <div className="fg-row">{builtin.map(e => <span key={e.id} className="fg-chip">{e.label}<small>{e.id}</small></span>)}</div>
+    </>
+  )
+}
+
 export function CastPanel({ view, gameId, onClose }) {
   const [tab, setTab] = React.useState('people')
   const [busy, run] = useBusy()
   const [name, setName] = React.useState('')
   const cast = (view && view.cast) || []
   const log = (view && view.castLog) || []
-  const ACTION = { create: 'AI 建档', change: '外貌变化', temp: '临时状态', edit: '手动修改' }
+  const emotions = (view && view.emotions) || []
   return (
-    <Panel title="人物志" en="Characters" onClose={onClose} tabs={[{ id: 'people', label: `人物 · ${cast.length}` }, { id: 'log', label: `档案变更 · ${log.length}` }]} tab={tab} onTab={setTab}
+    <Panel title="人物志" en="Characters" onClose={onClose} tabs={[{ id: 'people', label: `人物 · ${cast.length}` }, { id: 'emotions', label: `情绪库 · ${allEmotions(emotions).length}` }, { id: 'log', label: `档案变更 · ${log.length}` }]} tab={tab} onTab={setTab}
       actions={tab === 'people' && (
-        <form className="fg-row" onSubmit={e => { e.preventDefault(); if (name.trim()) run('new', () => api.cast(gameId, 'save', { name: name.trim(), patch: {} }), '已新建').then(() => setName('')) }}>
-          <input className="fg-input" style={{ width: '14cqw' }} placeholder="新人物名字" value={name} onChange={e => setName(e.target.value)} />
-          <button type="submit" className="fg-btn">新建</button>
-        </form>
+        <div className="fg-row">
+          <button type="button" className="fg-btn" disabled={busy === 'fill'} onClick={() => run('fill', () => api.fill(gameId, { kinds: ['sprite'] }).then(r => toast(fillText(r))))}>补齐所有立绘</button>
+          <form className="fg-row" onSubmit={e => { e.preventDefault(); if (name.trim()) run('new', () => api.cast(gameId, 'save', { name: name.trim(), patch: {} }), '已新建').then(() => setName('')) }}>
+            <input className="fg-input" style={{ width: '14cqw' }} placeholder="新人物名字" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.stopPropagation()} />
+            <button type="submit" className="fg-btn">新建</button>
+          </form>
+        </div>
       )}>
-      {tab === 'people' && cast.map(p => <PersonCard key={p.name} gameId={gameId} person={p} />)}
-      {tab === 'people' && !cast.length && <div className="fg-note">有名字的角色第一次出场时，导演会自动给他建外貌档案；之后所有插画里写 @名字 都会换成这份外貌，长相不再漂移。</div>}
+      {tab === 'people' && cast.map(p => <PersonCard key={p.name} gameId={gameId} person={p} emotions={emotions} />)}
+      {tab === 'people' && !cast.length && <div className="fg-note">有名字的角色第一次出场时，导演会自动给他建档：固定外貌、身上的衣服。之后插画里写 @名字 都会换成这份档案，长相不再漂移；立绘按「服装 × 长期状态 × 情绪」各画一套，同一个种子。</div>}
+      {tab === 'emotions' && <EmotionLibrary emotions={emotions} />}
       {tab === 'log' && log.map(e => (
         <div key={e.index} className="fg-log-item" style={{ gridTemplateColumns: '12cqw 1fr auto', cursor: 'default' }}>
           <div className="fg-log-name">{e.name}</div>
-          <div><b style={{ color: 'var(--accent)' }}>{ACTION[e.action] || e.action}</b>{e.turn != null ? ` · 第 ${e.turn} 轮` : ''}<br /><span className="fg-note">{e.before ? `${e.before} → ` : ''}{e.after || (e.action === 'temp' ? '（解除）' : '')}</span></div>
-          {<button type="button" className="fg-btn" disabled={busy === 'rb' + e.index} onClick={() => run('rb' + e.index, () => api.cast(gameId, 'rollback', { index: e.index }), '已回滚')}>回滚</button>}
+          <div><b style={{ color: 'var(--accent)' }}>{LOG_ACTION[e.action] || e.action}</b>{e.turn != null ? ` · 第 ${e.turn} 轮` : ''}{e.source === 'user' ? ' · 手动' : ''}<br /><span className="fg-note">{e.action === 'outfit' ? `${e.outfit}：` : ''}{e.before ? `${e.before} → ` : ''}{e.after || (e.action === 'temp' || e.action === 'states' ? '（解除）' : '')}</span></div>
+          {e.rolledBack ? <span className="fg-note">已回滚</span> : <button type="button" className="fg-btn" disabled={busy === 'rb' + e.index} onClick={() => run('rb' + e.index, () => api.cast(gameId, 'rollback', { index: e.index }), '已回滚')}>回滚</button>}
         </div>
       ))}
-      {tab === 'log' && !log.length && <div className="fg-note">AI 每次建档、改外貌、加临时状态都会记在这里，可以一键回滚。</div>}
+      {tab === 'log' && !log.length && <div className="fg-note">AI 每次建档、改外貌、换装、加长期 / 临时状态都会记在这里，可以一键回滚。</div>}
     </Panel>
   )
 }
@@ -564,10 +734,13 @@ function DirectorSection({ data, onDirectorLog }) {
             : <Text value={cfg.director.model} placeholder="模型 ID" onCommit={v => p({ model: v })} />)}
         </div>
       </Field>
-      <Field label="最大输出 / 温度" hint="默认 128000（Claude Opus / Sonnet 5.5 的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。"><div className="fg-row"><Text type="number" style={{ width: '9cqw' }} value={cfg.director.maxTokens} onCommit={v => p({ maxTokens: v })} /><Text type="number" style={{ width: '7cqw' }} value={cfg.director.temperature} onCommit={v => p({ temperature: v })} /></div></Field>
+      <Field label="最大输出 / 温度" hint="默认 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。"><div className="fg-row"><Text type="number" style={{ width: '9cqw' }} value={cfg.director.maxTokens} onCommit={v => p({ maxTokens: v })} /><Text type="number" style={{ width: '7cqw' }} value={cfg.director.temperature} onCommit={v => p({ temperature: v })} /></div></Field>
       <Field label="资料长度" hint="给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认 1000000，等于不截断；超出模型窗口时自动缩短。"><Text type="number" value={cfg.director.contextChars} onCommit={v => p({ contextChars: v })} /></Field>
-      <Field label="自定义提示词" hint="留空用内置导演提示词。可用 {{maxImages}} {{styleHint}}。">
+      <Field label="自定义提示词" hint="留空用内置导演提示词。可用 {{maxImages}} {{styleHint}}。情绪库、配乐曲库附在用户消息里，自定义时也生效。">
         <textarea className="fg-textarea" defaultValue={cfg.director.systemPrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.systemPrompt) p({ systemPrompt: e.target.value }) }} />
+      </Field>
+      <Field label="立绘设计师提示词" hint="留空用内置的。可用 {{styleHint}}。输出格式必须是 {&quot;sprites&quot;:[{&quot;key&quot;,&quot;tags&quot;,&quot;negative&quot;}]}。">
+        <textarea className="fg-textarea" defaultValue={cfg.director.spritePrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.spritePrompt) p({ spritePrompt: e.target.value }) }} />
       </Field>
     </>
   )
@@ -581,8 +754,9 @@ function ImagesSection({ data }) {
       <div className="fg-section">自动配图</div>
       <Field label="自动插画" hint="导演判断值得画的地方自动出 CG，挂在正文对应段落后。"><div className="fg-row"><Toggle value={cfg.images.auto} onChange={v => p({ auto: v })} /><span className="fg-note">每轮最多</span><Text type="number" style={{ width: '6cqw' }} value={cfg.images.maxPerTurn} onCommit={v => p({ maxPerTurn: v })} /><span className="fg-note">张</span></div></Field>
       <Field label="新地点背景"><Toggle value={cfg.images.backgrounds} onChange={v => p({ backgrounds: v })} /></Field>
-      <Field label="首次登场立绘"><Toggle value={cfg.images.portraits} onChange={v => p({ portraits: v })} /></Field>
-      <Field label="表情差分" hint="导演用到新表情时补画一张，费用较高。"><div className="fg-row"><Toggle value={cfg.images.expressions} onChange={v => p({ expressions: v })} /><span className="fg-note">每轮最多</span><Text type="number" style={{ width: '6cqw' }} value={cfg.images.expressionsPerTurn} onCommit={v => p({ expressionsPerTurn: v })} /><span className="fg-note">张</span></div></Field>
+      <Field label="立绘" hint="角色登场、换装、长期状态变化时，画这一套的平静立绘。"><Toggle value={cfg.images.portraits} onChange={v => p({ portraits: v })} /></Field>
+      <Field label="情绪差分" hint="导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。"><div className="fg-row"><Toggle value={cfg.images.expressions} onChange={v => p({ expressions: v })} /><span className="fg-note">每轮最多</span><Text type="number" style={{ width: '6cqw' }} value={cfg.images.expressionsPerTurn} onCommit={v => p({ expressionsPerTurn: v })} /><span className="fg-note">张</span></div></Field>
+      <Field label="立绘设计师" hint="立绘提示词由后台模型读完人物卡、世界书和到这一轮为止的全部剧情来写，一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼。"><Toggle value={cfg.images.spriteWriter} onChange={v => p({ spriteWriter: v })} /></Field>
       <Field label="并发"><Text type="number" style={{ width: '6cqw' }} value={cfg.images.concurrency} onCommit={v => p({ concurrency: v })} /></Field>
     </>
   )

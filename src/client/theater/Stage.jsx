@@ -4,6 +4,7 @@ import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
 import { SKY, placeKey, actorX, cgSrc, TIME_LABEL, WEATHER_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
+import { lookAt, pickSprite } from '../../../lib/look.js'
 
 const TRANSITION = {
   dissolve: ['fg-dissolve', '1.1s'], cinematic: ['fg-cinematic', '1.5s'], wipe: ['fg-wipe', '1s'], iris: ['fg-iris', '1.2s'],
@@ -180,14 +181,16 @@ export function MangaSymbol({ kind, life = 2.6 }) {
   return <span className="fg-symbol" data-kind={kind} style={{ '--life': life + 's' }}><span className="fg-symbol-art" dangerouslySetInnerHTML={{ __html: svg }} /></span>
 }
 
-function spriteFor(person, emo) {
-  const s = (person && person.sprites) || {}
-  return s[emo] || s.neutral || Object.values(s).find(Boolean) || ''
+/** 这一拍该用的立绘：按这一轮的样子（外貌、服装、长期状态）找对应情绪的差分，新情绪没画好时先用它的基础情绪。 */
+function spriteFor(person, turn, emo, emotions) {
+  if (!person || !person.timeline) return ''
+  const custom = (emotions || []).find(e => e.id === emo)
+  return pickSprite(person.sprites, lookAt(person.timeline, turn), emo, custom ? custom.base : '')
 }
 
-function Actor({ entry, person, beat, emo }) {
+function Actor({ entry, person, beat, emo, emotions }) {
   const speaking = beat.speaker === entry.name
-  const sprite = spriteFor(person, emo)
+  const sprite = spriteFor(person, beat.turn, emo, emotions)
   const src = sprite ? assetUrl(sprite) : ''
   const color = (person && person.color) || '#9b7bff'
   const [shown, setShown] = React.useState(src)
@@ -202,7 +205,7 @@ function Actor({ entry, person, beat, emo }) {
     const t = setTimeout(() => setSwap(false), 300)
     return () => clearTimeout(t)
   }, [src])
-  const uploaded = person && person.uploaded
+  const uploaded = Boolean(person && Object.values(person.sprites || {}).some(r => r && r.assetId === sprite && r.uploaded))
   return (
     <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}`} style={{ '--x': actorX(entry.pos) + '%' }} data-name={entry.name}>
       <div className="fg-actor-body">
@@ -225,7 +228,7 @@ export function Cast({ beat, view }) {
   return (
     <div className="fg-cast">
       {cast.map(entry => (
-        <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} />
+        <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} />
       ))}
     </div>
   )

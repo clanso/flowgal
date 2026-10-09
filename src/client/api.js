@@ -36,6 +36,8 @@ export const api = {
   directorEntry: (gameId, id) => call(`/director-log?gameId=${encodeURIComponent(gameId)}&id=${encodeURIComponent(id)}`),
   place: (gameId, key) => call('/place/render', { gameId, key }),
   cast: (gameId, action, input) => call('/cast', { gameId, action, ...input }),
+  fill: (gameId, opts = {}) => call('/fill', { gameId, ...opts }),
+  emotion: (action, input) => call('/emotions', { action, ...input }),
   config: () => call('/config'),
   patchConfig: patch => call('/config', { patch }),
   secret: (backend, endpoint, value) => call('/secret', { backend, endpoint, value }),
@@ -55,6 +57,13 @@ export const api = {
     if (!res.ok || !data || data.ok === false) throw new Error((data && data.error) || `HTTP ${res.status}`)
     return data.track
   },
+}
+
+/** 补图结果的一句话说明。 */
+export function fillText(r) {
+  const parts = [r.cg && `插画 ${r.cg} 张`, r.bg && `背景 ${r.bg} 张`, r.sprite && `立绘差分 ${r.sprite} 张`].filter(Boolean)
+  const tail = r.undirected ? `；还有 ${r.undirected} 轮没整理，先在场景卡上点「重新整理」` : ''
+  return (parts.length ? `已排队补画：${parts.join('、')}` : '没有缺的图') + tail
 }
 
 // ───────────── 全局状态：剧场是否打开、看哪一局、从哪一轮开始 ─────────────
