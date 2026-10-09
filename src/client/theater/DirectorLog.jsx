@@ -1,4 +1,4 @@
-// 导演日志：后台导演每次整理的完整记录，以及立绘设计师每次写立绘提示词的记录。
+// 导演日志：后台导演每次整理的完整记录，以及立绘设计师、插画分镜师每次写提示词的记录。
 // 正在跑的那次实时滚动模型输出（有思考就一起显示），可以中途停止；
 // 历史记录能看实际发出去的提示词、每次尝试的原始输出 / 用量 / 报错，以及解析后逐句的演出标注。
 import React from 'react'
@@ -7,11 +7,13 @@ import { Panel } from './Panels.jsx'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL } from './playback.js'
 
 const STATUS = { running: ['进行中', 'is-running'], ok: ['完成', 'is-ok'], failed: ['失败', 'is-failed'], cancelled: ['已停止', 'is-cancelled'] }
-const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词' }
-const WRITER = { ai: '设计师写的', fallback: '按档案拼的', user: '玩家改的' }
+const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词', cg: '写插画提示词' }
+const WRITER = { ai: '模型写的', fallback: '按档案拼的', user: '玩家改的' }
 const SOURCE = { tavern: '跟随 Tavern 后台模型', plugin: '插件设置里指定' }
 const USAGE_LABEL = { inputTokens: '输入', outputTokens: '输出', reasoningTokens: '思考', cachedInputTokens: '缓存命中', cacheReadTokens: '缓存读', cacheWriteTokens: '缓存写', totalTokens: '合计' }
 const SHAPE_LABEL = { landscape: '横版', portrait: '竖版', square: '方形' }
+/** 一条记录的标题：导演按轮次，立绘按人，插画按轮次。 */
+const entryTitle = e => (e.kind === 'sprite' ? `立绘 · ${e.name}` : e.kind === 'cg' ? `插画 · 第 ${e.turn} 轮` : `第 ${e.turn} 轮`)
 
 const num = n => Number(n || 0).toLocaleString('en-US')
 const secs = ms => (ms >= 60000 ? `${Math.floor(ms / 60000)} 分 ${Math.round((ms % 60000) / 1000)} 秒` : `${(ms / 1000).toFixed(1)} 秒`)
@@ -67,7 +69,7 @@ function StatusPill({ status }) {
 function LogRow({ e, on, onClick }) {
   return (
     <button type="button" className={`fg-dlog-row${on ? ' is-on' : ''}`} onClick={onClick}>
-      <div className="fg-dlog-row-head"><b>{e.kind === 'sprite' ? `立绘 · ${e.name}` : `第 ${e.turn} 轮`}</b><StatusPill status={e.status} /></div>
+      <div className="fg-dlog-row-head"><b>{entryTitle(e)}</b><StatusPill status={e.status} /></div>
       <div className="fg-dlog-row-meta">{clock(e.at)} · {e.status === 'running' ? '进行中' : secs(e.ms)}{e.attempts > 1 ? ` · ${e.attempts} 次尝试` : ''}</div>
       <div className="fg-dlog-row-meta">{e.model || '（没有模型）'}</div>
       {e.summary && <div className="fg-dlog-row-sum">{e.summary}</div>}
@@ -132,8 +134,9 @@ function ScriptView({ script, units }) {
       <Block label={`插画分镜 · ${script.images.length}`}>
         {script.images.map((img, i) => (
           <div key={i} className="fg-dlog-card">
-            <div className="fg-dlog-chips"><Chip k="标题">{img.title || '—'}</Chip><Chip k="位置">{img.after} 之后</Chip><Chip k="画幅">{SHAPE_LABEL[img.shape] || img.shape}</Chip></div>
-            <div className="fg-dlog-mono">{img.tags}</div>
+            <div className="fg-dlog-chips"><Chip k="标题">{img.title || '—'}</Chip><Chip k="位置">{img.after} 之后</Chip>{img.who && img.who.length ? <Chip k="入画">{img.who.join('、')}</Chip> : null}{img.shape && <Chip k="画幅">{SHAPE_LABEL[img.shape] || img.shape}</Chip>}</div>
+            {img.moment && <div>{img.moment}</div>}
+            {img.tags && <div className="fg-dlog-mono">{img.tags}</div>}
             {img.desc && <div className="fg-note">{img.desc}</div>}
           </div>
         ))}
@@ -182,6 +185,32 @@ function SpritesView({ sprites }) {
   )
 }
 
+/** 插画分镜师这次写出的每张插画：Base 一块，每人一块。 */
+function CgsView({ cgs }) {
+  if (!cgs || !cgs.length) return <div className="fg-note">这次没有写出提示词，看「原始输出」里模型回了什么。</div>
+  return (
+    <Block label={`插画提示词 · ${cgs.length}`}>
+      {cgs.map(cg => (
+        <div key={cg.key} className="fg-dlog-card">
+          <div className="fg-dlog-chips"><Chip k="插画">{cg.label}</Chip>{cg.shape && <Chip k="画幅">{SHAPE_LABEL[cg.shape] || cg.shape}</Chip>}{cg.writer && <Chip k="来源">{WRITER[cg.writer] || cg.writer}</Chip>}</div>
+          {cg.tags || cg.characters?.length ? (
+            <>
+              <div className="fg-dlog-mono"><i className="fg-dlog-k">Base</i>{cg.tags || '—'}</div>
+              {cg.desc && <div className="fg-note">{cg.desc}</div>}
+              {(cg.characters || []).map((c, i) => (
+                <div key={i} className="fg-dlog-cgchar">
+                  <div className="fg-dlog-mono"><i className="fg-dlog-k">{c.name || `角色 ${i + 1}`}</i>{c.tag || '—'}</div>
+                  {c.nl && <div className="fg-note">{c.nl}</div>}
+                </div>
+              ))}
+            </>
+          ) : <div className="fg-note">没写出来，出图时按档案拼。</div>}
+        </div>
+      ))}
+    </Block>
+  )
+}
+
 function Attempts({ attempts }) {
   if (!attempts.length) return <div className="fg-note">还没有发出请求。</div>
   return attempts.map((a, i) => (
@@ -215,14 +244,16 @@ function LogDetail({ gameId, summary }) {
     try { await api.cancel(gameId, 'director', summary.id); toast('已停止这次整理') } catch (e) { toast(String(e.message || e), 'error') } finally { setStopping(false) }
   }
   const sprite = summary.kind === 'sprite'
-  const tabs = running ? [['live', '实时输出'], ['prompt', '提示词']] : [['result', sprite ? '写出的提示词' : '整理结果'], ['raw', `原始输出${summary.attempts > 1 ? ` · ${summary.attempts} 次` : ''}`], ['prompt', '提示词']]
+  const cg = summary.kind === 'cg'
+  const writer = sprite || cg
+  const tabs = running ? [['live', '实时输出'], ['prompt', '提示词']] : [['result', writer ? '写出的提示词' : '整理结果'], ['raw', `原始输出${summary.attempts > 1 ? ` · ${summary.attempts} 次` : ''}`], ['prompt', '提示词']]
   const live = summary.live || { output: '', reasoning: '', chars: 0, note: '' }
   const elapsed = running ? Math.max(summary.ms, now - summary.at) : summary.ms
   return (
     <div className="fg-dlog-detail">
       <div className="fg-dlog-head">
-        <div className="fg-dlog-title">{sprite ? `立绘 · ${summary.name}（读到第 ${summary.turn} 轮）` : `第 ${summary.turn} 轮`} <StatusPill status={summary.status} /><span className="fg-spacer" />
-          {running && <button type="button" className="fg-btn" disabled={stopping} onClick={stop}>{sprite ? '停止' : '停止整理'}</button>}
+        <div className="fg-dlog-title">{sprite ? `立绘 · ${summary.name}（读到第 ${summary.turn} 轮）` : entryTitle(summary)} <StatusPill status={summary.status} /><span className="fg-spacer" />
+          {running && <button type="button" className="fg-btn" disabled={stopping} onClick={stop}>{writer ? '停止' : '停止整理'}</button>}
         </div>
         <div className="fg-dlog-facts">
           <div><i>模型</i>{summary.model || '—'}{summary.provider ? <span className="fg-note"> · {summary.provider}</span> : null}{SOURCE[summary.source] ? <span className="fg-note">（{SOURCE[summary.source]}）</span> : null}</div>
@@ -230,7 +261,7 @@ function LogDetail({ gameId, summary }) {
           <div><i>最大输出</i>{num(summary.maxTokens)} token{entry && entry.temperature != null ? ` · 温度 ${entry.temperature}` : ''}</div>
           <div><i>模型窗口</i>{summary.window ? `${num(summary.window)} token` : 'DSH 没给窗口大小，按设置原样发'}{entry && entry.outputDefault ? <span className="fg-note"> · 模型默认输出 {num(entry.outputDefault)}</span> : null}</div>
           {entry && <div><i>资料</i>{entry.contextLength ? `发了 ${num(entry.contextChars)} 字（人物卡与世界书共 ${num(entry.contextLength)} 字）` : '这张卡没有人物卡 / 世界书资料'}</div>}
-          {entry && sprite && <div><i>剧情</i>{`发了 ${num(entry.storyChars)} 字（到这一轮为止共 ${num(entry.storyLength)} 字）`}</div>}
+          {entry && writer && <div><i>剧情</i>{`发了 ${num(entry.storyChars)} 字（到这一轮为止共 ${num(entry.storyLength)} 字）`}</div>}
           {summary.usage && <div><i>用量</i>{usageText(summary.usage)}</div>}
         </div>
         {summary.notes.map((n, i) => <div key={i} className="fg-dlog-notice">⚠ {n}</div>)}
@@ -247,12 +278,12 @@ function LogDetail({ gameId, summary }) {
           <Block label="模型输出（实时）"><Pre text={live.output} follow cursor empty="还没有输出" /></Block>
         </>
       )}
-      {tab === 'result' && (entry ? (sprite ? <SpritesView sprites={entry.sprites} /> : <ScriptView script={entry.script} units={entry.units || []} />) : <div className="fg-note">读取中…</div>)}
+      {tab === 'result' && (entry ? (sprite ? <SpritesView sprites={entry.sprites} /> : cg ? <CgsView cgs={entry.cgs} /> : <ScriptView script={entry.script} units={entry.units || []} />) : <div className="fg-note">读取中…</div>)}
       {tab === 'raw' && (entry ? <Attempts attempts={entry.attempts || []} /> : <div className="fg-note">读取中…</div>)}
       {tab === 'prompt' && (entry ? (
         <>
           <Block label={`系统提示词 · ${num((entry.system || '').length)} 字`} text={entry.system}><Pre text={entry.system} /></Block>
-          <Block label={`用户消息 · ${num((entry.user || '').length)} 字${sprite ? '（资料 + 全部剧情 + 角色档案 + 要画的差分）' : '（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）'}`} text={entry.user}><Pre text={entry.user} /></Block>
+          <Block label={`用户消息 · ${num((entry.user || '').length)} 字${sprite ? '（资料 + 全部剧情 + 角色档案 + 要画的差分）' : cg ? '（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）' : '（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）'}`} text={entry.user}><Pre text={entry.user} /></Block>
         </>
       ) : <div className="fg-note">读取中…</div>)}
     </div>
@@ -263,7 +294,7 @@ export function DirectorLog({ gameId, onClose, focusTurn = null }) {
   const { log, error } = useDirectorLog(gameId)
   const [selected, setSelected] = React.useState('')
   const items = log ? [...log.running, ...log.entries] : []
-  const current = items.find(e => e.id === selected) || (focusTurn != null && items.find(e => e.turn === focusTurn && e.kind !== 'sprite')) || items[0]
+  const current = items.find(e => e.id === selected) || (focusTurn != null && items.find(e => e.turn === focusTurn && (e.kind || 'director') === 'director')) || items[0]
   return (
     <Panel title="导演日志" en="Director" onClose={onClose}
       actions={log && <span className="fg-pill">{log.running.length ? `${log.running.length} 个整理中 · ` : ''}保留最近 {log.keep} 次</span>}>

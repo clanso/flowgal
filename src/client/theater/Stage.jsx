@@ -234,17 +234,53 @@ export function Cast({ beat, view }) {
   )
 }
 
+/** 竖版插画比舞台高得多时露出的比例（舞台高 ÷ 铺满宽度后的图高）；够矮、用铺满就行的返回 0。 */
+const PAN_BELOW = 0.85
+function usePanRatio(ref, src, version) {
+  const [state, setState] = React.useState({ src: '', ratio: 0 })
+  const w = version && version.width
+  const h = version && version.height
+  React.useLayoutEffect(() => {
+    if (!src) return undefined
+    let off = false
+    let dims = w && h ? [w, h] : null
+    const measure = () => {
+      const el = ref.current
+      if (off || !el || !dims || !el.clientWidth) return
+      const ratio = (el.clientHeight / el.clientWidth) / (dims[1] / dims[0])
+      setState({ src, ratio: ratio < PAN_BELOW ? ratio : 0 })
+    }
+    // 旧版本没记尺寸：读一下图片本身。
+    if (!dims) {
+      const probe = new Image()
+      probe.onload = () => { dims = [probe.naturalWidth, probe.naturalHeight]; measure() }
+      probe.src = src
+    }
+    measure()
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null
+    if (ro && ref.current) ro.observe(ref.current)
+    return () => { off = true; if (ro) ro.disconnect() }
+  }, [src, w, h])
+  return state.src === src ? state.ratio : 0
+}
+
 export function CgLayer({ beat }) {
   const img = beat.cg
   const src = cgSrc(img, assetUrl)
+  const box = React.useRef(null)
+  const ratio = usePanRatio(box, src, img && img.versions && img.versions[img.current])
   if (!img) return null
   if (!src) {
     if (img.status === 'failed' || img.status === 'cancelled') return null
-    return <div className="fg-cg-wait"><i />插画绘制中{img.title ? `「${img.title}」` : ''}</div>
+    return <div className="fg-cg-wait"><i />{img.status === 'writing' ? '插画分镜中' : '插画绘制中'}{img.title ? `「${img.title}」` : ''}</div>
   }
+  // 竖版：停在顶上 → 慢慢摇到底 → 拉远露出全貌 → 倒着放回去；越长摇得越久。横版照旧缓慢推拉。
+  const pan = ratio ? { '--r': ratio.toFixed(4), '--pan': `${Math.round(16 + (1 - ratio) * 16)}s` } : null
   return (
-    <div className="fg-cg" key={img.id + ':' + img.current}>
-      <div className="fg-cg-img" style={{ backgroundImage: `url("${src}")` }} />
+    <div className={`fg-cg${ratio ? ' is-tall' : ''}`} key={img.id + ':' + img.current} ref={box} style={pan}>
+      {ratio
+        ? <><div className="fg-cg-back" style={{ backgroundImage: `url("${src}")` }} /><img className="fg-cg-pan" src={src} alt="" draggable={false} /></>
+        : <div className="fg-cg-img" style={{ backgroundImage: `url("${src}")` }} />}
       {img.title && <div className="fg-cg-caption"><i /><span>CG</span><b>{img.title}</b></div>}
     </div>
   )

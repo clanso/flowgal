@@ -113,7 +113,7 @@ function readOutfit(t) {
   return { kind: 'plain', base: '#7e8aa8', trim: '#e8ebf3', accent: '#5a6688' }
 }
 
-export function paintSprite(prompt) {
+function drawSprite(prompt) {
   const t = String(prompt || '').toLowerCase()
   const c = canvas()
   const hair = hex(pickColor(t, HAIR, '#3a2c3c'))
@@ -242,5 +242,9 @@ export function paintSprite(prompt) {
     c.fill(segment(CX + 210, 1216, CX + 120, my + 70, 46), cloth, { outline: 2.5 })
     c.fill(union(ellipse(CX + 92, my + 46, 46, 40), segment(CX + 70, my + 20, CX + 58, my - 6, 13)), skin, { outline: 2.5 })
   }
-  return c.png()
+  return c
 }
+
+export const paintSprite = prompt => drawSprite(prompt).png()
+/** 同一张立绘的像素层（RGBA，直通色），给占位插画把人物叠进场景用。 */
+export const spriteLayer = prompt => ({ width: W, height: H, px: drawSprite(prompt).px })

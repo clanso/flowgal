@@ -85,6 +85,8 @@ export function CgCardInline({ item, gameId }) {
     try { await fn(); if (ok) toast(ok) } catch (e) { toast(String(e.message || e), 'error') } finally { setBusy('') }
   }
   const redraw = () => act('r', () => api.render(gameId, data.imageId, {}), '已加入出图队列')
+  // 竖版插画整张显示（窄一点），不裁成横条。
+  const tall = data.shape === 'portrait' ? ' is-tall' : ''
   if (item && item.status === 'failed' && !src) {
     return (
       <div className="fg-chat"><div className="fg-cgcard"><div className="fg-cgcard-fail">
@@ -96,14 +98,14 @@ export function CgCardInline({ item, gameId }) {
   }
   if (!src || (item && item.status === 'pending' && !src)) {
     return (
-      <div className="fg-chat"><div className="fg-cgcard"><div className="fg-cgcard-wait" style={{ aspectRatio: RATIO[data.shape] || RATIO.landscape }}>
-        <span>正在绘制{item && item.caption ? `「${item.caption}」` : '插画'}</span>
+      <div className="fg-chat"><div className={`fg-cgcard${tall}`}><div className="fg-cgcard-wait" style={{ aspectRatio: RATIO[data.shape] || RATIO.landscape }}>
+        <span>{data.writing ? '插画分镜师在构思' : '正在绘制'}{item && item.caption ? `「${item.caption}」` : '插画'}</span>
       </div></div></div>
     )
   }
   return (
     <div className="fg-chat">
-      <div className="fg-cgcard">
+      <div className={`fg-cgcard${tall}`}>
         <img key={src} src={src} alt={(item && item.caption) || '插画'} loading="lazy" onClick={() => setZoom(true)} />
         <div className="fg-cgcard-bar">
           <span className="fg-cap">{(item && item.caption) || 'CG'}{versions > 1 ? ` · ${current + 1}/${versions}` : ''}{item && item.status === 'pending' ? ' · 重画中…' : ''}</span>

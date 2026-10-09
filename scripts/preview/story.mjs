@@ -1,5 +1,6 @@
-// 预览用的一小段原创剧情（三轮 + 一轮演示「先文本后整理」），以及每轮对应的导演输出。
+// 预览用的一小段原创剧情（三轮 + 一轮演示「先文本后整理」），以及每轮对应的导演输出和插画分镜。
 // 第 2 轮导演自创一个复合情绪「害羞地强装镇定」，第 4 轮林岚换上冬季制服，用来演示立绘差分。
+// 第 1 轮的插画是竖版，用来演示剧场里竖图的摇镜。
 export const CARD = { id: 'preview-card', name: '放学后的约定' }
 
 export const TURNS = [
@@ -67,7 +68,7 @@ export function directorReply(turn, units) {
       L('不许走神', { sp: '林岚', emo: 'pout', sym: 'anger' }),
     ],
     choices: [],
-    images: [{ after: find(units, '那就罚你'), title: '午后的琴房', tags: '1girl, @林岚, sitting, playing piano, looking back, smile, sunlight, dust particles', desc: 'a girl at a piano looking back with a teasing smile', shape: 'landscape' }],
+    images: [{ after: find(units, '那就罚你'), title: '午后的琴房', moment: '林岚坐在琴凳上回过头，带着捉弄人的笑，要罚我听她弹完这一首', who: ['林岚'] }],
     people: [
       { name: '林岚', gender: 'female', appearance: '1girl, long black hair, blue eyes, hair ornament, slender', outfit: '校服', outfitTags: 'sailor school uniform, navy serafuku, red neckerchief, black pantyhose' },
     ],
@@ -88,7 +89,7 @@ export function directorReply(turn, units) {
     ],
     choices: [],
     emotions: [{ name: '害羞地强装镇定', desc: '脸颊泛红却板着脸，目光移开，嘴唇抿紧，手指捏着衣角', base: 'shy' }],
-    images: [{ after: find(units, '悄悄把一个小信封'), title: '萤火与信封', tags: '@林岚, @苏晴, 2girls, bamboo forest, fireflies, dusk, holding envelope', desc: 'two girls on a bamboo path among fireflies at dusk', shape: 'landscape' }],
+    images: [{ after: find(units, '悄悄把一个小信封'), title: '萤火与信封', moment: '萤火虫飞舞的竹林小径，林岚别过脸把信封递过来，苏晴还扶着膝盖喘气，惊讶地看着', who: ['林岚', '苏晴'] }],
     people: [
       { name: '林岚', temp: 'holding small envelope' },
       { name: '苏晴', gender: 'female', appearance: '1girl, short brown hair, side ponytail, amber eyes', outfit: '开衫校服', outfitTags: 'school uniform, beige cardigan, white shirt, red ribbon' },
@@ -119,4 +120,30 @@ export function directorReply(turn, units) {
     people: [{ name: '林岚', outfit: '冬季制服', outfitTags: 'winter school uniform, brown duffel coat, red checkered scarf, black pantyhose' }],
     summary: '旧校舍里传来琴声。',
   }
+}
+
+/**
+ * 假插画分镜师按插画标题回的提示词：Base + 每人一个角色块。真模型会读完剧情和档案自己写。
+ * 名字只放在 name 上，固定外貌由插件按档案补；衣服写成指纹，同框两人的颜色分开。
+ */
+export const CG_DRAFTS = {
+  '午后的琴房': {
+    size: 'portrait',
+    tag: 'indoors, school music room, grand piano, sheet music, afternoon, sunlight through window, light rays, dust particles, cowboy shot, from side, warm colors, detailed background, modern',
+    nl: 'A quiet school music room in the afternoon, sunlight slanting across a black grand piano.',
+    characters: [{
+      name: '林岚',
+      tag: 'girl, sitting on piano bench, sailor school uniform, navy serafuku, red neckerchief, black pantyhose, teasing smile, light blush, head tilt, looking back, hands on piano keys',
+      nl: 'She turns back from the keys with a teasing smile, as if she had been waiting the whole time.',
+    }],
+  },
+  '萤火与信封': {
+    size: 'landscape',
+    tag: 'outdoors, bamboo forest, stone path, dusk, fireflies, glowing particles, medium shot, cold colors, soft lighting, detailed background',
+    nl: 'A narrow bamboo path at dusk, fireflies drifting between the leaves.',
+    characters: [
+      { name: '林岚', tag: 'girl, sailor school uniform, navy serafuku, red neckerchief, blush, pursed lips, looking away, holding envelope, arm extended', nl: 'She holds out a small envelope with her face turned away, cheeks red.' },
+      { name: '苏晴', tag: 'girl, school uniform, beige cardigan, white shirt, red ribbon, open mouth, wide eyes, looking at another, hand on own knee, leaning forward, out of breath', nl: 'Still catching her breath, she stares at the envelope in surprise.' },
+    ],
+  },
 }

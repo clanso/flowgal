@@ -1,8 +1,9 @@
 // 本地预览：真实的宿主半边（导演 / 档案 / 出图队列 / 接口）+ 假的 Tavern、假的模型、假的生图服务，
 // 外加一个模拟 Tavern 聊天页的壳子，用来开发和截图。不需要 DSH，也不需要任何 Key。
 //   node scripts/preview-server.mjs [--port 5178]
-// 生图请求由假服务按提示词程序化画占位图：插画 / 背景画风景（scripts/preview/paint.mjs），
-// 立绘画透明底半身像，衣服和表情按立绘设计师写的 tag 变（scripts/preview/sprite.mjs）。
+// 生图请求由假服务按提示词程序化画占位图：背景画风景（scripts/preview/paint.mjs），
+// 立绘画透明底半身像，衣服和表情按立绘设计师写的 tag 变（scripts/preview/sprite.mjs）；
+// 插画按请求的尺寸画风景，再把插画分镜师写的每个角色块画成人物叠进去（第 1 轮是竖版，演示摇镜）。
 // 「我的配乐」里放三段程序合成的示例曲（scripts/preview/synth.mjs），假导演每轮从里面选曲。
 // 环境变量：FLOWGAL_SKIN 初始皮肤；FLOWGAL_FONT_DIR 本地字体镜像目录（结构同 jsDelivr 的 /npm/ 路径，
 // 例如 <目录>/@fontsource/noto-sans-sc@5.3.0/400.css），不设时字体照常从 jsDelivr 读。
@@ -16,9 +17,9 @@ import { createEngine } from '../lib/engine.js'
 import { createRoutes } from '../lib/routes.js'
 import { createMusic } from '../lib/music.js'
 import { segmentTurn } from '../lib/segment.js'
-import { CARD, TURNS, LATE_TURN, directorReply } from './preview/story.mjs'
+import { CARD, TURNS, LATE_TURN, directorReply, CG_DRAFTS } from './preview/story.mjs'
 import { paintPlaceholder } from './preview/paint.mjs'
-import { paintSprite } from './preview/sprite.mjs'
+import { paintSprite, spriteLayer } from './preview/sprite.mjs'
 import { emotionId } from '../lib/emotions.js'
 import { EMOTION_TAGS } from '../lib/vocab.js'
 import { demoTracks } from './preview/synth.mjs'
@@ -86,15 +87,29 @@ function spriteWriterReply(prompt) {
   return JSON.stringify({ sprites }, null, 1)
 }
 
+// 假插画分镜师：按「要画的插画」里的标题回 story.mjs 写好的 Base + 角色块。
+function cgWriterReply(prompt) {
+  const images = []
+  for (const m of prompt.matchAll(/^- (c\d+)：(.*)$/gm)) {
+    const title = (m[2].match(/标题「([^」]+)」/) || [])[1] || ''
+    images.push({ key: m[1], ...(CG_DRAFTS[title] || { size: 'landscape', tag: 'outdoors, scenery, wide shot, soft lighting', nl: '', characters: [] }) })
+  }
+  return JSON.stringify({ images }, null, 1)
+}
+const CG_THINKING = '状态账本：林岚此刻穿着海军蓝水手服，手里没有东西，没有长期状态。时代锚：现代日本高中，放学后的校舍。景别：她坐在琴凳上回头，用 cowboy shot 把琴键和回头的动作一起框进来；单人坐姿，竖版。表情：捉弄人的笑，配歪头和一点脸红；视线回头看向我。自查：tag 和 nl 里没有人名，衣服写成了指纹。'
+
 const THINKING = '先看这一轮的地点和时段，沿用上一幕的站位；说话人按引号前后的名字认，旁白里写到谁的动作就给谁换表情。值得画的只有一处，放在情绪最满的那句后面。'
 const llm = {
   resolveModelInfo: async () => ({ context: { contextWindow: 1000000 }, defaultMaxTokens: 128000 }),
   stream(request) {
     const prompt = request.messages[0].content[0].text
     const isDirector = String(request.system || '').includes('后台导演')
-    if (String(request.system || '').includes('立绘设计师')) {
-      const reply = spriteWriterReply(prompt)
+    const system = String(request.system || '')
+    const cgWriter = system.includes('你是视觉小说的插画分镜师')
+    if (system.includes('立绘设计师') || cgWriter) {
+      const reply = cgWriter ? cgWriterReply(prompt) : spriteWriterReply(prompt)
       return (async function* () {
+        if (cgWriter) for (let i = 0; i < CG_THINKING.length; i += 16) { yield { type: 'reasoning-delta', text: CG_THINKING.slice(i, i + 16) }; await sleep(8) }
         for (let i = 0; i < reply.length; i += 24) { yield { type: 'text-delta', text: reply.slice(i, i + 24) }; await sleep(6) }
         yield { type: 'usage', usage: { inputTokens: Math.ceil(prompt.length * 0.9), outputTokens: Math.ceil(reply.length / 3) } }
         yield { type: 'finish', reason: { kind: 'stop' } }
@@ -102,7 +117,7 @@ const llm = {
     }
     const turnInfo = isDirector ? [...TURNS, LATE_TURN].find(t => prompt.includes(t.text.split('\n')[0].slice(0, 12))) : null
     return (async function* () {
-      if (!turnInfo) { yield { type: 'text-delta', text: JSON.stringify({ tags: '@林岚, 1girl, smile, upper body', desc: 'a smiling girl' }) }; yield { type: 'finish', reason: { kind: 'stop' } }; return }
+      if (!turnInfo) { yield { type: 'text-delta', text: '{}' }; yield { type: 'finish', reason: { kind: 'stop' } }; return }
       const slow = turnInfo.turn === 4
       const units = segmentTurn(turnInfo.text)
       const reply = JSON.stringify(withMusic(turnInfo.turn, units, directorReply(turnInfo.turn, units)), null, 1)
@@ -115,15 +130,21 @@ const llm = {
   },
 }
 
-// ───────── 假生图：竖图（立绘）画半身像，其余画风景 ─────────
+// ───────── 假生图：立绘（白底 / 透明底的单人）画半身像；插画和背景按请求尺寸画风景，角色块画成人物叠上去 ─────────
 async function fakeFetch(url, init = {}) {
   const body = typeof init.body === 'string' ? init.body : ''
   if (/novelai/.test(String(url)) && /subscription/.test(String(url))) return new Response(JSON.stringify({ tier: 3 }), { status: 200 })
   await sleep(1200 + Math.random() * 800)
   const json = (() => { try { return JSON.parse(body) } catch { return {} } })()
   const prompt = json.input || body
-  const portrait = json.parameters?.height > json.parameters?.width
-  return new Response(portrait ? paintSprite(prompt) : paintPlaceholder(prompt), { status: 200, headers: { 'content-type': 'image/png' } })
+  const png = /white background|simple background/.test(prompt)
+    ? paintSprite(prompt)
+    : paintPlaceholder(prompt, {
+      width: json.parameters?.width || 1216,
+      height: json.parameters?.height || 832,
+      figures: (json.parameters?.v4_prompt?.caption?.char_captions || []).map(c => spriteLayer(c.char_caption)),
+    })
+  return new Response(png, { status: 200, headers: { 'content-type': 'image/png' } })
 }
 
 const dataDir = await mkdtemp(join(tmpdir(), 'flowgal-preview-'))

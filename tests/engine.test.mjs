@@ -1,4 +1,4 @@
-// 用假的 Tavern / llm / 生图服务跑通一整轮：正文 → 场景卡占位 → 导演 → 角色档案 / 情绪库 → 立绘设计师写词 → CG / 背景 / 立绘 → 挂回正文。
+// 用假的 Tavern / llm / 生图服务跑通一整轮：正文 → 场景卡占位 → 导演 → 角色档案 / 情绪库 → 立绘设计师 / 插画分镜师写词 → CG / 背景 / 立绘 → 挂回正文。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -45,7 +45,7 @@ const DIRECTOR_REPLY = JSON.stringify({
   cast: [{ name: '林岚', pos: 'center' }],
   lines: [{ u: 'U2', sp: '林岚', emo: 'smile', sym: 'heart', cam: 'zoom' }],
   choices: ['走到她身边', '递上饮料'],
-  images: [{ after: 'U2', title: '天台的等待', tags: '1girl, @林岚, smile, looking back, wind, petals', desc: 'a girl looking back on a rooftop at sunset', shape: 'landscape' }],
+  images: [{ after: 'U2', title: '天台的等待', moment: '夕阳下的天台，林岚扶着栏杆回过头来，风吹起花瓣', who: ['林岚'] }],
   people: [{ name: '林岚', gender: 'female', appearance: '1girl, long black hair, blue eyes', outfit: '校服', outfitTags: 'school uniform, sailor collar, red ribbon' }],
   summary: '林岚在天台等我。',
 })
@@ -56,8 +56,22 @@ export function spriteReply(request) {
   const ids = [...user.matchAll(/^- (s\d+)：/gm)].map(m => m[1])
   return JSON.stringify({ sprites: ids.map(id => ({ key: id, tags: `1girl, long black hair, blue eyes, school uniform, sailor collar, written-${id}` })) })
 }
-/** 导演和立绘设计师共用一个假模型：按系统提示词分流。 */
-export const routedReply = director => request => (request.system.includes('立绘设计师') ? spriteReply(request) : typeof director === 'function' ? director(request) : director)
+/** 假的插画分镜师：按「要画的插画」里的编号回 Base + 角色块。故意把人名混进 tag 和 nl、Base 不写人数，看插件能不能收拾干净。 */
+export function cgReply(request) {
+  const user = request.messages[0].content[0].text
+  const ids = [...user.matchAll(/^- (c\d+)：/gm)].map(m => m[1])
+  return '<thinking>状态账本：林岚穿校服。</thinking>' + JSON.stringify({
+    images: ids.map(id => ({
+      key: id, size: 'portrait',
+      tag: 'school rooftop, sunset, golden hour, cherry blossoms, wind, cowboy shot, warm colors',
+      nl: 'A school rooftop at sunset where 林岚 waits.',
+      characters: [{ name: '林岚', tag: 'girl, 林岚, school uniform, sailor collar, red ribbon, smile, blush, looking back, hand on railing', nl: "She turns around; 林岚's hair flows in the wind as she smiles at the viewer." }],
+    })),
+  })
+}
+const isCgWriter = request => request.system.includes('你是视觉小说的插画分镜师')
+/** 导演、立绘设计师和插画分镜师共用一个假模型：按系统提示词分流。 */
+export const routedReply = director => request => (request.system.includes('立绘设计师') ? spriteReply(request) : isCgWriter(request) ? cgReply(request) : typeof director === 'function' ? director(request) : director)
 
 test('gate: 一整轮的后台整理与出图', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
@@ -84,7 +98,7 @@ test('gate: 一整轮的后台整理与出图', async () => {
     const look = { appearance: '1girl, long black hair, blue eyes', outfit: '校服', states: [] }
     const neutralKey = variantKey(look, 'neutral'), smileKey = variantKey(look, 'smile')
     // 等出图队列跑完。
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 500; i++) {
       const view = await engine.gameView('g1')
       if (view.images[0]?.status === 'ready' && view.places['学园天台|dusk']?.assetId && view.cast[0]?.sprites?.[neutralKey]?.assetId && view.cast[0]?.sprites?.[smileKey]?.assetId) break
       await new Promise(r => setTimeout(r, 20))
@@ -117,10 +131,29 @@ test('gate: 一整轮的后台整理与出图', async () => {
     // 写词过程记进导演日志。
     const log = await engine.directorLog('g1')
     assert.ok(log.entries.some(e => e.kind === 'sprite' && e.name === '林岚' && e.status === 'ok'))
-    // @林岚 被替换成固定外貌 + 身上这套衣服，Key 只发给 NovelAI。
-    const cgReq = requests.find(r => r.body?.input?.includes('looking back'))
-    assert.match(cgReq.body.input, /long black hair, blue eyes, school uniform, sailor collar/)
-    assert.doesNotMatch(cgReq.body.input, /@/)
+    // 插画：导演只挑瞬间，插画分镜师读了剧情和档案写 Base + 角色块，记进导演日志。
+    const cgWriter = llm.calls.filter(isCgWriter)
+    assert.equal(cgWriter.length, 1)
+    const cgUser = cgWriter[0].messages[0].content[0].text
+    assert.match(cgUser, /放学铃响了/)
+    assert.match(cgUser, /扶着栏杆回过头来/)
+    assert.match(cgUser, /固定外貌：1girl, long black hair, blue eyes/)
+    assert.ok(log.entries.some(e => e.kind === 'cg' && e.status === 'ok' && e.turn === 2))
+    assert.equal(view.images[0].writer, 'ai')
+    assert.equal(view.images[0].shape, 'portrait')
+    assert.equal(view.images[0].characters[0].name, '林岚')
+    // NovelAI V4+：Base 进 base_caption（补了人数），角色块进 char_captions（补了固定外貌）；人名一个字都不发。Key 只发给 NovelAI。
+    const cgReq = requests.find(r => r.body?.parameters?.v4_prompt?.caption?.char_captions?.length)
+    const caption = cgReq.body.parameters.v4_prompt.caption
+    assert.match(caption.base_caption, /^1girl, /)
+    assert.match(caption.base_caption, /school rooftop, sunset/)
+    assert.match(caption.base_caption, /A school rooftop at sunset where the girl waits\./)
+    assert.equal(caption.char_captions.length, 1)
+    assert.match(caption.char_captions[0].char_caption, /^girl, long black hair, blue eyes, school uniform, sailor collar, red ribbon, smile/)
+    assert.match(caption.char_captions[0].char_caption, /the girl's hair flows/)
+    assert.doesNotMatch(JSON.stringify(cgReq.body), /林岚|@/)
+    assert.deepEqual([cgReq.body.parameters.width, cgReq.body.parameters.height], [832, 1216])
+    assert.equal(view.images[0].versions[0].width, 832)
     assert.equal(cgReq.auth, 'Bearer pst-test-key')
     const config = await engine.publicConfig()
     assert.equal(config.keys['novelai:official'], true)
@@ -132,6 +165,19 @@ test('gate: 一整轮的后台整理与出图', async () => {
     assert.equal(after.images[0].versions.length, 2)
     await engine.selectVersion('g1', view.images[0].id, 0)
     assert.equal((await engine.gameView('g1')).images[0].current, 0)
+
+    // AI 改写：分镜师带着现在的提示词和玩家的意见重写，只回草稿，不动存着的那份。
+    const draft = await engine.rewritePrompt('g1', view.images[0].id, '改成雨天')
+    assert.equal(draft.characters[0].name, '林岚')
+    const rewriteUser = llm.calls.filter(isCgWriter).at(-1).messages[0].content[0].text
+    assert.match(rewriteUser, /玩家的修改意见：改成雨天/)
+    assert.match(rewriteUser, /现在的提示词：/)
+    assert.equal((await engine.gameView('g1')).images[0].writer, 'user')
+    // 配一张：指定单元就画那一段，分镜师写好后出图。
+    const added = await engine.addImageAt('g1', 2, 'U1', {})
+    const withAdded = await settle(engine, 'g1', v => v.images.find(i => i.id === added)?.status === 'ready', 10000)
+    assert.equal(withAdded.images.find(i => i.id === added).after, 'U1')
+    assert.match(llm.calls.filter(isCgWriter).at(-1).messages[0].content[0].text, /画这一段：「夕阳下的天台。」/)
 
     // 改写正文后的新版本：旧版本的场景从视图里消失。
     for (const item of tavern.items.values()) item.current = false

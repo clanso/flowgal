@@ -46,6 +46,9 @@ try {
 
   await page.goto(BASE)
   await sleep(2500)
+  // 导演 → 插画分镜师 → 出图，等两张插画都画好再拍聊天页。
+  await page.waitForFunction(() => document.querySelectorAll('.fg-cgcard img').length >= 2, null, { timeout: 90000 })
+  await sleep(800)
   await page.evaluate(() => document.querySelector('.fg-scene') && document.querySelector('.fg-scene').scrollIntoView({ block: 'end' }))
   await page.evaluate(() => document.getElementById('log').scrollBy(0, 160))
   await sleep(600)
@@ -69,6 +72,10 @@ try {
   await jumpTo('那就罚你')
   await sleep(2200)
   await shot('05-cg')
+  // 竖版插画：摇到一半、拉远看全貌（把摇镜动画直接拨到那一刻）
+  const panTo = async f => { await page.evaluate(f => { const a = document.querySelector('.fg-cg-pan')?.getAnimations()[0]; if (a) { a.pause(); a.currentTime = a.effect.getComputedTiming().duration * f } }, f); await sleep(300) }
+  await panTo(0.4); await shot('35-cg-pan')
+  await panTo(0.97); await shot('36-cg-pan-whole')
 
   // 第 2 轮：竹林、两人同框、萤火
   await jumpTo('好巧啊')
@@ -90,7 +97,8 @@ try {
   await page.keyboard.press('l'); await sleep(900); await shot('09-backlog'); await page.keyboard.press('Escape'); await sleep(300)
   await click('.fg-quick button:has-text("CG")', 1400); await shot('10-gallery')
   await click('.fg-thumb-cap', 900); await shot('11-gallery-lightbox'); await page.mouse.click(30, 30); await sleep(400)
-  await click('.fg-btn:has-text("改词")', 900); await shot('12-prompt-editor'); await page.keyboard.press('Escape'); await sleep(300)
+  await page.locator('.fg-btn:has-text("改词")').nth(1).click(); await sleep(900); await shot('12-prompt-editor')
+  await page.locator('.fg-cg-chars').scrollIntoViewIfNeeded(); await sleep(300); await shot('37-prompt-editor-characters'); await page.keyboard.press('Escape'); await sleep(300)
   await click('.fg-quick button:has-text("CAST")', 1200); await shot('13-cast')
   await click('.fg-tab:has-text("档案变更")', 700); await shot('14-cast-log'); await page.keyboard.press('Escape'); await sleep(300)
   await click('.fg-quick button:has-text("CONFIG")', 1000); await shot('15-settings-look')
@@ -150,6 +158,7 @@ try {
   await page.keyboard.press('Escape'); await sleep(300)
   await click('.fg-quick button:has-text("DIR")', 1400)
   await click('.fg-dlog-row:has-text("立绘 · 林岚")', 900); await shot('34-director-sprite')
+  await click('.fg-dlog-row:has-text("插画 · 第 2 轮")', 900); await shot('38-director-cg')
   await page.keyboard.press('Escape'); await sleep(300)
   // NovelAI V5：透明底立绘、引导缩放、种子
   await click('.fg-quick button:has-text("CONFIG")', 800)

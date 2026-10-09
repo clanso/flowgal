@@ -11,7 +11,8 @@ import { webuiModels, generateWebUI } from '../lib/image/webui.js'
 import { buildNaiBody } from '../lib/image/novelai.js'
 import { BACKENDS, generateImage } from '../lib/image/index.js'
 import { firstImageFromZip } from '../lib/image/http.js'
-import { composePrompt, qualityFor } from '../lib/image/style.js'
+import { composePrompt, qualityFor, applyWeights } from '../lib/image/style.js'
+import { resolveCgPrompt, girlify, fallbackCg } from '../lib/illustrator.js'
 import { resolveConfig, applyPatch } from '../lib/config.js'
 import { imageFromChat, openaiModels } from '../lib/image/openai.js'
 
@@ -310,6 +311,64 @@ test('gate: 提示词组合：画师串在前、质量词在后、人数 tag 置
   assert.match(bg.negative, /1girl/)
   const sprite = composePrompt({ kind: 'sprite', person: { gender: 'female', appearance: 'silver hair' }, emotion: 'shy', backend: 'openai', config })
   assert.match(sprite.positive, /character sprite/)
+})
+
+test('gate: 插画提示词：人名不发出去，固定外貌补进角色块，Base 补人数，权重按渠道换写法', () => {
+  const people = {
+    林岚: { name: '林岚', gender: 'female', appearance: '1girl, long black hair, blue eyes' },
+    Mia: { name: 'Mia', gender: 'female', appearance: 'hatsune miku (vocaloid), 1girl, twintails' },
+    阿哲: { name: '阿哲', gender: 'male', appearance: '1boy, short brown hair' },
+  }
+  const lookup = name => people[name] || null
+  const names = Object.keys(people)
+  assert.equal(girlify('1girl, long hair'), 'girl, long hair')
+  const image = {
+    tags: 'indoors, 林岚, bedroom, warm colors, small table',
+    desc: "林岚 and Mia sit by the window while 阿哲's cat sleeps; 林岚说话.",
+    characters: [
+      { name: '林岚', tag: 'girl, pregnant, smile, looking at another', nl: '林岚 rests a hand on her belly.' },
+      { name: 'Mia', tag: 'girl, flat stomach, -1::pregnant::, 0.7::frown::, Mia, looking at another', nl: "Mia glances at her friend; Mia's twintails sway." },
+      { name: '阿哲', tag: 'boy, 阿哲, sleeping', nl: '' },
+    ],
+  }
+  const r = resolveCgPrompt(image, lookup, names)
+  // 人数按角色块的性别补，Base 里混进来的人名 tag 删掉；small 不会被 Mia 误伤。
+  assert.equal(r.tags, '2girls, 1boy, indoors, bedroom, warm colors, small table')
+  assert.equal(r.nl, "the girl and the girl sit by the window while the boy's cat sleeps; the girl.")
+  // 固定外貌在角色块最前面（1girl → girl，重复的 girl 去掉），同人身份 tag 保留在第一位。
+  assert.equal(r.characters[0].tag, 'girl, long black hair, blue eyes, pregnant, smile, looking at another')
+  assert.equal(r.characters[0].nl, 'the girl rests a hand on her belly.')
+  assert.match(r.characters[1].tag, /^hatsune miku \(vocaloid\), girl, twintails, flat stomach, -1::pregnant::, 0\.7::frown::, looking at another$/)
+  assert.equal(r.characters[1].nl, "the girl glances at her friend; the girl's twintails sway.")
+  assert.equal(r.characters[2].tag, 'boy, short brown hair, sleeping')
+  assert.doesNotMatch(JSON.stringify([r.tags, r.nl, r.characters.map(c => [c.tag, c.nl])]), /林岚|阿哲|Mia/, '名字只留在 name 上')
+  // 已经写了人数就不再补。
+  assert.equal(resolveCgPrompt({ tags: 'solo, 1girl, park', characters: [{ name: '林岚', tag: 'smile' }] }, lookup, names).tags, 'solo, 1girl, park')
+
+  // 权重：NovelAI V4 起原样；SD 写成 (tag:w)；旧 NovelAI 用括号；不认权重的去掉数字；负权重只有 NovelAI V4 起保留。
+  const text = 'flat stomach, -1::pregnant::, 0.7::frown::, 1.2::angry::'
+  assert.equal(applyWeights(text, 'nai'), text)
+  assert.equal(applyWeights(text, 'sd'), 'flat stomach, , (frown:0.7), (angry:1.2)')
+  assert.equal(applyWeights(text, 'nai3'), 'flat stomach, , [frown], {angry}')
+  assert.equal(applyWeights(text, 'plain'), 'flat stomach, , frown, angry')
+
+  // NovelAI V4.5：Base 一段 + 每人一条；SD 合并成一段，角色块开头的 girl / boy 去掉，负权重删掉。
+  const config = resolveConfig({ style: { artist: '', useQuality: false } })
+  const nai = composePrompt({ kind: 'cg', tags: r.tags, desc: r.nl, characters: r.characters, backend: 'novelai', config })
+  assert.match(nai.positive, /^2girls, 1boy, indoors, bedroom, warm colors, small table, the girl and the girl/)
+  assert.equal(nai.characters.length, 3)
+  assert.equal(nai.characters[1], "hatsune miku (vocaloid), girl, twintails, flat stomach, -1::pregnant::, 0.7::frown::, looking at another, the girl glances at her friend; the girl's twintails sway.")
+  const sd = composePrompt({ kind: 'cg', tags: r.tags, desc: r.nl, characters: r.characters, backend: 'webui', config })
+  assert.deepEqual(sd.characters, [])
+  assert.match(sd.positive, /^2girls, 1boy, indoors, bedroom, warm colors, small table, long black hair, blue eyes, pregnant/)
+  assert.match(sd.positive, /flat stomach, \(frown:0\.7\)/)
+  assert.doesNotMatch(sd.positive, /pregnant::|(^|, )girl(,|$)|the girl/)
+
+  // 分镜师写不出来时：场景 tag（去掉 no humans）+ 入画的人此刻的衣服和状态。
+  const fb = fallbackCg({ who: ['林岚', '路人'], shape: 'portrait' }, n => (n === '林岚' ? { ...people.林岚, outfitTags: 'school uniform, red ribbon', states: [{ name: '怀孕', tags: 'pregnant' }], temp: 'wet clothes' } : null), { bg: 'school rooftop, sunset, scenery, no humans' })
+  assert.equal(fb.tags, 'school rooftop, sunset')
+  assert.deepEqual(fb.characters, [{ name: '林岚', tag: 'school uniform, red ribbon, pregnant, wet clothes', nl: '' }])
+  assert.equal(fb.writer, 'fallback')
 })
 
 test('gate: 设置校验：未知键丢弃、非法地址回落、NAI 官方接入点常在', () => {

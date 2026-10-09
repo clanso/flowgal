@@ -10,8 +10,9 @@ import { previewTrack, stopPreview } from './audio.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
 import { modelKey, qualityFor, negativeFor } from '../../../lib/image/style.js'
 import { naiModelInfo } from '../../../lib/image/nai-models.js'
+import { CG_MAX_CHARACTERS } from '../../../lib/vocab.js'
 
-const STATUS_LABEL = { queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消', ready: '' }
+const STATUS_LABEL = { writing: '分镜中', queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消', ready: '' }
 
 export function Panel({ title, en, onClose, tabs, tab, onTab, children, actions }) {
   return (
@@ -84,23 +85,47 @@ export function Backlog({ beats, index, onJump, onClose, gameId }) {
 }
 
 // ───────────────────────── 鉴赏 ─────────────────────────
+const CG_WRITER_LABEL = { ai: '插画分镜师写的', fallback: '按档案拼的（分镜师没写出来）', user: '你改的', director: '导演写的（旧版）' }
+const blankCharacter = () => ({ name: '', tag: '', nl: '' })
+
+/** 改词：Base（画面）+ 每人一个角色块（柏宝绘的 NovelAI V4.5 分人写法）。名字只是标签，出图前换成档案外貌并删掉。 */
 function ImageEditor({ gameId, image, onClose }) {
-  const [draft, setDraft] = React.useState({ tags: image.tags || '', desc: image.desc || '', negativeExtra: image.negativeExtra || '', shape: image.shape || 'landscape', seed: '' })
+  const pick = img => ({ tags: img.tags || '', desc: img.desc || '', characters: (img.characters || []).map(c => ({ ...c })), negativeExtra: img.negativeExtra || '', shape: img.shape || 'landscape', seed: '' })
+  const [draft, setDraft] = React.useState(() => pick(image))
   const [instruction, setInstruction] = React.useState('')
   const [busy, run] = useBusy()
   const set = patch => setDraft(d => ({ ...d, ...patch }))
+  const setChar = (i, patch) => setDraft(d => ({ ...d, characters: d.characters.map((c, j) => (j === i ? { ...c, ...patch } : c)) }))
   const version = image.versions[image.current]
+  const stop = e => e.stopPropagation()
   return (
-    <div className="fg-person" style={{ gridTemplateColumns: '1fr' }}>
-      <div className="fg-section" style={{ marginTop: 0 }}>改提示词 · {image.title || image.id}</div>
-      <div className="fg-field"><label>画面 Tag</label><textarea className="fg-textarea" value={draft.tags} onChange={e => set({ tags: e.target.value })} /></div>
-      <small className="fg-note" style={{ display: 'block', margin: '-0.4cqw 0 0 15.2cqw' }}>人物写 @名字，出图前自动换成外貌档案（柏宝绘的 @ 外貌库）。</small>
-      <div className="fg-field"><label>画面说明</label><textarea className="fg-textarea" style={{ minHeight: '4cqw' }} value={draft.desc} onChange={e => set({ desc: e.target.value })} /></div>
+    <div className="fg-person fg-cg-editor" style={{ gridTemplateColumns: '1fr' }} onKeyDown={stop}>
+      <div className="fg-section" style={{ marginTop: 0 }}>改提示词 · {image.title || '第 ' + image.turn + ' 轮插画'}{image.writer && <span className="fg-pill" style={{ marginLeft: '1cqw' }}>{CG_WRITER_LABEL[image.writer] || image.writer}</span>}</div>
+      {image.moment && <div className="fg-note" style={{ marginBottom: '.6cqw' }}>导演挑的瞬间：{image.moment}{image.who && image.who.length ? `（入画：${image.who.join('、')}）` : ''}</div>}
+      <div className="fg-field"><label>画面 Base</label><textarea className="fg-textarea" placeholder="人数、构图、镜头、地点、光线、时代锚……用英文 tag" value={draft.tags} onChange={e => set({ tags: e.target.value })} /></div>
+      <div className="fg-field"><label>画面描述</label><textarea className="fg-textarea is-short" placeholder="一两句英文，补 tag 说不清的空间关系和氛围" value={draft.desc} onChange={e => set({ desc: e.target.value })} /></div>
+      <div className="fg-cg-chars">
+        {draft.characters.map((c, i) => (
+          <div key={i} className="fg-cg-char">
+            <div className="fg-row">
+              <input className="fg-input" style={{ width: '12cqw' }} placeholder="人物名" value={c.name} onChange={e => setChar(i, { name: e.target.value })} />
+              <span className="fg-note" style={{ flex: 1 }}>角色块 {i + 1}{c.name ? '：出图前补上档案里的固定外貌' : ''}</span>
+              <button type="button" className="fg-btn" onClick={() => set({ characters: draft.characters.filter((_, j) => j !== i) })}>移除</button>
+            </div>
+            <textarea className="fg-textarea is-short" placeholder="girl, 表情, 视线, 动作, 衣服指纹……" value={c.tag} onChange={e => setChar(i, { tag: e.target.value })} />
+            <textarea className="fg-textarea is-short" placeholder="一句英文：姿态、动作的来龙去脉、视线落在哪" value={c.nl} onChange={e => setChar(i, { nl: e.target.value })} />
+          </div>
+        ))}
+        <div className="fg-row">
+          <button type="button" className="fg-btn" disabled={draft.characters.length >= CG_MAX_CHARACTERS} onClick={() => set({ characters: [...draft.characters, blankCharacter()] })}>＋ 加一个人</button>
+          <small className="fg-note" style={{ flex: 1 }}>名字只用来对上档案，不会发出去：tag 和描述里的人名出图前会被删掉。NovelAI V4 以上每人一块分开发；其他渠道合并成一段。旧写法 @名字 也还能用。</small>
+        </div>
+      </div>
       <div className="fg-field"><label>额外负面</label><input className="fg-input" value={draft.negativeExtra} onChange={e => set({ negativeExtra: e.target.value })} /></div>
       <div className="fg-field"><label>画幅 / 种子</label>
         <div className="fg-row">
           <select className="fg-select" style={{ width: 'auto' }} value={draft.shape} onChange={e => set({ shape: e.target.value })}>
-            <option value="landscape">横版</option><option value="portrait">竖版</option><option value="square">方形</option>
+            <option value="portrait">竖版（剧场里会摇镜）</option><option value="landscape">横版</option><option value="square">方形</option>
           </select>
           <input className="fg-input" style={{ width: '14cqw' }} placeholder="随机" value={draft.seed} onChange={e => set({ seed: e.target.value.replace(/\D/g, '') })} />
           {version && <button type="button" className="fg-btn" onClick={() => set({ seed: String(version.seed ?? '') })}>沿用当前种子</button>}
@@ -108,20 +133,28 @@ function ImageEditor({ gameId, image, onClose }) {
       </div>
       <div className="fg-field"><label>AI 改写</label>
         <div className="fg-row">
-          <input className="fg-input" style={{ flex: 1, width: 'auto' }} placeholder="例如：改成雨夜、她在哭、镜头拉远……留空则重读原文" value={instruction} onChange={e => setInstruction(e.target.value)} />
-          <button type="button" className="fg-btn" disabled={busy === 'rw'} onClick={() => run('rw', async () => { const r = await api.rewrite(gameId, image.id, instruction); set({ tags: r.draft.tags, desc: r.draft.desc, negativeExtra: r.draft.negativeExtra || draft.negativeExtra }) }, '已改写，确认后点「按此重画」')}>{busy === 'rw' ? '改写中…' : '改写'}</button>
+          <input className="fg-input" style={{ flex: 1, width: 'auto' }} placeholder="例如：改成雨夜、她在哭、镜头拉远……留空则让分镜师重读正文" value={instruction} onChange={e => setInstruction(e.target.value)} />
+          <button type="button" className="fg-btn" disabled={busy === 'rw'} onClick={() => run('rw', async () => {
+            const { draft: d } = await api.rewrite(gameId, image.id, instruction)
+            set({ tags: d.tags || '', desc: d.desc || '', characters: (d.characters || []).map(c => ({ ...c })), shape: d.shape || draft.shape })
+          }, '已改写，确认后点「按此重画」')}>{busy === 'rw' ? '分镜师在写…' : '改写'}</button>
         </div>
       </div>
       {version && (
         <details className="fg-note" style={{ margin: '0.6cqw 0' }}>
           <summary>当前版本实际发出的提示词</summary>
-          <div style={{ userSelect: 'text', marginTop: '0.4cqw' }}>＋ {version.positive}<br />－ {version.negative}<br />{version.backend} · {version.model} · seed {version.seed}</div>
+          <div className="fg-sent">
+            <div>＋ {version.positive}</div>
+            {(version.characters || []).map((c, i) => <div key={i}>角色 {i + 1}：{c}</div>)}
+            <div>－ {version.negative}</div>
+            <div>{version.backend} · {version.model} · seed {version.seed}{version.width ? ` · ${version.width}×${version.height}` : ''}</div>
+          </div>
         </details>
       )}
       <div className="fg-row" style={{ justifyContent: 'flex-end' }}>
         <button type="button" className="fg-btn" onClick={onClose}>取消</button>
         <button type="button" className="fg-btn is-primary" onClick={() => run('go', async () => {
-          await api.render(gameId, image.id, { tags: draft.tags, desc: draft.desc, negativeExtra: draft.negativeExtra, shape: draft.shape, ...(draft.seed ? { seed: Number(draft.seed) } : {}) })
+          await api.render(gameId, image.id, { tags: draft.tags, desc: draft.desc, characters: draft.characters, negativeExtra: draft.negativeExtra, shape: draft.shape, ...(draft.seed ? { seed: Number(draft.seed) } : {}) })
           onClose()
         }, '已加入出图队列')}>按此重画</button>
       </div>
@@ -141,12 +174,12 @@ export function Lightbox({ src, onClose, children }) {
 function CgTile({ gameId, image, onOpen, onEdit }) {
   const [busy, run] = useBusy()
   const src = cgSrc(image, assetUrl)
-  const pending = image.status === 'queued' || image.status === 'running'
+  const pending = ['writing', 'queued', 'running'].includes(image.status)
   return (
     <div>
       <div className={`fg-thumb${src ? '' : ' is-locked'}`} onClick={() => src && onOpen(image)}>
-        {src ? <img src={src} alt={image.title} loading="lazy" /> : <span>{pending ? '🎨 ' + STATUS_LABEL[image.status] : image.status === 'failed' ? '⚠ ' + (image.error || '失败') : '未生成'}</span>}
-        {pending && src && <span className="fg-pill is-busy" style={{ position: 'absolute', right: '.6cqw', top: '.6cqw' }}>重画中</span>}
+        {src ? <img src={src} alt={image.title} loading="lazy" /> : <span>{pending ? (image.status === 'writing' ? '✍ ' : '🎨 ') + STATUS_LABEL[image.status] : image.status === 'failed' ? '⚠ ' + (image.error || '失败') : '未生成'}</span>}
+        {pending && src && <span className="fg-pill is-busy" style={{ position: 'absolute', right: '.6cqw', top: '.6cqw' }}>{image.status === 'writing' ? '分镜中' : '重画中'}</span>}
         <div className="fg-thumb-cap">{image.title || '第 ' + image.turn + ' 轮插画'}{image.versions.length > 1 ? ` · ${image.current + 1}/${image.versions.length}` : ''}</div>
       </div>
       <div className="fg-row" style={{ marginTop: '.6cqw' }}>
@@ -260,7 +293,7 @@ function ProfileEditor({ gameId, person }) {
 
 /** 衣橱与状态：衣服的 tag、现在穿哪套、长期状态、临时状态。从最新一轮起生效；全局角色写在本局。 */
 function WardrobeEditor({ gameId, person }) {
-  const [busy, run] = useBusy()
+  const [, run] = useBusy()
   const [draft, setDraft] = React.useState({ name: '', tags: '' })
   const [stateDraft, setStateDraft] = React.useState({ name: '', tags: '' })
   const look = patch => api.cast(gameId, 'look', { name: person.name, patch })
@@ -741,6 +774,9 @@ function DirectorSection({ data, onDirectorLog }) {
       </Field>
       <Field label="立绘设计师提示词" hint="留空用内置的。可用 {{styleHint}}。输出格式必须是 {&quot;sprites&quot;:[{&quot;key&quot;,&quot;tags&quot;,&quot;negative&quot;}]}。">
         <textarea className="fg-textarea" defaultValue={cfg.director.spritePrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.spritePrompt) p({ spritePrompt: e.target.value }) }} />
+      </Field>
+      <Field label="插画分镜师提示词" hint="留空用内置的（Base + 每人一个角色块的写法）。可用 {{styleHint}}。输出格式必须是 {&quot;images&quot;:[{&quot;key&quot;,&quot;tag&quot;,&quot;nl&quot;,&quot;characters&quot;:[{&quot;name&quot;,&quot;tag&quot;,&quot;nl&quot;}],&quot;size&quot;}]}。">
+        <textarea className="fg-textarea" defaultValue={cfg.director.cgPrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.cgPrompt) p({ cgPrompt: e.target.value }) }} />
       </Field>
     </>
   )

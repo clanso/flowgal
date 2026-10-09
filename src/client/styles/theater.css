@@ -168,6 +168,15 @@
 .fg-cg { position: absolute; inset: 0; z-index: 6; background-size: cover; background-position: center; animation: fg-cg-in 1.2s cubic-bezier(.5, 0, .2, 1) both; }
 .fg-cg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, .45)); }
 .fg-cg-img { position: absolute; inset: -2%; background-size: cover; background-position: center; animation: fg-kenburns 30s ease-in-out infinite alternate; }
+/* 竖版插画：模糊的同图垫底，前景铺满宽度，顶 → 底 → 拉远看全貌，再倒放回来。 */
+.fg-cg.is-tall { background: #000; }
+.fg-cg-back { position: absolute; inset: -6%; background-size: cover; background-position: center; filter: blur(2.4cqw) brightness(.5) saturate(1.15); }
+.fg-cg-pan { position: absolute; left: 0; top: 0; width: 100%; height: auto; transform-origin: 50% 0; box-shadow: 0 0 5cqw rgba(0, 0, 0, .65); animation: fg-cg-pan var(--pan, 26s) ease-in-out infinite alternate; will-change: transform; user-select: none; }
+@keyframes fg-cg-pan {
+  0%, 10% { transform: translateY(0) scale(1); }
+  55%, 64% { transform: translateY(calc((var(--r) - 1) * 100%)) scale(1); }
+  90%, 100% { transform: translateY(0) scale(var(--r)); }
+}
 .fg-cg-caption { position: absolute; right: 4%; top: 12%; flex-direction: row-reverse; z-index: 2; display: flex; align-items: center; gap: 1cqw; font-family: var(--font-latin); letter-spacing: .3em; font-size: 1.1cqw; color: rgba(255, 255, 255, .85); text-shadow: 0 2px 8px rgba(0, 0, 0, .6); animation: fg-slide-in 1.2s .4s ease both; }
 .fg-cg-caption b { font-family: var(--font-display); font-size: 1.9cqw; letter-spacing: .18em; font-weight: 700; }
 .fg-cg-caption i { width: 4cqw; height: 1px; background: linear-gradient(270deg, var(--accent), transparent); }
@@ -354,6 +363,8 @@
 .fg-dlog-uid { padding-top: .15cqw; font-family: var(--font-latin); font-size: .85cqw; letter-spacing: .1em; color: var(--accent); }
 .fg-dlog-card { margin-bottom: .6cqw; padding: .8cqw 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); font-size: 1cqw; line-height: 1.6; }
 .fg-dlog-mono { margin-top: .4cqw; font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; word-break: break-word; }
+.fg-dlog-k { display: inline-block; margin-right: .6cqw; padding: 0 .5cqw; border-radius: .3cqw; font-style: normal; font-family: var(--font-body); font-size: .8cqw; letter-spacing: .08em; color: var(--ink-dim); border: 1px solid var(--box-border); }
+.fg-dlog-cgchar { margin-top: .4cqw; padding-left: .8cqw; border-left: 2px solid var(--box-border); }
 .fg-dlog-list-plain { margin: 0; padding-left: 2cqw; font-size: 1.05cqw; line-height: 1.8; }
 .fg-pill.is-link { cursor: pointer; transition: border-color .2s; }
 .fg-pill.is-link:hover { border-color: var(--accent); }
@@ -392,6 +403,9 @@
 .fg-person-form { margin: .8cqw 0; padding: 1cqw 1.2cqw; border-radius: .9cqw; background: rgba(0, 0, 0, .22); border: 1px solid var(--box-border); }
 .fg-person-form .fg-field { grid-template-columns: 9cqw 1fr; }
 .fg-textarea.is-short { min-height: 4cqw; }
+.fg-cg-chars { display: grid; gap: .9cqw; margin: .9cqw 0 .9cqw 15.2cqw; }
+.fg-cg-char { display: grid; gap: .6cqw; padding: 1cqw; border-radius: .9cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .18); }
+.fg-sent { user-select: text; margin-top: .4cqw; display: grid; gap: .3cqw; word-break: break-word; }
 .fg-wardrobe { display: grid; gap: .5cqw; margin-bottom: .6cqw; }
 .fg-outfit { display: grid; grid-template-columns: 8cqw 1fr auto auto; gap: .7cqw; align-items: center; padding: .4cqw .6cqw; border-radius: .7cqw; border: 1px solid transparent; }
 .fg-outfit b { font-size: 1.1cqw; letter-spacing: .1em; }
@@ -462,6 +476,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .fg-bg, .fg-cg-img, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-symbol-art, .fg-symbol-art svg { animation: none !important; }
+  .fg-cg-pan { animation: none !important; transform: scale(var(--r)); }
 }
 @container stage (max-aspect-ratio: 4/5) {
   .fg-actor { width: 60%; height: 60%; bottom: 23%; }

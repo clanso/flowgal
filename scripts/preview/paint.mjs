@@ -1,9 +1,11 @@
-// 预览用的占位插画：按提示词关键词程序化画一张风景 PNG（琴房、竹林萤火、雨夜街道、旧校舍走廊、黄昏天台）。
+// 预览用的占位插画：按提示词关键词程序化画一张风景 PNG（琴房、竹林萤火、雨夜街道、旧校舍走廊、黄昏天台），
+// 尺寸跟着请求走（竖版插画就画竖的），插画的角色块会画成人物叠进场景。
 // 只给预览和截图用，不随插件发布；真实使用时这里是生图渠道出的图。
 import { deflateSync, crc32 } from 'node:zlib'
 
-const W = 1216
-const H = 832
+// 每次画之前按请求的尺寸设好（同步画完，不会串）。
+let W = 1216
+let H = 832
 
 function rng(seed) {
   let s = seed >>> 0
@@ -82,6 +84,25 @@ function canvas() {
         const k = strength * Math.sin((s / len) * Math.PI)
         const i = at(x, y)
         for (let ch = 0; ch < 3; ch++) px[i + ch] += c[ch] * k
+      }
+    },
+    /** 叠一层透明底的人物（RGBA 直通色）：缩放 scale 倍放在 (x0, y0)，双线性取样、按预乘透明度混合。 */
+    layer(src, x0, y0, scale) {
+      const dw = Math.round(src.width * scale), dh = Math.round(src.height * scale)
+      const sample = (j, w, acc) => { const a = src.px[j + 3] * w; acc[3] += a; for (let ch = 0; ch < 3; ch++) acc[ch] += src.px[j + ch] * a }
+      for (let y = Math.max(0, y0); y < Math.min(H, y0 + dh); y++) {
+        const sy = (y - y0 + 0.5) / scale - 0.5
+        const iy = Math.max(0, Math.min(src.height - 2, Math.floor(sy))), fy = clamp(sy - iy)
+        for (let x = Math.max(0, x0); x < Math.min(W, x0 + dw); x++) {
+          const sx = (x - x0 + 0.5) / scale - 0.5
+          const ix = Math.max(0, Math.min(src.width - 2, Math.floor(sx))), fx = clamp(sx - ix)
+          const acc = [0, 0, 0, 0]
+          const j = (iy * src.width + ix) * 4, k = j + src.width * 4
+          sample(j, (1 - fx) * (1 - fy), acc); sample(j + 4, fx * (1 - fy), acc); sample(k, (1 - fx) * fy, acc); sample(k + 4, fx * fy, acc)
+          if (acc[3] < 0.002) continue
+          const i = at(x, y)
+          for (let ch = 0; ch < 3; ch++) px[i + ch] = px[i + ch] * (1 - acc[3]) + acc[ch]
+        }
       }
     },
     /** 暗角 + 轻微颗粒，让占位图看起来像一张画。 */
@@ -279,14 +300,24 @@ const SCENES = [
   [/corridor|abandoned|hallway/, corridor],
 ]
 
-/** 按提示词挑一个场景画，同样的提示词画出同样的图。 */
-export function paintPlaceholder(prompt) {
+/**
+ * 按提示词挑一个场景画，同样的提示词画出同样的图。
+ * figures：透明底的人物层（scripts/preview/sprite.mjs 的 spriteLayer），从左到右站进画面、脚底贴着下边。
+ */
+export function paintPlaceholder(prompt, { width = 1216, height = 832, figures = [] } = {}) {
+  W = width
+  H = height
   const text = String(prompt || '').toLowerCase()
   let seed = 0
   for (const ch of text) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0
   const draw = (SCENES.find(([re]) => re.test(text)) || [, rooftop])[1]
   const c = canvas()
   draw(c, rng(seed || 1))
+  figures.forEach((f, i) => {
+    const scale = Math.min((H / f.height) * 0.82, (W / (f.width * figures.length)) * 1.2)
+    const cx = (W * (i + 0.5)) / figures.length
+    c.layer(f, Math.round(cx - (f.width * scale) / 2), Math.round(H - f.height * scale), scale)
+  })
   c.finish(seed)
   return c.png()
 }
