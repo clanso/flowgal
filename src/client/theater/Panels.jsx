@@ -736,7 +736,7 @@ function UpdateSection({ data }) {
       {u && !u.managed && (
         <>
           <Field label="当前版本">v{__FLOWGAL_VERSION__}</Field>
-          <div className="fg-note">{u.reason} 手动更新：在终端里进 clone 下来的 flowgal 文件夹执行 <code>git pull</code>，再重新执行一遍安装命令，然后重启 DSH。</div>
+          <div className="fg-note">{u.reason} 想在这里一键更新：在 DSH 终端里 <code>git clone https://github.com/clanso/flowgal.git</code>，<code>dsh plugin --profile tavern remove flowgal</code> 后再 <code>dsh plugin --profile tavern add</code> 这个文件夹，然后重启 DSH。</div>
         </>
       )}
       {u && u.managed && (

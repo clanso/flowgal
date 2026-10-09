@@ -11,9 +11,9 @@ import { TheaterRoot, Toast } from './theater/Theater.jsx'
 import { SceneCardInline, CgCardInline } from './chat/ChatCards.jsx'
 
 const PLUGIN = 'flowgal'
-// 卡片类型沿用改名前的插件名，和宿主半边 lib/engine.js 的 OWNER 一致。
-const KIND_SCENE = 'dsh-tavern-igs/scene'
-const KIND_CG = 'dsh-tavern-igs/cg'
+// 卡片类型，和宿主半边 lib/engine.js 的 KIND_SCENE / KIND_CG 一致。
+const KIND_SCENE = PLUGIN + '/scene'
+const KIND_CG = PLUGIN + '/cg'
 
 function injectStyles() {
   if (document.getElementById('fg-styles')) return () => {}

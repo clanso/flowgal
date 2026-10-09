@@ -1,4 +1,4 @@
-// 我的配乐：曲库存取、导演选曲、剧场放曲、描述文件、Range 播放、改名前的 Key 兼容。
+// 我的配乐：曲库存取、导演选曲、剧场放曲、描述文件、Range 播放；以及 Key 的存取。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm, readdir } from 'node:fs/promises'
@@ -9,7 +9,7 @@ import { createMusic, musicBrief } from '../lib/music.js'
 import { normalizeScript, playingAfter, direct } from '../lib/director.js'
 import { segmentTurn } from '../lib/segment.js'
 import { readSidecar, writeSidecar, AUDIO_FILE, MUSIC_SIDECAR } from '../lib/music-sidecar.js'
-import { createSecrets, legacyRef } from '../lib/secrets.js'
+import { createSecrets } from '../lib/secrets.js'
 import { secretRef } from '../lib/image/index.js'
 import { createRoutes, BASE } from '../lib/routes.js'
 import { buildBeats, pickTrack } from '../src/client/theater/playback.js'
@@ -148,29 +148,27 @@ test('gate: /asset 支持 Range（Safari 放音频、拖进度条要用）', asy
   assert.equal((await hit('', 'nope')).status, 404)
 })
 
-test('gate: 改名前存的 Key 还能读到，重新保存后清掉旧名字', async () => {
+test('gate: Key 存在凭据服务或 0600 文件里，清空后读不到', async () => {
   const dir = await tmp()
   try {
     const store = createStore(dir)
     const ref = secretRef('novelai', { novelai: { endpoint: 'official' } })
     assert.equal(ref, 'FLOWGAL_NOVELAI_OFFICIAL_KEY')
-    assert.equal(legacyRef(ref), 'DSH_TAVERN_IGS_NOVELAI_OFFICIAL_KEY')
-    await store.updateSecrets(s => { s[legacyRef(ref)] = 'old-key' })
     const secrets = createSecrets({ store })
-    assert.equal(await secrets.get(ref), 'old-key')
-    await secrets.set(ref, 'new-key')
-    assert.deepEqual(await store.readSecrets(), { [ref]: 'new-key' })
+    await secrets.set(ref, 'file-key')
+    assert.equal(await secrets.get(ref), 'file-key')
     await secrets.set(ref, '')
     assert.equal(await secrets.has(ref), false)
 
-    // DSH 凭据服务里存着旧名字：照样读到；保存新 Key 后旧的那份被清空。
-    const vault = new Map([[legacyRef(ref), 'vault-old']])
+    // 有 DSH 凭据服务时存进去，文件里的副本清掉。
+    await store.updateSecrets(s => { s[ref] = 'stale' })
+    const vault = new Map()
     const credentials = { resolve: async name => ({ value: vault.get(name) || '' }), set: async (name, value) => { vault.set(name, value) } }
     const withVault = createSecrets({ store, getCredentials: () => credentials })
-    assert.equal(await withVault.get(ref), 'vault-old')
-    await withVault.set(ref, 'vault-new')
-    assert.equal(vault.get(ref), 'vault-new')
-    assert.equal(vault.get(legacyRef(ref)), '')
+    await withVault.set(ref, 'vault-key')
+    assert.equal(vault.get(ref), 'vault-key')
+    assert.equal(await withVault.get(ref), 'vault-key')
+    assert.deepEqual(await store.readSecrets(), {})
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

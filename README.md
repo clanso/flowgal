@@ -26,12 +26,18 @@
 
 ## 安装
 
-需要 DSH Tavern（插件接口 v1，`dsh >=0.1.0-rc.8`）。
+需要 DSH Tavern（插件接口 v1，`dsh >=0.1.0-rc.8`）和 git。下面的命令都在 **DSH 终端**里执行（DSH 设置 → 通用设置 →「打开 DSH 终端」；Windows 上是 PowerShell），Tavern 用的 profile 叫 `tavern`。
 
 ```sh
+cd ~
 git clone https://github.com/clanso/flowgal.git
-pnpm dsh plugin --profile web add ./flowgal
+dsh plugin --profile tavern add ~/flowgal
 ```
+
+然后**完全退出 DSH 再打开**（只刷新网页不够，插件的后台部分要重启才加载），刷新 Tavern 页面。
+
+- 插件是按文件夹链接进去的，`flowgal` 文件夹装好后不要移动或删除；以后的更新也在这个文件夹里进行。
+- 卸载：`dsh plugin --profile tavern remove flowgal`，重启 DSH。插件的数据在 `$DSH_HOME/flowgal/`（默认 `~/.dsh/flowgal/`），不要了可以整个删掉。
 
 仓库里已经带了构建好的 `client.js`，不需要自己打包。改了 `src/client/` 之后再重建：
 
@@ -51,27 +57,11 @@ npm test
 - 更新只做快进（相当于 `git pull --ff-only`），本地改过的文件不会被覆盖；有冲突、或者本地有没推送的提交时会停下来，把原因写在页面上。
 - 跟踪的分支在远端被删了时，可以一键改跟 `main`；`main` 上还没有插件时不会切。
 - 打开剧场时会顺便检查一次（最多 12 小时一次），可以在同一页关掉。
-- 不是 git 克隆的装法（压缩包、npm）没法在页面里更新：重新执行一遍安装命令即可。
+- 不是 git 克隆的装法（压缩包、npm）没法在页面里更新：先 `dsh plugin --profile tavern remove flowgal`，再按上面的「安装」用 git clone 装一次。
 
 | | |
 |---|---|
 | ![有新版本](docs/screenshots/27-update-available.webp) | ![更新完，等重启](docs/screenshots/28-update-restart.webp) |
-
-### 从旧版本搬过来
-
-FlowGal 以前叫 dsh-tavern-igs，放在另一个仓库的子目录里。现在是独立仓库，要在终端里重装一次（之后又可以在页面里更新）。先删掉旧的，装的是哪个就删哪个：
-
-```sh
-pnpm dsh plugin --profile web remove dsh-tavern-igs   # 改名前的版本
-pnpm dsh plugin --profile web remove flowgal          # 旧仓库里已经改名成 flowgal 的版本
-```
-
-然后按上面的「安装」装新仓库，重启 DSH。设置、API Key、每局的存档和生成的图片都会保留：
-
-- 数据目录：第一次启动时 `$DSH_HOME/dsh-tavern-igs/` 会整个改名成 `$DSH_HOME/flowgal/`（已经有 `flowgal/` 时不动）。
-- API Key：凭据名改成了 `FLOWGAL_*`，读不到时会自动找改名前的 `DSH_TAVERN_IGS_*`；在设置里重新保存一次后旧的那份会被清掉。
-- 旧聊天里的场景卡和插画卡照常显示、照常能在剧场里演；读到哪一句也会接着记。
-- 旧版的背景图库和自带配乐已经去掉：没有生成背景的地点用程序绘制的天空，配乐改成用你自己的音乐（见下面「我的配乐」）。
 
 ## 在聊天里
 

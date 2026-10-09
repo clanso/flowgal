@@ -1,7 +1,7 @@
 // 用假的 Tavern / llm / 生图服务跑通一整轮：正文 → 场景卡占位 → 导演 → 外貌档案 → CG / 背景 / 立绘 → 挂回正文。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, rm, access } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createStore } from '../lib/store.js'
@@ -226,31 +226,6 @@ test('gate: 导演整理到一半可以停止，场景按原文演，日志记�
     assert.equal(log.entries[0].status, 'cancelled')
     assert.equal(engine.cancel('g', 'director', live.id), false)
     engine.dispose()
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
-})
-
-test('gate: 改名后第一次启动把旧数据目录整个搬到新目录，已有新目录时不动旧的', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'flowgal-rename-'))
-  try {
-    const legacy = join(dir, 'dsh-tavern-igs')
-    const root = join(dir, 'flowgal')
-    const old = createStore(legacy)
-    await old.updateConfig(c => { c.ui = { skin: 'ink' } })
-    await old.updateGame('g1', g => { g.scenes.v1 = { turn: 1, textVersion: 'v1', units: [] } })
-
-    const store = createStore(root, { legacy })
-    assert.equal((await store.readConfig()).ui.skin, 'ink')
-    assert.ok((await store.readGame('g1')).scenes.v1)
-    await assert.rejects(access(legacy), '旧目录已经搬走')
-
-    // 新目录已经在用：再出现旧目录也不合并、不覆盖。
-    const again = createStore(legacy)
-    await again.updateConfig(c => { c.ui = { skin: 'noir' } })
-    const reopened = createStore(root, { legacy })
-    assert.equal((await reopened.readConfig()).ui.skin, 'ink')
-    await access(legacy)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

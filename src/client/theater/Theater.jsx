@@ -9,9 +9,9 @@ import { DirectorLog } from './DirectorLog.jsx'
 import { playBgm, stopBgm, sfx } from './audio.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
 
-// 读到哪一句：每局记在浏览器里。改名前记在 igsd:pos:* 下，读不到新键时沿用旧的。
+// 读到哪一句：每局记在浏览器里。
 const POS_KEY = gameId => 'flowgal:pos:' + gameId
-const readPos = gameId => { try { return localStorage.getItem(POS_KEY(gameId)) || localStorage.getItem('igsd:pos:' + gameId) || '' } catch { return '' } }
+const readPos = gameId => { try { return localStorage.getItem(POS_KEY(gameId)) || '' } catch { return '' } }
 const writePos = (gameId, key) => { try { localStorage.setItem(POS_KEY(gameId), key) } catch {} }
 
 /** 提前下载后面几拍要用的字形分片。 */
