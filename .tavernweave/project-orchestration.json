@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "authoritySchema": "tavernweave/project-orchestration/v1",
+  "projectId": "flowgal-two-hosts",
+  "title": "FlowGal 一套核心两个宿主（DSH + SillyTavern）",
+  "profile": "blueprint-set",
+  "state": "driver-approved-design",
+  "authorityFile": "总设计案.md",
+  "nextFile": "NEXT.md",
+  "blueprintPolicy": {
+    "masterFile": "蓝图集/BLUEPRINT_INDEX.md",
+    "maxDepth": 2,
+    "maxChildren": 5,
+    "runtimePersistentBlueprintBudget": 0,
+    "blueprints": [
+      {
+        "id": "BP-ROOT",
+        "path": "蓝图集/BLUEPRINT_INDEX.md",
+        "parentId": null,
+        "depth": 1,
+        "status": "active"
+      }
+    ]
+  },
+  "runtimeRefinementPolicy": {
+    "trigger": "observed-problem-or-failed-exit-condition",
+    "maxDepth": 1,
+    "maxOpenBranches": 1,
+    "persistent": false,
+    "mayExpandProductScope": false,
+    "mustReturnToParent": true
+  },
+  "runtimeRefinements": [],
+  "discussionDirections": [
+    {
+      "id": "dir-host",
+      "topic": "宿主与迁移策略",
+      "level": "foundational",
+      "roundLimit": 4,
+      "roundsUsed": 2,
+      "status": "frozen",
+      "decisionIds": [
+        "C1",
+        "C2",
+        "C4",
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "id": "dir-scope",
+      "topic": "第一版范围",
+      "level": "core",
+      "roundLimit": 3,
+      "roundsUsed": 1,
+      "status": "frozen",
+      "decisionIds": [
+        "C3"
+      ]
+    }
+  ],
+  "frontendDecision": {
+    "recommended": "independent-ui",
+    "fit": "suitable",
+    "reason": "剧场是全屏覆盖层、设置和人物志是独立面板，与 DSH 版同构；酒馆 UI 扩展能稳定挂载",
+    "fallback": "只搬剧场，不搬后台自动整理",
+    "reopenWhen": "需要关页面也继续出图，或要把 Key 放到后台",
+    "driverOverride": false,
+    "prototypeGateRequired": false,
+    "realHostGateRequired": true
+  },
+  "acceptance": {
+    "automated": "not-run",
+    "staticPreview": "not-run",
+    "realHost": "pending",
+    "driver": {
+      "status": "pending",
+      "source": "driver"
+    }
+  }
+}
