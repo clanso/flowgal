@@ -9,7 +9,7 @@ import { aaPrompt, cleanRects, defaultRects, rectsBox, stillPack, cleanPack, pac
 import { pngSize, maskPng, grayPng } from '../lib/image/png.js'
 import { inpaintModel } from '../lib/image/novelai.js'
 import { noteEmotionUsers, personEmotions } from '../lib/emotions.js'
-import { createStore } from '../lib/store.js'
+import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 
 const dataUrl = bytes => 'data:image/png;base64,' + Buffer.from(bytes).toString('base64')
@@ -43,7 +43,7 @@ test('gate: 眨眼口型的重画提示词：要的 tag 放最前，打架的拿
   assert.throws(() => aaPrompt(positive, '', 'nose', 'open'), /没有这个状态/)
 })
 
-test('gate: 框对齐 8 像素、夹在图里、不能太小太大；遮罩只有框里是白的；局部重绘用对应的 inpainting 模型', () => {
+test('gate: 框对齐 8 像素、夹在图里、不能太小太大；遮罩只有框里是白的；局部重绘用对应的 inpainting 模型', async () => {
   const rects = cleanRects({ eyes: [[321, 215, 393, 281], [430, 210, 500, 270]], mouth: [[395, 313, 431, 327]] }, 832, 1216)
   assert.deepEqual(rects, { eyes: [[320, 216, 392, 280], [432, 208, 504, 272]], mouth: [[392, 312, 432, 328]] })
   assert.deepEqual(rectsBox(rects.eyes), [320, 208, 504, 280])
@@ -55,7 +55,7 @@ test('gate: 框对齐 8 像素、夹在图里、不能太小太大；遮罩只�
   const d = defaultRects(832, 1216)
   assert.deepEqual(cleanRects(d, 832, 1216), d)
 
-  const mask = maskPng(64, 32, [[8, 8, 24, 16]])
+  const mask = await maskPng(64, 32, [[8, 8, 24, 16]])
   assert.deepEqual(pngSize(mask), { width: 64, height: 32 })
   const px = grayPixels(mask)
   assert.deepEqual([px(8, 8), px(23, 15), px(24, 15), px(7, 8), px(8, 16), px(0, 0)], [255, 255, 0, 0, 0, 0])
@@ -79,14 +79,14 @@ async function setup(dir, { backend = 'novelai' } = {}) {
   const fetchImpl = async (url, init) => {
     const body = JSON.parse(init.body)
     requests.push({ url: String(url), body })
-    return new Response(grayPng(body.parameters.width, body.parameters.height, () => 77), { status: 200, headers: { 'content-type': 'image/png' } })
+    return new Response(await grayPng(body.parameters.width, body.parameters.height, () => 77), { status: 200, headers: { 'content-type': 'image/png' } })
   }
   const store = createStore(dir)
   const engine = createEngine({ store, services: {}, fetchImpl, logger: { warn() {}, info() {} } })
   await engine.patchConfig({ images: { backend } })
   await engine.setSecret('novelai', 'official', 'k')
   await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair, blue eyes', gender: 'female' } })
-  const still = grayPng(832, 1216, () => 200)
+  const still = await grayPng(832, 1216, () => 200)
   await engine.castAction('g', 'upload', { name: '林岚', emotion: 'happy', dataUrl: dataUrl(still) })
   await engine.castAction('g', 'upload', { name: '林岚', emotion: 'sad', dataUrl: dataUrl(still) })
   const lin = () => engine.gameView('g').then(v => v.cast.find(p => p.name === '林岚'))
@@ -102,7 +102,7 @@ test('gate: 工作台局部重绘：用画这张时的提示词和种子，按�
   try {
     const { engine, key, requests } = await setup(dir)
     const rects = { eyes: [[320, 216, 392, 280], [424, 208, 504, 272]], mouth: [[392, 312, 432, 328]] }
-    const image = dataUrl(grayPng(832, 1216, () => 255))
+    const image = dataUrl(await grayPng(832, 1216, () => 255))
     const res = await engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects, image })
     assert.match(res.image, /^data:image\/png;base64,/)
     assert.equal(res.seed, 4242)
@@ -124,7 +124,7 @@ test('gate: 工作台局部重绘：用画这张时的提示词和种子，按�
     assert.equal(requests.at(-1).body.parameters.seed, 7)
     assert.match(requests.at(-1).body.input, /^parted lips, /)
 
-    await assert.rejects(engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects, image: dataUrl(grayPng(830, 1216, () => 255)) }), /64 的倍数/)
+    await assert.rejects(engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects, image: dataUrl(await grayPng(830, 1216, () => 255)) }), /64 的倍数/)
     await assert.rejects(engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects: { eyes: rects.eyes }, image }), /还没框嘴/)
     await assert.rejects(engine.aaInpaint('g', { name: '林岚', key: 'nope', part: 'eyes', state: 'closed', rects, image }), /还没有图/)
     engine.dispose()
@@ -144,7 +144,7 @@ test('gate: 按柏宝绘写法画的差分（有角色块）：眨眼口型改�
       characterNegatives: ['glasses, full body'],
     }))
     const rects = { eyes: [[320, 216, 392, 280]], mouth: [[392, 312, 432, 328]] }
-    await engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects, image: dataUrl(grayPng(832, 1216, () => 255)) })
+    await engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects, image: dataUrl(await grayPng(832, 1216, () => 255)) })
     const q = requests.at(-1).body.parameters
     assert.equal(requests.at(-1).body.input, '<artist>a</artist>, transparent background, cowboy shot, solo, looking at viewer', 'Base 原样')
     assert.equal(q.v4_prompt.caption.char_captions[0].char_caption, 'closed eyes, girl, long black hair, light smile, cowboy shot')
@@ -161,7 +161,7 @@ test('gate: 局部重绘只走 NovelAI，别的渠道说清楚', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
   try {
     const { engine, key } = await setup(dir, { backend: 'webui' })
-    await assert.rejects(engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects: defaultRects(832, 1216), image: dataUrl(grayPng(832, 1216, () => 255)) }), /要用 NovelAI 的局部重绘/)
+    await assert.rejects(engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects: defaultRects(832, 1216), image: dataUrl(await grayPng(832, 1216, () => 255)) }), /要用 NovelAI 的局部重绘/)
     engine.dispose()
   } finally {
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
@@ -178,7 +178,7 @@ test('gate: 工作台做好的素材包：静止帧沿用原图（不另存、�
     const patches = {}, files = {}
     for (const [part, state] of AA_STEPS) {
       patches[part] = { ...(patches[part] || {}), [state]: { file: `${part}_${state}.png`, x: part === 'eyes' ? 320 : 392, y: part === 'eyes' ? 208 : 312 } }
-      files[`${part}_${state}.png`] = dataUrl(grayPng(16, 8, () => 9))
+      files[`${part}_${state}.png`] = dataUrl(await grayPng(16, 8, () => 9))
     }
     const rects = { eyes: [[320, 216, 392, 280]], mouth: [[392, 312, 432, 328]] }
     const manifest = stillPack({ name: '林岚·开心', width: 832, height: 1216, still: 'still.png', patches })

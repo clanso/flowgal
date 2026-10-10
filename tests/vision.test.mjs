@@ -5,7 +5,8 @@ import { createHash } from 'node:crypto'
 import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createVision, sourceUrls, VISION_FILES, VISION_PACKS, DEFAULT_MIRROR } from '../lib/vision.js'
+import { createVision } from '../lib/dsh/vision.js'
+import { sourceUrls, VISION_FILES, VISION_PACKS, DEFAULT_MIRROR } from '../lib/vision.js'
 import { resolveConfig, applyPatch } from '../lib/config.js'
 
 const sha = b => createHash('sha256').update(b).digest('hex')

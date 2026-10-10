@@ -1,7 +1,7 @@
 ---
 handoff_schema: tavernweave/next/v1
 project_id: flowgal-two-hosts
-status: phase-1-active
+status: phase-1-exit-pending-push
 updated: 2026-10-10
 ---
 
@@ -24,6 +24,11 @@ updated: 2026-10-10
 ## 最近证据
 
 - 只读调查（酒馆源码、柏宝绘 / 酒馆数据库生图的 NovelAI 调用方式），见总设计案。
+- 阶段 1 · 拆出核心（2026-10-10，本地提交，未推送）：
+  - 核心改用 Web 标准接口：新增 lib/bytes.js（base64、随机数、压缩、格式识别）；png.js、http.js（ZIP）、四个出图渠道、engine、music、library 不再用 Buffer / node:*。生成 PNG、解 ZIP 改成异步。
+  - DSH 专用代码归入 lib/dsh/（plugin、store、routes、updater、vision 下载）；lib/index.js 只是 DSH 入口的转接；接口表拆成核心的 lib/api.js（含同页直接调用 call()），DSH 只包 HTTP。
+  - 自动化：npm test 108/108（含新增 tests/hosts.test.mjs：核心不许用 node:、Buffer、process、require，界面不许引 DSH 宿主层）；npm run build 通过，client.js 不含 node:。
+  - DSH 预览冒烟（flowgal-aa-vision，真立绘）：导演整理、插画 ready、两个角色立绘、配乐 3 首、认脸模型状态、工作台自动框、只做这一张（假局部重绘）全部正常。
 
 ## 开放风险
 
@@ -32,7 +37,7 @@ updated: 2026-10-10
 
 ## 下一道门
 
-完成阶段 1 退出条件 → 推送前问驾驶员 D2（权威文件是否公开）→ 驾驶员 DSH 冒烟。
+推送前问驾驶员 D2（权威文件是否公开）→ 推 GitHub → 驾驶员在 DSH 里「检查更新」+ 重启后冒烟 → 进入阶段 2（酒馆宿主层）。
 
 ## 一句续接
 

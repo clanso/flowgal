@@ -9,7 +9,7 @@ import { segmentTurn } from '../lib/segment.js'
 import { normalizeScript, rawSection } from '../lib/director.js'
 import { playedUnits } from '../lib/staging.js'
 import { buildBeats } from '../src/client/theater/playback.js'
-import { createStore } from '../lib/store.js'
+import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 
 /** 只要导演那一步：Tavern 记轮次和挂上去的场景卡，模型每次回同一份 JSON。 */

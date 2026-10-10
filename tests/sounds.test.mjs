@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { VOICES, SOUND_SLOTS, DEFAULT_SOUNDS, resolveVoice, castVoices, lineVoice, soundFor } from '../lib/sounds.js'
 import { resolveConfig, applyPatch } from '../lib/config.js'
 import { editPerson, effectivePerson } from '../lib/cast.js'
-import { createStore } from '../lib/store.js'
+import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 
 const WAVES = new Set(['sine', 'triangle', 'square', 'sawtooth', 'noise'])

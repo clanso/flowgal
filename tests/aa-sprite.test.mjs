@@ -4,7 +4,7 @@ import { breathFrame, blinkAt, blinkGap, mouthAt, cleanPack, packFiles, packWith
 import { mkdtemp, rm, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createStore } from '../lib/store.js'
+import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 import { typeTimes } from '../lib/typing.js'
 

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm, open, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createStore } from '../lib/store.js'
+import { createStore } from '../lib/dsh/store.js'
 import { createEngine, KIND_SCENE, KIND_CG } from '../lib/engine.js'
 import { variantKey, nameSeed } from '../lib/look.js'
 

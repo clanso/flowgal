@@ -269,7 +269,7 @@ test('gate: ComfyUI 占位符与自动定位', () => {
   assert.equal(graph['6'].inputs.text, 'old', '不改原工作流')
 })
 
-test('gate: NovelAI V4.5 请求体与 ZIP 解包', () => {
+test('gate: NovelAI V4.5 请求体与 ZIP 解包', async () => {
   const body = buildNaiBody({ prompt: '1girl', negative: 'bad', width: 1210, height: 830, seed: 5, config: { model: 'nai-diffusion-4-5-full' } })
   assert.equal(body.parameters.width, 1216)
   assert.equal(body.parameters.v4_prompt.caption.base_caption, '1girl')
@@ -279,7 +279,7 @@ test('gate: NovelAI V4.5 请求体与 ZIP 解包', () => {
   // 构造一个最小 ZIP（deflate）。
   const png = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')
   const zip = makeZip('image_0.png', png)
-  assert.deepEqual(Buffer.from(firstImageFromZip(new Uint8Array(zip))), png)
+  assert.deepEqual(Buffer.from(await firstImageFromZip(new Uint8Array(zip))), png)
 })
 
 test('gate: NovelAI 新出的模型填 ID 就能用，按版本号选协议和默认质量词', () => {
@@ -503,7 +503,7 @@ function makeZip(name, data) {
 }
 
 test('gate: 每个接口路径只注册一次', async () => {
-  const { createRoutes } = await import('../lib/routes.js')
+  const { createRoutes } = await import('../lib/dsh/routes.js')
   const routes = createRoutes({ engine: { subscribe() {} }, logger: {} })
   const paths = routes.map(r => r.path)
   assert.equal(new Set(paths).size, paths.length)

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { resolveConfig } from '../lib/config.js'
 import { normalizeStyle, composePrompt, applyGuidance, BUILTIN_STYLES, DEFAULT_SAMPLE, SAMPLE_SEED, DEFAULT_QUALITY, DEFAULT_NEGATIVE } from '../lib/image/style.js'
-import { createStore } from '../lib/store.js'
+import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')

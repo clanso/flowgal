@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtemp, rm, writeFile, mkdir, access } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createUpdater } from '../lib/updater.js'
+import { createUpdater } from '../lib/dsh/updater.js'
 
 const ENV = { ...process.env, GIT_AUTHOR_NAME: 'flowgal', GIT_AUTHOR_EMAIL: 'flowgal@example.invalid', GIT_COMMITTER_NAME: 'flowgal', GIT_COMMITTER_EMAIL: 'flowgal@example.invalid', GIT_CONFIG_NOSYSTEM: '1', HOME: tmpdir() }
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()

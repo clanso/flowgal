@@ -16,11 +16,11 @@ import { readFile, readdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, dirname, extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createStore } from '../lib/store.js'
+import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
-import { createRoutes } from '../lib/routes.js'
+import { createRoutes } from '../lib/dsh/routes.js'
 import { createMusic } from '../lib/music.js'
-import { createVision } from '../lib/vision.js'
+import { createVision } from '../lib/dsh/vision.js'
 import { segmentTurn } from '../lib/segment.js'
 import { cleanTurnText } from '../lib/clean.js'
 import { CARD, TURNS, LATE_TURN, directorReply, CG_DRAFTS } from './preview/story.mjs'
@@ -165,7 +165,7 @@ async function fakeFetch(url, init = {}) {
   if (json.action === 'infill') {
     const face = chars[0] || prompt // 状态 tag 写在角色块最前（老记录在 Base 最前）
     const shade = /^closed eyes/.test(face) ? 30 : /^half-closed eyes/.test(face) ? 120 : /^open mouth/.test(face) ? 70 : 170
-    return new Response(grayPng(json.parameters.width, json.parameters.height, () => shade), { status: 200, headers: { 'content-type': 'image/png' } })
+    return new Response(await grayPng(json.parameters.width, json.parameters.height, () => shade), { status: 200, headers: { 'content-type': 'image/png' } })
   }
   // 逆转式立绘演示：这个人的立绘一律用素材包的第一张呼吸帧（剧场里实际按素材包分层画）
   if (aaStill && /white background|simple background/.test(prompt) && prompt.includes(AA_MARK)) {
