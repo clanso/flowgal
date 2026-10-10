@@ -1,6 +1,6 @@
 // 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含声音、「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
-import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic } from '../api.js'
+import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, hostName } from '../api.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions } from '../../../lib/emotions.js'
@@ -1084,9 +1084,9 @@ function DirectorSection({ data, onDirectorLog }) {
     <>
       <div className="fg-section">导演（后台整理）{onDirectorLog && <button type="button" className="fg-btn" onClick={onDirectorLog}>查看导演日志</button>}</div>
       <Field label="自动整理" hint="每轮正文写完后，后台模型把它整理成场景：说话人、表情、站位、镜头、天气、选项、插画分镜。正文一字不改。"><Toggle value={cfg.director.auto} onChange={v => p({ auto: v })} /></Field>
-      <Field label="模型" hint="留空跟随 Tavern 的后台模型。整理用的是便宜的小模型就够。">
+      <Field label="模型" hint={hostName() === 'st' ? '默认跟着酒馆当前的连接；也可以选一套连接配置（在酒馆「API 连接」里存的）专门给导演用，整理用便宜的小模型就够。' : '留空跟随 Tavern 的后台模型。整理用的是便宜的小模型就够。'}>
         <div className="fg-row">
-          <Select value={cfg.director.provider} onChange={v => p({ provider: v, model: '' })} options={[['', '跟随 Tavern'], ...llm.providers.map(x => [x.id, x.name])]} />
+          <Select value={cfg.director.provider} onChange={v => p({ provider: v, model: '' })} options={[['', hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern'], ...llm.providers.map(x => [x.id, x.name])]} />
           {cfg.director.provider && (llm.models.length
             ? <Select value={cfg.director.model} onChange={v => p({ model: v })} options={[['', '（请选择）'], ...llm.models.map(m => [m.id, m.name])]} />
             : <Text value={cfg.director.model} placeholder="模型 ID" onCommit={v => p({ model: v })} />)}
@@ -1135,9 +1135,11 @@ function ImagesSection({ data }) {
       </Field>
       <div className="fg-section">图片文件夹</div>
       <Field label="另存一份" hint="画好的插画、背景、立绘按「卡名 / 插画 / 第 3 轮 标题」这样的名字复制一份，方便在文件夹里找。那里的图改了、删了都不影响剧场；删局、重新整理也不会删它们。"><Toggle value={cfg.images.library} onChange={v => p({ library: v })} /></Field>
+      {hostName() === 'st' ? <div className="fg-note">酒馆版存在酒馆的 data/&lt;用户&gt;/user/images/FlowGal-&lt;卡名&gt;/ 里（浏览器没法选别的文件夹），酒馆自带的「图库」也能看到。</div> : (
       <Field label="位置" hint={`现在是 ${(data.paths && data.paths.library) || '数据目录下的「图片」'}。留空用数据目录下的「图片」；要换地方就填绝对路径，比如 D:\\Pictures\\FlowGal。`}>
         <div className="fg-row"><Text value={cfg.images.libraryDir} placeholder="留空用默认位置" style={{ flex: 1 }} onCommit={v => p({ libraryDir: v })} /><button type="button" className="fg-btn" onClick={() => openLibrary('').catch(e => toast(e.message, 'error'))}>打开</button></div>
       </Field>
+      )}
     </>
   )
 }
@@ -1368,7 +1370,13 @@ function UpdateSection({ data }) {
     <>
       <div className="fg-section">版本与更新</div>
       {!u && <div className="fg-note">读取中…</div>}
-      {u && !u.managed && (
+      {u && !u.managed && hostName() === 'st' && (
+        <>
+          <Field label="当前版本">v{__FLOWGAL_VERSION__}</Field>
+          <div className="fg-note">酒馆版的更新由酒馆管：扩展 → 管理扩展 → FlowGal → 更新（也可以打开它的自动更新）。更新后刷新网页就用上新版本。</div>
+        </>
+      )}
+      {u && !u.managed && hostName() !== 'st' && (
         <>
           <Field label="当前版本">v{__FLOWGAL_VERSION__}</Field>
           <div className="fg-note">{u.reason} 想在这里一键更新：在 DSH 终端里 <code>git clone https://github.com/clanso/flowgal.git</code>，<code>dsh plugin --profile tavern remove flowgal</code> 后再 <code>dsh plugin --profile tavern add</code> 这个文件夹，然后重启 DSH。</div>
@@ -1418,7 +1426,7 @@ export function Settings({ onClose, onDirectorLog = null, initialTab = 'look' })
       {data && tab === 'images' && <BackendSection data={data} />}
       {data && tab === 'style' && <><StyleSection data={data} /><ImagesSection data={data} /></>}
       {data && tab === 'about' && <UpdateSection data={data} />}
-      {data && <div className="fg-note" style={{ marginTop: '2cqw' }}>Key 只存在 DSH 宿主（优先存进 DSH 凭据库：{data.secretStorage}），浏览器只看得到「有没有填」。</div>}
+      {data && <div className="fg-note" style={{ marginTop: '2cqw' }}>{hostName() === 'st' ? <>Key 存在{data.secretStorage}，出图时由这个页面直接带去请求；别把酒馆的数据文件夹发给别人。</> : <>Key 只存在 DSH 宿主（优先存进 DSH 凭据库：{data.secretStorage}），浏览器只看得到「有没有填」。</>}</div>}
     </Panel>
   )
 }

@@ -1,0 +1,14 @@
+{
+  "display_name": "FlowGal",
+  "loading_order": 100,
+  "js": "dist/st.js",
+  "author": "clanso",
+  "version": "0.2.0",
+  "homePage": "https://github.com/clanso/flowgal",
+  "auto_update": false,
+  "minimum_client_version": "1.18.0",
+  "hooks": {
+    "activate": "onActivate",
+    "disable": "onDisable"
+  }
+}

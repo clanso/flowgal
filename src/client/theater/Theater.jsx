@@ -1,6 +1,6 @@
 // 剧场：全屏 galgame 播放器。读宿主整理好的场景脚本，逐拍演出；导演没整理完的部分先按原文演。
 import React from 'react'
-import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, updateAvailable, toast, openTheater, assetUrl } from '../api.js'
+import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, emotionLabel, pickTrack, stageRatio } from './playback.js'
 import { Backdrop, Cast, CgLayer, TitleCard, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
@@ -316,7 +316,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
         {title && (
           <div className="fg-title" onClick={e => e.stopPropagation()}>
-            <div className="fg-title-kicker">FlowGal · DSH Tavern</div>
+            <div className="fg-title-kicker">FlowGal · {hostName() === 'st' ? 'SillyTavern' : 'DSH Tavern'}</div>
             <div className="fg-title-logo">{cardTitle}</div>
             <div className="fg-title-sub">{latest ? `第 ${latest.turn} 轮 · ${latest.scene.location || '—'} · ${TIME_LABEL[latest.scene.time] || ''}` : gameId ? '开场白还没有整理' : '先在聊天里打开一局'}</div>
             <div className="fg-title-menu">

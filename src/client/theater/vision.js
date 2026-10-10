@@ -1,10 +1,14 @@
-// 浏览器里跑认脸模型（逆转式立绘工作台的「自动框」）。模型和运行库都从宿主下好的地方读（/vision-files/…，见 lib/vision.js），
-// 不连外网。小模型（脸、头、眼睛）用 onnxruntime 直接跑；精细模式的 Florence-2 用 transformers.js 跑（它自带一份 onnxruntime）。
+// 浏览器里跑认脸模型（逆转式立绘工作台的「自动框」）。模型和运行库都从宿主下好的地方读，不连外网：
+// DSH 从宿主的 /vision-files/…（见 lib/dsh/vision.js）；酒馆版从浏览器缓存（宿主给一个 loader，见 st/vision.js）。小模型（脸、头、眼睛）用 onnxruntime 直接跑；精细模式的 Florence-2 用 transformers.js 跑（它自带一份 onnxruntime）。
 // 怎么认、框怎么推都在 lib/detect.js，这里只负责把图变成像素、把模型跑起来。
-import { API, call } from '../api.js'
+import { call, visionFiles, visionLoader } from '../api.js'
 import { autoFrame, followFrame, imageTensor, parseYolo } from '../../../lib/detect.js'
 
-const FILES = API + '/vision-files/'
+// 文件从哪拿由宿主定，宿主启动后才定下来，所以每次现取：
+//   DSH：模型文件的根地址（/plugins/flowgal/api/vision-files/），onnxruntime 和 transformers.js 按地址自己读；
+//   酒馆版：一个 loader，从浏览器缓存里给 blob 地址、字节，transformers.js 改读缓存。
+const FILES = () => visionFiles()
+const loader = () => visionLoader()
 
 export const visionApi = {
   status: () => call('/vision'),
@@ -20,11 +24,13 @@ const sessions = {}
 
 function loadOrt(status) {
   if (!ortLoad) {
-    ortLoad = import(/* 运行时才知道地址，打包时不碰它 */ FILES + status.paths.ort).then(ort => {
-      ort.env.wasm.wasmPaths = FILES + status.paths.ortDir
+    const L = loader()
+    ortLoad = (async () => {
+      const ort = await import(/* 运行时才知道地址，打包时不碰它 */ L ? await L.moduleUrl(status.paths.ort) : FILES() + status.paths.ort)
+      ort.env.wasm.wasmPaths = L ? await L.wasmPaths(status.paths.ortDir) : FILES() + status.paths.ortDir
       ort.env.wasm.numThreads = 1 // 页面没开跨源隔离，多线程用不了；单线程一张图也不到 1 秒
       return ort
-    })
+    })()
     ortLoad.catch(() => { ortLoad = null })
   }
   return ortLoad
@@ -32,7 +38,8 @@ function loadOrt(status) {
 
 async function session(status, model) {
   if (!sessions[model]) {
-    sessions[model] = loadOrt(status).then(ort => ort.InferenceSession.create(FILES + status.models[model].path, { executionProviders: ['wasm'] }))
+    const L = loader()
+    sessions[model] = loadOrt(status).then(async ort => ort.InferenceSession.create(L ? new Uint8Array(await L.bytes(status.models[model].path)) : FILES() + status.models[model].path, { executionProviders: ['wasm'] }))
     sessions[model].catch(() => { delete sessions[model] })
   }
   return sessions[model]
@@ -40,21 +47,29 @@ async function session(status, model) {
 
 function loadFlorence(status) {
   if (!florenceLoad) {
-    florenceLoad = import(FILES + status.paths.tjs).then(async tjs => {
-      tjs.env.allowRemoteModels = false
-      tjs.env.allowLocalModels = true
-      tjs.env.localModelPath = FILES
-      tjs.env.useBrowserCache = false // 文件就在本机宿主上，不用再在浏览器里存一份 300 MB
-      tjs.env.backends.onnx.wasm.wasmPaths = FILES + status.paths.tjsDir
+    const L = loader()
+    florenceLoad = (async () => {
+      const tjs = await import(L ? await L.moduleUrl(status.paths.tjs) : FILES() + status.paths.tjs)
+      let revision = 'main'
+      if (L) {
+        revision = (await L.florence(tjs)).revision
+        tjs.env.backends.onnx.wasm.wasmPaths = await L.wasmPaths(status.paths.tjsDir, true)
+      } else {
+        tjs.env.allowRemoteModels = false
+        tjs.env.allowLocalModels = true
+        tjs.env.localModelPath = FILES()
+        tjs.env.useBrowserCache = false // 文件就在本机宿主上，不用再在浏览器里存一份 300 MB
+        tjs.env.backends.onnx.wasm.wasmPaths = FILES() + status.paths.tjsDir
+      }
       tjs.env.backends.onnx.wasm.numThreads = 1
       const id = status.paths.florence
       const [model, processor, tokenizer] = await Promise.all([
-        tjs.Florence2ForConditionalGeneration.from_pretrained(id, { dtype: 'q8', device: 'wasm' }),
-        tjs.AutoProcessor.from_pretrained(id),
-        tjs.AutoTokenizer.from_pretrained(id),
+        tjs.Florence2ForConditionalGeneration.from_pretrained(id, { dtype: 'q8', device: 'wasm', revision }),
+        tjs.AutoProcessor.from_pretrained(id, { revision }),
+        tjs.AutoTokenizer.from_pretrained(id, { revision }),
       ])
       return { tjs, model, processor, tokenizer }
-    })
+    })()
     florenceLoad.catch(() => { florenceLoad = null })
   }
   return florenceLoad

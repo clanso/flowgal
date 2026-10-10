@@ -7,7 +7,10 @@ import { createStStore, stAssetUrl } from '../st/store.js'
 import { createStLlm } from '../st/llm.js'
 import { createStTavern, TURN_FIELD } from '../st/tavern.js'
 import { createStHost } from '../st/host.js'
-import { toBase64, fromBase64 } from '../lib/bytes.js'
+import { fromBase64 } from '../lib/bytes.js'
+import { createNetFetch } from '../st/net.js'
+import { createBrowserVision, cacheKey } from '../st/vision.js'
+import { createHash } from 'node:crypto'
 
 const PNG = fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==')
 const MP3 = new Uint8Array([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xfb])
@@ -25,6 +28,7 @@ function fakeServer() {
       files.set(body.name, fromBase64(body.data))
       return json({ path: '/user/files/' + body.name })
     }
+    if (path === '/api/files/verify') return json(Object.fromEntries(body.urls.map(u => [u, files.has(u.replace('/user/files/', ''))])))
     if (path === '/api/files/delete') return files.delete(body.path.replace('/user/files/', '')) ? new Response('', { status: 200 }) : new Response('', { status: 404 })
     if (path.startsWith('/user/files/')) return files.has(path.slice(12)) ? new Response(files.get(path.slice(12))) : new Response('', { status: 404 })
     if (path === '/api/images/upload') {
@@ -124,7 +128,7 @@ test('gate: 酒馆版存档——JSON 写进 user/files、读回来是拷贝、�
 test('gate: 酒馆版大模型——走连接配置流式、累计全文换成增量、带上温度；没有连接配置时退回 generateRaw；出错变成 finish', async () => {
   const { ctx, requests } = fakeContext({ reply: () => '{"scene":{}}' })
   const llm = createStLlm({ getContext: () => ctx })
-  assert.deepEqual(llm.listProviders().map(p => p.id), ['current', 'p1'])
+  assert.deepEqual(llm.listProviders().map(p => p.id), ['p1'], '「跟着酒馆当前的连接」是设置里的默认项，这里不重复列')
   assert.deepEqual(await llm.listModels('current'), [{ id: 'deepseek-chat', name: 'deepseek-chat' }])
   assert.deepEqual(await llm.resolveModelInfo(), { context: { contextWindow: 16384 } })
   assert.deepEqual(llm.current(), { provider: 'current', model: 'deepseek-chat' })
@@ -230,4 +234,70 @@ test('gate: 装起来以后——酒馆写完一轮（MESSAGE_RECEIVED）→ 导
     assert.equal((await host.tavern.list({ gameId })).length, 1)
     await assert.rejects(host.api.call('GET', '/nope'), /没有这个接口/)
   } finally { host.dispose() }
+})
+
+test('gate: 酒馆版出图请求——NovelAI 官方、同源、上传文件直连；本机 ComfyUI 这类走酒馆转发；转发关着就都直连', async () => {
+  const seen = []
+  const make = proxyOn => createNetFetch({
+    origin: 'http://localhost:8000',
+    fetchImpl: async (url, init = {}) => {
+      if (String(url).startsWith('/proxy/https://flowgal-cors-probe.invalid')) return proxyOn ? new Response('boom', { status: 500 }) : new Response('CORS proxy is disabled. Enable it in config.yaml', { status: 404 })
+      seen.push(String(url))
+      return new Response('ok')
+    },
+  })
+  const on = make(true)
+  await on('https://image.novelai.net/ai/generate-image', { method: 'POST', body: '{}' })
+  await on('http://127.0.0.1:8188/prompt', { method: 'POST', body: '{}' })
+  await on('http://127.0.0.1:8188/upload/image', { method: 'POST', body: new Blob(['x']) })
+  await on('/user/files/flowgal-config.json')
+  assert.deepEqual(seen, ['https://image.novelai.net/ai/generate-image', '/proxy/http://127.0.0.1:8188/prompt', 'http://127.0.0.1:8188/upload/image', '/user/files/flowgal-config.json'])
+  seen.length = 0
+  await make(false)('http://127.0.0.1:8188/prompt', { method: 'POST', body: '{}' })
+  assert.deepEqual(seen, ['http://127.0.0.1:8188/prompt'], '转发关着：直连（ComfyUI 要自己开跨域）')
+})
+
+test('gate: 酒馆版认脸模型——下到浏览器缓存、核对 SHA-256、按官方地址存（镜像下的也是）；界面从缓存拿字节和 blob 地址；transformers.js 改读这份缓存', async () => {
+  const sha = b => createHash('sha256').update(b).digest('hex')
+  const model = new TextEncoder().encode('fake onnx model bytes')
+  const glue = new TextEncoder().encode('export default 1')
+  const FILES = [
+    { id: 'face', pack: 'p', hf: ['org/repo', 'r1', 'face/model.onnx'], local: 'org/face.onnx', size: model.length, sha256: sha(model), threshold: 0.3 },
+    { id: 'ort', pack: 'p', npm: ['onnxruntime-web', '1.20.1', 'dist/ort.mjs'], local: 'ort-dir/ort.mjs', size: glue.length, sha256: sha(glue) },
+  ]
+  const store = new Map()
+  const cache = { match: async k => (store.has(k) ? store.get(k).clone() : undefined), put: async (k, r) => { store.set(k, r) }, delete: async k => store.delete(k) }
+  const caches = { open: async () => cache }
+  const asked = []
+  const fetchImpl = async url => {
+    asked.push(url)
+    if (url.startsWith('https://huggingface.co/')) throw new TypeError('Failed to fetch')
+    return new Response(url.includes('model.onnx') ? model : glue)
+  }
+  const vision = createBrowserVision({ caches, fetchImpl, files: FILES, packs: { p: { label: '测试' } }, settings: async () => ({ source: 'auto' }) })
+  assert.equal((await vision.status()).packs.p.ready, false)
+  await vision.download('p')
+  let s
+  for (let i = 0; i < 100; i++) { s = await vision.status(); if (s.job.state !== 'running') break; await new Promise(r => setTimeout(r, 5)) }
+  assert.equal(s.job.state, 'done', s.job.error)
+  assert.equal(s.packs.p.ready, true)
+  assert.equal(s.root, '浏览器缓存（Cache Storage）')
+  assert.ok(asked.some(u => u.startsWith('https://hf-mirror.com/')), '官网不通换镜像')
+  assert.ok(store.has('https://huggingface.co/org/repo/resolve/r1/face/model.onnx'), '镜像下的也记在官方地址下')
+  assert.equal(cacheKey(FILES[1]), 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.mjs')
+  assert.deepEqual(new Uint8Array(await vision.loader.bytes('org/face.onnx')), model)
+  const env = { backends: { onnx: { wasm: {} } } }
+  const { revision } = await vision.loader.florence({ env })
+  assert.equal(env.useCustomCache, true)
+  assert.equal(env.customCache, cache)
+  assert.equal(env.allowLocalModels, false)
+  assert.equal(typeof revision, 'string')
+  // 校验不对：不进缓存
+  const bad = createBrowserVision({ caches: { open: async () => ({ ...cache, match: async () => undefined }) }, fetchImpl: async () => new Response(new Uint8Array(model.length)), files: [FILES[0]], packs: { p: { label: '测试' } }, settings: async () => ({ source: 'official' }) })
+  await bad.download('p')
+  for (let i = 0; i < 100; i++) { s = await bad.status(); if (s.job.state !== 'running') break; await new Promise(r => setTimeout(r, 5)) }
+  assert.equal(s.job.state, 'failed')
+  assert.match(s.job.error, /校验不对/)
+  await vision.remove('p')
+  assert.equal((await vision.status()).packs.p.ready, false)
 })

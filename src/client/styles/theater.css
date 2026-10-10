@@ -16,7 +16,8 @@
   --font-display: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", serif;
   --font-latin: "Cormorant Garamond", "Playfair Display", Georgia, serif;
   --wait-glyph: "◆";
-  position: fixed; inset: 0; z-index: 2147483000; overflow: hidden; overflow: clip;
+  /* 宽高写死成视口大小：酒馆给 <html> 加了 transform，fixed 层的「inset: 0」会跟着 html（高 0）算 */
+  position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 2147483000; overflow: hidden; overflow: clip;
   display: flex; align-items: center; justify-content: center;
   background: #05040c; color: var(--ink);
   font-family: var(--font-body);
@@ -564,7 +565,7 @@
 .fg-changes code, .fg-note code { font-family: "JetBrains Mono", Consolas, monospace; color: var(--accent); }
 .fg-changes small { color: var(--ink-dim); white-space: nowrap; }
 
-.fg-lightbox { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2cqw; background: rgba(0, 0, 0, .9); animation: fg-fade-in .25s ease both; cursor: zoom-out; }
+.fg-lightbox { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2cqw; background: rgba(0, 0, 0, .9); animation: fg-fade-in .25s ease both; cursor: zoom-out; }
 .fg-lightbox img { max-width: 92%; max-height: 82%; object-fit: contain; box-shadow: 0 0 6cqw rgba(0, 0, 0, .8); cursor: default; }
 .fg-lightbox .fg-row { cursor: default; }
 

@@ -46,12 +46,12 @@
 .fg-cgcard-bar button[disabled] { opacity: .35; pointer-events: none; }
 @media (hover: none) { .fg-cgcard-bar { opacity: 1; transform: none; } }
 
-.fg-chat-lightbox { position: fixed; inset: 0; z-index: 2147483100; display: grid; place-items: center; background: rgba(0, 0, 0, .9); cursor: zoom-out; animation: fg-fade-in .2s ease both; }
+.fg-chat-lightbox { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 2147483100; display: grid; place-items: center; background: rgba(0, 0, 0, .9); cursor: zoom-out; animation: fg-fade-in .2s ease both; }
 .fg-chat-lightbox img { max-width: 94vw; max-height: 92vh; object-fit: contain; }
 
-.fg-toast { position: fixed; left: 50%; bottom: 7vh; z-index: 2147483200; transform: translateX(-50%); padding: 10px 18px; border-radius: 99px; font-size: 13.5px; letter-spacing: .04em; color: #fff; background: rgba(18, 14, 40, .92); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 10px 30px rgba(0, 0, 0, .4); backdrop-filter: blur(10px); animation: fg-toast-in .35s cubic-bezier(.2, .8, .2, 1) both; max-width: 86vw; }
+.fg-toast { position: fixed; left: 50%; top: 93vh; top: 93dvh; z-index: 2147483200; transform: translate(-50%, -100%); padding: 10px 18px; border-radius: 99px; font-size: 13.5px; letter-spacing: .04em; color: #fff; background: rgba(18, 14, 40, .92); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 10px 30px rgba(0, 0, 0, .4); backdrop-filter: blur(10px); animation: fg-toast-in .35s cubic-bezier(.2, .8, .2, 1) both; max-width: 86vw; }
 .fg-toast.is-error { border-color: rgba(255, 120, 120, .6); }
-@keyframes fg-toast-in { from { opacity: 0; transform: translate(-50%, 10px); } }
+@keyframes fg-toast-in { from { opacity: 0; transform: translate(-50%, calc(-100% + 10px)); } }
 
 .fg-settings-card { display: grid; gap: 12px; padding: 18px; border-radius: 14px; border: 1px solid rgba(127, 127, 127, .25); background: linear-gradient(135deg, rgba(155, 123, 255, .08), rgba(255, 126, 182, .06)); }
 .fg-settings-card h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }

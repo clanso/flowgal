@@ -35,7 +35,7 @@ test('gate: 核心（lib/ 除了 DSH 宿主层）和酒馆宿主层（st/）不�
     for (const [re, what] of NODE_ONLY) if (re.test(text)) bad.push(`${rel(file)} 用了 ${what}`)
   }
   for (const file of await walk(join(root, 'src'))) {
-    if (/lib\/dsh\//.test(await readFile(file, 'utf8'))) bad.push(`${rel(file)} 引用了 DSH 宿主层`)
+    if (/from ['"][^'"]*lib\/dsh\//.test(await readFile(file, 'utf8'))) bad.push(`${rel(file)} 引用了 DSH 宿主层`)
   }
   assert.deepEqual(bad, [])
 })

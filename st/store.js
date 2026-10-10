@@ -42,6 +42,11 @@ export function createStStore({ fetchImpl = (...a) => fetch(...a), headers = () 
     if (!res.ok) throw new Error(`读不到 ${url}：HTTP ${res.status}`)
     return new Uint8Array(await res.arrayBuffer())
   }
+  const exists = async url => {
+    const res = await post('/api/files/verify', { urls: [url] }).catch(() => null)
+    if (!res) return true // 问不了就直接读（读不到按没有算）
+    return Boolean((await res.json().catch(() => ({})))[url])
+  }
   const uploadFile = (name, bytes) => post('/api/files/upload', { name, data: toBase64(bytes) })
   const deleteFile = name => post('/api/files/delete', { path: `/user/files/${name}` }).catch(() => {})
 
@@ -55,7 +60,8 @@ export function createStStore({ fetchImpl = (...a) => fetch(...a), headers = () 
       docs.set(name, doc)
     }
     if (doc.value === undefined) {
-      doc.loading = doc.loading || get(`/user/files/${name}`).then(bytes => {
+      // 先问酒馆有没有这个文件（没有就不去读，免得控制台一片 404）
+      doc.loading = doc.loading || exists(`/user/files/${name}`).then(yes => (yes ? get(`/user/files/${name}`) : null)).then(bytes => {
         if (!bytes || !bytes.length) return structuredClone(fallback)
         try { return JSON.parse(new TextDecoder().decode(bytes)) } catch { return structuredClone(fallback) }
       })

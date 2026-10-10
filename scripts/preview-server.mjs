@@ -21,15 +21,9 @@ import { createEngine } from '../lib/engine.js'
 import { createRoutes } from '../lib/dsh/routes.js'
 import { createMusic } from '../lib/music.js'
 import { createVision } from '../lib/dsh/vision.js'
-import { segmentTurn } from '../lib/segment.js'
-import { cleanTurnText } from '../lib/clean.js'
-import { CARD, TURNS, LATE_TURN, directorReply, CG_DRAFTS } from './preview/story.mjs'
-import { paintPlaceholder } from './preview/paint.mjs'
-import { paintSprite, spriteLayer } from './preview/sprite.mjs'
-import { grayPng } from '../lib/image/png.js'
-import { emotionId } from '../lib/emotions.js'
-import { EMOTION_TAGS } from '../lib/vocab.js'
 import { demoTracks } from './preview/synth.mjs'
+import { CARD, TURNS, LATE_TURN } from './preview/story.mjs'
+import { fakeLlmReply, fakePaint } from './preview/fake-models.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const fontDir = process.env.FLOWGAL_FONT_DIR ? resolve(process.env.FLOWGAL_FONT_DIR) : ''
@@ -79,78 +73,24 @@ function withMusic(turn, units, reply) {
   }
   return reply
 }
-// 假立绘设计师：读请求里的角色档案和差分清单，按固定外貌 + 衣服 + 情绪拼 tag（真模型会结合剧情写得更细）。
-const EXPRESSIONS = {
-  thinking: 'thinking, hand on own chin, looking down, closed mouth',
-  smile: 'gentle smile, closed mouth, light blush',
-  teasing: 'teasing smile, one eye closed, smirk',
-  shy: 'shy, light blush, looking away, small smile',
-  pout: 'pout, puffed cheeks, annoyed, furrowed brow',
-  love: 'blush, heart-shaped pupils, smile',
-  serious: 'serious, closed mouth, straight face',
-  '害羞地强装镇定': 'blush, embarrassed, looking away, pursed lips, straight face, hand on own chest',
-}
-function spriteWriterReply(prompt) {
-  const person = prompt.slice(prompt.lastIndexOf('【角色档案】'))
-  const appearance = (person.match(/固定外貌：(.*)/) || [])[1] || '1girl'
-  const sprites = []
-  for (const m of prompt.matchAll(/^- (s\d+)：(.*)$/gm)) {
-    const outfit = (m[2].match(/「[^」]*」（([^）]*)）/) || [])[1] || ''
-    const states = [...(m[2].match(/长期状态 ([^；]*)/) || [])[1]?.matchAll(/（([^）]*)）/g) || []].map(x => x[1])
-    const id = emotionId((m[2].match(/情绪「([^」]+)」/) || [])[1])
-    const base = emotionId((m[2].match(/接近 (\S+)$/) || [])[1])
-    const face = EXPRESSIONS[id] || EMOTION_TAGS[id] || EMOTION_TAGS[base] || EMOTION_TAGS.neutral
-    sprites.push({ key: m[1], tags: [appearance, outfit, ...states, face].filter(Boolean).join(', ') })
-  }
-  return JSON.stringify({ sprites }, null, 1)
-}
-
-// 假插画分镜师：按「要画的插画」里的标题回 story.mjs 写好的 Base + 角色块。
-function cgWriterReply(prompt) {
-  const images = []
-  for (const m of prompt.matchAll(/^- (c\d+)：(.*)$/gm)) {
-    const title = (m[2].match(/标题「([^」]+)」/) || [])[1] || ''
-    images.push({ key: m[1], ...(CG_DRAFTS[title] || { size: 'landscape', tag: 'outdoors, scenery, wide shot, soft lighting', nl: '', characters: [] }) })
-  }
-  return JSON.stringify({ images }, null, 1)
-}
-const CG_THINKING = '状态账本：林岚此刻穿着海军蓝水手服，手里没有东西，没有长期状态。时代锚：现代日本高中，放学后的校舍。景别：她坐在琴凳上回头，用 cowboy shot 把琴键和回头的动作一起框进来；单人坐姿，竖版。表情：捉弄人的笑，配歪头和一点脸红；视线回头看向我。自查：tag 和 nl 里没有人名，衣服写成了指纹。'
-
-const THINKING = '先看这一轮的地点和时段，沿用上一幕的站位；说话人按引号前后的名字认，旁白里写到谁的动作就给谁换表情。值得画的只有一处，放在情绪最满的那句后面。'
 const llm = {
   resolveModelInfo: async () => ({ context: { contextWindow: 1000000 }, defaultMaxTokens: 128000 }),
   stream(request) {
     const prompt = request.messages[0].content[0].text
-    const isDirector = String(request.system || '').includes('后台导演')
     const system = String(request.system || '')
-    const cgWriter = system.includes('你是视觉小说的插画分镜师')
-    if (system.includes('立绘设计师') || cgWriter) {
-      const reply = cgWriter ? cgWriterReply(prompt) : spriteWriterReply(prompt)
-      return (async function* () {
-        if (cgWriter) for (let i = 0; i < CG_THINKING.length; i += 16) { yield { type: 'reasoning-delta', text: CG_THINKING.slice(i, i + 16) }; await sleep(8) }
-        for (let i = 0; i < reply.length; i += 24) { yield { type: 'text-delta', text: reply.slice(i, i + 24) }; await sleep(6) }
-        yield { type: 'usage', usage: { inputTokens: Math.ceil(prompt.length * 0.9), outputTokens: Math.ceil(reply.length / 3) } }
-        yield { type: 'finish', reason: { kind: 'stop' } }
-      })()
-    }
-    const turnInfo = isDirector ? [...TURNS, LATE_TURN].find(t => prompt.includes(t.sig || t.text.split('\n')[0].slice(0, 12))) : null
+    const { reasoning, text, turn } = fakeLlmReply({ system, prompt, decorate: withMusic })
+    const director = system.includes('后台导演')
+    const slow = turn === 4
     return (async function* () {
-      if (!turnInfo) { yield { type: 'text-delta', text: '{}' }; yield { type: 'finish', reason: { kind: 'stop' } }; return }
-      const slow = turnInfo.turn === 4
-      const units = segmentTurn(cleanTurnText({ text: turnInfo.text, rawText: turnInfo.raw || turnInfo.text, card: CARD }))
-      const reply = JSON.stringify(withMusic(turnInfo.turn, units, directorReply(turnInfo.turn, units)), null, 1)
-      for (let i = 0; i < THINKING.length; i += 12) { yield { type: 'reasoning-delta', text: THINKING.slice(i, i + 12) }; await sleep(slow ? 90 : 4) }
-      const step = 12
-      for (let i = 0; i < reply.length; i += step) { yield { type: 'text-delta', text: reply.slice(i, i + step) }; await sleep(slow ? Math.max(20, 12000 / (reply.length / step)) : 1) }
-      yield { type: 'usage', usage: { inputTokens: Math.ceil(prompt.length * 0.9), outputTokens: Math.ceil(reply.length / 3), reasoningTokens: THINKING.length } }
+      const think = director ? 12 : 16
+      for (let i = 0; i < reasoning.length; i += think) { yield { type: 'reasoning-delta', text: reasoning.slice(i, i + think) }; await sleep(director ? (slow ? 90 : 4) : 8) }
+      const step = director ? 12 : 24
+      for (let i = 0; i < text.length; i += step) { yield { type: 'text-delta', text: text.slice(i, i + step) }; await sleep(director ? (slow ? Math.max(20, 12000 / (text.length / step)) : 1) : 6) }
+      if (text !== '{}') yield { type: 'usage', usage: { inputTokens: Math.ceil(prompt.length * 0.9), outputTokens: Math.ceil(text.length / 3), ...(director ? { reasoningTokens: reasoning.length } : {}) } }
       yield { type: 'finish', reason: { kind: 'stop' } }
     })()
   },
 }
-
-// ───────── 假生图：立绘（白底 / 透明底的单人）画半身像；插画和背景按请求尺寸画风景，角色块画成人物叠上去 ─────────
-/** 插画的每个角色块画一个人；没有角色块的单人图（画风的试画样图）按整段提示词画一个。 */
-const figuresFor = (prompt, captions) => (captions.length ? captions.map(c => spriteLayer(c.char_caption)) : /\b1(girl|boy)\b/.test(prompt) ? [spriteLayer(prompt)] : [])
 
 async function fakeFetch(url, init = {}) {
   const body = typeof init.body === 'string' ? init.body : ''
@@ -161,12 +101,6 @@ async function fakeFetch(url, init = {}) {
   const chars = (json.parameters?.v4_prompt?.caption?.char_captions || []).map(c => c.char_caption).filter(Boolean)
   const sprite = chars.length && /transparent background|white background|simple background/.test(json.input || '')
   const prompt = sprite ? [json.input, ...chars].join(', ') : json.input || body
-  // 逆转式立绘工作台的局部重绘：按状态回一张不同深浅的灰图（框里贴上去就看得出眨眼、张嘴在动）
-  if (json.action === 'infill') {
-    const face = chars[0] || prompt // 状态 tag 写在角色块最前（老记录在 Base 最前）
-    const shade = /^closed eyes/.test(face) ? 30 : /^half-closed eyes/.test(face) ? 120 : /^open mouth/.test(face) ? 70 : 170
-    return new Response(await grayPng(json.parameters.width, json.parameters.height, () => shade), { status: 200, headers: { 'content-type': 'image/png' } })
-  }
   // 逆转式立绘演示：这个人的立绘一律用素材包的第一张呼吸帧（剧场里实际按素材包分层画）
   if (aaStill && /white background|simple background/.test(prompt) && prompt.includes(AA_MARK)) {
     return new Response(aaStill, { status: 200, headers: { 'content-type': 'image/webp' } })
@@ -175,14 +109,7 @@ async function fakeFetch(url, init = {}) {
     const set = realSprites[prompt.includes(AA_MARK) ? 'a' : 'b']
     if (set.files.length) return new Response(await readFile(set.files[set.next++ % set.files.length]), { status: 200, headers: { 'content-type': 'image/png' } })
   }
-  const png = /white background|simple background/.test(prompt)
-    ? paintSprite(prompt)
-    : paintPlaceholder(prompt, {
-      width: json.parameters?.width || 1216,
-      height: json.parameters?.height || 832,
-      figures: figuresFor(prompt, json.parameters?.v4_prompt?.caption?.char_captions || []),
-    })
-  return new Response(png, { status: 200, headers: { 'content-type': 'image/png' } })
+  return new Response(await fakePaint(json), { status: 200, headers: { 'content-type': 'image/png' } })
 }
 
 const dataDir = await mkdtemp(join(tmpdir(), 'flowgal-preview-'))

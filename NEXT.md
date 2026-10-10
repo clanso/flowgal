@@ -1,7 +1,7 @@
 ---
 handoff_schema: tavernweave/next/v1
 project_id: flowgal-two-hosts
-status: phase-3-active
+status: phase-5-active
 updated: 2026-10-10
 ---
 
@@ -32,6 +32,11 @@ updated: 2026-10-10
 
 - 阶段 2 · 酒馆宿主层（2026-10-10）：st/store.js（user/files、user/images、Key 存扩展设置、写回合并）、st/llm.js（连接配置流式 / generateRaw 退路）、st/tavern.js（轮次号写进楼层 extra、正文版本、角色卡 + 世界书、楼层卡片）、st/host.js（装配引擎和接口表）；核心面向用户的文字去掉写死的 DSH。npm test 112/112（新增 tests/st-host.test.mjs 4 组，含「写完一轮 → 导演整理 → 挂场景卡」端到端；边界检查覆盖 st/）。真酒馆里跑引擎并到阶段 3 的测试酒馆冒烟里验。
 
+- 阶段 3、4 · 酒馆界面、出图和媒体（2026-10-10）：界面接口改成可换的传输（src/client/api.js：DSH 走 HTTP，酒馆同页直接调接口表）；共用界面件拆进 src/client/shell.jsx；酒馆版入口 st/index.jsx（魔杖菜单、扩展设置卡、剧场覆盖层、楼层场景卡 / 插画卡、楼层按钮）；manifest.json + dist/st.js（npm run build 一起出）；st/net.js（NovelAI 官方直连，其它走酒馆 /proxy/）；st/vision.js（认脸模型存浏览器缓存、SHA-256、transformers.js 读这份缓存）；全屏层写死视口宽高（酒馆给 html 加了 transform）；界面上宿主说法分开。
+  - 自动化：npm test 114/114。
+  - 测试酒馆（C:Usersadminst-test，1.19.0，假模型 scripts/st-mock.mjs，开 --corsProxy）：扩展加载；发一轮→导演整理→楼层场景卡；剧场播放；生图渠道加接入点、填 Key→插画、立绘画好存进 user/images/flowgal；配乐上传进 user/files 并播放；认脸小模型和精细模式大模型下到浏览器缓存、自动框（精细模式「大模型找到了嘴」）；工作台只做这一张（假局部重绘）存素材包并播放；导演改走连接配置后流式整理（日志显示 flowgal-mock）；刷新后卡片从存档读回。
+  - DSH 预览复查：剧场全屏、楼层卡、出图、导演日志正常。
+
 ## 开放风险
 
 - 一次全搬：驾驶员首次试用要等全部阶段完成。
@@ -39,7 +44,7 @@ updated: 2026-10-10
 
 ## 下一道门
 
-阶段 3 · 酒馆界面：界面接口改成可换的传输（DSH 走 HTTP，酒馆同页直接调用）；manifest.json + 酒馆版打包；剧场覆盖层、扩展菜单入口、设置卡、楼层场景卡 / 插画卡与按钮；在测试酒馆 C:Usersadminst-test 里冒烟。驾驶员 DSH 冒烟（daa2abf）结果待回。
+阶段 5：测试酒馆从 GitHub 地址安装（不用联接）、更新；README 写酒馆版安装说明；之后交驾驶员在真实酒馆安装试用（安装另行授权）。驾驶员 DSH 冒烟（daa2abf 起）结果待回。
 
 ## 一句续接
 

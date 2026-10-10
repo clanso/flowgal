@@ -2,7 +2,7 @@
 // 正在跑的那次实时滚动模型输出（有思考就一起显示），可以中途停止；
 // 历史记录能看实际发出去的提示词、每次尝试的原始输出 / 用量 / 报错，以及解析后逐句的演出标注。
 import React from 'react'
-import { api, toast, useDirectorLog } from '../api.js'
+import { api, toast, useDirectorLog, hostName } from '../api.js'
 import { Panel } from './Panels.jsx'
 import { formatLook } from '../../../lib/look.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL } from './playback.js'
@@ -13,7 +13,8 @@ const lookText = v => (typeof v === 'string' ? v : v ? formatLook(v) : '')
 const STATUS = { running: ['进行中', 'is-running'], ok: ['完成', 'is-ok'], failed: ['失败', 'is-failed'], cancelled: ['已停止', 'is-cancelled'] }
 const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词', cg: '写插画提示词' }
 const WRITER = { ai: '模型写的', fallback: '按档案拼的', user: '玩家改的' }
-const SOURCE = { tavern: '跟随 Tavern 后台模型', plugin: '插件设置里指定' }
+// 宿主在启动后才定（酒馆版换了传输），所以现取
+const sourceLabel = source => ({ tavern: hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern 后台模型', plugin: '插件设置里指定' })[source]
 const USAGE_LABEL = { inputTokens: '输入', outputTokens: '输出', reasoningTokens: '思考', cachedInputTokens: '缓存命中', cacheReadTokens: '缓存读', cacheWriteTokens: '缓存写', totalTokens: '合计' }
 const SHAPE_LABEL = { landscape: '横版', portrait: '竖版', square: '方形' }
 /** 一条记录的标题：导演按轮次，立绘按人，插画按轮次。 */
@@ -273,10 +274,10 @@ function LogDetail({ gameId, summary }) {
           {running && <button type="button" className="fg-btn" disabled={stopping} onClick={stop}>{writer ? '停止' : '停止整理'}</button>}
         </div>
         <div className="fg-dlog-facts">
-          <div><i>模型</i>{summary.model || '—'}{summary.provider ? <span className="fg-note"> · {summary.provider}</span> : null}{SOURCE[summary.source] ? <span className="fg-note">（{SOURCE[summary.source]}）</span> : null}</div>
+          <div><i>模型</i>{summary.model || '—'}{summary.provider ? <span className="fg-note"> · {summary.provider}</span> : null}{sourceLabel() ? <span className="fg-note">（{sourceLabel()}）</span> : null}</div>
           <div><i>时间</i>{clock(summary.at)} · {secs(elapsed)} · {REASON[summary.reason] || summary.reason}</div>
           <div><i>最大输出</i>{num(summary.maxTokens)} token{entry && entry.temperature != null ? ` · 温度 ${entry.temperature}` : ''}</div>
-          <div><i>模型窗口</i>{summary.window ? `${num(summary.window)} token` : 'DSH 没给窗口大小，按设置原样发'}{entry && entry.outputDefault ? <span className="fg-note"> · 模型默认输出 {num(entry.outputDefault)}</span> : null}</div>
+          <div><i>模型窗口</i>{summary.window ? `${num(summary.window)} token` : '宿主没给窗口大小，按设置原样发'}{entry && entry.outputDefault ? <span className="fg-note"> · 模型默认输出 {num(entry.outputDefault)}</span> : null}</div>
           {entry && <div><i>资料</i>{entry.contextLength ? `发了 ${num(entry.contextChars)} 字（人物卡与世界书共 ${num(entry.contextLength)} 字）` : '这张卡没有人物卡 / 世界书资料'}</div>}
           {entry && writer && <div><i>剧情</i>{`发了 ${num(entry.storyChars)} 字（到这一轮为止共 ${num(entry.storyLength)} 字）`}</div>}
           {summary.usage && <div><i>用量</i>{usageText(summary.usage)}</div>}

@@ -1,4 +1,5 @@
-// 浏览器 ↔ 宿主半边的 JSON 接口，以及一个极小的全局状态（剧场开关、当前对局）。
+// 浏览器 ↔ 宿主的接口，以及一个极小的全局状态（剧场开关、当前对局）。
+// 怎么跟宿主说话是可换的「传输」：DSH 默认走 HTTP（/plugins/flowgal/api/*）；酒馆版（st/index.jsx）启动时换成同页直接调用接口表。
 import React from 'react'
 
 function originBase() {
@@ -9,10 +10,9 @@ function originBase() {
   return origin || ''
 }
 
-export const API = originBase() + '/plugins/flowgal/api'
-export const assetUrl = id => (id ? `${API}/asset?id=${encodeURIComponent(id)}` : '')
+const API = originBase() + '/plugins/flowgal/api'
 
-export async function call(path, body, { method = body ? 'POST' : 'GET', signal } = {}) {
+async function httpCall(path, body, { method, signal }) {
   const init = { method, signal, cache: 'no-store', headers: { 'x-flowgal-request': '1' } }
   if (method === 'POST') { init.headers['content-type'] = 'application/json'; init.body = JSON.stringify(body || {}) }
   const res = await fetch(API + path, init)
@@ -21,6 +21,39 @@ export async function call(path, body, { method = body ? 'POST' : 'GET', signal 
   if (!res.ok || !data || data.ok === false) throw new Error((data && data.error) || `HTTP ${res.status}`)
   return data
 }
+
+async function httpUpload(path, file) {
+  const res = await fetch(API + path, { method: 'POST', cache: 'no-store', headers: { 'x-flowgal-request': '1', 'content-type': file.type || 'application/octet-stream' }, body: file })
+  let data = null
+  try { data = await res.json() } catch {}
+  if (!res.ok || !data || data.ok === false) throw new Error((data && data.error) || `HTTP ${res.status}`)
+  return data
+}
+
+/**
+ * 传输：call(路径, 请求体, { method, signal }) 回 { ok, ...结果 }；upload(路径, 文件) 上传原始字节；
+ * assetUrl(素材编号) 是浏览器能直接读的地址；visionFiles 是认脸模型文件的根地址（以 / 结尾）；
+ * visionLoader 是另一种给模型文件的办法（酒馆版：从浏览器缓存给 blob 地址和字节，见 st/vision.js），有它就不用 visionFiles。
+ */
+const transport = {
+  call: httpCall,
+  upload: httpUpload,
+  assetUrl: id => `${API}/asset?id=${encodeURIComponent(id)}`,
+  visionFiles: API + '/vision-files/',
+  visionLoader: null,
+  host: 'dsh',
+}
+/** 换传输（酒馆版启动时调用一次）。 */
+export function setTransport(patch) { Object.assign(transport, patch) }
+export const hostName = () => transport.host
+export const visionFiles = () => transport.visionFiles
+export const visionLoader = () => transport.visionLoader
+export const assetUrl = id => (id ? transport.assetUrl(id) : '')
+
+export function call(path, body, { method = body ? 'POST' : 'GET', signal } = {}) {
+  return transport.call(path, body, { method, signal })
+}
+const uploadFile = (path, file) => transport.upload(path, file)
 
 export const api = {
   game: (gameId, since, signal) => call(`/game?gameId=${encodeURIComponent(gameId)}${since ? `&since=${since}` : ''}`, null, { signal }),
@@ -63,13 +96,6 @@ export const api = {
   removeSound: slot => call('/sound', { action: 'remove', slot }),
 }
 
-async function uploadFile(path, file) {
-  const res = await fetch(API + path, { method: 'POST', cache: 'no-store', headers: { 'x-flowgal-request': '1', 'content-type': file.type || 'application/octet-stream' }, body: file })
-  let data = null
-  try { data = await res.json() } catch {}
-  if (!res.ok || !data || data.ok === false) throw new Error((data && data.error) || `HTTP ${res.status}`)
-  return data
-}
 
 /** 补图结果的一句话说明。 */
 export function fillText(r) {

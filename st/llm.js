@@ -23,7 +23,8 @@ export function createStLlm({ getContext = () => globalThis.SillyTavern.getConte
 
   return {
     listProviders() {
-      return [{ id: CURRENT, name: '跟着酒馆当前的连接' }, ...profiles().map(p => ({ id: p.id, name: '连接配置：' + (p.name || p.id) }))]
+      // 「跟着酒馆当前的连接」是设置里的默认项（留空），这里只列存好的连接配置
+      return profiles().map(p => ({ id: p.id, name: '连接配置：' + (p.name || p.id) }))
     },
     async listModels(provider) {
       const id = profileIdOf(provider)

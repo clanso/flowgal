@@ -4,7 +4,7 @@
 // 宿主没有图片库：垫白底、切贴片都在这里用画布做；宿主只负责带着 Key 去请求、按框画遮罩、存素材包。
 // 「自动框」用本机下好的认脸模型在浏览器里认眼睛和嘴（vision.js / lib/detect.js），认不准的标出来让人看一眼。
 import React from 'react'
-import { api, assetUrl, toast } from '../api.js'
+import { api, assetUrl, toast, hostName } from '../api.js'
 import { PlayView, useDemoTalk, SpriteViewer } from './AaPreview.jsx'
 import { emotionLabel } from './playback.js'
 import { visionApi, frameSprite, followSprite, holdVision, releaseVisionLater } from './vision.js'
@@ -193,7 +193,7 @@ function VisionBar({ status, setStatus, fine, setFine }) {
         </div>
       )}
       {job && job.state === 'failed' && <div className="fg-note fg-err">下载{label(job.pack)}失败：{job.error}（可以换个下载来源再点下载，下好的部分不会重下）</div>}
-      {!basic.ready && !busy && <div className="fg-note">自动框要先下载认脸小模型：二次元的脸、头、眼睛识别（deepghs，MIT / OpenRAIL 许可），只下一次，存在 FlowGal 数据目录的 models 文件夹，在你自己电脑上跑、不上传图片。</div>}
+      {!basic.ready && !busy && <div className="fg-note">自动框要先下载认脸小模型：二次元的脸、头、眼睛识别（deepghs，MIT / OpenRAIL 许可），只下一次，存在{hostName() === 'st' ? '这个浏览器的缓存里（换浏览器、清浏览器数据要重下）' : ' FlowGal 数据目录的 models 文件夹'}，在你自己电脑上跑、不上传图片。</div>}
     </div>
   )
 }
