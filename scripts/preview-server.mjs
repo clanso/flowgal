@@ -33,8 +33,10 @@ const aaArg = process.argv.indexOf('--aa-demo')
 const aaDir = (aaArg > 0 ? process.argv[aaArg + 1] : process.env.FLOWGAL_AA_DEMO) ? resolve(aaArg > 0 ? process.argv[aaArg + 1] : process.env.FLOWGAL_AA_DEMO) : ''
 const AA_NAME = process.env.FLOWGAL_AA_DEMO_NAME || '林岚'
 const AA_MARK = process.env.FLOWGAL_AA_DEMO_MARK || 'long black hair'
-const aaManifest = aaDir ? JSON.parse(await readFile(join(aaDir, 'sprite.json'), 'utf8')) : null
-const aaStill = aaDir ? await readFile(join(aaDir, aaManifest.breath.frames[0])) : null
+// 目录里有 motion.json 就是 v2 素材包（会侧头），否则读 v1 的 sprite.json
+const aaFile = aaDir ? ((await readdir(aaDir)).includes('motion.json') ? 'motion.json' : 'sprite.json') : ''
+const aaManifest = aaDir ? JSON.parse(await readFile(join(aaDir, aaFile), 'utf8')) : null
+const aaStill = aaDir ? await readFile(join(aaDir, aaManifest.version === 2 ? aaManifest.poses[aaManifest.default_pose || 'front'].base : aaManifest.breath.frames[0])) : null
 const argOf = name => { const i = process.argv.indexOf(name); return i > 0 ? resolve(process.argv[i + 1]) : '' }
 const spriteDir = argOf('--sprite-dir')
 const visionDir = argOf('--vision-dir') || (process.env.FLOWGAL_VISION_DIR ? resolve(process.env.FLOWGAL_VISION_DIR) : '')
@@ -157,7 +159,8 @@ const updater = {
   apply: async () => { await sleep(1200); Object.assign(update, { restartRequired: true, last: { ...update.last, behind: 0, commits: [], checkedAt: Date.now() } }); return update },
   switchToFallback: async () => update,
 }
-// 逆转式立绘演示：发给剧场的局面里给演示人物的立绘记录挂上素材包（复制一份再改，不动引擎里的数据）
+// 逆转式立绘演示：发给剧场的局面里给演示人物的立绘记录挂上素材包（复制一份再改，不动引擎里的数据）；
+// v2 素材包有侧头时，假导演给这个人每 4 句台词的第 2 句写侧头、第 4 句写转回来，剧场里看得到转头
 const routeEngine = !aaDir ? engine : new Proxy(engine, {
   get(target, key) {
     if (key !== 'gameView') return Reflect.get(target, key)
@@ -165,7 +168,19 @@ const routeEngine = !aaDir ? engine : new Proxy(engine, {
       const view = structuredClone(await target.gameView(...args))
       for (const person of view?.cast || []) {
         if (person.name !== AA_NAME) continue
-        for (const record of Object.values(person.sprites || {})) if (record?.assetId) record.aa = { manifest: '/aa-demo/sprite.json' }
+        for (const record of Object.values(person.sprites || {})) if (record?.assetId) record.aa = { manifest: '/aa-demo/' + aaFile }
+      }
+      if (aaManifest.version === 2 && aaManifest.poses?.side) {
+        let n = 0
+        for (const t of view?.turns || []) {
+          for (const u of t.units || []) {
+            const line = t.script?.lines?.[u.id]
+            if (!line || line.sp !== AA_NAME) continue
+            n += 1
+            if (n % 4 === 2) line.facing = 'side'
+            if (n % 4 === 0) line.facing = 'front'
+          }
+        }
       }
       return view
     }

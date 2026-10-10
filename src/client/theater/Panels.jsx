@@ -326,11 +326,13 @@ function readFile(file) {
 /** 读一个逆转式素材包文件夹：找到 sprite.json（选了上一层文件夹也行），先检查格式，再按它收齐要用的图片（data URL）。 */
 async function readAaFolder(files) {
   const path = f => f.webkitRelativePath || f.name
-  const json = files.filter(f => f.name === 'sprite.json').sort((a, b) => path(a).length - path(b).length)[0]
-  if (!json) throw new Error('这个文件夹里没有 sprite.json：选素材包所在的那个文件夹')
-  const dir = path(json).slice(0, -'sprite.json'.length)
+  // v2 的 motion.json（会侧头）优先；同一层两个都有时用 motion.json
+  const json = files.filter(f => f.name === 'motion.json' || f.name === 'sprite.json')
+    .sort((a, b) => path(a).length - path(b).length || (a.name === 'motion.json' ? -1 : 1))[0]
+  if (!json) throw new Error('这个文件夹里没有 motion.json 或 sprite.json：选素材包所在的那个文件夹')
+  const dir = path(json).slice(0, -json.name.length)
   let manifest
-  try { manifest = JSON.parse(await json.text()) } catch { throw new Error('sprite.json 不是合法的 JSON') }
+  try { manifest = JSON.parse(await json.text()) } catch { throw new Error(json.name + ' 不是合法的 JSON') }
   const pack = cleanPack(manifest)
   const byPath = new Map(files.map(f => [path(f), f]))
   const images = {}
@@ -608,7 +610,7 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
           }} />
         </div>
         <div className="fg-row">
-          <span className="fg-note">{record && record.aa ? `逆转式素材包${record.aa.pack && record.aa.pack.name ? `「${record.aa.pack.name}」` : ''}：会呼吸、眨眼，说话时动嘴` : '逆转式立绘：导入素材包文件夹（sprite.json 加图片），这张就会呼吸、眨眼、动嘴；图会换成素材包自带的那张'}</span>
+          <span className="fg-note">{record && record.aa ? `逆转式素材包${record.aa.pack && record.aa.pack.name ? `「${record.aa.pack.name}」` : ''}：${record.aa.pack && record.aa.pack.version === 2 ? `会眨眼，说话时按字动嘴${Object.keys(record.aa.pack.poses || {}).length > 1 ? '，导演让他侧头时会转过去' : ''}` : '会呼吸、眨眼，说话时动嘴'}` : '逆转式立绘：导入素材包文件夹（motion.json 或 sprite.json 加图片），这张就会眨眼、动嘴（新版还会侧头）；图会换成素材包自带的那张'}</span>
           <button type="button" className="fg-btn" disabled={!reachable || busy === 'aa'} onClick={() => aaRef.current && aaRef.current.click()}>{busy === 'aa' ? '导入中…' : record && record.aa ? '换素材包' : '导入素材包'}</button>
           {record && record.aa && record.aa.pack && <button type="button" className="fg-btn" disabled={busy === 'aa-rm'} onClick={() => run('aa-rm', () => api.cast(gameId, 'aa-remove', { name: person.name, key }), '已取消动态，图留着')}>取消动态</button>}
           <input ref={aaRef} type="file" webkitdirectory="" multiple hidden onChange={e => {

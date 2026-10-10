@@ -2,7 +2,8 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, emotionLabel, pickTrack, stageRatio } from './playback.js'
-import { Backdrop, Cast, CgLayer, TitleCard, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, Cast, CgLayer, TitleCard, Flash, Particles, useCamera, useHits, aaOf } from './Stage.jsx'
+import { aaTurnWait } from './AaSprite.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -51,6 +52,32 @@ function fillComposer(text) {
 function firstBeatOfTurn(beats, turn) {
   const i = beats.findIndex(b => b.turn === turn)
   return i < 0 ? -1 : i
+}
+
+/**
+ * 这一拍说话人要转头时，返回 true 直到他转完（转头时长 + 转完停的那一下，按他的素材包算）。
+ * 判断「要转头」：说话人在台上、这一拍的朝向和上一拍不一样、他的立绘是有这个姿势的 v2 素材包；瞬间显示（跳过、标题卡）时不等。
+ * 在渲染时就算好截止时刻，第一帧就挡住打字机，不会先出几个字再停。
+ */
+function useTurnHold(beat, prev, people, view, speed) {
+  const ref = React.useRef({ key: '', until: 0 })
+  const [, wake] = React.useReducer(n => n + 1, 0)
+  if (beat && ref.current.key !== beat.key) {
+    let ms = 0
+    const name = beat.speaker
+    if (speed > 0 && name && (beat.cast || []).some(c => c.name === name)) {
+      const facing = b => (b && b.facing && b.facing[name]) || ''
+      if (facing(beat) !== facing(prev)) ms = aaTurnWait(aaOf(people.get(name), beat, name, view && view.emotions), facing(prev), facing(beat))
+    }
+    ref.current = { key: beat.key, until: ms ? performance.now() + ms : 0 }
+  }
+  const waiting = Boolean(beat) && performance.now() < ref.current.until
+  React.useEffect(() => {
+    if (!waiting) return undefined
+    const t = setTimeout(wake, Math.max(0, ref.current.until - performance.now()) + 5)
+    return () => clearTimeout(t)
+  }, [waiting, beat && beat.key])
+  return waiting
 }
 
 export function TheaterRoot() {
@@ -133,9 +160,11 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   // 这句用谁的声音念：旁白按设置，台词和心声按说话人档案里的声音（没指定时按性别自动分，一局里尽量不撞）
   const voices = React.useMemo(() => castVoices((view && view.cast) || [], ui0), [view, ui0])
   const voice = React.useMemo(() => (beat ? lineVoice(beat.type, beat.speaker, voices, ui0) : null), [beat && beat.type, beat && beat.speaker, voices, ui0])
-  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : hit })
+  // 说话人这句侧头 / 转回来（v2 逆转式立绘）：文字等他转完再出（原作的前置动作也是播完才出字）
+  const turnHold = useTurnHold(beat, index > 0 ? beats[index - 1] : null, people, view, typeSpeed)
+  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText || turnHold, onFx: title ? null : hit })
   // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
-  const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])
+  const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])
   // 灵光一闪（漫画符号是灯泡）：逆转裁判那一声「叮」
   React.useEffect(() => { if (beat && beat.sym === 'bulb' && sfxOn) stinger('ding') }, [beat && beat.key])
   const cam = useCamera(title ? null : beat)
