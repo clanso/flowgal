@@ -86,7 +86,8 @@ test('gate: 一整轮的后台整理与出图', async () => {
     }
     const services = { tavern, llm, credentials: null }
     const engine = createEngine({ store, services, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { expressions: true } })
+    // 这条测的是每个情绪整张画（关掉「表情只换脸」）；只换脸的流程在 tests/face.test.mjs
+    await engine.patchConfig({ images: { expressions: true, faceSwap: false } })
     await engine.setSecret('novelai', 'official', 'pst-test-key')
     const turn = { gameId: 'g1', turn: 2, textVersion: 'v-a', text: '夕阳下的天台。\n“你终于来了。”林岚回过头。', card: { id: 'c', name: '学园' } }
     tavern.turns.set('g1:1', { text: '放学铃响了，我想起学姐约我去天台。' })
@@ -372,7 +373,7 @@ test('gate: 导演新造的复合情绪进情绪库，按这身衣服和长期�
     const requests = []
     const fetchImpl = async (url, init) => { requests.push(JSON.parse(init.body)); return new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } }) }
     const engine = createEngine({ store, services: { tavern, llm }, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { auto: false, backgrounds: false } })
+    await engine.patchConfig({ images: { auto: false, backgrounds: false, faceSwap: false } })
     await engine.setSecret('novelai', 'official', 'k')
     await engine.onTurnSettled({ gameId: 'g', turn: 3, textVersion: 'v', text: '“又是这样……”\n“算了。”' })
     const lib = (await engine.emotions()).list
@@ -406,7 +407,7 @@ test('gate: 当时没填 Key 错过的插画、背景、立绘差分可以一键
     const fetchImpl = async (url, init) => { requests.push(JSON.parse(init.body)); return new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } }) }
     const engine = createEngine({ store, services: { tavern, llm }, fetchImpl, logger: { warn() {}, info() {} } })
     // 每轮自动差分上限设成 0，看补图会不会把用到的情绪都补齐；背景关掉，看补图是否跟着设置走。
-    await engine.patchConfig({ images: { expressionsPerTurn: 0, backgrounds: false } })
+    await engine.patchConfig({ images: { expressionsPerTurn: 0, backgrounds: false, faceSwap: false } })
     await engine.onTurnSettled({ gameId: 'g', turn: 1, textVersion: 'v1', text: '夕阳下的天台。\n“你终于来了。”林岚回过头。' })
     let view = await engine.gameView('g')
     assert.equal(view.images.length, 0, '没有 Key 时不出图')
