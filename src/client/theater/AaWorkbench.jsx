@@ -2,10 +2,12 @@
 // 用 NovelAI 局部重绘做出半闭眼、闭眼、嘴半张、嘴张开四个状态；浏览器把重画的那一小块切成软边贴片，
 // 按素材包挂到这张差分上（静止帧就是原图，只做一帧、不呼吸）。做好的当场能看它眨眼、说话，哪个状态不满意单独重画。
 // 宿主没有图片库：垫白底、切贴片都在这里用画布做；宿主只负责带着 Key 去请求、按框画遮罩、存素材包。
+// 「自动框」用本机下好的认脸模型在浏览器里认眼睛和嘴（vision.js / lib/detect.js），认不准的标出来让人看一眼。
 import React from 'react'
 import { api, assetUrl, toast } from '../api.js'
 import { PlayView, useDemoTalk, SpriteViewer } from './AaPreview.jsx'
 import { emotionLabel } from './playback.js'
+import { visionApi, frameSprite, followSprite, holdVision, releaseVisionLater } from './vision.js'
 import { AA_PARTS, AA_STEPS, defaultRects, rectsBox, stillPack } from '../../../lib/aa-sprite.js'
 
 const FEATHER = 3 // 贴片边缘羽化的像素（跟最早的 Python 版一样）
@@ -155,6 +157,47 @@ function RectEditor({ src, width, height, rects, onChange, zoom }) {
   )
 }
 
+const mb = n => `${(n / 1048576).toFixed(n >= 100 * 1048576 ? 0 : 1)} MB`
+const SOURCES = [['auto', '自动（先官网，连不上换镜像）'], ['official', '只用官网'], ['mirror', '先用镜像']]
+/** 自动框的结果怎么标：准的绿、要看一眼的黄、不准的红。 */
+const AUTO_BADGE = { high: ['准', 'is-ok'], mid: ['看一眼', 'is-warn'], low: ['不准', 'is-bad'], none: ['没认出', 'is-bad'] }
+
+/**
+ * 认脸模型：下没下好、下载进度、下载来源。小模型（约 46 MB）是自动框必需的；
+ * 精细模式的大模型（约 300 MB）可选，下好后小模型没把握的图自动请它补认，勾上精细模式则每张都用它找嘴。
+ */
+function VisionBar({ status, setStatus, fine, setFine }) {
+  const act = promise => promise.then(setStatus, e => toast(e.message, 'error'))
+  if (!status) return <div className="fg-note">正在看认脸模型下好没有…</div>
+  const { basic, fine: big } = status.packs
+  const job = status.job
+  const busy = job && job.state === 'running'
+  const label = pack => status.packs[pack] ? status.packs[pack].label : pack
+  return (
+    <div className="fg-aa-vision">
+      <div className="fg-row">
+        <b>自动框</b>
+        {basic.ready ? <span className="fg-pill">✓ 认脸小模型</span> : !busy && <button type="button" className="fg-btn is-mini is-primary" onClick={() => act(visionApi.download('basic'))}>下载认脸小模型（{mb(basic.missing)}）</button>}
+        {big.ready
+          ? <label className="fg-check" title={big.note}><input type="checkbox" checked={fine} onChange={e => setFine(e.target.checked)} />精细模式（每张都让大模型找嘴，多 7~15 秒）</label>
+          : basic.ready && !busy && <button type="button" className="fg-btn is-mini" title={big.note} onClick={() => act(visionApi.download('fine'))}>下载精细模式大模型（{mb(big.missing)}）</button>}
+        <span className="fg-spacer" />
+        <label className="fg-note">下载来源 <select value={status.source} onChange={e => api.patchConfig({ vision: { source: e.target.value } }).then(() => act(visionApi.status()), err => toast(err.message, 'error'))}>{SOURCES.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label>
+        {big.ready && <button type="button" className="fg-btn is-mini" title="删掉大模型的文件，腾出约 300 MB" onClick={() => act(visionApi.remove('fine'))}>删掉大模型</button>}
+      </div>
+      {busy && (
+        <div className="fg-row">
+          <span className="fg-pill is-busy">下载{label(job.pack)}：{mb(job.received)} / {mb(job.total)}{job.source ? ` · 来自 ${job.source}` : ''}</span>
+          <progress max={job.total || 1} value={job.received} />
+          <button type="button" className="fg-btn is-mini" onClick={() => act(visionApi.cancel())}>取消</button>
+        </div>
+      )}
+      {job && job.state === 'failed' && <div className="fg-note fg-err">下载{label(job.pack)}失败：{job.error}（可以换个下载来源再点下载，下好的部分不会重下）</div>}
+      {!basic.ready && !busy && <div className="fg-note">自动框要先下载认脸小模型：二次元的脸、头、眼睛识别（deepghs，MIT / OpenRAIL 许可），只下一次，存在 FlowGal 数据目录的 models 文件夹，在你自己电脑上跑、不上传图片。</div>}
+    </div>
+  )
+}
+
 /** 一个状态的效果小图：脸附近，原图上贴着这个状态的贴片。 */
 function StateThumb({ still, patch, box }) {
   const ref = React.useRef(null)
@@ -191,8 +234,25 @@ export function AaWorkbench({ gameId, person, onClose }) {
   const [close, setClose] = React.useState(true)
   const [tab, setTab] = React.useState('frame')
   const [viewing, setViewing] = React.useState(null) // 放大看的那张差分
+  const [vision, setVision] = React.useState(null) // 认脸模型下没下好（visionApi.status）
+  const [fine, setFineState] = React.useState(() => { try { return localStorage.getItem('flowgal.aa.fine') === '1' } catch { return false } })
+  const [auto, setAuto] = React.useState({}) // key → 自动框的结果 { confidence, notes }
+  const [framing, setFraming] = React.useState('') // 正在自动框的那张
+  const touched = React.useRef(new Set()) // 手动调过框的差分（自动框认不出时照着它找）
   const stop = React.useRef(false)
   const job = (key, patch) => setJobs(j => ({ ...j, [key]: { ...(j[key] || {}), ...patch } }))
+  const setFine = on => { setFineState(on); try { localStorage.setItem('flowgal.aa.fine', on ? '1' : '0') } catch {} }
+
+  // 认脸模型的状态：打开工作台时看一次，下载中每秒刷新
+  React.useEffect(() => { visionApi.status().then(setVision, () => {}) }, [])
+  React.useEffect(() => { holdVision(); return () => releaseVisionLater() }, [])
+  const downloading = Boolean(vision && vision.job && vision.job.state === 'running')
+  React.useEffect(() => {
+    if (!downloading) return undefined
+    const timer = setInterval(() => visionApi.status().then(setVision, () => {}), 1000)
+    return () => clearInterval(timer)
+  }, [downloading])
+  const visionReady = Boolean(vision && vision.packs.basic.ready)
 
   const current = variants.find(v => v.key === focus) || null
   // 上次用过的框：这个角色最近做过的那张
@@ -218,12 +278,75 @@ export function AaWorkbench({ gameId, person, onClose }) {
   const applyToPicked = () => {
     const r = rectsOf(focus)
     setFrames(f => { const n = { ...f }; for (const key of picked) n[key] = r; return n })
+    setAuto(a => { const n = { ...a }; for (const key of picked) delete n[key]; return n })
+    for (const key of picked) touched.current.add(key)
     toast(`已把这张的框套用到所选的 ${picked.size} 张`)
   }
 
+  /** 认不出脸时照着找的那张：这次手动调过框的优先，其次最近做好动态的。 */
+  const refFor = v => {
+    const hand = variants.find(o => o.key !== v.key && touched.current.has(o.key) && frames[o.key])
+    if (hand) return { ...hand, rects: frames[hand.key] }
+    const done = variants.filter(o => o.key !== v.key && o.record.aa && o.record.aa.rects).sort((a, b) => (b.record.at || 0) - (a.record.at || 0))[0]
+    return done ? { ...done, rects: done.record.aa.rects } : null
+  }
+
+  /**
+   * 自动框一批差分：认脸模型认眼睛和嘴，认不出（furry、兽头、没下大模型时）就照这个角色手动框好的那张找同一张脸。
+   * 框直接放进工作台（还没存，生成时才用），结果标在列表里。回 key → { rects, confidence }。
+   */
+  const autoFrameList = async list => {
+    if (!visionReady) { toast('先下载认脸小模型', 'error'); return {} }
+    if (framing || running || !list.length) return {}
+    stop.current = false
+    const out = {}
+    let weak = 0
+    for (const v of list) {
+      if (stop.current) break
+      setFraming(v.key)
+      const src = assetUrl(v.record.assetId)
+      let info
+      try {
+        let r = await frameSprite(vision, src, { fine })
+        const ref = !r && refFor(v) // 完全没认出脸才照别的差分找（认出脸、只是没把握的，比粗找准）
+        if (ref) {
+          const f = await followSprite(assetUrl(ref.record.assetId), ref.rects, src)
+          // 跟随只是粗找（头一歪就偏），一律标「不准」让人看一眼，「自动框并生成」也不会直接拿它去生成
+          if (f.score >= 0.25) r = { rects: f.rects, confidence: 'low', notes: [`没认准，照「${ref.label}」框好的位置在这张里找同一张脸（相似度 ${Math.round(f.score * 100)}%），位置可能偏，拖一下`] }
+        }
+        info = r ? { confidence: r.confidence, notes: r.notes } : { confidence: 'none', notes: ['没认出脸。手动框好这个角色的一张，再点自动框，其它的会照着那张找'] }
+        if (r) {
+          const rects = { eyes: r.rects.eyes.map(b => b.map(Math.round)), mouth: r.rects.mouth.map(b => b.map(Math.round)) }
+          out[v.key] = { rects, confidence: r.confidence }
+          touched.current.delete(v.key)
+          setFrames(fr => ({ ...fr, [v.key]: rects }))
+        }
+      } catch (e) {
+        info = { confidence: 'none', notes: ['出错了：' + String((e && e.message) || e)] }
+      }
+      if (info.confidence === 'low' || info.confidence === 'none') weak++
+      setAuto(a => ({ ...a, [v.key]: info }))
+    }
+    setFraming('')
+    const done = Object.keys(out).length
+    toast(`自动框好 ${done} / ${list.length} 张${weak ? `，其中 ${weak} 张没认准，标红的点开看一眼` : ''}`, weak ? 'error' : undefined)
+    return out
+  }
+
+  /** 自动框所选、再直接生成：认准了（标绿、标黄）的才生成，标红的留着让人调好再做。手动调过框的不再自动框。 */
+  const autoAndMake = async () => {
+    const list = pickedList.filter(v => !touched.current.has(v.key))
+    const results = await autoFrameList(list)
+    const ok = pickedList.filter(v => touched.current.has(v.key) || (results[v.key] && results[v.key].confidence !== 'low'))
+    if (stop.current || !ok.length) return
+    const skipped = pickedList.length - ok.length
+    if (skipped) toast(`${skipped} 张没认准，先不生成；调好框再点「生成所选」`, 'error')
+    await run(ok, null, Object.fromEntries(Object.entries(results).map(([k, r]) => [k, r.rects])))
+  }
+
   /** 做一张差分：四个状态依次局部重绘（only 只重画其中一个，其余用已经做好的），切贴片，存成素材包。 */
-  const make = async (v, only = null) => {
-    const rects = rectsOf(v.key)
+  const make = async (v, only = null, given = null) => {
+    const rects = given || rectsOf(v.key)
     job(v.key, { status: 'running', step: 0, error: '' })
     const prep = await prepare(v.record)
     setSizes(s => ({ ...s, [v.key]: { w: prep.w, h: prep.h } }))
@@ -241,14 +364,14 @@ export function AaWorkbench({ gameId, person, onClose }) {
     job(v.key, { status: 'done', error: '' })
   }
 
-  const run = async (list, only = null) => {
+  const run = async (list, only = null, given = {}) => {
     if (running || !list.length) return
     setRunning(true)
     stop.current = false
     let ok = 0
     for (const v of list) {
       if (stop.current) break
-      try { await make(v, only); ok++ } catch (e) { job(v.key, { status: 'failed', error: String((e && e.message) || e) }) }
+      try { await make(v, only, given[v.key] || null); ok++ } catch (e) { job(v.key, { status: 'failed', error: String((e && e.message) || e) }) }
     }
     setRunning(false)
     toast(stop.current ? `已停止：做好了 ${ok} 张` : `做好了 ${ok} / ${list.length} 张`, ok === list.length ? undefined : 'error')
@@ -258,6 +381,7 @@ export function AaWorkbench({ gameId, person, onClose }) {
   const pickedList = variants.filter(v => picked.has(v.key))
   const talk = useDemoTalk(tab === 'play')
   const statusText = v => {
+    if (framing === v.key) return '正在自动框…'
     const j = jobs[v.key]
     if (j && j.status === 'running') return `生成中 ${j.step || 0}/${j.total || 4}${j.now ? ' · ' + j.now : ''}`
     if (j && j.status === 'failed') return '失败：' + j.error
@@ -277,6 +401,7 @@ export function AaWorkbench({ gameId, person, onClose }) {
         给差分做眨眼和说话的口型：框好两只眼睛和嘴，每张差分用 NovelAI 局部重绘 4 次（半闭眼、闭眼、嘴半张、嘴张开），只重画框里那一小块，原图不动。
         同一个角色的差分姿势相同，框一次可以「套用到所选」。生成要用 NovelAI 的额度（之前试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。
       </div>
+      {variants.length > 0 && <VisionBar status={vision} setStatus={setVision} fine={fine} setFine={setFine} />}
       {!variants.length && <div className="fg-note" style={{ marginTop: '1cqw' }}>这个角色还没有画好的差分。先在人物志里画几张。</div>}
       {variants.length > 0 && (
         <div className="fg-aa-grid">
@@ -286,12 +411,17 @@ export function AaWorkbench({ gameId, person, onClose }) {
               <button type="button" className="fg-btn is-mini" onClick={() => setPicked(new Set())}>全不选</button>
               <button type="button" className="fg-btn is-mini" onClick={() => setPicked(new Set(variants.filter(v => !v.record.aa).map(v => v.key)))}>选还没做的</button>
               <span className="fg-note">已选 {picked.size}</span>
+              <button type="button" className="fg-btn is-mini" disabled={!visionReady || !picked.size || running || Boolean(framing)} title={visionReady ? '用认脸模型给所选的差分框好眼睛和嘴' : '先在上面下载认脸小模型'} onClick={() => autoFrameList(pickedList)}>🪄 自动框所选</button>
             </div>
             {variants.map(v => (
               <div key={v.key} className={`fg-aa-item${v.key === focus ? ' is-on' : ''}`} onClick={() => setFocus(v.key)}>
                 <input type="checkbox" checked={picked.has(v.key)} onClick={e => e.stopPropagation()} onChange={() => toggle(v.key)} aria-label={`选择 ${v.label}`} />
                 <img src={assetUrl(v.record.assetId)} alt="" loading="lazy" title="双击放大看" onDoubleClick={e => { e.stopPropagation(); setViewing(v) }} />
-                <div><b>{v.label}</b><small>{v.look}</small><small className={jobs[v.key] && jobs[v.key].status === 'failed' ? 'fg-err' : ''}>{statusText(v)}</small></div>
+                <div>
+                  <b>{v.label}{auto[v.key] && <i className={`fg-aa-badge ${AUTO_BADGE[auto[v.key].confidence][1]}`} title={auto[v.key].notes.join('；')}>自动框·{AUTO_BADGE[auto[v.key].confidence][0]}</i>}</b>
+                  <small>{v.look}</small>
+                  <small className={jobs[v.key] && jobs[v.key].status === 'failed' ? 'fg-err' : ''}>{statusText(v)}</small>
+                </div>
               </div>
             ))}
           </div>
@@ -306,9 +436,11 @@ export function AaWorkbench({ gameId, person, onClose }) {
                 </div>
                 {tab === 'frame' && (
                   <>
-                    <RectEditor src={assetUrl(current.record.assetId)} width={sizeOf(current.key).w} height={sizeOf(current.key).h} rects={rectsOf(current.key)} zoom={zoom} onChange={r => setFrames(f => ({ ...f, [current.key]: r }))} />
+                    <RectEditor src={assetUrl(current.record.assetId)} width={sizeOf(current.key).w} height={sizeOf(current.key).h} rects={rectsOf(current.key)} zoom={zoom} onChange={r => { touched.current.add(current.key); setFrames(f => ({ ...f, [current.key]: r })) }} />
+                    {auto[current.key] && <div className={`fg-note ${auto[current.key].confidence === 'high' ? '' : 'fg-err'}`}>自动框：{auto[current.key].notes.join('；')}{auto[current.key].confidence === 'high' ? '' : '。框不对就拖一下（拖过的这张会被当成样子，其它认不出的照它找）'}</div>}
                     <div className="fg-row">
                       <button type="button" className="fg-btn is-mini" onClick={() => setZoom(!zoom)}>{zoom ? '看全图（找不到脸时）' : '放大看脸'}</button>
+                      <button type="button" className="fg-btn is-mini" disabled={!visionReady || running || Boolean(framing)} title={visionReady ? '' : '先在上面下载认脸小模型'} onClick={() => autoFrameList([current])}>{framing === current.key ? '认脸中…' : '🪄 自动框这张'}</button>
                       <button type="button" className="fg-btn is-mini" onClick={() => setFrames(f => ({ ...f, [current.key]: defaultRects(sizeOf(current.key).w, sizeOf(current.key).h) }))}>框放回默认位置</button>
                       <button type="button" className="fg-btn is-mini" disabled={!picked.size} onClick={applyToPicked}>把这张的框套用到所选</button>
                     </div>
@@ -343,8 +475,10 @@ export function AaWorkbench({ gameId, person, onClose }) {
       )}
       {variants.length > 0 && (
         <div className="fg-row fg-aa-actions">
-          {!running && <button type="button" className="fg-btn is-primary" disabled={!picked.size} onClick={() => run(pickedList)}>生成所选（{picked.size} 张 × 4 次局部重绘）</button>}
-          {!running && current && <button type="button" className="fg-btn" onClick={() => run([current])}>只做这一张</button>}
+          {!running && !framing && <button type="button" className="fg-btn is-primary" disabled={!picked.size} onClick={() => run(pickedList)}>生成所选（{picked.size} 张 × 4 次局部重绘）</button>}
+          {!running && !framing && <button type="button" className="fg-btn" disabled={!picked.size || !visionReady} title={visionReady ? '先自动框（手动调过的不动），认准了的直接生成，没认准的留下来' : '先在上面下载认脸小模型'} onClick={autoAndMake}>🪄 自动框并生成所选</button>}
+          {framing && <button type="button" className="fg-btn" onClick={() => { stop.current = true }}>停止自动框</button>}
+          {!running && !framing && current && <button type="button" className="fg-btn" onClick={() => run([current])}>只做这一张</button>}
           {running && <button type="button" className="fg-btn" onClick={() => { stop.current = true }}>停止（做完手上这次就停）</button>}
           <button type="button" className="fg-btn" disabled={running || !pickedList.some(v => v.record.aa)} onClick={() => removeAa(pickedList.filter(v => v.record.aa))}>取消所选的动态</button>
         </div>

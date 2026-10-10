@@ -1170,7 +1170,16 @@ export function LookSection({ data }) {
       <Field label="自动播放间隔"><input type="range" min="400" max="4000" step="100" value={cfg.ui.autoDelay} onChange={e => p({ autoDelay: Number(e.target.value) })} style={{ width: '100%' }} /></Field>
       <Field label="天气粒子"><Toggle value={cfg.ui.particles} onChange={v => p({ particles: v })} /></Field>
       <Field label="写完自动打开剧场"><Toggle value={cfg.ui.autoOpen} onChange={v => p({ autoOpen: v })} /></Field>
-      <Field label="字体地址" hint="皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。"><Text value={cfg.ui.fontBase} onCommit={v => p({ fontBase: v })} /></Field>
+      <Field label="字体地址" hint="皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。立绘工作台的认脸模型也从这里下它的运行库。"><Text value={cfg.ui.fontBase} onCommit={v => p({ fontBase: v })} /></Field>
+      <div className="fg-section">认脸模型（立绘工作台的自动框）</div>
+      <Field label="下载来源" hint="模型在 HuggingFace：自动是先连官网、连不上换镜像；只下一次，存在数据目录的 models 文件夹。">
+        <select className="fg-select" style={{ width: 'auto' }} value={cfg.vision.source} onChange={e => patchConfig({ vision: { source: e.target.value } }).catch(err => toast(err.message, 'error'))}>
+          <option value="auto">自动（先官网，连不上换镜像）</option>
+          <option value="official">只用官网</option>
+          <option value="mirror">先用镜像</option>
+        </select>
+      </Field>
+      <Field label="镜像地址" hint="HuggingFace 的镜像站，默认 hf-mirror.com；路径规则要跟官网一样（…/仓库/resolve/版本/文件）。"><Text value={cfg.vision.mirror} onCommit={v => patchConfig({ vision: { mirror: v } }).catch(err => toast(err.message, 'error'))} /></Field>
     </>
   )
 }

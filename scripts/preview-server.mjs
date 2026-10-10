@@ -9,8 +9,10 @@
 // 例如 <目录>/@fontsource/noto-sans-sc@5.3.0/400.css），不设时字体照常从 jsDelivr 读。
 // 逆转式立绘演示：--aa-demo <素材包目录>（或 FLOWGAL_AA_DEMO），把林岚的立绘换成这个素材包（呼吸 + 眨眼 + 口型），
 // 素材包格式见 lib/aa-sprite.js；FLOWGAL_AA_DEMO_NAME 换演示的人物，FLOWGAL_AA_DEMO_MARK 是认出这个人立绘请求的外貌 tag。
+// 自动框测试：--sprite-dir <目录>，立绘请求按顺序回这个目录里的真立绘（a/ 给演示的人物，b/ 给其他人），看认脸模型在真图上认得怎样；
+// --vision-dir <目录> 把认脸模型下到这个常驻目录（同 FLOWGAL_VISION_DIR），免得每次开预览都重下。
 import { createServer } from 'node:http'
-import { readFile, mkdtemp, rm } from 'node:fs/promises'
+import { readFile, readdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, dirname, extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,6 +20,7 @@ import { createStore } from '../lib/store.js'
 import { createEngine } from '../lib/engine.js'
 import { createRoutes } from '../lib/routes.js'
 import { createMusic } from '../lib/music.js'
+import { createVision } from '../lib/vision.js'
 import { segmentTurn } from '../lib/segment.js'
 import { cleanTurnText } from '../lib/clean.js'
 import { CARD, TURNS, LATE_TURN, directorReply, CG_DRAFTS } from './preview/story.mjs'
@@ -38,6 +41,11 @@ const AA_NAME = process.env.FLOWGAL_AA_DEMO_NAME || '林岚'
 const AA_MARK = process.env.FLOWGAL_AA_DEMO_MARK || 'long black hair'
 const aaManifest = aaDir ? JSON.parse(await readFile(join(aaDir, 'sprite.json'), 'utf8')) : null
 const aaStill = aaDir ? await readFile(join(aaDir, aaManifest.breath.frames[0])) : null
+const argOf = name => { const i = process.argv.indexOf(name); return i > 0 ? resolve(process.argv[i + 1]) : '' }
+const spriteDir = argOf('--sprite-dir')
+const visionDir = argOf('--vision-dir') || (process.env.FLOWGAL_VISION_DIR ? resolve(process.env.FLOWGAL_VISION_DIR) : '')
+const realSprites = {}
+if (spriteDir) for (const k of ['a', 'b']) realSprites[k] = { files: (await readdir(join(spriteDir, k)).catch(() => [])).filter(f => /\.png$/i.test(f)).sort().map(f => join(spriteDir, k, f)), next: 0 }
 const GAME = 'preview-game'
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
@@ -163,6 +171,10 @@ async function fakeFetch(url, init = {}) {
   if (aaStill && /white background|simple background/.test(prompt) && prompt.includes(AA_MARK)) {
     return new Response(aaStill, { status: 200, headers: { 'content-type': 'image/webp' } })
   }
+  if (spriteDir && sprite) {
+    const set = realSprites[prompt.includes(AA_MARK) ? 'a' : 'b']
+    if (set.files.length) return new Response(await readFile(set.files[set.next++ % set.files.length]), { status: 200, headers: { 'content-type': 'image/png' } })
+  }
   const png = /white background|simple background/.test(prompt)
     ? paintSprite(prompt)
     : paintPlaceholder(prompt, {
@@ -230,7 +242,13 @@ const routeEngine = !aaDir ? engine : new Proxy(engine, {
     }
   },
 })
-const routes = new Map(createRoutes({ engine: routeEngine, music, updater, logger }).map(r => [r.path, r.handler]))
+// 认脸模型：默认下到这次预览的临时数据目录（关掉就删）；--vision-dir / FLOWGAL_VISION_DIR 指定一个常驻目录，免得每次重下
+const vision = createVision({ root: visionDir || join(dataDir, 'models'), logger, settings: async () => { const { config } = await engine.publicConfig(); return { ...config.vision, npmBase: config.ui.fontBase } } })
+const routeList = createRoutes({ engine: routeEngine, music, updater, vision, logger })
+const routes = new Map(routeList.filter(r => r.kind === 'exact').map(r => [r.path, r.handler]))
+// 前缀路由跟 DSH 一样：精确的没有就找最长的前缀
+const prefixes = routeList.filter(r => r.kind === 'prefix').sort((a, b) => b.path.length - a.path.length)
+const routeFor = path => routes.get(path) || prefixes.find(r => path === r.path || path.startsWith(r.path + '/'))?.handler
 const TYPES = { '.js': 'text/javascript; charset=utf-8', '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.json': 'application/json' }
 async function sendFile(res, file) {
   try {
@@ -242,7 +260,7 @@ async function sendFile(res, file) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
-  const handler = routes.get(url.pathname)
+  const handler = routeFor(url.pathname)
   if (handler) return handler(req, res)
   if (url.pathname === '/') return sendFile(res, join(root, 'scripts/preview/shell.html'))
   if (url.pathname === '/shell.js') return sendFile(res, join(root, 'scripts/preview/shell.js'))

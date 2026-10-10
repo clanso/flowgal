@@ -489,6 +489,15 @@
 .fg-aa-state { display: flex; flex-direction: column; align-items: center; gap: .3cqw; font-size: .9cqw; }
 .fg-aa-thumb { width: 100%; height: auto; border-radius: .5cqw; background: repeating-conic-gradient(rgba(255, 255, 255, .06) 0 25%, transparent 0 50%) 0 0 / 1cqw 1cqw; }
 .fg-aa-actions { margin-top: 1.2cqw; }
+/* 自动框：认脸模型条、列表里的结果标记 */
+.fg-aa-vision { display: grid; gap: .5cqw; margin-top: .9cqw; padding: .7cqw 1cqw; border-radius: .8cqw; background: rgba(0, 0, 0, .2); border: 1px solid var(--box-border); font-size: .95cqw; }
+.fg-aa-vision select { font: inherit; color: var(--ink); background: rgba(0, 0, 0, .35); border: 1px solid var(--box-border); border-radius: .4cqw; padding: .1cqw .4cqw; }
+.fg-aa-vision progress { flex: 1; min-width: 10cqw; height: .7cqw; accent-color: var(--accent); }
+.fg-aa-vision .fg-check { display: inline-flex; align-items: center; gap: .4cqw; cursor: pointer; }
+.fg-aa-badge { margin-left: .5cqw; padding: 0 .5cqw; border-radius: 99px; font-style: normal; font-size: .75cqw; font-weight: normal; vertical-align: middle; }
+.fg-aa-badge.is-ok { background: rgba(110, 240, 168, .2); color: #6ef0a8; }
+.fg-aa-badge.is-warn { background: rgba(255, 210, 110, .2); color: #ffd26e; }
+.fg-aa-badge.is-bad { background: rgba(255, 138, 138, .2); color: #ff8a8a; }
 /* 人物志里的立绘小图：做过逆转式动态的直接动；点一下放大 */
 .fg-sprite-art { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
 .fg-sprite-art img, .fg-sprite-art canvas { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
@@ -613,6 +622,7 @@
   .fg-outfit, .fg-outfit.is-new, .fg-emotion-row, .fg-emotion-row.is-new { grid-template-columns: 1fr; }
   .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }
   .fg-aa-grid { grid-template-columns: 1fr; } .fg-aa-list { max-height: 50cqw; }
+  .fg-aa-vision { font-size: 2.6cqw; } .fg-aa-badge { font-size: 2.2cqw; } .fg-aa-vision progress { height: 1.6cqw; }
   .fg-aa-frame, .fg-aa-play { height: 90cqw; } .fg-aa-play.is-close { width: 90cqw; }
   .fg-aa-item img { width: 9cqw; height: 11cqw; } .fg-aa-item { grid-template-columns: auto 9cqw 1fr; }
   .fg-track { grid-template-columns: 9cqw 1fr; gap: 2cqw; padding: 2cqw; }
