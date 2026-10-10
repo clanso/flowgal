@@ -96,8 +96,11 @@ async function savePack(gameId, person, key, record, size, rects, patches) {
   await api.cast(gameId, 'aa-pack', { name: person.name, key, keepImage: true, manifest, files, rects })
 }
 
-/** 框眼睛和嘴：在图上拖框移动，拖右下角改大小（对齐 8 像素）。zoom 时只看脸附近。 */
-function RectEditor({ src, width, height, rects, onChange, zoom }) {
+/**
+ * 框眼睛和嘴：在图上拖框移动，拖右下角改大小（对齐 8 像素）。zoom 时只看脸附近。
+ * parts / names 换掉就能框别的（人物志里给表情差分的底图框脸：parts=['face']）。
+ */
+export function RectEditor({ src, width, height, rects, onChange, zoom, parts = ['eyes', 'mouth'], names = BOX_NAMES }) {
   const svg = React.useRef(null)
   const drag = React.useRef(null)
   const [frozen, setFrozen] = React.useState(null) // 拖动时视野不跟着框变（不然图会在鼠标底下跑），松手再重新取景
@@ -132,7 +135,7 @@ function RectEditor({ src, width, height, rects, onChange, zoom }) {
   let view = [0, 0, width, height]
   if (frozen) view = frozen
   else if (zoom) {
-    const [x0, y0, x1, y1] = rectsBox([...rects.eyes, ...rects.mouth])
+    const [x0, y0, x1, y1] = rectsBox(parts.flatMap(part => rects[part]))
     const size = Math.max(256, Math.max(x1 - x0, y1 - y0) * 3)
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
     const vx = Math.max(0, Math.min(width - size, cx - size / 2)), vy = Math.max(0, Math.min(height - size, cy - size / 2))
@@ -142,14 +145,14 @@ function RectEditor({ src, width, height, rects, onChange, zoom }) {
   return (
     <svg ref={svg} className="fg-aa-frame" viewBox={view.join(' ')} preserveAspectRatio="xMidYMid meet" onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
       <image href={src} x="0" y="0" width={width} height={height} />
-      {['eyes', 'mouth'].flatMap(part => rects[part].map((r, i) => {
+      {parts.flatMap(part => rects[part].map((r, i) => {
         // 改大小的小方块不超过框宽高的一半：小框（嘴）中间留给拖动
         const handle = Math.max(4, Math.min(unit, (r[2] - r[0]) / 2, (r[3] - r[1]) / 2))
         return (
           <g key={part + i} className={`fg-aa-box is-${part}`}>
             <rect x={r[0]} y={r[1]} width={r[2] - r[0]} height={r[3] - r[1]} onPointerDown={e => begin(e, part, i, 'move')} />
             <rect className="fg-aa-handle" x={r[2] - handle / 2} y={r[3] - handle / 2} width={handle} height={handle} onPointerDown={e => begin(e, part, i, 'size')} />
-            <text x={r[0]} y={r[1] - unit / 2} fontSize={unit * 1.6}>{BOX_NAMES[part][i]}</text>
+            <text x={r[0]} y={r[1] - unit / 2} fontSize={unit * 1.6}>{names[part][i]}</text>
           </g>
         )
       }))}

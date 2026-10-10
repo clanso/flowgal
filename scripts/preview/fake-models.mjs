@@ -5,7 +5,9 @@ import { segmentTurn } from '../../lib/segment.js'
 import { cleanTurnText } from '../../lib/clean.js'
 import { emotionId } from '../../lib/emotions.js'
 import { EMOTION_TAGS } from '../../lib/vocab.js'
-import { grayPng } from '../../lib/image/png.js'
+import { grayPng, decodePng, encodePng } from '../../lib/image/png.js'
+import { fromBase64 } from '../../lib/bytes.js'
+import { fnv1a } from '../../lib/look.js'
 import { CARD, TURNS, LATE_TURN, directorReply, CG_DRAFTS } from './story.mjs'
 import { paintPlaceholder } from './paint.mjs'
 import { paintSprite, spriteLayer } from './sprite.mjs'
@@ -68,9 +70,24 @@ export function fakeLlmReply({ system = '', prompt = '', decorate = (turn, units
 /** 插画的每个角色块画一个人；没有角色块的单人图（画风的试画样图）按整段提示词画一个。 */
 const figuresFor = (prompt, captions) => (captions.length ? captions.map(c => spriteLayer(c.char_caption)) : /\b1(girl|boy)\b/.test(prompt) ? [spriteLayer(prompt)] : [])
 
+/** 换脸的假结果：原图照旧，遮罩里按这张的提示词染一层颜色（同一个提示词同一个颜色，种子不同深浅不同）。 */
+async function tintMasked(json, face) {
+  const img = await decodePng(fromBase64(json.parameters.image))
+  const mask = await decodePng(fromBase64(json.parameters.mask))
+  const h = fnv1a(face)
+  const color = [h & 255, (h >> 8) & 255, (h >> 16) & 255]
+  const k = 0.35 + ((json.parameters.seed || 0) % 3) * 0.1
+  for (let i = 0; i < img.data.length; i += 4) {
+    if (!mask.data[i]) continue
+    for (let c = 0; c < 3; c++) img.data[i + c] = img.data[i + c] * (1 - k) + color[c] * k
+  }
+  return encodePng(img)
+}
+
 /**
  * 假画师：吃 NovelAI 的请求体（json），回 PNG。立绘（白底 / 透明底的单人）画半身像；插画和背景按请求尺寸画风景，角色块画成人物；
- * 局部重绘（action infill）按状态回不同深浅的灰图（贴上去就看得出眨眼、张嘴在动）。
+ * 局部重绘（action infill）：逆转式工作台的眨眼口型按状态回不同深浅的灰图（贴上去就看得出眨眼、张嘴在动）；
+ * 表情只换脸回原图、遮罩那块按表情染一层颜色（看得出只有脸那块变了，换个表情换个颜色）。
  */
 export async function fakePaint(json) {
   const chars = (json.parameters?.v4_prompt?.caption?.char_captions || []).map(c => c.char_caption).filter(Boolean)
@@ -78,8 +95,11 @@ export async function fakePaint(json) {
   const prompt = sprite ? [json.input, ...chars].join(', ') : json.input || ''
   if (json.action === 'infill') {
     const face = chars[0] || prompt
-    const shade = /^closed eyes/.test(face) ? 30 : /^half-closed eyes/.test(face) ? 120 : /^open mouth/.test(face) ? 70 : 170
-    return grayPng(json.parameters.width, json.parameters.height, () => shade)
+    if (/^(closed eyes|half-closed eyes|parted lips|open mouth)/.test(face)) {
+      const shade = /^closed eyes/.test(face) ? 30 : /^half-closed eyes/.test(face) ? 120 : /^open mouth/.test(face) ? 70 : 170
+      return grayPng(json.parameters.width, json.parameters.height, () => shade)
+    }
+    return tintMasked(json, face)
   }
   return /white background|simple background/.test(prompt)
     ? paintSprite(prompt)

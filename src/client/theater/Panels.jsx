@@ -4,7 +4,9 @@ import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, set
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions } from '../../../lib/emotions.js'
-import { AaWorkbench } from './AaWorkbench.jsx'
+import { AaWorkbench, RectEditor } from './AaWorkbench.jsx'
+import { visionApi, frameSprite } from './vision.js'
+import { framedResult } from './faceFramer.js'
 import { SpriteArt, SpriteViewer } from './AaPreview.jsx'
 import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn, LOOK_FIELDS, LOOK_FIELD_LABELS, lookTags } from '../../../lib/look.js'
 import { Silhouette } from './Stage.jsx'
@@ -15,7 +17,9 @@ import { cleanPack, packFiles } from '../../../lib/aa-sprite.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
 import { modelKey, qualityFor, negativeFor, sizeFor, MAX_STYLES } from '../../../lib/image/style.js'
 import { naiModelInfo } from '../../../lib/image/nai-models.js'
-import { CG_MAX_CHARACTERS } from '../../../lib/vocab.js'
+import { CG_MAX_CHARACTERS, EMOTIONS, EMOTION_POSE, POSES } from '../../../lib/vocab.js'
+import { POSE_IDS, poseMembers, anchorOf, faceBoxFrom, cleanFaceBox } from '../../../lib/face.js'
+import { defaultRects } from '../../../lib/aa-sprite.js'
 
 const STATUS_LABEL = { writing: '分镜中', queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消', ready: '' }
 
@@ -310,7 +314,7 @@ export function Gallery({ view, gameId, onClose, focusId }) {
 }
 
 // ───────────────────────── 人物志 ─────────────────────────
-const SPRITE_STATUS = { writing: '写词中', queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消' }
+const SPRITE_STATUS = { writing: '写词中', queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消', face: '等认脸' }
 const WRITER_LABEL = { ai: '立绘设计师写的', fallback: '按档案拼的（模型没写出来）', user: '你改的', upload: '你上传的' }
 const LOG_ACTION = { create: 'AI 建档', change: '外貌变化', temp: '临时状态', edit: '手动修改', wear: '换装', states: '长期状态', outfit: '新衣服' }
 const GENDERS = [['', '未知'], ['female', '女'], ['male', '男'], ['other', '其他']]
@@ -482,6 +486,87 @@ function WardrobeEditor({ gameId, person }) {
   )
 }
 
+/**
+ * 给动作底图框脸（表情只换脸用）：一个框盖住眉毛到嘴、两颊，框外一点都不会变。
+ * 打开时用存着的框；没有就照逆转式工作台框好的眼睛和嘴推，再没有就按立绘常见构图估一个。
+ */
+function FaceBoxEditor({ gameId, person, bodyKey, record, onDone }) {
+  const [size, setSize] = React.useState(null)
+  const [box, setBox] = React.useState(null)
+  const [busy, run] = useBusy()
+  const src = assetUrl(record.assetId)
+  React.useEffect(() => {
+    let live = true
+    const img = new Image()
+    img.onload = () => {
+      if (!live) return
+      const w = img.naturalWidth, h = img.naturalHeight
+      setSize({ w, h })
+      setBox(record.faceBox || (record.aa && record.aa.rects && faceBoxFrom(record.aa.rects, w, h)) || faceBoxFrom(defaultRects(w, h), w, h) || [0, 0, 64, 64])
+    }
+    img.src = src
+    return () => { live = false }
+  }, [src])
+  if (!size || !box) return <div className="fg-note">读图中…</div>
+  const auto = () => run('auto', async () => {
+    const status = await visionApi.status()
+    if (!status.packs.basic.ready) throw new Error('先在逆转式工作台下载认脸小模型')
+    const r = await frameSprite(status, src)
+    const found = r && faceBoxFrom(r.rects, size.w, size.h)
+    if (!found) throw new Error('没认出脸，手动拖一下框')
+    setBox(found)
+    if (r.confidence === 'low') toast('认得没把握，看一眼框对不对', 'error')
+  })
+  const save = () => run('save', async () => {
+    const ok = cleanFaceBox(box, size.w, size.h)
+    if (!ok) throw new Error('框太小或太大：框住眉毛到嘴就够（不超过整张图的六分之一）')
+    const r = await api.cast(gameId, 'face-box', { name: person.name, key: bodyKey, box: ok, by: 'hand' })
+    toast(r.redo ? `脸框已存，同组 ${r.redo} 张表情重换中` : '脸框已存')
+    onDone()
+  })
+  return (
+    <div className="fg-face-editor">
+      <RectEditor src={src} width={size.w} height={size.h} rects={{ face: [box] }} parts={['face']} names={{ face: ['脸'] }} zoom onChange={r => setBox(r.face[0])} />
+      <div className="fg-row">
+        <button type="button" className="fg-btn is-mini is-primary" disabled={busy === 'save'} onClick={save}>存下并重换同组表情</button>
+        <button type="button" className="fg-btn is-mini" disabled={busy === 'auto'} onClick={auto}>{busy === 'auto' ? '认脸中…' : '🪄 自动认脸'}</button>
+        <button type="button" className="fg-btn is-mini" onClick={onDone}>取消</button>
+      </div>
+      <div className="fg-note">框住眉毛到嘴、两颊（下巴轮廓和头发外沿别框进去）。拖框移动，拖右下角改大小；框外的地方换脸时一点都不会变。</div>
+    </div>
+  )
+}
+
+/** 表情只换脸：这张是换脸的（在哪张底图上换）、或者是动作底图（几张表情在它上面换、脸框认好没有）。 */
+function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
+  const [busy, run] = useBusy()
+  const [framing, setFraming] = React.useState(false)
+  const sprites = person.sprites || {}
+  if (record && record.face) {
+    const body = sprites[record.face.from]
+    const bodyLabel = body ? emotionEntry(body.emotion || record.face.from.split('|').pop(), emotions).label : record.face.from.split('|').pop()
+    return (
+      <div className="fg-row fg-face-info">
+        <span className="fg-note">只换脸：在「{bodyLabel}」这张「{(POSES[record.face.pose] || {}).label || '动作'}」底图上重画脸，身体衣服跟底图一样{Number.isInteger(record.face.seed) ? ` · 脸的种子 ${record.face.seed}` : ''}</span>
+        {record.assetId && <button type="button" className="fg-btn is-mini" disabled={busy === 'redo'} onClick={() => run('redo', () => api.cast(gameId, 'face-redo', { name: person.name, key: emotionKey }), '换个种子重画脸')}>换个种子重画脸</button>}
+      </div>
+    )
+  }
+  const deps = Object.values(sprites).filter(r => r && r.face && r.face.from === emotionKey)
+  if (!record || !record.assetId || (!deps.length && !record.pose)) return null
+  const auto = framedResult(record.assetId)
+  const boxText = record.faceBox ? (record.faceBy === 'hand' ? '脸框：你框的' : '脸框：自动认出') : auto === 'miss' ? '脸框：自动没认准，框一下' : '脸框：还没认（剧场开着、认脸小模型下好时自动认）'
+  return (
+    <>
+      <div className="fg-row fg-face-info">
+        <span className="fg-note">「{(POSES[record.pose] || {}).label || '动作'}」动作底图：同组 {deps.length} 张表情在它上面只换脸，重画或上传这张，它们会跟着重换。{boxText}</span>
+        <button type="button" className="fg-btn is-mini" onClick={() => setFraming(!framing)}>{framing ? '收起' : record.faceBox ? '调整脸框' : '框脸'}</button>
+      </div>
+      {framing && <FaceBoxEditor gameId={gameId} person={person} bodyKey={emotionKey} record={record} onDone={() => setFraming(false)} />}
+    </>
+  )
+}
+
 /** 选中的一张差分：看 / 改提示词，让立绘设计师重写，按自己的词画，上传，删除。 */
 function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose }) {
   const key = `${group.key}|${emotion}`
@@ -505,8 +590,9 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
       <div className="fg-variant-body">
         <div className="fg-row"><b>{label}</b><span className="fg-spacer" /><button type="button" className="fg-btn is-mini" onClick={onClose}>收起</button></div>
         {entry.desc && <div className="fg-note">情绪：{entry.desc}{entry.base ? `（接近${emotionLabel(entry.base)}）` : ''}</div>}
-        {st && st.error && <div className="fg-note fg-err">{st.error}</div>}
-        <textarea className="fg-textarea" value={tags} onChange={e => setTags(e.target.value)} onKeyDown={e => e.stopPropagation()} placeholder="还没有提示词：点「让设计师写」，它会读完资料和剧情来写" />
+        {st && st.error && <div className={`fg-note${st.status === 'face' ? '' : ' fg-err'}`}>{st.error}</div>}
+        <FaceInfo gameId={gameId} person={person} group={group} emotionKey={key} record={record} emotions={emotions} />
+        <textarea className="fg-textarea" value={tags} onChange={e => setTags(e.target.value)} onKeyDown={e => e.stopPropagation()} placeholder={record && record.face ? '只换脸：这里只写表情（眉、眼、嘴、脸红、泪、视线）' : '还没有提示词：点「让设计师写」，它会读完资料和剧情来写'} />
         <div className="fg-note">{record && record.writer ? WRITER_LABEL[record.writer] || record.writer : ''}{record && record.seed != null ? ` · 种子 ${record.seed}` : ''}{!reachable ? ' · 这套样子在剧情里已经不会再出现（外貌改过），只能删除或上传' : ''}</div>
         <div className="fg-row">
           <button type="button" className="fg-btn is-primary" disabled={!reachable || busy === 'w'} onClick={() => run('w', () => api.cast(gameId, 'sprite', { name: person.name, emotion, rewrite: true, ...at }), '已交给立绘设计师：写好词就画')}>{record && record.assetId ? '让设计师重写并重画' : '让设计师写并画'}</button>
@@ -611,7 +697,7 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
               className={`fg-emo${t.st && ['writing', 'queued', 'running'].includes(t.st.status) ? ' is-busy' : ''}${!manage && emotion === t.id ? ' is-on' : ''}${manage && picked.has(t.key) ? ' is-picked' : ''}${t.builtin ? '' : ' is-custom'}`}
               onClick={() => (manage ? pick(t.key) : setEmotion(emotion === t.id ? '' : t.id))}>
               {t.record && t.record.assetId && <img src={assetUrl(t.record.assetId)} alt="" loading="lazy" />}
-              <span>{t.label}{t.record && t.record.aa ? ' · 动' : ''}{t.st && t.st.status === 'failed' ? ' ⚠' : ''}</span>
+              <span>{t.label}{t.record && t.record.face ? ' · 脸' : ''}{t.record && t.record.aa ? ' · 动' : ''}{t.st && t.st.status === 'failed' ? ' ⚠' : t.st && t.st.status === 'face' ? ' …' : ''}</span>
             </button>
           ))}
         </div>
@@ -1107,6 +1193,32 @@ function DirectorSection({ data, onDirectorLog }) {
   )
 }
 
+/** 动作组：每个内置情绪归哪组。改回默认组时写 null（设置里删掉这条改动）。 */
+function PoseGroups({ poses, onChange }) {
+  const changed = Object.keys(poses).length > 0
+  return (
+    <Field label="动作组" hint="每组整张画一张底图（标「底图」的情绪），同组其余情绪在它上面只换脸。想让某个情绪换个动作，就把它挪到别的组；导演新造的情绪跟着它最接近的内置情绪走。改了只影响之后画的。">
+      <div className="fg-pose-grid">
+        {POSE_IDS.map(pose => (
+          <div key={pose} className="fg-pose-col">
+            <b>{POSES[pose].label}</b>
+            {poseMembers(pose, [], poses).map(e => (
+              <label key={e} className="fg-pose-item">
+                <span>{EMOTIONS[e]}{anchorOf(pose, [], poses) === e ? <i> · 底图</i> : null}</span>
+                <select value={pose} onChange={ev => onChange({ [e]: ev.target.value === EMOTION_POSE[e] ? null : ev.target.value })}>
+                  {POSE_IDS.map(id => <option key={id} value={id}>{POSES[id].label}</option>)}
+                </select>
+              </label>
+            ))}
+            {!poseMembers(pose, [], poses).length && <span className="fg-note">（空着：这组不画）</span>}
+          </div>
+        ))}
+      </div>
+      {changed && <button type="button" className="fg-btn is-mini" onClick={() => onChange(Object.fromEntries(Object.keys(poses).map(k => [k, null])))}>恢复默认分组</button>}
+    </Field>
+  )
+}
+
 const SIZE_SHAPES = [['landscape', '横版'], ['portrait', '竖版'], ['square', '方形']]
 /** 「1216×832」「1216x832」「1216 832」都认。 */
 const parseSize = text => { const m = /^\s*(\d{3,4})\s*[×xX*，, ]\s*(\d{3,4})\s*$/.exec(String(text)); return m ? [Number(m[1]), Number(m[2])] : null }
@@ -1121,6 +1233,8 @@ function ImagesSection({ data }) {
       <Field label="新地点背景"><Toggle value={cfg.images.backgrounds} onChange={v => p({ backgrounds: v })} /></Field>
       <Field label="立绘" hint="角色登场、换装、长期状态变化时，画这一套的平静立绘。"><Toggle value={cfg.images.portraits} onChange={v => p({ portraits: v })} /></Field>
       <Field label="情绪差分" hint="导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。"><div className="fg-row"><Toggle value={cfg.images.expressions} onChange={v => p({ expressions: v })} /><span className="fg-note">每轮最多</span><Text type="number" style={{ width: '6cqw' }} value={cfg.images.expressionsPerTurn} onCommit={v => p({ expressionsPerTurn: v })} /><span className="fg-note">张</span></div></Field>
+      <Field label="表情只换脸" hint="galgame 的「一个动作 + 一套表情」：同一套衣服每个动作组整张画一张底图，同组其余情绪用 NovelAI 局部重绘只重画脸（眉、眼、两颊、嘴），身体和衣服一个像素都不动。底图画好后要认一次脸：剧场开着、认脸小模型下好时自动认，认不准的在人物志里点开底图框一下。只对 NovelAI 有效；关掉就像以前一样每个情绪整张画。已经画好的立绘不会自动重画。"><Toggle value={cfg.images.faceSwap} onChange={v => p({ faceSwap: v })} /></Field>
+      {cfg.images.faceSwap && <PoseGroups poses={cfg.images.poses || {}} onChange={poses => p({ poses })} />}
       <Field label="立绘设计师" hint="立绘提示词由后台模型读完人物卡、世界书和到这一轮为止的全部剧情来写，一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼。"><Toggle value={cfg.images.spriteWriter} onChange={v => p({ spriteWriter: v })} /></Field>
       <Field label="并发"><Text type="number" style={{ width: '6cqw' }} value={cfg.images.concurrency} onCommit={v => p({ concurrency: v })} /></Field>
       <div className="fg-section">尺寸</div>

@@ -6,6 +6,7 @@ import { Backdrop, Cast, CgLayer, TitleCard, Flash, Particles, useCamera, useHit
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
+import { useFaceFramer } from './faceFramer.js'
 import { playBgm, stopBgm, sfx, stinger, configureSounds } from './audio.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
 import { castVoices, lineVoice } from '../../../lib/sounds.js'
@@ -59,6 +60,8 @@ export function TheaterRoot() {
   const watching = s.open || Boolean(s.resume) || Boolean(cfg && cfg.ui.autoOpen && s.lastGameId)
   const gameId = s.open ? s.gameId : (s.resume && s.resume.gameId) || s.lastGameId
   const { view, error } = useGameView(gameId, watching)
+  // 表情只换脸：动作底图画好后在这里认脸（认脸模型只能在浏览器里跑）
+  useFaceFramer(gameId, view)
   const maxTurn = view && view.turns.length ? view.turns[view.turns.length - 1].turn : -1
   const seen = React.useRef({ gameId: '', turn: -1 })
 

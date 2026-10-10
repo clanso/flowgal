@@ -101,6 +101,8 @@ async function fakeFetch(url, init = {}) {
   const chars = (json.parameters?.v4_prompt?.caption?.char_captions || []).map(c => c.char_caption).filter(Boolean)
   const sprite = chars.length && /transparent background|white background|simple background/.test(json.input || '')
   const prompt = sprite ? [json.input, ...chars].join(', ') : json.input || body
+  // 局部重绘（逆转式工作台、表情只换脸）一律交给假画师：在原图上改，不换成别的立绘
+  if (json.action === 'infill') return new Response(await fakePaint(json), { status: 200, headers: { 'content-type': 'image/png' } })
   // 逆转式立绘演示：这个人的立绘一律用素材包的第一张呼吸帧（剧场里实际按素材包分层画）
   if (aaStill && /white background|simple background/.test(prompt) && prompt.includes(AA_MARK)) {
     return new Response(aaStill, { status: 200, headers: { 'content-type': 'image/webp' } })
