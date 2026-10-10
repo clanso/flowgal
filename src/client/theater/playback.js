@@ -46,7 +46,6 @@ export function buildBeats(view) {
     const steps = stageSteps(script, units, cast)
     if (steps.length) cast = steps[steps.length - 1].cast
     const unitIndex = new Map(units.map((u, i) => [u.id, i]))
-    const facing = {} // 朝向（侧头）只在这一轮里沿用：新一轮都先正对镜头，导演要侧头再写
     // 挂在不演的单元上的插画（导演整理前就有的、手动配的）：算到它前面最近一个要演的单元。
     const indexOf = id => {
       for (let i = all.findIndex(u => u.id === id); i >= 0; i--) if (unitIndex.has(all[i].id)) return unitIndex.get(all[i].id)
@@ -71,7 +70,6 @@ export function buildBeats(view) {
       else if (type === 'thought') speaker = line.sp || '我'
       else if (line.sp) speaker = line.sp
       if (speaker && line.emo) emotions[speaker] = line.emo
-      if (speaker && line.facing) { if (line.facing === 'front') delete facing[speaker]; else facing[speaker] = line.facing }
       // 同时有几张在显示时，后出现的盖住先出现的。
       const cgEntry = [...turnImages].reverse().find(e => e.at <= ui && ui <= e.end)
       const cg = cgEntry ? cgEntry.img : null
@@ -98,7 +96,6 @@ export function buildBeats(view) {
         entered: steps[ui].entered,
         left: steps[ui].left,
         emotions: { ...emotions },
-        facing: { ...facing },
         cg,
         cgAnchor: Boolean(cgEntry && cgEntry.at === ui),
         directed: Boolean(script),

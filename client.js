@@ -933,7 +933,6 @@ function buildBeats(view) {
     const steps = stageSteps(script, units, cast);
     if (steps.length) cast = steps[steps.length - 1].cast;
     const unitIndex = new Map(units.map((u, i) => [u.id, i]));
-    const facing = {};
     const indexOf = (id) => {
       for (let i = all.findIndex((u) => u.id === id); i >= 0; i--) if (unitIndex.has(all[i].id)) return unitIndex.get(all[i].id);
       return -1;
@@ -955,10 +954,6 @@ function buildBeats(view) {
       } else if (type === "thought") speaker = line.sp || "我";
       else if (line.sp) speaker = line.sp;
       if (speaker && line.emo) emotions[speaker] = line.emo;
-      if (speaker && line.facing) {
-        if (line.facing === "front") delete facing[speaker];
-        else facing[speaker] = line.facing;
-      }
       const cgEntry = [...turnImages].reverse().find((e) => e.at <= ui2 && ui2 <= e.end);
       const cg = cgEntry ? cgEntry.img : null;
       beats.push({
@@ -984,7 +979,6 @@ function buildBeats(view) {
         entered: steps[ui2].entered,
         left: steps[ui2].left,
         emotions: { ...emotions },
-        facing: { ...facing },
         cg,
         cgAnchor: Boolean(cgEntry && cgEntry.at === ui2),
         directed: Boolean(script),
@@ -1539,35 +1533,18 @@ function mouthOnTrack(track, elapsed) {
   return state2;
 }
 function blinkSteps(blink, { double = false, slow = false } = {}) {
-  const close = blink?.close || [{ eyes: "half", ms: 40 }, { eyes: "closed", ms: 60 }];
-  const open = blink?.open || [{ eyes: "half", ms: 60 }];
+  const close = blink?.close || [{ eyes: "half", ms: 40 }, { eyes: "closed", ms: 70 }];
+  const open = blink?.open || [{ eyes: "half", ms: 90 }];
   const hold = slow ? [{ eyes: "closed", ms: 120 }] : [];
-  const one = [...close, ...hold, ...open];
-  if (!double) return one;
-  const gap = [{ eyes: open[open.length - 1]?.eyes || "half", ms: blink?.double_gap_ms ?? 110 }];
-  return [...one, ...gap, ...one];
+  if (!double) return [...close, ...hold, ...open];
+  const shut = close[close.length - 1];
+  const again = { eyes: shut.eyes, ms: Math.max(1, Math.round(shut.ms * 0.8)) };
+  return [...close, { eyes: "half", ms: blink?.double_gap_ms ?? 60 }, again, ...hold, ...open];
 }
 function nextBlinkGap(blink, random = Math.random) {
   const [a, b] = blink?.interval_ms || [2200, 5600];
   return a + random() * Math.max(0, b - a);
 }
-function turnFrames(pack, from, to) {
-  const fwd = pack?.turns?.[`${from}>${to}`];
-  if (fwd) return fwd;
-  const back = pack?.turns?.[`${to}>${from}`];
-  return back ? [...back].reverse() : [];
-}
-function turnSteps(pack, from, to) {
-  const t = pack?.turn || {};
-  const frames = turnFrames(pack, from, to);
-  const ms = t.frames_ms?.length ? t.frames_ms : [150];
-  return [
-    ...(t.lead || []).map((s) => ({ pose: from, frame: null, eyes: s.eyes, ms: s.ms })),
-    ...frames.map((f, i) => ({ pose: to, frame: f, eyes: "closed", ms: ms[Math.min(i, ms.length - 1)] })),
-    ...(t.land || []).map((s) => ({ pose: to, frame: null, eyes: s.eyes, ms: s.ms }))
-  ];
-}
-var stepsDuration = (steps) => steps.reduce((s, x) => s + x.ms, 0);
 function stepAt(steps, t) {
   let r = t;
   for (const s of steps) {
@@ -1585,25 +1562,21 @@ function seeded2(seed) {
     return ((x ^ x >>> 14) >>> 0) / 4294967296;
   };
 }
-function createActor(pack, { seed = "actor", now = 0, pose = "" } = {}) {
+function createActor(pack, { seed = "actor", now = 0 } = {}) {
   const rand2 = seeded2(seed);
   const blink = pack.blink || {};
   const st = {
-    pose: (pose && pack.poses?.[pose] ? pose : "") || pack.default_pose || Object.keys(pack.poses || {})[0] || "front",
-    turn: null,
-    // { steps, start, to }
+    pose: pack.default_pose || Object.keys(pack.poses || {})[0] || "front",
     blink: null,
     // { steps, start }
     nextBlink: now + nextBlinkGap(blink, rand2),
     queued: [],
     // 计划好的眨眼时刻（句末、开口）
-    line: null,
+    line: null
     // { track, start, end }
-    turnedAt: -Infinity
-    // 上次转完的时刻：刚睁开眼不再马上眨
   };
   const startBlink = (t, opts = {}) => {
-    if (st.blink || st.turn) return;
+    if (st.blink) return;
     const double = opts.double ?? rand2() < (blink.double_chance ?? 0);
     st.blink = { steps: blinkSteps(blink, { double, slow: opts.slow }), start: t };
   };
@@ -1629,27 +1602,15 @@ function createActor(pack, { seed = "actor", now = 0, pose = "" } = {}) {
       st.line = null;
       st.queued = [];
     },
-    turn(to, now2) {
-      if (!pack.poses?.[to]) return 0;
-      const from = st.turn ? st.turn.to : st.pose;
-      if (to === from) return st.turn ? Math.max(0, st.turn.start + stepsDuration(st.turn.steps) - now2) : 0;
-      const steps = turnSteps(pack, from, to);
-      st.turn = { steps, start: now2, to };
+    /** 立刻眨一下（预览、调试用）；double 连眨两下。 */
+    blinkNow(now2, { double = false } = {}) {
       st.blink = null;
-      return stepsDuration(steps);
+      startBlink(now2, { double });
     },
     frame(now2) {
-      if (st.turn) {
-        const s = stepAt(st.turn.steps, now2 - st.turn.start);
-        if (s) return { pose: s.pose, frame: s.frame, eyes: s.eyes, mouth: "closed", turning: true };
-        st.pose = st.turn.to;
-        st.turn = null;
-        st.turnedAt = now2;
-        st.nextBlink = now2 + nextBlinkGap(blink, rand2);
-      }
       while (st.queued.length && st.queued[0] <= now2) {
         st.queued.shift();
-        if (now2 - st.turnedAt > 400) startBlink(now2, { double: false });
+        startBlink(now2, { double: false });
       }
       if (!st.blink && now2 >= st.nextBlink) startBlink(now2);
       let eyes = "open";
@@ -1666,12 +1627,11 @@ function createActor(pack, { seed = "actor", now = 0, pose = "" } = {}) {
         mouth = mouthOnTrack(st.line.track, now2 - st.line.start);
         if (now2 > st.line.end + 50) st.line = null;
       }
-      return { pose: st.pose, frame: null, eyes, mouth, turning: false };
+      return { pose: st.pose, eyes, mouth };
     }
   };
 }
 function motionLayers(pack, f) {
-  if (f.frame) return [{ file: f.frame, x: 0, y: 0 }];
   const pose = pack.poses[f.pose];
   const out = [{ file: pose.base, x: 0, y: 0 }];
   const eye = pose.parts?.eyes?.[f.eyes];
@@ -1680,18 +1640,13 @@ function motionLayers(pack, f) {
   if (mouth) out.push(mouth);
   return out;
 }
-var TURN_SETTLE_MS = 120;
-function turnWaitMs(pack, from, to) {
-  if (!pack?.poses?.[to] || !pack.poses[from] || from === to) return 0;
-  return stepsDuration(turnSteps(pack, from, to)) + TURN_SETTLE_MS;
-}
 var MOTION_DEFAULTS = {
   blink: {
     close: [{ eyes: "half", ms: 40 }, { eyes: "closed", ms: 70 }],
     open: [{ eyes: "half", ms: 90 }],
     interval_ms: [2200, 5600],
     double_chance: 0.18,
-    double_gap_ms: 110,
+    double_gap_ms: 60,
     sentence_end_chance: 0.5,
     line_start_chance: 0.3
   },
@@ -1706,11 +1661,6 @@ var MOTION_DEFAULTS = {
     accent: { normal: ["half", "open"], loud: ["open"], soft: ["narrow"] },
     release: { open: "half", half: "narrow", round: "narrow", narrow: "closed" },
     bump: { narrow: "half", half: "round", round: "half", open: "half", closed: "narrow" }
-  },
-  turn: {
-    lead: [{ eyes: "half", ms: 40 }, { eyes: "closed", ms: 50 }],
-    frames_ms: [150],
-    land: [{ eyes: "closed", ms: 60 }, { eyes: "half", ms: 90 }]
   }
 };
 
@@ -1830,7 +1780,6 @@ function packFiles(pack) {
       files2.push(p2.base);
       for (const states of Object.values(p2.parts || {})) for (const v of Object.values(states)) files2.push(v.file);
     }
-    for (const list2 of Object.values(pack.turns || {})) files2.push(...list2);
     return [...new Set(files2)];
   }
   const parts = Object.values(pack.parts || {}).flatMap((states) => Object.values(states).map((p2) => p2.file));
@@ -1868,10 +1817,11 @@ var stateMap = (v, keys, values, fallback, what) => {
 function cleanMotionPack(raw) {
   const size = list(raw.size, "size（宽、高）");
   const w = int(size[0], 1, 8192, "宽"), h = int(size[1], 1, 8192, "高");
-  const names = Object.keys(raw.poses || {});
-  if (!names.length || names.length > 4) throw new Error("素材包的姿势（poses）要 1~4 个");
+  const all = Object.keys(raw.poses || {});
+  if (!all.length) throw new Error("素材包缺 poses（整图和眼嘴贴片）");
+  const defaultPose = all.includes(raw.default_pose) ? raw.default_pose : all[0];
   const poses = {};
-  for (const name2 of names) {
+  for (const name2 of [defaultPose]) {
     if (!POSE_NAME.test(name2)) throw new Error("素材包的姿势名不对：" + name2);
     const p2 = raw.poses[name2] || {};
     const parts = {};
@@ -1883,13 +1833,6 @@ function cleanMotionPack(raw) {
       }
     }
     poses[name2] = { label: String(p2.label || "").slice(0, 20), base: file(p2.base, `姿势「${name2}」的整图`), parts };
-  }
-  const defaultPose = names.includes(raw.default_pose) ? raw.default_pose : names[0];
-  const turns = {};
-  for (const [k, v] of Object.entries(raw.turns || {})) {
-    const [a, b] = k.split(">");
-    if (!poses[a] || !poses[b] || a === b) throw new Error("素材包的转头写法不对：" + k + "（要「姿势>姿势」）");
-    turns[k] = list(v, `转头 ${k} 的中间帧`).slice(0, 6).map((f, i) => file(f, `转头 ${k} 第 ${i + 1} 张`));
   }
   const D = MOTION_DEFAULTS;
   const eyesAll = ["open", ...EYE_STATES];
@@ -1920,13 +1863,7 @@ function cleanMotionPack(raw) {
     release: stateMap(T.release, mouthAll, mouthAll, D.talk.release, "talk.release"),
     bump: stateMap(T.bump, mouthAll, mouthAll, D.talk.bump, "talk.bump")
   };
-  const U = raw.turn || {};
-  const turn = {
-    lead: timedSteps(U.lead, "转头前", "eyes", eyesAll, D.turn.lead),
-    frames_ms: Array.isArray(U.frames_ms) && U.frames_ms.length ? U.frames_ms.slice(0, 6).map((v, i) => int(v, 1, 3e3, `中间帧第 ${i + 1} 张的时长`)) : D.turn.frames_ms,
-    land: timedSteps(U.land, "转头后", "eyes", eyesAll, D.turn.land)
-  };
-  return { version: 2, name: String(raw.name || "").slice(0, 60), size: [w, h], poses, default_pose: defaultPose, turns, blink, talk, turn };
+  return { version: 2, name: String(raw.name || "").slice(0, 60), size: [w, h], poses, default_pose: defaultPose, blink, talk };
 }
 var AA_PARTS = {
   eyes: {
@@ -1961,7 +1898,6 @@ function stillPack({ name: name2, width, height, still, patches }) {
 
 // src/client/theater/AaSprite.jsx
 var packs = /* @__PURE__ */ new Map();
-var ready = /* @__PURE__ */ new Map();
 var loadImage = (src) => new Promise((resolve, reject) => {
   const img = new Image();
   img.onload = () => resolve(img);
@@ -1996,27 +1932,17 @@ function loadAaPack(aa) {
       }
       return { m, frames, parts, w: m.size[0], h: m.size[1] };
     })();
-    task.then((p2) => ready.set(key, p2), () => packs.delete(key));
+    task.catch(() => packs.delete(key));
     packs.set(key, task);
   }
   return packs.get(key);
 }
-function aaTurnWait(aa, from, to) {
-  if (!aa) return 0;
-  const m = aa.pack || ready.get(packKey(aa))?.m;
-  if (!m || m.version !== 2) return 0;
-  const pose = (f) => f && m.poses?.[f] ? f : m.default_pose;
-  return turnWaitMs(m, pose(from), pose(to));
-}
 var reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-function AaSprite({ aa, talk, facing = "", fallback, className, label }) {
+function AaSprite({ aa, talk, fallback, className, label }) {
   const [pack, setPack] = import_react3.default.useState(null);
   const canvas = import_react3.default.useRef(null);
   const talkRef = import_react3.default.useRef(talk);
   talkRef.current = talk;
-  const facingRef = import_react3.default.useRef(facing);
-  facingRef.current = facing;
-  const poseRef = import_react3.default.useRef("");
   const key = packKey(aa);
   import_react3.default.useEffect(() => {
     let live = true;
@@ -2034,7 +1960,7 @@ function AaSprite({ aa, talk, facing = "", fallback, className, label }) {
     el.width = pack.w;
     el.height = pack.h;
     const g = el.getContext("2d");
-    const draw = pack.v2 ? motionDrawer(pack, g, { talkRef, facingRef, poseRef, label }) : breathDrawer(pack, g, talkRef);
+    const draw = pack.v2 ? motionDrawer(pack, g, { talkRef, label }) : breathDrawer(pack, g, talkRef);
     draw(performance.now());
     let raf = requestAnimationFrame(function tick(now) {
       raf = requestAnimationFrame(tick);
@@ -2079,16 +2005,14 @@ function breathDrawer(pack, g, talkRef) {
     }
   };
 }
-function motionDrawer(pack, g, { talkRef, facingRef, poseRef, label }) {
+function motionDrawer(pack, g, { talkRef, label }) {
   const { m, images } = pack;
-  const want = () => facingRef.current && m.poses[facingRef.current] ? facingRef.current : m.default_pose;
-  const actor = createActor(m, { seed: label || "aa", now: performance.now(), pose: poseRef.current || want() });
+  const actor = createActor(m, { seed: label || "aa", now: performance.now() });
   let said = "";
   let drawn = "";
   return (now) => {
     const still = reduced();
     if (still) actor.hush();
-    else actor.turn(want(), now);
     const t = talkRef.current;
     const sayKey = t && t.type === "dialogue" && t.speed > 0 && !t.done && Number.isFinite(t.startedAt) ? `${t.key}|${t.startedAt}` : "";
     if (sayKey !== said) {
@@ -2096,9 +2020,8 @@ function motionDrawer(pack, g, { talkRef, facingRef, poseRef, label }) {
       if (sayKey && !still) actor.say({ chars: t.chars, times: t.times, gap: t.gap, mouth: t.mouth, marks: t.marks }, t.startedAt);
       else actor.hush();
     }
-    const f = still ? { pose: want(), frame: null, eyes: "open", mouth: "closed" } : actor.frame(now);
-    if (!f.frame) poseRef.current = f.pose;
-    const key = `${f.pose}|${f.frame}|${f.eyes}|${f.mouth}`;
+    const f = still ? { pose: m.default_pose, eyes: "open", mouth: "closed" } : actor.frame(now);
+    const key = `${f.eyes}|${f.mouth}`;
     if (key === drawn) return;
     drawn = key;
     g.clearRect(0, 0, pack.w, pack.h);
@@ -2451,10 +2374,6 @@ function spriteFor(person, turn, emo, emotions) {
   const custom = (emotions || []).find((e) => e.id === emo);
   return pickSprite(person.sprites, lookAt(person.timeline, turn), emo, custom ? custom.base : "");
 }
-function aaOf(person, beat, name2, emotions) {
-  const sprite = spriteFor(person, beat.turn, beat.emotions && beat.emotions[name2] || "neutral", emotions);
-  return (sprite && person && Object.values(person.sprites || {}).find((r) => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null;
-}
 var SIDE = { farleft: "-40%", left: "-28%", center: "0%", right: "28%", farright: "40%" };
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && beat.speaker === entry.name;
@@ -2481,7 +2400,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const uploaded = Boolean(person && Object.values(person.sprites || {}).some((r) => r && r.assetId === sprite && r.uploaded));
   const aa = (person && Object.values(person.sprites || {}).find((r) => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null;
   const still = shown ? /* @__PURE__ */ import_react4.default.createElement("img", { src: shown, alt: entry.name, className: swap ? "is-swap" : "", draggable: "false" }) : /* @__PURE__ */ import_react4.default.createElement(Silhouette, { name: entry.name, color, appearance: person && person.appearance, gender: person && person.gender });
-  return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-actor${speaking ? " is-speaking" : ""}${uploaded ? " is-upload" : ""}${leaving ? " is-leaving" : ""}${aa ? " is-aa" : ""}`, style: { "--x": actorX(entry.pos) + "%", "--side": SIDE[entry.pos] || "0%" }, "data-name": entry.name }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { aa, talk: speaking && talk && talk.key === beat.key ? talk : null, facing: beat.facing && beat.facing[entry.name] || "", fallback: still, className: "fg-aa", label: entry.name }) : still), speaking && beat.sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: beat.sym })));
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-actor${speaking ? " is-speaking" : ""}${uploaded ? " is-upload" : ""}${leaving ? " is-leaving" : ""}${aa ? " is-aa" : ""}`, style: { "--x": actorX(entry.pos) + "%", "--side": SIDE[entry.pos] || "0%" }, "data-name": entry.name }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { aa, talk: speaking && talk && talk.key === beat.key ? talk : null, fallback: still, className: "fg-aa", label: entry.name }) : still), speaking && beat.sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: beat.sym })));
 }
 var LEAVE_MS = 450;
 function useLeaving(cast) {
@@ -4974,26 +4893,6 @@ function firstBeatOfTurn(beats, turn) {
   const i = beats.findIndex((b) => b.turn === turn);
   return i < 0 ? -1 : i;
 }
-function useTurnHold(beat, prev, people, view, speed) {
-  const ref = import_react11.default.useRef({ key: "", until: 0 });
-  const [, wake] = import_react11.default.useReducer((n) => n + 1, 0);
-  if (beat && ref.current.key !== beat.key) {
-    let ms = 0;
-    const name2 = beat.speaker;
-    if (speed > 0 && name2 && (beat.cast || []).some((c) => c.name === name2)) {
-      const facing = (b) => b && b.facing && b.facing[name2] || "";
-      if (facing(beat) !== facing(prev)) ms = aaTurnWait(aaOf(people.get(name2), beat, name2, view && view.emotions), facing(prev), facing(beat));
-    }
-    ref.current = { key: beat.key, until: ms ? performance.now() + ms : 0 };
-  }
-  const waiting = Boolean(beat) && performance.now() < ref.current.until;
-  import_react11.default.useEffect(() => {
-    if (!waiting) return void 0;
-    const t = setTimeout(wake, Math.max(0, ref.current.until - performance.now()) + 5);
-    return () => clearTimeout(t);
-  }, [waiting, beat && beat.key]);
-  return waiting;
-}
 function TheaterRoot() {
   const s = useUi();
   const data = useConfig();
@@ -5072,8 +4971,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const people = import_react11.default.useMemo(() => new Map((view && view.cast || []).map((p2) => [p2.name, p2])), [view]);
   const voices = import_react11.default.useMemo(() => castVoices(view && view.cast || [], ui0), [view, ui0]);
   const voice = import_react11.default.useMemo(() => beat ? lineVoice(beat.type, beat.speaker, voices, ui0) : null, [beat && beat.type, beat && beat.speaker, voices, ui0]);
-  const turnHold = useTurnHold(beat, index > 0 ? beats[index - 1] : null, people, view, typeSpeed);
-  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText || turnHold, onFx: title ? null : hit });
+  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : hit });
   const talk = import_react11.default.useMemo(() => beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null, [beat, chars, typed, typeSpeed, typedAt, done]);
   import_react11.default.useEffect(() => {
     if (beat && beat.sym === "bulb" && sfxOn) stinger("ding");

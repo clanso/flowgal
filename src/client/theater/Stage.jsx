@@ -190,12 +190,6 @@ function spriteFor(person, turn, emo, emotions) {
   return pickSprite(person.sprites, lookAt(person.timeline, turn), emo, custom ? custom.base : '')
 }
 
-/** 这个人这一拍的立绘挂着的逆转式素材包（立绘记录的 aa），没有就是 null。剧场用它算转头时文字要等多久。 */
-export function aaOf(person, beat, name, emotions) {
-  const sprite = spriteFor(person, beat.turn, (beat.emotions && beat.emotions[name]) || 'neutral', emotions)
-  return (sprite && person && Object.values(person.sprites || {}).find(r => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null
-}
-
 /** 登场从靠近的那一侧滑进来，退场往同一侧淡出。 */
 const SIDE = { farleft: '-40%', left: '-28%', center: '0%', right: '28%', farright: '40%' }
 
@@ -217,13 +211,13 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     return () => clearTimeout(t)
   }, [src])
   const uploaded = Boolean(person && Object.values(person.sprites || {}).some(r => r && r.assetId === sprite && r.uploaded))
-  // 立绘记录带逆转式素材包时，用分层画布（眨眼 + 口型，v2 还会按导演给的朝向侧头），原图作读包前的后备
+  // 立绘记录带逆转式素材包时，用分层画布（眨眼 + 口型），原图作读包前的后备
   const aa = (person && Object.values(person.sprites || {}).find(r => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null
   const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
   return (
     <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}${aa ? ' is-aa' : ''}`} style={{ '--x': actorX(entry.pos) + '%', '--side': SIDE[entry.pos] || '0%' }} data-name={entry.name}>
       <div className="fg-actor-body">
-        {aa ? <AaSprite aa={aa} talk={speaking && talk && talk.key === beat.key ? talk : null} facing={(beat.facing && beat.facing[entry.name]) || ''} fallback={still} className="fg-aa" label={entry.name} /> : still}
+        {aa ? <AaSprite aa={aa} talk={speaking && talk && talk.key === beat.key ? talk : null} fallback={still} className="fg-aa" label={entry.name} /> : still}
       </div>
       {speaking && beat.sym && (
         <div className="fg-symbol-anchor"><MangaSymbol key={beat.key} kind={beat.sym} /></div>

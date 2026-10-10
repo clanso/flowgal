@@ -159,8 +159,7 @@ const updater = {
   apply: async () => { await sleep(1200); Object.assign(update, { restartRequired: true, last: { ...update.last, behind: 0, commits: [], checkedAt: Date.now() } }); return update },
   switchToFallback: async () => update,
 }
-// 逆转式立绘演示：发给剧场的局面里给演示人物的立绘记录挂上素材包（复制一份再改，不动引擎里的数据）；
-// v2 素材包有侧头时，假导演给这个人每 4 句台词的第 2 句写侧头、第 4 句写转回来，剧场里看得到转头
+// 逆转式立绘演示：发给剧场的局面里给演示人物的立绘记录挂上素材包（复制一份再改，不动引擎里的数据）
 const routeEngine = !aaDir ? engine : new Proxy(engine, {
   get(target, key) {
     if (key !== 'gameView') return Reflect.get(target, key)
@@ -169,18 +168,6 @@ const routeEngine = !aaDir ? engine : new Proxy(engine, {
       for (const person of view?.cast || []) {
         if (person.name !== AA_NAME) continue
         for (const record of Object.values(person.sprites || {})) if (record?.assetId) record.aa = { manifest: '/aa-demo/' + aaFile }
-      }
-      if (aaManifest.version === 2 && aaManifest.poses?.side) {
-        let n = 0
-        for (const t of view?.turns || []) {
-          for (const u of t.units || []) {
-            const line = t.script?.lines?.[u.id]
-            if (!line || line.sp !== AA_NAME) continue
-            n += 1
-            if (n % 4 === 2) line.facing = 'side'
-            if (n % 4 === 0) line.facing = 'front'
-          }
-        }
       }
       return view
     }
