@@ -1,7 +1,7 @@
 ---
 handoff_schema: tavernweave/next/v1
 project_id: flowgal-two-hosts
-status: phase-5-active
+status: phase-5-driver-acceptance-pending
 updated: 2026-10-10
 ---
 
@@ -37,14 +37,18 @@ updated: 2026-10-10
   - 测试酒馆（C:Usersadminst-test，1.19.0，假模型 scripts/st-mock.mjs，开 --corsProxy）：扩展加载；发一轮→导演整理→楼层场景卡；剧场播放；生图渠道加接入点、填 Key→插画、立绘画好存进 user/images/flowgal；配乐上传进 user/files 并播放；认脸小模型和精细模式大模型下到浏览器缓存、自动框（精细模式「大模型找到了嘴」）；工作台只做这一张（假局部重绘）存素材包并播放；导演改走连接配置后流式整理（日志显示 flowgal-mock）；刷新后卡片从存档读回。
   - DSH 预览复查：剧场全屏、楼层卡、出图、导演日志正常。
 
+- 阶段 5 · 打包与测试酒馆验收（2026-10-10）：测试酒馆拆掉开发联接后，从「安装扩展」填 https://github.com/clanso/flowgal 正式安装（克隆 c503c7b 到 data/default-user/extensions/flowgal），不用刷新即加载，旧存档的卡片读回；README 加酒馆版说明（4be4f83）后，在「管理扩展」点更新拉到 4be4f83，提示刷新生效。
+
 ## 开放风险
 
 - 一次全搬：驾驶员首次试用要等全部阶段完成。
+- 真实酒馆里还没装过：驾驶员的酒馆有柏宝绘、IGS、酒馆数据库生图等扩展，样式和事件冲突只在测试酒馆（无其它扩展）里排除过；真实 NovelAI 请求、真实大模型的导演输出质量未在酒馆版验过（核心与 DSH 版同一份）。
+- D1（跟 IGS 共处）未定：现在 FlowGal 只有全局「启用」和「每轮自动整理」开关，开着时每个聊天都会整理。
 - 阶段 1 改动的是驾驶员正在用的 DSH 版，靠测试 + 预览冒烟 + 驾驶员 DSH 冒烟兜底。
 
 ## 下一道门
 
-阶段 5：测试酒馆从 GitHub 地址安装（不用联接）、更新；README 写酒馆版安装说明；之后交驾驶员在真实酒馆安装试用（安装另行授权）。驾驶员 DSH 冒烟（daa2abf 起）结果待回。
+驾驶员验收：① DSH 里检查更新、重启后冒烟（拆核心后的 DSH 版）；② 驾驶员同意后在真实酒馆 D:AI chatsSillyTavern 安装（扩展 → 安装扩展 → https://github.com/clanso/flowgal）并试用；③ 决定 D1（每个聊天单独开关，或别的办法）。
 
 ## 一句续接
 

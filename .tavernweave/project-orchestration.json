@@ -4,7 +4,7 @@
   "projectId": "flowgal-two-hosts",
   "title": "FlowGal 一套核心两个宿主（DSH + SillyTavern）",
   "profile": "blueprint-set",
-  "state": "driver-approved-design",
+  "state": "automated-evidence",
   "authorityFile": "总设计案.md",
   "nextFile": "NEXT.md",
   "blueprintPolicy": {
@@ -71,8 +71,8 @@
     "realHostGateRequired": true
   },
   "acceptance": {
-    "automated": "not-run",
-    "staticPreview": "not-run",
+    "automated": "passed",
+    "staticPreview": "passed",
     "realHost": "pending",
     "driver": {
       "status": "pending",
