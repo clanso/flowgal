@@ -486,7 +486,7 @@
 .fg-face-info { gap: .6cqw; margin: .4cqw 0; }
 .fg-face-editor { margin: .6cqw 0; }
 .fg-face-editor .fg-aa-frame { height: 28cqw; }
-.fg-pose-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8cqw; width: 100%; }
+.fg-pose-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .8cqw; width: 100%; }
 .fg-pose-col { display: flex; flex-direction: column; gap: .3cqw; padding: .6cqw; border-radius: .6cqw; background: rgba(255, 255, 255, .05); }
 .fg-pose-item { display: flex; align-items: center; justify-content: space-between; gap: .4cqw; font-size: .92em; }
 .fg-pose-item i { opacity: .7; font-style: normal; }
@@ -495,7 +495,7 @@
 .fg-aa-play > canvas, .fg-aa-play > img { position: absolute; left: 50%; top: 0; height: 100%; width: auto; transform: translateX(-50%); }
 .fg-aa-play.is-close { width: 34cqw; height: auto; aspect-ratio: 1; align-self: center; }
 .fg-aa-play.is-close canvas, .fg-aa-play.is-close img { display: block; width: 100%; height: auto; }
-.fg-aa-states { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8cqw; }
+.fg-aa-states { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8cqw; }
 .fg-aa-state { display: flex; flex-direction: column; align-items: center; gap: .3cqw; font-size: .9cqw; }
 .fg-aa-thumb { width: 100%; height: auto; border-radius: .5cqw; background: repeating-conic-gradient(rgba(255, 255, 255, .06) 0 25%, transparent 0 50%) 0 0 / 1cqw 1cqw; }
 .fg-aa-actions { margin-top: 1.2cqw; }

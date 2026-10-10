@@ -5,7 +5,7 @@ import { inflateSync } from 'node:zlib'
 import { mkdtemp, rm, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { aaPrompt, cleanRects, defaultRects, rectsBox, stillPack, cleanPack, packFiles, AA_STEPS } from '../lib/aa-sprite.js'
+import { aaPrompt, cleanRects, defaultRects, rectsBox, motionPack, cleanPack, packFiles, packStill, packLevel, stateRects, AA_STEPS, AA_STEPS_LITE } from '../lib/aa-sprite.js'
 import { pngSize, maskPng, grayPng } from '../lib/image/png.js'
 import { inpaintModel } from '../lib/image/novelai.js'
 import { noteEmotionUsers, personEmotions } from '../lib/emotions.js'
@@ -38,6 +38,9 @@ test('gate: 眨眼口型的重画提示词：要的 tag 放最前，打架的拿
   assert.match(half.prompt, /^half-closed eyes, .*blue eyes/, '半闭眼留着眼睛颜色')
   const talk = aaPrompt(positive, '', 'mouth', 'open')
   assert.match(talk.prompt, /^open mouth, talking, /)
+  assert.match(aaPrompt(positive, '', 'mouth', 'narrow').prompt, /^parted lips, /)
+  assert.match(aaPrompt(positive, '', 'mouth', 'round').prompt, /^:o, open mouth, talking, /)
+  assert.doesNotMatch(aaPrompt(positive, '', 'mouth', 'half').prompt, /small mouth/, '不加 small mouth（会画成一个点）')
   assert.doesNotMatch(talk.prompt, /smile|closed mouth/)
   assert.match(talk.prompt, /blue eyes/, '眼睛上的不动')
   assert.throws(() => aaPrompt(positive, '', 'nose', 'open'), /没有这个状态/)
@@ -65,12 +68,27 @@ test('gate: 框对齐 8 像素、夹在图里、不能太小太大；遮罩只�
   assert.equal(inpaintModel('nai-diffusion-5-full'), 'nai-diffusion-5-full-inpainting')
   assert.equal(inpaintModel('nai-diffusion-4-curated-preview'), 'nai-diffusion-4-curated-inpainting')
 
-  // 工作台拼出的素材包（只一帧）过得了导入检查
-  const patches = {}
-  for (const [part, state] of AA_STEPS) patches[part] = { ...(patches[part] || {}), [state]: { file: `${part}_${state}.png`, x: 8, y: 8 } }
-  const pack = cleanPack(stillPack({ name: '林岚·开心', width: 832, height: 1216, still: 'still.png', patches }))
-  assert.deepEqual(pack.breath, { frames: ['still.png'], lifts: [0], steps: [{ frame: 0, ms: 1000 }] })
-  assert.deepEqual(packFiles(pack), ['still.png', 'eyes_half.png', 'eyes_closed.png', 'mouth_half.png', 'mouth_open.png'])
+  // 圆嘴的框往下多出半个框高（至少 8 像素），夹在图里；别的状态就是原来的框
+  assert.deepEqual(stateRects({ mouth: [[392, 312, 432, 328]] }, 'mouth', 'round', 1216), [[392, 312, 432, 336]])
+  assert.deepEqual(stateRects({ mouth: [[392, 1200, 432, 1216]] }, 'mouth', 'round', 1216), [[392, 1200, 432, 1216]])
+  assert.deepEqual(stateRects({ mouth: [[392, 312, 432, 328]] }, 'mouth', 'half', 1216), [[392, 312, 432, 328]])
+  assert.equal(AA_STEPS.length, 6)
+  assert.deepEqual(AA_STEPS_LITE, [['eyes', 'closed'], ['mouth', 'half']])
+
+  // 工作台拼出的 v2 素材包（完整版、精简版）过得了导入检查
+  const make = steps => {
+    const patches = {}
+    for (const [part, state] of steps) patches[part] = { ...(patches[part] || {}), [state]: { file: `${part}_${state}.png`, x: 8, y: 8 } }
+    return cleanPack(motionPack({ name: '林岚·开心', width: 832, height: 1216, still: 'still.png', patches }))
+  }
+  const pack = make(AA_STEPS)
+  assert.equal(pack.version, 2)
+  assert.equal(packStill(pack), 'still.png')
+  assert.deepEqual(packFiles(pack), ['still.png', 'eyes_half.png', 'eyes_closed.png', 'mouth_narrow.png', 'mouth_half.png', 'mouth_open.png', 'mouth_round.png'])
+  assert.equal(packLevel(pack), 'full')
+  const lite = make(AA_STEPS_LITE)
+  assert.deepEqual(packFiles(lite), ['still.png', 'eyes_closed.png', 'mouth_half.png'])
+  assert.equal(packLevel(lite), 'lite')
 })
 
 /** 一局里建个林岚，上传一张立绘；返回引擎、这张差分的编号、发给 NovelAI 的请求。 */
@@ -120,9 +138,13 @@ test('gate: 工作台局部重绘：用画这张时的提示词和种子，按�
     assert.deepEqual([px(320, 216), px(503, 271), px(400, 240), px(400, 320), px(10, 10)], [255, 255, 0, 0, 0])
     assert.equal(body.parameters.image, image.split(',')[1], '原图原样转发')
     // 指定种子（重画单个状态时换个种子）
-    await engine.aaInpaint('g', { name: '林岚', key, part: 'mouth', state: 'half', rects, image, seed: 7 })
+    await engine.aaInpaint('g', { name: '林岚', key, part: 'mouth', state: 'narrow', rects, image, seed: 7 })
     assert.equal(requests.at(-1).body.parameters.seed, 7)
     assert.match(requests.at(-1).body.input, /^parted lips, /)
+    // 圆嘴：遮罩比嘴框往下多出半个框高
+    await engine.aaInpaint('g', { name: '林岚', key, part: 'mouth', state: 'round', rects, image })
+    const round = grayPixels(Buffer.from(requests.at(-1).body.parameters.mask, 'base64'))
+    assert.deepEqual([round(400, 320), round(400, 333), round(400, 336)], [255, 255, 0])
 
     await assert.rejects(engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects, image: dataUrl(await grayPng(830, 1216, () => 255)) }), /64 的倍数/)
     await assert.rejects(engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects: { eyes: rects.eyes }, image }), /还没框嘴/)
@@ -181,19 +203,19 @@ test('gate: 工作台做好的素材包：静止帧沿用原图（不另存、�
       files[`${part}_${state}.png`] = dataUrl(await grayPng(16, 8, () => 9))
     }
     const rects = { eyes: [[320, 216, 392, 280]], mouth: [[392, 312, 432, 328]] }
-    const manifest = stillPack({ name: '林岚·开心', width: 832, height: 1216, still: 'still.png', patches })
+    const manifest = motionPack({ name: '林岚·开心', width: 832, height: 1216, still: 'still.png', patches })
     for (const k of keys) await engine.castAction('g', 'aa-pack', { name: '林岚', key: k, keepImage: true, manifest, files, rects })
     let after = (await lin()).sprites[key]
     assert.equal(after.assetId, before.assetId, '图没换')
-    assert.equal(after.aa.pack.breath.frames[0], before.assetId)
+    assert.equal(after.aa.pack.poses.front.base, before.assetId)
     assert.equal(after.writer, before.writer)
     assert.equal(after.positive, '1girl, long black hair, blue eyes, light smile, masterpiece', '记录里别的东西都在')
     assert.deepEqual(after.aa.rects, rects)
-    assert.equal(await assets(), 2 + 4 * keys.length, '每张只多存 4 个贴片')
+    assert.equal(await assets(), 2 + 6 * keys.length, '每张只多存 6 个贴片')
     // 缺贴片时报错、不留半截
     const { 'mouth_open.png': _, ...missing } = files
     await assert.rejects(engine.castAction('g', 'aa-pack', { name: '林岚', key, keepImage: true, manifest, files: missing, rects }), /素材包缺文件：mouth_open\.png/)
-    assert.equal(await assets(), 2 + 4 * keys.length)
+    assert.equal(await assets(), 2 + 6 * keys.length)
 
     await engine.castAction('g', 'aa-remove', { name: '林岚', keys })
     const view = await lin()

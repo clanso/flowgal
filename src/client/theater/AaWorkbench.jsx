@@ -1,16 +1,17 @@
 // 逆转式立绘工作台（一个角色）：勾选差分（单选 / 多选 / 全选），在图上框好两只眼睛和嘴，
-// 用 NovelAI 局部重绘做出半闭眼、闭眼、嘴半张、嘴张开四个状态；浏览器把重画的那一小块切成软边贴片，
-// 按素材包挂到这张差分上（静止帧就是原图，只做一帧、不呼吸）。做好的当场能看它眨眼、说话，哪个状态不满意单独重画。
-// 宿主没有图片库：垫白底、切贴片都在这里用画布做；宿主只负责带着 Key 去请求、按框画遮罩、存素材包。
+// 用 NovelAI 局部重绘做出眼睛（半闭、闭）和嘴（齿缝、小开、开、圆）；精简版只做闭眼和一个张嘴（路人省额度）。
+// 浏览器把重画结果洗成贴片（只留真正变了的像素、颜色对齐原图、刘海用原图，见 lib/aa-patch.js），
+// 拼成 v2 素材包挂到这张差分上（整图就是原图，头部不动）。做好的当场能看它眨眼、说话，哪个状态不满意单独重画。
+// 宿主没有图片库：垫白底、洗贴片都在这里做；宿主只负责带着 Key 去请求、按框画遮罩、存素材包。
 // 「自动框」用本机下好的认脸模型在浏览器里认眼睛和嘴（vision.js / lib/detect.js），认不准的标出来让人看一眼。
 import React from 'react'
 import { api, assetUrl, toast, hostName } from '../api.js'
 import { PlayView, useDemoTalk, SpriteViewer } from './AaPreview.jsx'
 import { emotionLabel } from './playback.js'
 import { visionApi, frameSprite, followSprite, holdVision, releaseVisionLater } from './vision.js'
-import { AA_PARTS, AA_STEPS, defaultRects, rectsBox, stillPack } from '../../../lib/aa-sprite.js'
+import { AA_PARTS, AA_STEPS, AA_STEPS_LITE, defaultRects, rectsBox, stateRects, motionPack, packLevel } from '../../../lib/aa-sprite.js'
+import { cleanPatch } from '../../../lib/aa-patch.js'
 
-const FEATHER = 3 // 贴片边缘羽化的像素（跟最早的 Python 版一样）
 const BOX_NAMES = { eyes: ['左眼', '右眼'], mouth: ['嘴'] }
 
 const loadImage = src => new Promise((resolve, reject) => {
@@ -23,36 +24,24 @@ const makeCanvas = (w, h) => { const c = document.createElement('canvas'); c.wid
 const readBlob = blob => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(blob) })
 const assetDataUrl = async id => readBlob(await (await fetch(assetUrl(id))).blob())
 
-/** 框边往里的羽化：贴片在框边上全透明，往里 FEATHER 像素后完全不透明（平滑过渡）。 */
-function feather(x, y, [x0, y0, x1, y1]) {
-  const d = Math.min(x - x0, x1 - 1 - x, y - y0, y1 - 1 - y)
-  if (d < 0) return 0
-  const t = Math.min(1, Math.max(0, (d - 0.5) / FEATHER))
-  return t * t * (3 - 2 * t)
+/**
+ * 重画结果洗成贴片：只留真正变了的像素、颜色对齐原图；眼睛的贴片里刘海一律用原图（见 lib/aa-patch.js）。
+ * gen 是重画结果（垫过白底、补成 64 的倍数），prep.src 是原图像素（带透明度）。
+ */
+function cleanToPatch(gen, prep, rects, part, state) {
+  const c = makeCanvas(prep.padW, prep.padH)
+  const g = c.getContext('2d')
+  g.drawImage(gen, 0, 0, prep.padW, prep.padH)
+  const p = cleanPatch(prep.src, g.getImageData(0, 0, prep.padW, prep.padH), stateRects(rects, part, state, prep.h), { classes: part === 'eyes', keepHair: part === 'eyes' })
+  const out = makeCanvas(p.width, p.height)
+  out.getContext('2d').putImageData(new ImageData(p.data, p.width, p.height), 0, 0)
+  return { dataUrl: out.toDataURL('image/png'), x: p.x, y: p.y }
 }
 
-/**
- * 从重画后的整张图里切出这个部件的贴片：只取框里，透明度 = 原图透明度 × 羽化，贴回原图正好接上。
- * gen 是重画结果（垫过白底、可能比原图大一圈），src 是原图的像素（取透明度）。
- */
-function cutPatch(gen, src, list, padW, padH) {
-  const [x0, y0, x1, y1] = rectsBox(list)
-  const w = x1 - x0, h = y1 - y0
-  const c = makeCanvas(w, h)
-  const g = c.getContext('2d')
-  const kx = gen.naturalWidth / padW, ky = gen.naturalHeight / padH
-  g.drawImage(gen, x0 * kx, y0 * ky, w * kx, h * ky, 0, 0, w, h)
-  const d = g.getImageData(0, 0, w, h)
-  for (let py = 0; py < h; py++) {
-    for (let px = 0; px < w; px++) {
-      const X = x0 + px, Y = y0 + py
-      const soft = Math.max(...list.map(r => feather(X, Y, r)))
-      const alpha = X < src.width && Y < src.height ? src.data[(Y * src.width + X) * 4 + 3] / 255 : 0
-      d.data[(py * w + px) * 4 + 3] = Math.round(255 * soft * alpha)
-    }
-  }
-  g.putImageData(d, 0, 0)
-  return { dataUrl: c.toDataURL('image/png'), x: x0, y: y0 }
+/** 素材包里有的眼嘴状态（按做的顺序）；旧版（v1）素材包回空，要整张重做一次才升级成新版。 */
+function packSteps(pack) {
+  const parts = pack && pack.version === 2 ? (pack.poses[pack.default_pose] || {}).parts || {} : null
+  return parts ? AA_STEPS.filter(([part, state]) => parts[part] && parts[part][state]) : []
 }
 
 /** 准备一张差分：原图像素（取透明度）+ 垫白底、补成 64 倍数的 PNG（NovelAI 局部重绘要的）。 */
@@ -70,29 +59,29 @@ async function prepare(record) {
   return { w, h, padW, padH, image: flat.toDataURL('image/png'), src: raw.getImageData(0, 0, w, h) }
 }
 
-/** 这张差分已经做好的贴片（从存着的素材包里取），重画单个状态时其余三个照用。 */
+/** 这张差分已经做好的贴片（从存着的 v2 素材包里取），重画单个状态时其余的照用。 */
 async function storedPatches(record) {
-  const parts = record.aa?.pack?.parts || {}
+  const pack = record.aa && record.aa.pack
   const out = {}
-  for (const [part, state] of AA_STEPS) {
-    const p = parts[part]?.[state]
-    if (p) out[`${part}_${state}`] = { dataUrl: await assetDataUrl(p.file), x: p.x, y: p.y }
+  for (const [part, state] of packSteps(pack)) {
+    const p = pack.poses[pack.default_pose].parts[part][state]
+    out[`${part}_${state}`] = { dataUrl: await assetDataUrl(p.file), x: p.x, y: p.y }
   }
   return out
 }
 
-/** 把四个贴片按素材包存进这张差分（静止帧沿用原图）。 */
-async function savePack(gameId, person, key, record, size, rects, patches) {
+/** 把这一套贴片（完整版 6 个，或精简版 2 个）按 v2 素材包存进这张差分（整图沿用原图）。 */
+async function savePack(gameId, person, key, record, size, rects, patches, steps) {
   const parts = {}
   const files = {}
-  for (const [part, state] of AA_STEPS) {
+  for (const [part, state] of steps) {
     const p = patches[`${part}_${state}`]
     if (!p) throw new Error(`还缺「${AA_PARTS[part].states[state].label}」`)
     const file = `${part}_${state}.png`
     parts[part] = { ...(parts[part] || {}), [state]: { file, x: p.x, y: p.y } }
     files[file] = p.dataUrl
   }
-  const manifest = stillPack({ name: `${person.name}·${emotionLabel(record.emotion || key.split('|').pop())}`, width: size.w, height: size.h, still: 'still.png', patches: parts })
+  const manifest = motionPack({ name: `${person.name}·${emotionLabel(record.emotion || key.split('|').pop())}`, width: size.w, height: size.h, still: 'still.png', patches: parts })
   await api.cast(gameId, 'aa-pack', { name: person.name, key, keepImage: true, manifest, files, rects })
 }
 
@@ -239,12 +228,15 @@ export function AaWorkbench({ gameId, person, onClose }) {
   const [viewing, setViewing] = React.useState(null) // 放大看的那张差分
   const [vision, setVision] = React.useState(null) // 认脸模型下没下好（visionApi.status）
   const [fine, setFineState] = React.useState(() => { try { return localStorage.getItem('flowgal.aa.fine') === '1' } catch { return false } })
+  const [lite, setLiteState] = React.useState(() => { try { return localStorage.getItem('flowgal.aa.lite') === '1' } catch { return false } })
   const [auto, setAuto] = React.useState({}) // key → 自动框的结果 { confidence, notes }
   const [framing, setFraming] = React.useState('') // 正在自动框的那张
   const touched = React.useRef(new Set()) // 手动调过框的差分（自动框认不出时照着它找）
   const stop = React.useRef(false)
   const job = (key, patch) => setJobs(j => ({ ...j, [key]: { ...(j[key] || {}), ...patch } }))
   const setFine = on => { setFineState(on); try { localStorage.setItem('flowgal.aa.fine', on ? '1' : '0') } catch {} }
+  const setLite = on => { setLiteState(on); try { localStorage.setItem('flowgal.aa.lite', on ? '1' : '0') } catch {} }
+  const steps = lite ? AA_STEPS_LITE : AA_STEPS
 
   // 认脸模型的状态：打开工作台时看一次，下载中每秒刷新
   React.useEffect(() => { visionApi.status().then(setVision, () => {}) }, [])
@@ -347,22 +339,25 @@ export function AaWorkbench({ gameId, person, onClose }) {
     await run(ok, null, Object.fromEntries(Object.entries(results).map(([k, r]) => [k, r.rects])))
   }
 
-  /** 做一张差分：四个状态依次局部重绘（only 只重画其中一个，其余用已经做好的），切贴片，存成素材包。 */
+  /**
+   * 做一张差分：各个状态依次局部重绘（完整版 6 次、精简版 2 次；only 只重画其中一个，其余用已经做好的），
+   * 洗成贴片，存成 v2 素材包。
+   */
   const make = async (v, only = null, given = null) => {
     const rects = given || rectsOf(v.key)
     job(v.key, { status: 'running', step: 0, error: '' })
     const prep = await prepare(v.record)
     setSizes(s => ({ ...s, [v.key]: { w: prep.w, h: prep.h } }))
     const patches = only ? await storedPatches(v.record) : {}
-    const steps = only ? [only] : AA_STEPS
-    for (let i = 0; i < steps.length; i++) {
+    const todo = only ? [only] : steps
+    for (let i = 0; i < todo.length; i++) {
       if (stop.current) throw new Error('已停止')
-      const [part, state] = steps[i]
-      job(v.key, { step: i + 1, total: steps.length, now: AA_PARTS[part].states[state].label })
+      const [part, state] = todo[i]
+      job(v.key, { step: i + 1, total: todo.length, now: AA_PARTS[part].states[state].label })
       const res = await api.aaInpaint({ gameId, name: person.name, key: v.key, part, state, rects, image: prep.image, ...(only ? { seed: Math.floor(Math.random() * 2 ** 31) } : {}) })
-      patches[`${part}_${state}`] = cutPatch(await loadImage(res.image), prep.src, rects[part], prep.padW, prep.padH)
+      patches[`${part}_${state}`] = cleanToPatch(await loadImage(res.image), prep, rects, part, state)
     }
-    await savePack(gameId, person, v.key, v.record, prep, rects, patches)
+    await savePack(gameId, person, v.key, v.record, prep, rects, patches, only ? packSteps(v.record.aa && v.record.aa.pack) : steps)
     setFrames(f => { const n = { ...f }; delete n[v.key]; return n })
     job(v.key, { status: 'done', error: '' })
   }
@@ -386,9 +381,10 @@ export function AaWorkbench({ gameId, person, onClose }) {
   const statusText = v => {
     if (framing === v.key) return '正在自动框…'
     const j = jobs[v.key]
-    if (j && j.status === 'running') return `生成中 ${j.step || 0}/${j.total || 4}${j.now ? ' · ' + j.now : ''}`
+    if (j && j.status === 'running') return `生成中 ${j.step || 0}/${j.total || steps.length}${j.now ? ' · ' + j.now : ''}`
     if (j && j.status === 'failed') return '失败：' + j.error
-    return v.record.aa ? '已动' : '静态'
+    const level = packLevel(v.record.aa && v.record.aa.pack)
+    return !v.record.aa ? '静态' : level === 'lite' ? '已动（精简版）' : level === 'v1' ? '已动（旧版，重做升级）' : '已动'
   }
   const pack = current && current.record.aa && current.record.aa.pack
   const box = current ? (() => { const r = rectsOf(current.key); const [x0, y0, x1, y1] = rectsBox([...r.eyes, ...r.mouth]); const m = 24; return [Math.max(0, x0 - m), Math.max(0, y0 - m), x1 + m, y1 + m] })() : null
@@ -401,8 +397,9 @@ export function AaWorkbench({ gameId, person, onClose }) {
         <button type="button" className="fg-btn" onClick={onClose}>返回人物列表</button>
       </div>
       <div className="fg-note">
-        给差分做眨眼和说话的口型：框好两只眼睛和嘴，每张差分用 NovelAI 局部重绘 4 次（半闭眼、闭眼、嘴半张、嘴张开），只重画框里那一小块，原图不动。
-        同一个角色的差分姿势相同，框一次可以「套用到所选」。生成要用 NovelAI 的额度（之前试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。
+        给差分做眨眼和说话的口型：框好两只眼睛和嘴，每张差分用 NovelAI 局部重绘 6 次（眼睛半闭、闭；嘴齿缝、小开、开、圆），只重画框里那一小块，原图不动；
+        重画的结果会洗干净（颜色对齐原图、刘海用原图），眨眼时不闪色、头发不跳。路人可以勾「精简版」：只做闭眼和一个张嘴，每张 2 次。
+        同一个角色的差分姿势相同，框一次可以「套用到所选」。嘴框尽量扁：框多高，嘴最多张多大。生成要用 NovelAI 的额度（试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。
       </div>
       {variants.length > 0 && <VisionBar status={vision} setStatus={setVision} fine={fine} setFine={setFine} />}
       {!variants.length && <div className="fg-note" style={{ marginTop: '1cqw' }}>这个角色还没有画好的差分。先在人物志里画几张。</div>}
@@ -456,9 +453,10 @@ export function AaWorkbench({ gameId, person, onClose }) {
                     <div className="fg-row">
                       <button type="button" className="fg-btn is-mini" onClick={() => setClose(!close)}>{close ? '看全身' : '看脸部特写'}</button>
                     </div>
+                    {!packSteps(pack).length && <div className="fg-note">这张是旧版素材包（半张、张开两种嘴）。整张重做一次就升级成新版（更细的嘴、洗过的眼睛）。</div>}
                     <div className="fg-aa-states">
-                      {AA_STEPS.map(([part, state]) => {
-                        const p = pack.parts && pack.parts[part] && pack.parts[part][state]
+                      {packSteps(pack).map(([part, state]) => {
+                        const p = pack.poses[pack.default_pose].parts[part][state]
                         return (
                           <div key={part + state} className="fg-aa-state">
                             {p && box ? <StateThumb still={assetUrl(current.record.assetId)} patch={{ src: assetUrl(p.file), x: p.x, y: p.y }} box={box} /> : <span className="fg-note">没有</span>}
@@ -468,7 +466,7 @@ export function AaWorkbench({ gameId, person, onClose }) {
                         )
                       })}
                     </div>
-                    <div className="fg-note">会一直眨眼，嘴跟着一句台词开合。哪个状态不像就单独重画（换个随机种子），框不准就回「框眼睛和嘴」调好再整张重做。</div>
+                    <div className="fg-note">会一直眨眼，嘴跟着一句台词开合{packLevel(pack) === 'lite' ? '（精简版：眨眼是睁 → 闭 → 睁，嘴在闭和开之间来回）' : ''}。哪个状态不像就单独重画（换个随机种子），框不准就回「框眼睛和嘴」调好再整张重做。</div>
                   </>
                 )}
               </>
@@ -478,7 +476,8 @@ export function AaWorkbench({ gameId, person, onClose }) {
       )}
       {variants.length > 0 && (
         <div className="fg-row fg-aa-actions">
-          {!running && !framing && <button type="button" className="fg-btn is-primary" disabled={!picked.size} onClick={() => run(pickedList)}>生成所选（{picked.size} 张 × 4 次局部重绘）</button>}
+          <label className="fg-check" title="路人、不重要的角色：只做闭眼和一个张嘴（每张 2 次局部重绘），眨眼是睁 → 闭 → 睁，嘴在闭和开之间来回"><input type="checkbox" checked={lite} disabled={running} onChange={e => setLite(e.target.checked)} />精简版（省额度）</label>
+          {!running && !framing && <button type="button" className="fg-btn is-primary" disabled={!picked.size} onClick={() => run(pickedList)}>生成所选（{picked.size} 张 × {steps.length} 次局部重绘）</button>}
           {!running && !framing && <button type="button" className="fg-btn" disabled={!picked.size || !visionReady} title={visionReady ? '先自动框（手动调过的不动），认准了的直接生成，没认准的留下来' : '先在上面下载认脸小模型'} onClick={autoAndMake}>🪄 自动框并生成所选</button>}
           {framing && <button type="button" className="fg-btn" onClick={() => { stop.current = true }}>停止自动框</button>}
           {!running && !framing && current && <button type="button" className="fg-btn" onClick={() => run([current])}>只做这一张</button>}
