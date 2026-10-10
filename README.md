@@ -1,6 +1,6 @@
-# FlowGal · DSH Tavern 视觉小说插件
+# FlowGal · DSH Tavern / SillyTavern 视觉小说插件
 
-把 [DSH Tavern](https://github.com/flizzywine/dsh-tavern) 的聊天变成一部会自己排版、配图、配乐的视觉小说。
+把 [DSH Tavern](https://github.com/flizzywine/dsh-tavern) 或 [SillyTavern](https://github.com/SillyTavern/SillyTavern)（酒馆）的聊天变成一部会自己排版、配图、配乐的视觉小说。两个版本是同一套代码：功能一样，只是挂在各自的界面上（酒馆版见下面「酒馆（SillyTavern）版」）。
 
 **正文先出，演出后到。** Tavern 照常流式输出正文，你可以立刻读；这一轮写完后，插件在后台让一个「导演」模型把正文整理成场景脚本：哪些是故事、哪些是状态栏和装饰，谁在说话、什么表情、站在哪、谁在哪一句登场退场、镜头怎么走、这一幕放哪首曲子、哪个瞬间值得画成 CG、给你几个选项。要画的瞬间再交给「插画分镜师」，按柏宝绘的分人写法写成生图提示词。整理好之前剧场就能按原文先演，整理好后画面会原地更新。
 
@@ -24,7 +24,24 @@
 
 > 截图来自仓库里的预览环境：没有生图 Key，所以 CG 是按提示词程序画的占位风景，插画分镜师写的每个角色块画成占位小人叠在上面；立绘是按立绘设计师写的 tag 程序画的占位小人（衣服、表情会跟着 tag 变）；配乐是三段合成的示例曲。接上 NovelAI / ComfyUI 等渠道、导入自己的音乐后，这些位置是真正生成的 CG、立绘和你的曲子。
 
-## 安装
+## 酒馆（SillyTavern）版
+
+需要 SillyTavern 1.18 以上（在 1.19.0 上测过）。
+
+1. 安装：酒馆 → 扩展（三个方块的图标）→「安装扩展」，地址填 `https://github.com/clanso/flowgal`，选「只给我安装」，确认「安装第三方扩展」。装好就能用，不用重启。
+2. 入口：输入框左边的魔杖菜单里「FlowGal 剧场」；每条 AI 回复下面有场景卡（整理好后显示地点、时段、在场的人），回复的「…」菜单里有「剧场」「配一张」两个按钮；扩展面板里有一张「🎬 FlowGal」设置卡。
+3. 导演用哪个模型：默认跟着酒馆当前的连接（也就是你聊天用的那个）。想让导演用便宜的小模型，先在酒馆「API 连接」里存一套连接配置（Connection Profile），再到 FlowGal 设置 → 导演 → 模型里选它。
+4. 出图：FlowGal 设置 → 生图渠道里填 Key。NovelAI 由浏览器直接连（跟柏宝绘一样）；本机的 ComfyUI、WebUI 要么自己开跨域，要么在酒馆的 `config.yaml` 里打开 `enableCorsProxy: true`（FlowGal 会自动走酒馆的转发）。
+5. 更新：扩展 →「管理扩展」里 FlowGal 那一行点更新（或打开它的自动更新），然后刷新网页。
+
+跟 DSH 版不一样的地方：
+
+- 东西存在酒馆的数据文件夹里：每局的场景、人物志、配乐清单是 `data/<用户>/user/files/flowgal-*.json`，图片在 `user/images/flowgal/`，配乐和音效在 `user/files/flowgal-a-*`；「图片文件夹」另存到 `user/images/FlowGal-<卡名>/`（酒馆自带的图库也看得到）。Key 存在酒馆的扩展设置里（`settings.json`），别把数据文件夹发给别人。
+- 认脸模型（立绘工作台的自动框）下到浏览器缓存里，换浏览器或清浏览器数据要重下。
+- 导演、出图都在酒馆网页里跑：网页开着才会整理、出图；关掉网页时正在跑的会停，下次打开点场景卡上的「重新整理」或「补图」接着来。
+- 轮次号写在每条 AI 回复里（`extra.flowgal_turn`），删掉前面的楼层也不会错位；换回复（swipe）、编辑后导演会按新的正文重新整理。
+
+## 安装（DSH 版）
 
 需要 DSH Tavern（插件接口 v1，`dsh >=0.1.0-rc.8`）和 git。下面的命令都在 **DSH 终端**里执行（DSH 设置 → 通用设置 →「打开 DSH 终端」），Tavern 用的 profile 叫 `tavern`。
 
@@ -288,8 +305,10 @@ npm run screenshots    # 需要 playwright；截图输出到 .tmp-screenshots/
 
 ## 实现说明
 
-- 宿主半边：`lib/`。`clean.js` 在切单元前剥掉思考、变量更新、网页外壳和装饰（模型写 HTML 时按结构拆开），`segment.js` 把正文切成旁白 / 台词 / 心声单元；`director.js` 和 `prompts.js` 负责导演提示词和结果校验（含选曲）；`engine.js` 管排队、出图、补图、挂载到正文；`cast.js` 是外貌库（固定外貌、衣橱、长期状态的时间线），`look.js` 是「这一身」的键和立绘挑选（前后端共用），`staging.js` 按导演标的登场 / 退场算出每一句谁在台上（剧场和导演共用），`illustrator.js` 是插画分镜师（以及出图前补外貌、删人名、补人数），`sprites.js` 是立绘设计师，两者共用 `writer.js` 里按模型窗口裁剧情、重试、补写漏项的流程，`emotions.js` 是情绪库，`library.js` 把画好的图按名字另存进图片文件夹；`music.js` 是曲库，`music-sidecar.js` 是描述文件格式（前后端共用）；`image/` 是四个生图渠道，其中 `image/style.js` 管画风（一套套画风的校验和旧设置搬迁、拼提示词、按画风盖过 CFG）。
-- 浏览器半边：`src/client/`，打包成 `client.js`。React 由 DSH 提供，不打进包里。漫画符号是 `src/client/theater/symbols.js` 里自己画的 SVG，动效在 `styles/theater.css`。逆转式立绘在 `theater/AaSprite.jsx`（剧场里分层画）和 `theater/AaWorkbench.jsx`（工作台：框眼睛和嘴、垫白底、切软边贴片；宿主没有图片库，这些在浏览器画布上做），素材包格式、重画提示词和框的检查在 `lib/aa-sprite.js`，宿主按框画遮罩用 `lib/image/png.js`。自动框：认脸模型的文件清单、下载（换镜像、核对 SHA-256）和只读提供在 `lib/vision.js`（`/vision` 接口和 `/vision-files/` 前缀路由），怎么认、框怎么推（YOLO 前后处理、找嘴、读 Florence-2 的结果、同一角色跟随）是纯函数，在 `lib/detect.js`，浏览器里载运行库、跑模型在 `theater/vision.js`。
+- 一套核心两个宿主：`lib/` 是两个宿主共用的核心（只用两边都有的 Web 标准接口，`tests/hosts.test.mjs` 盯着不许混进 Node 专用的东西）；`lib/dsh/` 是 DSH 宿主层（插件入口、存档读写本地文件、HTTP 路由、git 自更新、认脸模型下载）；`st/` 是酒馆宿主层（`store.js` 存档放 user/files、user/images，`llm.js` 走酒馆的连接配置，`tavern.js` 照 DSH Tavern 插件接口提供轮次、角色卡和世界书、楼层卡片，`net.js` 出图请求走不走酒馆转发，`vision.js` 认脸模型存浏览器缓存，`index.jsx` 把界面挂到酒馆上）。浏览器界面只认 `src/client/api.js` 的 `api`：DSH 走 HTTP，酒馆版在同一页里直接调 `lib/api.js` 的接口表。`npm run build` 一起出 DSH 的 `client.js` 和酒馆的 `dist/st.js`（`manifest.json` 指向它）。
+- 测酒馆版：另装一个酒馆，`node scripts/st-mock.mjs` 起假模型、假出图（不要 Key、不花钱）；酒馆 API 选「自定义（OpenAI 兼容）」填 `http://127.0.0.1:5190/v1`，FlowGal 生图渠道加接入点 `http://127.0.0.1:5190`，酒馆用 `--corsProxy true` 启动可以顺带测转发。
+- 核心里的模块：`clean.js` 在切单元前剥掉思考、变量更新、网页外壳和装饰（模型写 HTML 时按结构拆开），`segment.js` 把正文切成旁白 / 台词 / 心声单元；`director.js` 和 `prompts.js` 负责导演提示词和结果校验（含选曲）；`engine.js` 管排队、出图、补图、挂载到正文；`cast.js` 是外貌库（固定外貌、衣橱、长期状态的时间线），`look.js` 是「这一身」的键和立绘挑选（前后端共用），`staging.js` 按导演标的登场 / 退场算出每一句谁在台上（剧场和导演共用），`illustrator.js` 是插画分镜师（以及出图前补外貌、删人名、补人数），`sprites.js` 是立绘设计师，两者共用 `writer.js` 里按模型窗口裁剧情、重试、补写漏项的流程，`emotions.js` 是情绪库，`library.js` 把画好的图按名字另存进图片文件夹；`music.js` 是曲库，`music-sidecar.js` 是描述文件格式（前后端共用）；`image/` 是四个生图渠道，其中 `image/style.js` 管画风（一套套画风的校验和旧设置搬迁、拼提示词、按画风盖过 CFG）。
+- 浏览器半边：`src/client/`，打包成 `client.js`（DSH 版，React 由 DSH 提供，不打进包里）和 `dist/st.js`（酒馆版，自己带 React）。漫画符号是 `src/client/theater/symbols.js` 里自己画的 SVG，动效在 `styles/theater.css`。逆转式立绘在 `theater/AaSprite.jsx`（剧场里分层画）和 `theater/AaWorkbench.jsx`（工作台：框眼睛和嘴、垫白底、切软边贴片；宿主没有图片库，这些在浏览器画布上做），素材包格式、重画提示词和框的检查在 `lib/aa-sprite.js`，宿主按框画遮罩用 `lib/image/png.js`。自动框：认脸模型的文件清单（固定版本、SHA-256、换镜像的地址）在 `lib/vision.js`，DSH 版下到数据目录、经 `/vision-files/` 前缀路由给浏览器（`lib/dsh/vision.js`），酒馆版下到浏览器缓存（`st/vision.js`）；怎么认、框怎么推（YOLO 前后处理、找嘴、读 Florence-2 的结果、同一角色跟随）是纯函数，在 `lib/detect.js`，浏览器里载运行库、跑模型在 `theater/vision.js`。
 - 功能参考了 [bigmalove/galgame](https://github.com/bigmalove/galgame) 和柏宝绘（ST-BaiBai-Image），代码、样式和素材全部自己编写，没有复制这些项目以及 DSH Tavern 本身的代码、样式或素材。
 
 ## 鸣谢

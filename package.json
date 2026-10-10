@@ -1,7 +1,7 @@
 {
   "name": "flowgal",
   "version": "0.2.0",
-  "description": "FlowGal：DSH Tavern 的视觉小说插件。正文先流式输出，后台导演把每轮整理成视觉小说场景并从你自己的曲库里选配乐；柏宝绘式自动配图、角色外貌库、背景与立绘生成。",
+  "description": "FlowGal：DSH Tavern / SillyTavern 的视觉小说插件。正文先流式输出，后台导演把每轮整理成视觉小说场景并从你自己的曲库里选配乐；柏宝绘式自动配图、角色外貌库、背景与立绘生成。",
   "type": "module",
   "repository": { "type": "git", "url": "https://github.com/clanso/flowgal.git" },
   "main": "lib/index.js",
