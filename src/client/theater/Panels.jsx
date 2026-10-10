@@ -5,6 +5,7 @@ import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, cgSrc } from './pl
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions } from '../../../lib/emotions.js'
 import { AaWorkbench } from './AaWorkbench.jsx'
+import { SpriteArt, SpriteViewer } from './AaPreview.jsx'
 import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn, LOOK_FIELDS, LOOK_FIELD_LABELS, lookTags } from '../../../lib/look.js'
 import { Silhouette } from './Stage.jsx'
 import { SKINS } from './skins.js'
@@ -495,9 +496,12 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
   const reachable = group.current || turn != null
   const at = group.current ? {} : { turn }
   const label = `${person.name} · ${lookLabel(group.look)} · ${entry.label}`
+  const [viewing, setViewing] = React.useState(false)
   return (
     <div className="fg-variant">
-      <div className="fg-variant-art">{record && record.assetId ? <img src={assetUrl(record.assetId)} alt={label} /> : <span>{st ? SPRITE_STATUS[st.status] : '还没画'}</span>}</div>
+      {/* 做过逆转式动态的直接动起来；点一下放大看 */}
+      <div className="fg-variant-art">{record && record.assetId ? <SpriteArt record={record} label={label} onOpen={() => setViewing(true)} /> : <span>{st ? SPRITE_STATUS[st.status] : '还没画'}</span>}</div>
+      {viewing && <SpriteViewer record={record} label={label} onClose={() => setViewing(false)} />}
       <div className="fg-variant-body">
         <div className="fg-row"><b>{label}</b><span className="fg-spacer" /><button type="button" className="fg-btn is-mini" onClick={onClose}>收起</button></div>
         {entry.desc && <div className="fg-note">情绪：{entry.desc}{entry.base ? `（接近${emotionLabel(entry.base)}）` : ''}</div>}
@@ -557,9 +561,12 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
     if (!keys.length || !window.confirm(`删除 ${person.name} 的 ${keys.length} 张立绘？${person.global ? '这是全局角色，所有对局里都会少这几张。' : ''}删掉后可以再画。`)) return
     run('del', () => api.cast(gameId, 'sprite-delete', { name: person.name, keys }).then(endManage), `已删除 ${keys.length} 张`)
   }
+  const mainRecord = main ? Object.values(person.sprites || {}).find(r => r && r.assetId === main) : null
+  const [viewing, setViewing] = React.useState(false)
   return (
     <div className="fg-person" style={{ '--c': person.color }}>
-      <div className="fg-person-art">{main ? <img src={assetUrl(main)} alt={person.name} /> : <Silhouette name={person.name} color={person.color} appearance={person.appearance} gender={person.gender} />}</div>
+      <div className="fg-person-art">{mainRecord ? <SpriteArt record={mainRecord} label={person.name} onOpen={() => setViewing(true)} /> : <Silhouette name={person.name} color={person.color} appearance={person.appearance} gender={person.gender} />}</div>
+      {viewing && mainRecord && <SpriteViewer record={mainRecord} label={`${person.name} · ${lookLabel(now)}`} onClose={() => setViewing(false)} />}
       <div className="fg-person-main">
         <h3>
           <span style={{ color: person.color }}>{person.name}</span>

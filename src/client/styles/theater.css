@@ -489,6 +489,18 @@
 .fg-aa-state { display: flex; flex-direction: column; align-items: center; gap: .3cqw; font-size: .9cqw; }
 .fg-aa-thumb { width: 100%; height: auto; border-radius: .5cqw; background: repeating-conic-gradient(rgba(255, 255, 255, .06) 0 25%, transparent 0 50%) 0 0 / 1cqw 1cqw; }
 .fg-aa-actions { margin-top: 1.2cqw; }
+/* 人物志里的立绘小图：做过逆转式动态的直接动；点一下放大 */
+.fg-sprite-art { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.fg-sprite-art img, .fg-sprite-art canvas { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.fg-variant-art .fg-sprite-art img, .fg-variant-art .fg-sprite-art canvas { object-fit: contain; }
+.fg-sprite-art i { position: absolute; top: .4cqw; left: .4cqw; padding: .05cqw .5cqw; border-radius: 99px; font-style: normal; font-size: .8cqw; background: var(--accent); color: #111; }
+.fg-sprite-art span { position: absolute; right: .4cqw; bottom: .4cqw; font-size: 1cqw; opacity: 0; transition: opacity .2s; text-shadow: 0 1px 3px #000; }
+.fg-sprite-art:hover span { opacity: 1; }
+/* 放大看立绘 */
+.fg-viewer-stage { display: flex; align-items: center; justify-content: center; max-width: 92%; height: min(46cqw, 76cqh); }
+.fg-viewer-stage > img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 0 6cqw rgba(0, 0, 0, .8); }
+.fg-aa-play.is-big { width: 60cqw; height: min(46cqw, 76cqh); background: none; }
+.fg-aa-play.is-big.is-close { width: min(46cqw, 76cqh); height: auto; aspect-ratio: 1; }
 .fg-variant-body { display: grid; gap: .6cqw; align-content: start; min-width: 0; }
 .fg-variant-body b { font-size: 1.15cqw; letter-spacing: .08em; }
 .fg-emotion-row { display: grid; grid-template-columns: 12cqw 1fr 9cqw auto auto; gap: .8cqw; align-items: center; padding: .6cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .05); }

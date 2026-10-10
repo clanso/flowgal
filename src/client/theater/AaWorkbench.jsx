@@ -4,10 +4,9 @@
 // 宿主没有图片库：垫白底、切贴片都在这里用画布做；宿主只负责带着 Key 去请求、按框画遮罩、存素材包。
 import React from 'react'
 import { api, assetUrl, toast } from '../api.js'
-import { AaSprite } from './AaSprite.jsx'
+import { PlayView, useDemoTalk, SpriteViewer } from './AaPreview.jsx'
 import { emotionLabel } from './playback.js'
 import { AA_PARTS, AA_STEPS, defaultRects, rectsBox, stillPack } from '../../../lib/aa-sprite.js'
-import { planLine } from '../../../lib/typing.js'
 
 const FEATHER = 3 // 贴片边缘羽化的像素（跟最早的 Python 版一样）
 const BOX_NAMES = { eyes: ['左眼', '右眼'], mouth: ['嘴'] }
@@ -95,24 +94,6 @@ async function savePack(gameId, person, key, record, size, rects, patches) {
   await api.cast(gameId, 'aa-pack', { name: person.name, key, keepImage: true, manifest, files, rects })
 }
 
-/** 预览用的一句台词：循环念，嘴跟着动（跟剧场里一样按演出计划开合）。 */
-function useDemoTalk(on) {
-  const [talk, setTalk] = React.useState(null)
-  React.useEffect(() => {
-    if (!on) { setTalk(null); return undefined }
-    const chars = Array.from('你终于来了，我等了你好久。')
-    const plan = planLine(chars, 40, {})
-    let timer = null
-    const say = () => {
-      setTalk({ key: 'demo' + Date.now(), type: 'dialogue', chars, times: plan.times, gap: plan.gap, mouth: plan.mouth, speed: 40, startedAt: performance.now(), done: false })
-      timer = setTimeout(say, plan.times[plan.times.length - 1] + 1600)
-    }
-    say()
-    return () => clearTimeout(timer)
-  }, [on])
-  return talk
-}
-
 /** 框眼睛和嘴：在图上拖框移动，拖右下角改大小（对齐 8 像素）。zoom 时只看脸附近。 */
 function RectEditor({ src, width, height, rects, onChange, zoom }) {
   const svg = React.useRef(null)
@@ -174,25 +155,6 @@ function RectEditor({ src, width, height, rects, onChange, zoom }) {
   )
 }
 
-/**
- * 看效果：跟剧场里一样的分层画布（眨眼、跟着台词动嘴）。close 时只看脸：眼睛和嘴的外接矩形放大 2.4 倍那一块，
- * 不然整张立绘缩在框里，眼睛只有几个像素，看不出眨没眨。
- */
-function PlayView({ aa, talk, label, still, size, rects, close }) {
-  const fallback = <img src={still} alt="" />
-  if (!close) return <div className="fg-aa-play"><AaSprite aa={aa} talk={talk} label={label} fallback={fallback} /></div>
-  const [x0, y0, x1, y1] = rectsBox([...rects.eyes, ...rects.mouth])
-  const side = Math.min(size.w, size.h, Math.max(x1 - x0, y1 - y0) * 2.4)
-  const bx = Math.max(0, Math.min(size.w - side, (x0 + x1) / 2 - side / 2)), by = Math.max(0, Math.min(size.h - side, (y0 + y1) / 2 - side / 2))
-  return (
-    <div className="fg-aa-play is-close">
-      <div style={{ position: 'absolute', width: `${size.w / side * 100}%`, left: `${-bx / side * 100}%`, top: `${-by / side * 100}%` }}>
-        <AaSprite aa={aa} talk={talk} label={label} fallback={fallback} />
-      </div>
-    </div>
-  )
-}
-
 /** 一个状态的效果小图：脸附近，原图上贴着这个状态的贴片。 */
 function StateThumb({ still, patch, box }) {
   const ref = React.useRef(null)
@@ -228,6 +190,7 @@ export function AaWorkbench({ gameId, person, onClose }) {
   const [zoom, setZoom] = React.useState(true)
   const [close, setClose] = React.useState(true)
   const [tab, setTab] = React.useState('frame')
+  const [viewing, setViewing] = React.useState(null) // 放大看的那张差分
   const stop = React.useRef(false)
   const job = (key, patch) => setJobs(j => ({ ...j, [key]: { ...(j[key] || {}), ...patch } }))
 
@@ -246,6 +209,10 @@ export function AaWorkbench({ gameId, person, onClose }) {
     loadImage(assetUrl(current.record.assetId)).then(img => setSizes(s => ({ ...s, [current.key]: { w: img.naturalWidth, h: img.naturalHeight } })), () => {})
   }, [current && current.key])
   React.useEffect(() => { setTab(current && current.record.aa ? 'play' : 'frame') }, [current && current.key])
+  // 正在看的这张刚做好（素材包换了）：直接切到「看效果」
+  const packOf = current && current.record.aa && current.record.aa.pack
+  const lastPack = React.useRef(packOf)
+  React.useEffect(() => { if (packOf && packOf !== lastPack.current && lastPack.current !== undefined) setTab('play'); lastPack.current = packOf }, [packOf])
 
   const toggle = key => setPicked(p => { const n = new Set(p); if (n.has(key)) n.delete(key); else n.add(key); return n })
   const applyToPicked = () => {
@@ -323,7 +290,7 @@ export function AaWorkbench({ gameId, person, onClose }) {
             {variants.map(v => (
               <div key={v.key} className={`fg-aa-item${v.key === focus ? ' is-on' : ''}`} onClick={() => setFocus(v.key)}>
                 <input type="checkbox" checked={picked.has(v.key)} onClick={e => e.stopPropagation()} onChange={() => toggle(v.key)} aria-label={`选择 ${v.label}`} />
-                <img src={assetUrl(v.record.assetId)} alt="" loading="lazy" />
+                <img src={assetUrl(v.record.assetId)} alt="" loading="lazy" title="双击放大看" onDoubleClick={e => { e.stopPropagation(); setViewing(v) }} />
                 <div><b>{v.label}</b><small>{v.look}</small><small className={jobs[v.key] && jobs[v.key].status === 'failed' ? 'fg-err' : ''}>{statusText(v)}</small></div>
               </div>
             ))}
@@ -333,7 +300,8 @@ export function AaWorkbench({ gameId, person, onClose }) {
               <>
                 <div className="fg-row">
                   <button type="button" className={`fg-btn is-mini${tab === 'frame' ? ' is-on' : ''}`} onClick={() => setTab('frame')}>框眼睛和嘴</button>
-                  <button type="button" className={`fg-btn is-mini${tab === 'play' ? ' is-on' : ''}`} disabled={!current.record.aa} onClick={() => setTab('play')}>看效果</button>
+                  <button type="button" className={`fg-btn is-mini${tab === 'play' ? ' is-on' : ''}`} disabled={!current.record.aa} title={current.record.aa ? '' : '这张还没做，生成后才能看动起来的样子'} onClick={() => setTab('play')}>看效果</button>
+                  <button type="button" className="fg-btn is-mini" onClick={() => setViewing(current)}>🔍 放大看</button>
                   <span className="fg-note">{current.label}{current.look ? ' · ' + current.look : ''}</span>
                 </div>
                 {tab === 'frame' && (
@@ -381,6 +349,7 @@ export function AaWorkbench({ gameId, person, onClose }) {
           <button type="button" className="fg-btn" disabled={running || !pickedList.some(v => v.record.aa)} onClick={() => removeAa(pickedList.filter(v => v.record.aa))}>取消所选的动态</button>
         </div>
       )}
+      {viewing && <SpriteViewer record={(variants.find(v => v.key === viewing.key) || viewing).record} label={`${person.name} · ${viewing.label}`} onClose={() => setViewing(null)} />}
     </div>
   )
 }
