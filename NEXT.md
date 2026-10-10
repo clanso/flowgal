@@ -1,7 +1,7 @@
 ---
 handoff_schema: tavernweave/next/v1
 project_id: flowgal-two-hosts
-status: phase-1-exit-pending-push
+status: phase-3-active
 updated: 2026-10-10
 ---
 
@@ -30,6 +30,8 @@ updated: 2026-10-10
   - 自动化：npm test 108/108（含新增 tests/hosts.test.mjs：核心不许用 node:、Buffer、process、require，界面不许引 DSH 宿主层）；npm run build 通过，client.js 不含 node:。
   - DSH 预览冒烟（flowgal-aa-vision，真立绘）：导演整理、插画 ready、两个角色立绘、配乐 3 首、认脸模型状态、工作台自动框、只做这一张（假局部重绘）全部正常。
 
+- 阶段 2 · 酒馆宿主层（2026-10-10）：st/store.js（user/files、user/images、Key 存扩展设置、写回合并）、st/llm.js（连接配置流式 / generateRaw 退路）、st/tavern.js（轮次号写进楼层 extra、正文版本、角色卡 + 世界书、楼层卡片）、st/host.js（装配引擎和接口表）；核心面向用户的文字去掉写死的 DSH。npm test 112/112（新增 tests/st-host.test.mjs 4 组，含「写完一轮 → 导演整理 → 挂场景卡」端到端；边界检查覆盖 st/）。真酒馆里跑引擎并到阶段 3 的测试酒馆冒烟里验。
+
 ## 开放风险
 
 - 一次全搬：驾驶员首次试用要等全部阶段完成。
@@ -37,7 +39,7 @@ updated: 2026-10-10
 
 ## 下一道门
 
-已推 GitHub（驾驶员同意权威文件一起公开，C6）→ 驾驶员在 DSH 里「检查更新」+ 重启后冒烟 → 进入阶段 2（酒馆宿主层）。阶段 2 可以先做，DSH 冒烟有问题再回头修。
+阶段 3 · 酒馆界面：界面接口改成可换的传输（DSH 走 HTTP，酒馆同页直接调用）；manifest.json + 酒馆版打包；剧场覆盖层、扩展菜单入口、设置卡、楼层场景卡 / 插画卡与按钮；在测试酒馆 C:Usersadminst-test 里冒烟。驾驶员 DSH 冒烟（daa2abf）结果待回。
 
 ## 一句续接
 
