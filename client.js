@@ -1687,8 +1687,8 @@ function turnWaitMs(pack, from, to) {
 }
 var MOTION_DEFAULTS = {
   blink: {
-    close: [{ eyes: "lower", ms: 30 }, { eyes: "half", ms: 30 }, { eyes: "closed", ms: 60 }],
-    open: [{ eyes: "half", ms: 50 }, { eyes: "lower", ms: 70 }],
+    close: [{ eyes: "half", ms: 40 }, { eyes: "closed", ms: 70 }],
+    open: [{ eyes: "half", ms: 90 }],
     interval_ms: [2200, 5600],
     double_chance: 0.18,
     double_gap_ms: 110,
@@ -1710,7 +1710,7 @@ var MOTION_DEFAULTS = {
   turn: {
     lead: [{ eyes: "half", ms: 40 }, { eyes: "closed", ms: 50 }],
     frames_ms: [150],
-    land: [{ eyes: "closed", ms: 60 }, { eyes: "half", ms: 50 }, { eyes: "lower", ms: 60 }]
+    land: [{ eyes: "closed", ms: 60 }, { eyes: "half", ms: 90 }]
   }
 };
 

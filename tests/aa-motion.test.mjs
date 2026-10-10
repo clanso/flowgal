@@ -16,11 +16,11 @@ const RAW = {
   default_pose: 'front',
   poses: {
     front: { label: '正面', base: 'front.webp', parts: {
-      eyes: { lower: part('f_el.png', 320, 200), half: part('f_eh.png', 320, 200), closed: part('f_ec.png', 320, 200) },
+      eyes: { half: part('f_eh.png', 320, 200), closed: part('f_ec.png', 320, 200) },
       mouth: { narrow: part('f_mn.png', 392, 312), half: part('f_mh.png', 392, 312), open: part('f_mo.png', 392, 312), round: part('f_mr.png', 392, 312) },
     } },
     side: { label: '侧头', base: 'side.webp', parts: {
-      eyes: { lower: part('s_el.png', 296, 216), half: part('s_eh.png', 296, 216), closed: part('s_ec.png', 296, 216) },
+      eyes: { half: part('s_eh.png', 296, 216), closed: part('s_ec.png', 296, 216) },
       mouth: { narrow: part('s_mn.png', 336, 304), half: part('s_mh.png', 336, 304), open: part('s_mo.png', 336, 304), round: part('s_mr.png', 336, 304) },
     } },
   },
@@ -40,7 +40,7 @@ test('gate: v2 素材包检查：姿势、贴片、转头、节奏补默认值�
   assert.deepEqual(pack.talk.shapes, MOTION_DEFAULTS.talk.shapes)
   assert.equal(packStill(pack), 'front.webp')
   const files = packFiles(pack)
-  assert.equal(files.length, 2 + 14 + 1)
+  assert.equal(files.length, 2 + 12 + 1)
   const stored = packWithAssets(pack, Object.fromEntries(files.map(f => [f, 'id-' + f])))
   assert.equal(packStill(stored), 'id-front.webp')
   assert.deepEqual(stored.turns['front>side'], ['id-turn_mid.webp'])
@@ -96,7 +96,8 @@ test('gate: 嘴跟着演法：威压一字一拍张大，低语只用齿缝，�
 
 test('gate: 眨眼闭得快睁得慢、偶尔连眨；转头先闭眼、中间帧闭眼、到位才睁开，反方向倒着播', () => {
   const one = blinkSteps(pack.blink)
-  assert.equal(one[0].eyes, 'lower')
+  assert.equal(one[0].eyes, 'half')
+  assert.ok(stepsDuration(pack.blink.open) > stepsDuration(pack.blink.close.slice(0, 1)), '睁得比闭得慢')
   assert.equal(blinkSteps(pack.blink, { double: true }).filter(s => s.eyes === 'closed').length, 2)
   const steps = turnSteps(pack, 'front', 'side')
   const i = steps.findIndex(s => s.frame)
