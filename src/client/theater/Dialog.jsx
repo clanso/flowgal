@@ -76,7 +76,8 @@ export function DialogBox({ beat, chars, plan, done, waiting, color, quick, prog
       {hiddenText && <div className="fg-text is-cardhint">〔 {CARD_LABEL[beat.card] || '卡片'} 〕</div>}
       {!hiddenText && (
         <div className={`fg-text is-${beat.type}${plan && plan.say ? ' say-' + plan.say : ''}${done ? ' is-done' : waiting ? ' is-wait' : ''}`} key={beat.key} aria-live="polite">
-          {chars.map((ch, i) => <span key={i} className={marks[i] ? 'fg-char is-' + marks[i] : 'fg-char'} style={{ '--d': (times ? times[i] : i * speed) + 'ms' }}>{ch}</span>)}
+          {beat.orig && <div className="fg-orig" lang="und">{beat.orig}</div>}
+          <span className="fg-line">{chars.map((ch, i) => <span key={i} className={marks[i] ? 'fg-char is-' + marks[i] : 'fg-char'} style={{ '--d': (times ? times[i] : i * speed) + 'ms' }}>{ch}</span>)}</span>
         </div>
       )}
       {done && <div className="fg-wait" aria-hidden="true" />}

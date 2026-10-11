@@ -83,6 +83,7 @@ export function buildBeats(view) {
         unitId: unit.id,
         type,
         text: unit.text,
+        ...(unit.orig ? { orig: unit.orig } : {}), // 双语对照的原文（剧场上方小字）
         speaker,
         alias: line.as || '',
         emo: line.emo || '',
