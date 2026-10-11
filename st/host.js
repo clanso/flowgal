@@ -2,6 +2,7 @@
 // 接口表（lib/api.js，界面同页直接调用）。跟 DSH 的 lib/dsh/plugin.js 是同一个位置的东西。
 import { createEngine } from '../lib/engine.js'
 import { createMusic } from '../lib/music.js'
+import { createSoundLib } from '../lib/soundlib.js'
 import { createApi } from '../lib/api.js'
 import { createStStore } from './store.js'
 import { createStLlm } from './llm.js'
@@ -28,7 +29,7 @@ export function createStHost({ getContext = () => globalThis.SillyTavern.getCont
     caches, fetchImpl: imageFetch, log,
     settings: async () => { const { config } = await engine.publicConfig(); return { ...config.vision, npmBase: config.ui.fontBase } },
   }) : null
-  const api = createApi({ engine, music: createMusic({ store }), vision })
+  const api = createApi({ engine, music: createMusic({ store }), soundlib: createSoundLib({ store }), vision })
   const stop = tavern.listen()
   return {
     engine, api, tavern, store, llm, vision,

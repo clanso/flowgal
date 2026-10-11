@@ -1,13 +1,13 @@
 // 剧场：全屏 galgame 播放器。读宿主整理好的场景脚本，逐拍演出；导演没整理完的部分先按原文演。
 import React from 'react'
-import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
+import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, emotionLabel, pickTrack, stageRatio } from './playback.js'
 import { Backdrop, Cast, CgLayer, TitleCard, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
 import { useFaceFramer } from './faceFramer.js'
-import { playBgm, stopBgm, sfx, stinger, configureSounds } from './audio.js'
+import { playBgm, stopBgm, playAmbience, stopAmbience, playLibSound, sfx, stinger, configureSounds } from './audio.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
 import { castVoices, lineVoice } from '../../../lib/sounds.js'
 
@@ -75,7 +75,7 @@ export function TheaterRoot() {
     if ((s.resume && s.resume.gameId === gameId && maxTurn > s.resume.afterTurn) || (cfg && cfg.ui.autoOpen)) openTheater(gameId, { turn: maxTurn })
   }, [view, maxTurn, s.open])
 
-  React.useEffect(() => { if (!s.open) stopBgm() }, [s.open])
+  React.useEffect(() => { if (!s.open) { stopBgm(); stopAmbience() } }, [s.open])
   if (!s.open) return null
   return <Theater key={s.gameId} gameId={s.gameId} view={view} viewError={error} cfg={cfg} startTurn={s.startTurn} panel={s.panel} panelArg={s.panelArg} />
 }
@@ -162,6 +162,18 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const musicBeat = beat || beats[beats.length - 1]
   const track = React.useMemo(() => (ui0.bgm ? pickTrack(musicBeat, tracks, assetUrl) : null), [ui0.bgm, tracks, musicBeat && musicBeat.bgm, scene && scene.mood, scene && scene.location])
   React.useEffect(() => { if (track || !ui0.bgm) playBgm(track, ui0.bgmVolume) }, [track && track.id, ui0.bgm, ui0.bgmVolume])
+  // 环境音和剧情音效：导演从音效库里配的（音效库是空的就什么都不响）。剧情音效读到那句时响一次，快进时不响。
+  const soundlib = useSoundlib()
+  const soundById = React.useMemo(() => new Map((soundlib || []).map(s => [s.id, s])), [soundlib])
+  const ambId = ui0.amb !== false && musicBeat && musicBeat.amb !== 'none' ? musicBeat.amb : ''
+  const ambSound = (ambId && soundById.get(ambId)) || null
+  React.useEffect(() => {
+    playAmbience(ambSound ? { id: ambSound.id, url: assetUrl(ambSound.assetId) } : null, (ui0.ambVolume ?? 0.35) * (ambSound ? ambSound.volume ?? 1 : 1))
+  }, [ambSound && ambSound.id, ambSound && ambSound.volume, ui0.ambVolume])
+  React.useEffect(() => {
+    const sound = beat && beat.sfx && !title && !skip && ui0.storySfx !== false ? soundById.get(beat.sfx) : null
+    if (sound) playLibSound(sound.assetId, (ui0.storySfxVolume ?? 0.8) * (sound.volume ?? 1))
+  }, [beat && beat.key])
 
   const go = React.useCallback(i => {
     if (!beats.length) return
@@ -197,6 +209,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const close = React.useCallback(() => {
     setClosing(true)
     stopBgm()
+    stopAmbience()
     setTimeout(() => ui.set({ open: false }), 320)
   }, [])
 

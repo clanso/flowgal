@@ -174,3 +174,18 @@ test('gate: Key 存在凭据服务或 0600 文件里，清空后读不到', asyn
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('gate: 曲库很大时导演只看一批：按第一个标签分组轮流挑，正文提到的优先，上一幕的那首一定在；同一轮挑的一样', async () => {
+  const { musicCandidates } = await import('../lib/music.js')
+  const moods = ['日常', '恋爱', '悲伤', '紧张', '搞笑', '夜晚']
+  const tracks = Array.from({ length: 120 }, (_, i) => ({ id: 't' + i, name: `曲${i}`, tags: [moods[i % moods.length], i === 7 ? '雨' : '其他'] }))
+  const text = '雨一直下。'
+  const picked = musicCandidates(tracks, text, { limit: 30, keep: 't100' })
+  assert.equal(picked.length, 30)
+  assert.equal(picked[0].id, 't100')
+  assert.ok(picked.some(t => t.id === 't7'), '标签在正文里出现的那首在')
+  for (const mood of moods) assert.ok(picked.filter(t => t.tags[0] === mood).length >= 4, mood + ' 每组都有')
+  assert.deepEqual(musicCandidates(tracks, text, { limit: 30, keep: 't100' }).map(t => t.id), picked.map(t => t.id))
+  assert.notDeepEqual(musicCandidates(tracks, '另一轮。', { limit: 30 }).map(t => t.id), musicCandidates(tracks, '又一轮。', { limit: 30 }).map(t => t.id), '换一轮换一批')
+  assert.equal(musicCandidates(tracks.slice(0, 10), text).length, 10, '曲库小时全给')
+})

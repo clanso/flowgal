@@ -119,6 +119,8 @@ export function createStStore({ fetchImpl = (...a) => fetch(...a), headers = () 
     updateGlobalCast: mutate => update('flowgal-global-cast.json', { cast: {} }, mutate),
     readMusic: () => readJson('flowgal-music.json', { tracks: [] }),
     updateMusic: mutate => update('flowgal-music.json', { tracks: [] }, mutate),
+    readSoundLib: () => readJson('flowgal-soundlib.json', { sounds: [] }),
+    updateSoundLib: mutate => update('flowgal-soundlib.json', { sounds: [] }, mutate),
     readEmotions: () => readJson('flowgal-emotions.json', { list: [] }),
     updateEmotions: mutate => update('flowgal-emotions.json', { list: [] }, mutate),
     readGame: async gameId => readJson(await gameFile(gameId), EMPTY_GAME),

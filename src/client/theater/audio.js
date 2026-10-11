@@ -1,9 +1,9 @@
-// 配乐（「我的配乐」里的曲子，交叉淡入淡出；设置里试听时先把它压下去）+ 打字音 / 落字音效 / 界面音。
+// 配乐（「我的配乐」里的曲子，交叉淡入淡出；设置里试听时先把它压下去）+ 环境音（音效库里循环的底，另一条）
+// + 剧情音效（音效库里响一次的）+ 打字音 / 落字音效 / 界面音。
 // 打字音和音效照 lib/sounds.js 的配方用 WebAudio 现场合成，不需要音频文件；某种音效换成了玩家上传的文件时放那个文件。
 import { assetUrl } from '../api.js'
 import { voiceById, soundFor, slotById, DEFAULT_SOUNDS } from '../../../lib/sounds.js'
 
-let bgm = null       // { el, id, volume }
 let preview = null   // { el, id, onEnd }
 let ctx = null
 
@@ -29,36 +29,52 @@ function fade(el, to, ms, done) {
   requestAnimationFrame(tick)
 }
 
-export function playBgm(track, volume = 0.45) {
-  if (!track) { stopBgm(); return }
-  const audible = preview ? 0 : volume
-  if (bgm && bgm.id === track.id) { bgm.volume = volume; bgm.el.volume = Math.min(bgm.el.volume, audible); fade(bgm.el, audible, 400); return }
-  const old = bgm
-  const el = new Audio()
-  el.src = track.url
-  el.loop = true
-  el.volume = 0
-  el.play().then(() => fade(el, preview ? 0 : volume, 1800)).catch(() => {})
-  bgm = { el, id: track.id, volume }
-  if (old) fade(old.el, 0, 1400, () => { old.el.pause(); old.el.src = '' })
+/** 一条循环播放的声音（配乐、环境音各一条）：换的时候交叉淡入淡出，试听时压到 0。 */
+function loopPlayer() {
+  let cur = null // { el, id, volume }
+  return {
+    get current() { return cur },
+    play(item, volume) {
+      if (!item) { this.stop(); return }
+      volume = Math.max(0, Math.min(1, volume))
+      const audible = preview ? 0 : volume
+      if (cur && cur.id === item.id) { cur.volume = volume; cur.el.volume = Math.min(cur.el.volume, audible); fade(cur.el, audible, 400); return }
+      const old = cur
+      const el = new Audio()
+      el.src = item.url
+      el.loop = true
+      el.volume = 0
+      el.play().then(() => fade(el, preview ? 0 : volume, 1800)).catch(() => {})
+      cur = { el, id: item.id, volume }
+      if (old) fade(old.el, 0, 1400, () => { old.el.pause(); old.el.src = '' })
+    },
+    stop() {
+      if (!cur) return
+      const old = cur
+      cur = null
+      fade(old.el, 0, 900, () => { old.el.pause(); old.el.src = '' })
+    },
+  }
 }
+const music = loopPlayer()
+const ambience = loopPlayer()
+const loops = () => [music.current, ambience.current].filter(Boolean)
 
-export function stopBgm() {
-  if (!bgm) return
-  const old = bgm
-  bgm = null
-  fade(old.el, 0, 900, () => { old.el.pause(); old.el.src = '' })
-}
+export function playBgm(track, volume = 0.45) { music.play(track, volume) }
+export function stopBgm() { music.stop() }
+/** 环境音：{ id, url }，null 停掉。 */
+export function playAmbience(sound, volume = 0.35) { ambience.play(sound, volume) }
+export function stopAmbience() { ambience.stop() }
 
 /** 试听一首（设置里的配乐页）：剧场配乐先淡出，试听停了再淡回来。onEnd 在停下时调用（播完、换一首或手动停）。 */
 export function previewTrack(track, onEnd) {
   stopPreview()
   if (!track) return
   const el = new Audio(track.url)
-  el.volume = bgm ? bgm.volume : 0.6
+  el.volume = Math.max(0, Math.min(1, track.volume ?? (music.current ? music.current.volume : 0.6)))
   preview = { el, id: track.id, onEnd }
   el.onended = () => { if (preview && preview.el === el) stopPreview() }
-  if (bgm) fade(bgm.el, 0, 500)
+  for (const loop of loops()) fade(loop.el, 0, 500)
   el.play().catch(() => { if (preview && preview.el === el) stopPreview() })
 }
 
@@ -68,7 +84,7 @@ export function stopPreview() {
   preview = null
   p.el.pause()
   p.el.src = ''
-  if (bgm) fade(bgm.el, bgm.volume, 800)
+  for (const loop of loops()) fade(loop.el, loop.volume, 800)
   if (p.onEnd) p.onEnd()
 }
 
@@ -163,6 +179,23 @@ function playFile(ac, id, volume) {
     src.connect(g).connect(ac.destination)
     src.start(t)
     if (buffer.duration > MAX_FILE_SECONDS) { g.gain.setValueAtTime(volume, t + MAX_FILE_SECONDS - 0.3); g.gain.linearRampToValueAtTime(0, t + MAX_FILE_SECONDS); src.stop(t + MAX_FILE_SECONDS) }
+  }).catch(() => {})
+}
+
+/** 剧情音效（音效库里响一次的）：整段放完，最长 12 秒（再长的最后淡出）。 */
+const MAX_STORY_SECONDS = 12
+export function playLibSound(assetId, volume = 1) {
+  const ac = assetId && volume > 0 && audioCtx()
+  if (!ac) return
+  decoded(ac, assetId).then(buffer => {
+    const src = ac.createBufferSource()
+    const g = ac.createGain()
+    const t = ac.currentTime
+    src.buffer = buffer
+    g.gain.setValueAtTime(volume, t)
+    src.connect(g).connect(ac.destination)
+    src.start(t)
+    if (buffer.duration > MAX_STORY_SECONDS) { g.gain.setValueAtTime(volume, t + MAX_STORY_SECONDS - 1); g.gain.linearRampToValueAtTime(0, t + MAX_STORY_SECONDS); src.stop(t + MAX_STORY_SECONDS) }
   }).catch(() => {})
 }
 

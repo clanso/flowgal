@@ -35,9 +35,11 @@ export function buildBeats(view) {
   const turns = view.turns || []
   const images = view.images || []
   let bgm = '' // 当前在放的曲子（导演选的编号 / none）；没整理的轮次沿用上一轮
+  let amb = '' // 当前的环境音，同上
   turns.forEach((t, ti) => {
     const script = t.script
     if (script && script.scene && script.scene.bgm) bgm = script.scene.bgm
+    if (script && script.scene && script.scene.amb) amb = script.scene.amb
     const prevKey = placeKey(scene)
     if (script) scene = { ...EMPTY_SCENE, ...script.scene }
     const changed = beats.length === 0 || placeKey(scene) !== prevKey
@@ -63,6 +65,7 @@ export function buildBeats(view) {
     units.forEach((unit, ui) => {
       const line = (script && script.lines && script.lines[unit.id]) || {}
       if (line.bgm) bgm = line.bgm
+      if (line.amb) amb = line.amb
       let speaker = ''
       const type = line.type || unit.type
       // 导演只给换人那一句写说话人：同一人连续说话沿用上一位。旁白写了 sp 表示描写的是谁（立绘高亮、换表情，不显示名牌）。
@@ -90,6 +93,8 @@ export function buildBeats(view) {
         card: line.card || '',
         scene,
         bgm,
+        amb,
+        sfx: line.sfx || '',
         sceneEnter: ui === 0 && changed,
         transition: ui === 0 && changed ? scene.transition || 'dissolve' : 'none',
         cast: steps[ui].cast,

@@ -94,6 +94,14 @@ export const api = {
   /** 某一种音效换成自己的文件（最大 5 MB）；返回最新设置。 */
   uploadSound: (slot, file) => uploadFile(`/sound/upload?slot=${encodeURIComponent(slot)}&name=${encodeURIComponent(file.name || '')}`, file),
   removeSound: slot => call('/sound', { action: 'remove', slot }),
+  soundlib: () => call('/soundlib'),
+  updateLibSound: (id, patch) => call('/soundlib', { action: 'update', id, patch }),
+  removeLibSounds: ids => call('/soundlib', { action: 'remove', ids }),
+  /** 往音效库导入一个（最大 20 MB）：path 是相对导入文件夹的路径，meta 是描述文件里这一条。 */
+  async uploadLibSound(file, path, meta) {
+    const query = `name=${encodeURIComponent(path || file.name || '')}${meta ? `&meta=${encodeURIComponent(JSON.stringify(meta))}` : ''}`
+    return (await uploadFile(`/soundlib/upload?${query}`, file)).sound
+  },
 }
 
 
@@ -165,6 +173,17 @@ export function useMusic() {
   const [, force] = React.useReducer(x => x + 1, 0)
   React.useEffect(() => { musicListeners.add(force); if (!musicCache) loadMusic().catch(() => {}); return () => musicListeners.delete(force) }, [])
   return musicCache
+}
+
+// ───────────── 音效库（整个页面共用一份） ─────────────
+let soundlibCache = null
+const soundlibListeners = new Set()
+export function setSoundlib(sounds) { soundlibCache = sounds; for (const fn of [...soundlibListeners]) fn() }
+export function loadSoundlib() { return api.soundlib().then(r => { setSoundlib(r.sounds); return r.sounds }) }
+export function useSoundlib() {
+  const [, force] = React.useReducer(x => x + 1, 0)
+  React.useEffect(() => { soundlibListeners.add(force); if (!soundlibCache) loadSoundlib().catch(() => {}); return () => soundlibListeners.delete(force) }, [])
+  return soundlibCache
 }
 
 // ───────────── 插件更新状态（整个页面共用一份；自动检查由宿主限频） ─────────────

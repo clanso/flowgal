@@ -20,6 +20,7 @@ import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 import { createRoutes } from '../lib/dsh/routes.js'
 import { createMusic } from '../lib/music.js'
+import { createSoundLib } from '../lib/soundlib.js'
 import { createVision } from '../lib/dsh/vision.js'
 import { demoTracks } from './preview/synth.mjs'
 import { CARD, TURNS, LATE_TURN } from './preview/story.mjs'
@@ -126,6 +127,7 @@ await engine.patchConfig({
 })
 await engine.setSecret('novelai', 'official', 'preview-not-a-real-key')
 const music = createMusic({ store })
+const soundlib = createSoundLib({ store })
 for (const t of demoTracks()) {
   const track = await music.add(t.bytes, t.file)
   await music.update(track.id, t)
@@ -175,7 +177,7 @@ const routeEngine = !aaDir ? engine : new Proxy(engine, {
 })
 // 认脸模型：默认下到这次预览的临时数据目录（关掉就删）；--vision-dir / FLOWGAL_VISION_DIR 指定一个常驻目录，免得每次重下
 const vision = createVision({ root: visionDir || join(dataDir, 'models'), logger, settings: async () => { const { config } = await engine.publicConfig(); return { ...config.vision, npmBase: config.ui.fontBase } } })
-const routeList = createRoutes({ engine: routeEngine, music, updater, vision, logger })
+const routeList = createRoutes({ engine: routeEngine, music, soundlib, updater, vision, logger })
 const routes = new Map(routeList.filter(r => r.kind === 'exact').map(r => [r.path, r.handler]))
 // 前缀路由跟 DSH 一样：精确的没有就找最长的前缀
 const prefixes = routeList.filter(r => r.kind === 'prefix').sort((a, b) => b.path.length - a.path.length)
