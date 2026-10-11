@@ -854,6 +854,14 @@
 .fg-face-info { gap: .6cqw; margin: .4cqw 0; }
 .fg-face-editor { margin: .6cqw 0; }
 .fg-face-editor .fg-aa-frame { height: 28cqw; }
+/* 动作与表情设计：一个动作一块，块里每个情绪一行（名字、归哪个动作、他的这种表情） */
+.fg-acting { display: grid; gap: .7cqw; }
+.fg-acting .fg-field { grid-template-columns: 9cqw 1fr; }
+.fg-acting-pose { display: grid; gap: .45cqw; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
+.fg-acting-head { display: flex; align-items: center; gap: .6cqw; }
+.fg-acting-emo { display: grid; grid-template-columns: 9cqw 11cqw 1fr 1fr 6cqw; gap: .5cqw; align-items: center; font-size: .95em; }
+.fg-acting-emo b { font-weight: 600; letter-spacing: .04em; }
+.fg-acting-emo b i { font-style: normal; font-size: .75em; margin-left: .4em; padding: .05em .45em; border-radius: 99px; background: var(--accent); color: #111; }
 .fg-pose-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .8cqw; width: 100%; }
 .fg-pose-col { display: flex; flex-direction: column; gap: .3cqw; padding: .6cqw; border-radius: .6cqw; background: rgba(255, 255, 255, .05); }
 .fg-pose-item { display: flex; align-items: center; justify-content: space-between; gap: .4cqw; font-size: .92em; }
@@ -1005,6 +1013,7 @@
   .fg-aa-grid { grid-template-columns: 1fr; } .fg-aa-list { max-height: 50cqw; }
   .fg-aa-vision { font-size: 2.6cqw; } .fg-aa-badge { font-size: 2.2cqw; } .fg-aa-vision progress { height: 1.6cqw; }
   .fg-pose-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fg-acting .fg-field, .fg-acting-emo { grid-template-columns: 1fr; } .fg-acting-head { flex-wrap: wrap; } .fg-acting-head > input:first-child { flex: 1 1 100%; }
   .fg-face-editor .fg-aa-frame { height: 80cqw; }
   .fg-aa-frame, .fg-aa-play { height: 90cqw; } .fg-aa-play.is-close { width: 90cqw; }
   .fg-aa-item img { width: 9cqw; height: 11cqw; } .fg-aa-item { grid-template-columns: auto 9cqw 1fr; }

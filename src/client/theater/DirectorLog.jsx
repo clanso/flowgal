@@ -1,17 +1,18 @@
-// 导演日志：后台导演每次整理的完整记录，以及立绘设计师、插画分镜师每次写提示词的记录。
+// 导演日志：后台导演每次整理的完整记录，以及立绘设计师（动作与表情设计、写差分提示词）、插画分镜师每次写提示词的记录。
 // 正在跑的那次实时滚动模型输出（有思考就一起显示），可以中途停止；
 // 历史记录能看实际发出去的提示词、每次尝试的原始输出 / 用量 / 报错，以及解析后逐句的演出标注。
 import React from 'react'
 import { api, toast, useDirectorLog, hostName } from '../api.js'
 import { Panel } from './Panels.jsx'
 import { formatLook } from '../../../lib/look.js'
+import { emotionEntry } from '../../../lib/emotions.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL, VOICE_LABEL, CG_IN_LABEL, CG_OUT_LABEL, CG_MOTION_LABEL } from './playback.js'
 
 /** 导演写的外貌：新版是字段，老日志里是一整串。 */
 const lookText = v => (typeof v === 'string' ? v : v ? formatLook(v) : '')
 
 const STATUS = { running: ['进行中', 'is-running'], ok: ['完成', 'is-ok'], failed: ['失败', 'is-failed'], cancelled: ['已停止', 'is-cancelled'] }
-const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词', cg: '写插画提示词' }
+const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词', cg: '写插画提示词', acting: '设计动作与表情' }
 const WRITER = { ai: '模型写的', fallback: '按档案拼的', user: '玩家改的' }
 // 宿主在启动后才定（酒馆版换了传输），所以现取
 const sourceLabel = source => ({ tavern: hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern 后台模型', plugin: '插件设置里指定' })[source]
@@ -19,8 +20,8 @@ const USAGE_LABEL = { inputTokens: '输入', outputTokens: '输出', reasoningTo
 const SHAPE_LABEL = { landscape: '横版', portrait: '竖版', square: '方形' }
 /** 段落里一个人当时的样子：「柯萝伊 魔导师长袍 · 无状态 · 外貌另写」。 */
 const thenText = t => [t.name, t.outfit, t.states ? (t.states.length ? t.states.map(s => s.name).join('、') : '无状态') : '', t.change ? '外貌另写' : ''].filter(Boolean).join(' ')
-/** 一条记录的标题：导演按轮次，立绘按人，插画按轮次。 */
-const entryTitle = e => (e.kind === 'sprite' ? `立绘 · ${e.name}` : e.kind === 'cg' ? `插画 · 第 ${e.turn} 轮` : `第 ${e.turn} 轮`)
+/** 一条记录的标题：导演按轮次，立绘和动作与表情设计按人，插画按轮次。 */
+const entryTitle = e => (e.kind === 'sprite' ? `立绘 · ${e.name}` : e.kind === 'acting' ? `动作与表情 · ${e.name}` : e.kind === 'cg' ? `插画 · 第 ${e.turn} 轮` : `第 ${e.turn} 轮`)
 
 const num = n => Number(n || 0).toLocaleString('en-US')
 const secs = ms => (ms >= 60000 ? `${Math.floor(ms / 60000)} 分 ${Math.round((ms % 60000) / 1000)} 秒` : `${(ms / 1000).toFixed(1)} 秒`)
@@ -221,6 +222,36 @@ function SpritesView({ sprites }) {
   )
 }
 
+/** 动作与表情设计：这个人怎么流露情绪、每个动作（身体 tag、承载哪些情绪）、每种情绪的表情。 */
+function ActingView({ acting }) {
+  if (!acting || !acting.poses || !acting.poses.length) return <div className="fg-note">这次没有设计出能用的动作，先按已有的设计或通用动作组画；看「原始输出」里模型回了什么。</div>
+  const label = e => emotionEntry(e).label
+  return (
+    <>
+      {acting.read && <Block label="怎么流露情绪"><div>{acting.read}</div></Block>}
+      <Block label={`动作 · ${acting.poses.length}`}>
+        {acting.poses.map(p => (
+          <div key={p.id} className="fg-dlog-card">
+            <div className="fg-dlog-chips"><Chip k={p.id}>{p.label}</Chip>{p.side && <Chip k="构图">侧身</Chip>}<Chip k="底图">{label(p.emotions[0])}</Chip></div>
+            {p.desc && <div>{p.desc}</div>}
+            <div className="fg-dlog-mono">{p.tags || '—'}</div>
+            <div className="fg-note">情绪：{p.emotions.map(label).join('、')}</div>
+          </div>
+        ))}
+      </Block>
+      <Block label={`表情 · ${Object.keys(acting.faces || {}).length}`}>
+        {Object.entries(acting.faces || {}).map(([e, f]) => (
+          <div key={e} className="fg-dlog-card">
+            <div className="fg-dlog-chips"><Chip k="情绪">{label(e)}</Chip></div>
+            {f.desc && <div>{f.desc}</div>}
+            <div className="fg-dlog-mono">{f.tags}</div>
+          </div>
+        ))}
+      </Block>
+    </>
+  )
+}
+
 /** 插画分镜师这次写出的每张插画：Base 一块，每人一块。 */
 function CgsView({ cgs }) {
   if (!cgs || !cgs.length) return <div className="fg-note">这次没有写出提示词，看「原始输出」里模型回了什么。</div>
@@ -280,15 +311,16 @@ function LogDetail({ gameId, summary }) {
     try { await api.cancel(gameId, 'director', summary.id); toast('已停止这次整理') } catch (e) { toast(String(e.message || e), 'error') } finally { setStopping(false) }
   }
   const sprite = summary.kind === 'sprite'
+  const acting = summary.kind === 'acting'
   const cg = summary.kind === 'cg'
-  const writer = sprite || cg
-  const tabs = running ? [['live', '实时输出'], ['prompt', '提示词']] : [['result', writer ? '写出的提示词' : '整理结果'], ['raw', `原始输出${summary.attempts > 1 ? ` · ${summary.attempts} 次` : ''}`], ['prompt', '提示词']]
+  const writer = sprite || cg || acting
+  const tabs = running ? [['live', '实时输出'], ['prompt', '提示词']] : [['result', acting ? '设计结果' : writer ? '写出的提示词' : '整理结果'], ['raw', `原始输出${summary.attempts > 1 ? ` · ${summary.attempts} 次` : ''}`], ['prompt', '提示词']]
   const live = summary.live || { output: '', reasoning: '', chars: 0, note: '' }
   const elapsed = running ? Math.max(summary.ms, now - summary.at) : summary.ms
   return (
     <div className="fg-dlog-detail">
       <div className="fg-dlog-head">
-        <div className="fg-dlog-title">{sprite ? `立绘 · ${summary.name}（读到第 ${summary.turn} 轮）` : entryTitle(summary)} <StatusPill status={summary.status} /><span className="fg-spacer" />
+        <div className="fg-dlog-title">{sprite || acting ? `${entryTitle(summary)}（读到第 ${summary.turn} 轮）` : entryTitle(summary)} <StatusPill status={summary.status} /><span className="fg-spacer" />
           {running && <button type="button" className="fg-btn" disabled={stopping} onClick={stop}>{writer ? '停止' : '停止整理'}</button>}
         </div>
         <div className="fg-dlog-facts">
@@ -314,12 +346,12 @@ function LogDetail({ gameId, summary }) {
           <Block label="模型输出（实时）"><Pre text={live.output} follow cursor empty="还没有输出" /></Block>
         </>
       )}
-      {tab === 'result' && (entry ? (sprite ? <SpritesView sprites={entry.sprites} /> : cg ? <CgsView cgs={entry.cgs} /> : <ScriptView script={entry.script} units={entry.units || []} />) : <div className="fg-note">读取中…</div>)}
+      {tab === 'result' && (entry ? (sprite ? <SpritesView sprites={entry.sprites} /> : acting ? <ActingView acting={entry.acting} /> : cg ? <CgsView cgs={entry.cgs} /> : <ScriptView script={entry.script} units={entry.units || []} />) : <div className="fg-note">读取中…</div>)}
       {tab === 'raw' && (entry ? <Attempts attempts={entry.attempts || []} /> : <div className="fg-note">读取中…</div>)}
       {tab === 'prompt' && (entry ? (
         <>
           <Block label={`系统提示词 · ${num((entry.system || '').length)} 字`} text={entry.system}><Pre text={entry.system} /></Block>
-          <Block label={`用户消息 · ${num((entry.user || '').length)} 字${sprite ? '（资料 + 全部剧情 + 角色档案 + 要画的差分）' : cg ? '（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）' : '（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）'}`} text={entry.user}><Pre text={entry.user} /></Block>
+          <Block label={`用户消息 · ${num((entry.user || '').length)} 字${sprite ? '（资料 + 全部剧情 + 角色档案 + 要画的差分）' : acting ? '（资料 + 全部剧情 + 角色档案 + 要设计的情绪）' : cg ? '（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）' : '（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）'}`} text={entry.user}><Pre text={entry.user} /></Block>
         </>
       ) : <div className="fg-note">读取中…</div>)}
     </div>
