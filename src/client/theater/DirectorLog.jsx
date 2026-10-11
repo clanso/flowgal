@@ -5,7 +5,7 @@ import React from 'react'
 import { api, toast, useDirectorLog, hostName } from '../api.js'
 import { Panel } from './Panels.jsx'
 import { formatLook } from '../../../lib/look.js'
-import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL } from './playback.js'
+import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL } from './playback.js'
 
 /** 导演写的外貌：新版是字段，老日志里是一整串。 */
 const lookText = v => (typeof v === 'string' ? v : v ? formatLook(v) : '')
@@ -85,6 +85,11 @@ function LogRow({ e, on, onClick }) {
 
 const TYPE_LABEL = { dialogue: '台词', narration: '旁白', thought: '心声' }
 
+/** 一句里的场景变化写成一行字：地点 · 时段 · 天气 · 光线 · 效果 · 基调 · 转场。 */
+function sceneChange(c) {
+  return [c.location, TIME_LABEL[c.time], WEATHER_LABEL[c.weather], c.light && (LIGHT_LABEL[c.light] || '正常光线'), c.fx && (FX_LABEL[c.fx] || '停止效果'), c.mood && '♪ ' + (MOOD_LABEL[c.mood] || c.mood), c.transition && (TRANSITION_LABEL[c.transition] || c.transition)].filter(Boolean).join(' · ')
+}
+
 function Chip({ k, children }) {
   return <span className="fg-dlog-chip">{k && <i>{k}</i>}{children}</span>
 }
@@ -102,7 +107,9 @@ function ScriptView({ script, units }) {
           <Chip k="地点">{s.location || '—'}</Chip>
           <Chip k="时段">{TIME_LABEL[s.time] || s.time}</Chip>
           <Chip k="天气">{WEATHER_LABEL[s.weather] || s.weather}</Chip>
-          <Chip k="配乐">{MOOD_LABEL[s.mood] || s.mood}</Chip>
+          <Chip k="基调">{MOOD_LABEL[s.mood] || s.mood}</Chip>
+          {LIGHT_LABEL[s.light] && <Chip k="光线">{LIGHT_LABEL[s.light]}</Chip>}
+          {FX_LABEL[s.fx] && <Chip k="效果">{FX_LABEL[s.fx]}</Chip>}
           <Chip k="转场">{TRANSITION_LABEL[s.transition] || s.transition}</Chip>
         </div>
         {s.bg && <div className="fg-note">背景提示词：{s.bg}</div>}
@@ -131,6 +138,11 @@ function ScriptView({ script, units }) {
               l.sym && <Chip key="sym" k="符号">{SYMBOL_LABEL[l.sym] || l.sym}</Chip>,
               l.cam && <Chip key="cam" k="镜头">{CAMERA_LABEL[l.cam] || l.cam}</Chip>,
               l.card && <Chip key="card" k="卡片">{CARD_LABEL[l.card] || l.card}</Chip>,
+              l.cut && <Chip key="cut" k="字卡">{l.cut.text}</Chip>,
+              l.mode && <Chip key="mode" k="段落">{MODE_LABEL[l.mode] || l.mode}</Chip>,
+              l.scene && <Chip key="scene" k="场景">{sceneChange(l.scene)}</Chip>,
+              l.bgm && <Chip key="bgm" k="换歌">{l.bgm === 'none' ? '停' : l.bgm}</Chip>,
+              l.amb && <Chip key="amb" k="环境音">{l.amb === 'none' ? '停' : l.amb}</Chip>,
               l.enter && <Chip key="in" k="登场">{l.enter.map(e => e.name + (e.pos ? `（${POS_LABEL[e.pos] || e.pos}）` : '')).join('、')}</Chip>,
               l.exit && <Chip key="out" k="退场">{l.exit.join('、')}</Chip>,
             ].filter(Boolean)

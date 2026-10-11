@@ -1,25 +1,31 @@
 // 把宿主给的视图（每轮的单元 + 导演脚本 + 插画）摊平成一拍一拍的「演出节拍」。
 // 导演还没整理完的轮次也能演：用切分时猜出的说话人，沿用上一轮的地点和站位（前台先文本）。
 // 立绘按导演标的登场 / 退场逐句增减；插画从 after 那一句显示到 until 那一句（没写就到这一轮结束）。
+// 场景逐句变：导演在某一句写的地点、时段、天气、光线、基调、画面效果从那一句起生效，特殊段落（回忆、梦境……）进出见 lib/scenes.js。
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
 import { placeKey } from '../../../lib/vocab.js'
-import { stageSteps, playedUnits } from '../../../lib/staging.js'
+import { stageWalk, playedUnits } from '../../../lib/staging.js'
+import { walkScenes, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
 
 export { placeKey }
 export { emotionLabel } from '../../../lib/emotions.js'
 
 export const TIME_LABEL = { dawn: '黎明', morning: '清晨', noon: '正午', afternoon: '午后', dusk: '黄昏', evening: '傍晚', night: '夜', midnight: '深夜' }
-export const WEATHER_LABEL = { clear: '晴', rain: '雨', storm: '暴雨', snow: '雪', sakura: '樱吹雪', leaves: '落叶', fireflies: '萤火', fog: '雾', embers: '余烬', dust: '浮尘', bokeh: '光斑', stars: '星空' }
-export const MOOD_LABEL = { daily: '日常', cheerful: '轻快', sweet: '甜蜜', calm: '静谧', sad: '感伤', tense: '紧张', battle: '激战', eerie: '诡异', silence: '寂静' }
+export const WEATHER_LABEL = { clear: '晴', rain: '雨', storm: '暴雨', snow: '雪', blizzard: '暴风雪', wind: '狂风', sakura: '樱吹雪', leaves: '落叶', fireflies: '萤火', fog: '雾', embers: '余烬', dust: '浮尘', bokeh: '光斑', stars: '星空', sparkles: '光点', bubbles: '气泡' }
+export const MOOD_LABEL = { daily: '日常', cheerful: '轻快', comic: '滑稽', sweet: '甜蜜', touching: '感动', calm: '静谧', solemn: '庄严', sad: '感伤', despair: '绝望', tense: '紧张', mystery: '悬疑', eerie: '诡异', battle: '激战', heroic: '热血', silence: '寂静' }
+export const LIGHT_LABEL = { normal: '', dim: '昏暗', dark: '熄灯', black: '漆黑', candle: '烛光', spot: '聚光', neon: '霓虹', screen: '屏幕光', alarm: '警报红光', moon: '月光', warm: '暖光', cold: '冷光', glare: '强光', flicker: '灯光闪烁' }
+export const FX_LABEL = { none: '', sway: '摇晃', ride: '颠簸', handheld: '手持', drift: '推近', woozy: '晕眩', heat: '热浪', underwater: '水下', rumble: '震动', speed: '疾驰', heartbeat: '心跳' }
+export const MODE_LABEL = { memory: '回忆', dream: '梦境', illusion: '幻觉', imagine: '想象', pov: '主观视角', inner: '内心世界', screen: '画面中', tale: '故事中', vision: '预见', digital: '虚拟世界', real: '回到现实' }
+export const CUT_LABEL = { time: 'Time Skip', date: 'Date', chapter: 'Chapter', meanwhile: 'Meanwhile' }
 export const CARD_LABEL = { sms: '短信', letter: '信', note: '便条', news: '报纸', terminal: '终端', notice: '告示', diary: '日记', scroll: '卷轴' }
 export const POS_LABEL = { farleft: '最左', left: '左', center: '中', right: '右', farright: '最右' }
 export const CAMERA_LABEL = { shake: '震动', zoom: '推近', zoomout: '拉远', flash: '闪白', pan: '平移', blur: '虚焦', fadeblack: '黑场', redflash: '红闪', tilt: '倾斜' }
 export const SYMBOL_LABEL = { heart: '爱心', anger: '怒筋', sweat: '汗滴', sparkle: '闪光', surprise: '惊叹', gloom: '阴云', note: '音符', zzz: '睡着', bulb: '灵光', heartbreak: '心碎', sigh: '叹气', dizzy: '眩晕', fire: '燃起', blush: '红晕', bloom: '开花', silence: '无语' }
-export const TRANSITION_LABEL = { dissolve: '溶解', cinematic: '电影黑边', wipe: '横扫', iris: '圆形收缩', strips: '百叶', black: '黑场', flash: '白闪', none: '直接切' }
+export const TRANSITION_LABEL = { dissolve: '溶解', fade: '慢慢变化', cinematic: '电影黑边', wipe: '横扫', iris: '圆形收缩', strips: '百叶', black: '黑场', flash: '白闪', blink: '闭眼睁眼', glitch: '画面撕裂', swirl: '旋转入梦', none: '直接切' }
 const POS_X = { farleft: 14, left: 28, center: 50, right: 72, farright: 86 }
 
-const EMPTY_SCENE = { location: '', time: 'afternoon', weather: 'clear', mood: 'daily', transition: 'dissolve', bg: '' }
+const EMPTY_SCENE = { ...SCENE_DEFAULTS, transition: 'dissolve' }
 
 function imageReady(img) { return img && img.current >= 0 && img.versions && img.versions[img.current] }
 
@@ -29,24 +35,28 @@ function imageReady(img) { return img && img.current >= 0 && img.versions && img
 export function buildBeats(view) {
   const beats = []
   if (!view) return { beats, byKey: new Map() }
-  let scene = EMPTY_SCENE
+  let scene = EMPTY_SCENE // 现实里的场景：这一轮开场时的样子；导演还没整理的轮次沿用上一轮结束时的
+  let layer = null // 上一轮结束时还在的特殊段落：这一轮第一句接着演同一种段落才留着
   let cast = [] // 上一轮结束时在场的人：导演还没整理的轮次沿用
   const emotions = {}
   const turns = view.turns || []
   const images = view.images || []
   let bgm = '' // 当前在放的曲子（导演选的编号 / none）；没整理的轮次沿用上一轮
   let amb = '' // 当前的环境音，同上
+  let shown = null // 上一拍画面上的场景和段落：判断新一轮开场要不要转场
   turns.forEach((t, ti) => {
     const script = t.script
     if (script && script.scene && script.scene.bgm) bgm = script.scene.bgm
     if (script && script.scene && script.scene.amb) amb = script.scene.amb
-    const prevKey = placeKey(scene)
     if (script) scene = { ...EMPTY_SCENE, ...script.scene }
-    const changed = beats.length === 0 || placeKey(scene) !== prevKey
     const all = t.units || []
     const units = playedUnits(all, script)
-    const steps = stageSteps(script, units, cast)
-    if (steps.length) cast = steps[steps.length - 1].cast
+    const walk = stageWalk(script, units, cast)
+    const steps = walk.steps
+    cast = walk.end
+    const lines = units.map(u => (script && script.lines && script.lines[u.id]) || {})
+    const keep = script && layer && lines.length && lines[0].mode === layer.mode ? layer : null
+    const scenes = walkScenes({ scene, bgm, amb, layer: keep }, lines)
     const unitIndex = new Map(units.map((u, i) => [u.id, i]))
     // 挂在不演的单元上的插画（导演整理前就有的、手动配的）：算到它前面最近一个要演的单元。
     const indexOf = id => {
@@ -62,17 +72,9 @@ export function buildBeats(view) {
       })
       .sort((a, b) => a.at - b.at)
     let lastSpeaker = ''
-    // 回忆：flash: in 那一句起换成回忆里的场景（画面加回忆滤镜），flash: out 那一句起回到现在，配乐、环境音换回进回忆前的。
-    // 一轮结束时还在回忆里也回到现在（下一轮还在回忆就再标一次 in）。
-    let memory = null // { scene, bgm, amb }：回忆里的场景，和进回忆前在放的
-    let enterAt = -1
-    const leaveMemory = () => { if (memory) { bgm = memory.bgm; amb = memory.amb; memory = null } }
     units.forEach((unit, ui) => {
-      const line = (script && script.lines && script.lines[unit.id]) || {}
-      if (line.flash === 'in' && !memory) { memory = { scene: { ...scene, ...(line.memory || {}) }, bgm, amb }; enterAt = ui }
-      else if (line.flash === 'out' && memory) { leaveMemory(); enterAt = ui }
-      if (line.bgm) bgm = line.bgm
-      if (line.amb) amb = line.amb
+      const line = lines[ui]
+      const at = scenes[ui]
       let speaker = ''
       const type = line.type || unit.type
       // 导演只给换人那一句写说话人：同一人连续说话沿用上一位。旁白写了 sp 表示描写的是谁（立绘高亮、换表情，不显示名牌）。
@@ -83,6 +85,16 @@ export function buildBeats(view) {
       // 同时有几张在显示时，后出现的盖住先出现的。
       const cgEntry = [...turnImages].reverse().find(e => e.at <= ui && ui <= e.end)
       const cg = cgEntry ? cgEntry.img : null
+      // 新一轮的第一句：跟上一拍画面上的地方、段落比，换了才转场、出地点标题；之后每句看导演写的变化。
+      let enter = at.moved
+      let transition = at.transition
+      if (ui === 0) {
+        const opened = !shown || placeKey(at.scene) !== placeKey(shown.scene) || at.scene.bg !== shown.scene.bg || at.mode !== shown.mode
+        enter = !shown || at.scene.location !== shown.scene.location || at.mode !== shown.mode
+        const opening = scene.transition && scene.transition !== 'none' ? scene.transition : 'dissolve'
+        transition = !opened ? '' : at.transition || (at.mode && (!shown || at.mode !== shown.mode) ? MODE_TRANSITION[at.mode] : enter ? opening : 'fade')
+      }
+      shown = at
       beats.push({
         key: `${t.turn}:${unit.id}`,
         turn: t.turn,
@@ -99,13 +111,14 @@ export function buildBeats(view) {
         say: line.say || '',
         stress: line.stress || '',
         card: line.card || '',
-        scene: memory ? memory.scene : scene,
-        ...(memory ? { flashback: true } : {}),
-        bgm,
-        amb,
+        scene: at.scene,
+        mode: at.mode,
+        ...(at.cut ? { cut: at.cut } : {}),
+        bgm: at.bgm,
+        amb: at.amb,
         sfx: line.sfx || '',
-        sceneEnter: (ui === 0 && changed) || ui === enterAt,
-        transition: ui === enterAt ? 'flash' : ui === 0 && changed ? scene.transition || 'dissolve' : 'none',
+        sceneEnter: enter,
+        transition,
         cast: steps[ui].cast,
         entered: steps[ui].entered,
         left: steps[ui].left,
@@ -120,7 +133,10 @@ export function buildBeats(view) {
         choices: ti === turns.length - 1 && ui === units.length - 1 && script ? script.choices || [] : [],
       })
     })
-    leaveMemory()
+    // 一轮结束：现实里的场景、配乐接着往下一轮带；还在段落里的先记着，下一轮第一句接着演同一种段落才留着。
+    const last = scenes[scenes.length - 1]
+    if (last) { scene = { ...last.real.scene, transition: 'dissolve' }; bgm = last.real.bgm; amb = last.real.amb; layer = last.layer }
+    else layer = null
   })
   return { beats, byKey: new Map(beats.map((b, i) => [b.key, i])) }
 }

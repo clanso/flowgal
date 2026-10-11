@@ -1,7 +1,7 @@
 // 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含声音、「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
 import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, hostName } from '../api.js'
-import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, cgSrc } from './playback.js'
+import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions } from '../../../lib/emotions.js'
 import { AaWorkbench, RectEditor } from './AaWorkbench.jsx'
@@ -95,6 +95,9 @@ export function Backlog({ beats, index, onJump, onClose, gameId }) {
                   {b.status === 'failed' && <span className="fg-pill fg-err" title={b.error}>整理失败</span>}
                   <button type="button" className="fg-btn" disabled={busy === 'r' + b.turn} onClick={e => { e.stopPropagation(); run('r' + b.turn, () => api.replan(gameId, b.turn), '已重新整理这一轮') }}>重新整理</button>
                 </div>
+              )}
+              {!head && (b.sceneEnter || b.cut) && (
+                <div className="fg-log-scene">{[b.cut && b.cut.text, MODE_LABEL[b.mode], b.sceneEnter && b.scene.location].filter(Boolean).join(' · ') || MODE_LABEL.real}</div>
               )}
               <div className={`fg-log-item${i === index ? ' is-current' : ''}`} onClick={() => onJump(i)} style={i === index ? { background: 'rgba(255,255,255,.06)' } : null}>
                 <div className="fg-log-name">{b.type === 'narration' ? '' : b.alias || b.speaker}</div>

@@ -5,6 +5,8 @@
 // 台词演法与重音：威压（不许走神）、迟疑（抱歉……）、激动（苏晴喊人）、重音（很可疑）、低语（信封那两句），
 // 第 3 轮苏晴的怒吼、说说停停和崩溃（旧校舍的事）。
 // 第 3 轮的原文像很多角色卡那样夹着状态栏、变量更新和章节尾巴（raw），导演把它们标成不演。
+// 场景逐句变：第 3 轮闪电那句路灯闪烁、苏晴跑走后暗下来；第 4 轮先出「翌日 放学后」字卡，中途进入三年前的回忆，
+// 回到现实时灯一盏盏熄灭（换成诡异、停掉音乐），林岚在黑暗里出现时打上一束光。
 export const CARD = { id: 'preview-card', name: '放学后的约定' }
 
 export const TURNS = [
@@ -62,6 +64,10 @@ export const LATE_TURN = {
   turn: 4,
   user: '（第二天放学，独自走向旧校舍）',
   text: `第二天放学，我一个人走向旧校舍。走廊尽头的音乐教室里，隐约传来熟悉的琴声。
+三年前的那个黄昏，我也听过这首曲子。
+“学姐，这是什么曲子？”
+“……一首还没写完的曲子。”
+琴声戛然而止，走廊的灯一盏接一盏地熄灭了。
 “你来了。”`,
 }
 
@@ -128,8 +134,8 @@ export function directorReply(turn, units) {
       L('那、那间教室里', { sp: '苏晴', emo: 'scared', sym: 'sweat' }),
       L('她的声音一下子乱了', { sp: '苏晴', emo: 'scared' }),
       L('有人从窗口', { sp: '苏晴', emo: 'cry', say: 'breakdown', stress: '掉下去了' }),
-      L('一道闪电', { cam: 'flash' }),
-      L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: ['苏晴'] }),
+      L('一道闪电', { cam: 'flash', scene: { light: 'flicker' } }),
+      L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: ['苏晴'], scene: { light: 'dim', mood: 'sad' } }),
       L('到底想告诉我什么', { sp: '我', sym: 'gloom' }),
     ],
     skip: [find(units, '状态栏'), find(units, '19:40'), find(units, '林岚 52'), find(units, '第三章 · 完')],
@@ -141,7 +147,14 @@ export function directorReply(turn, units) {
   return {
     scene: { location: '旧校舍走廊', time: 'dusk', weather: 'dust', mood: 'eerie', transition: 'iris', bg: 'abandoned school corridor, dusk, dust, scenery, no humans' },
     cast: [{ name: '林岚', pos: 'center' }],
-    lines: [L('你来了', { sp: '林岚', emo: 'serious', cam: 'zoom', enter: [{ name: '林岚' }] })],
+    lines: [
+      L('第二天放学', { cut: { kind: 'time', text: '翌日 放学后' } }),
+      L('三年前的那个黄昏', { mode: 'memory', scene: { location: '音乐教室（三年前）', time: 'dusk', weather: 'sakura', mood: 'touching', bg: 'school music room, grand piano, sunset through window, cherry blossoms outside, scenery, no humans' }, enter: [{ name: '林岚', pos: 'center' }] }),
+      L('学姐，这是什么曲子', { sp: '我' }),
+      L('一首还没写完的曲子', { sp: '林岚', emo: 'smile' }),
+      L('琴声戛然而止', { mode: 'real', scene: { light: 'dark', mood: 'eerie', transition: 'black' } }),
+      L('你来了', { sp: '林岚', emo: 'serious', cam: 'zoom', enter: [{ name: '林岚' }], scene: { light: 'spot', fx: 'drift' } }),
+    ],
     choices: ['走进音乐教室', '先在门口叫她的名字'],
     images: [],
     people: [{ name: '林岚', outfit: '冬季制服', outfitTags: 'winter school uniform, brown duffel coat, red checkered scarf, black pantyhose' }],

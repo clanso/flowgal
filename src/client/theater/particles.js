@@ -1,7 +1,7 @@
 // 天气粒子：一张 canvas，按导演给的 weather 切换。帧率随可见性暂停，减少动画偏好下不跑。
 import React from 'react'
 
-const COUNTS = { rain: 220, storm: 380, snow: 140, sakura: 70, leaves: 40, fireflies: 46, embers: 90, dust: 60, bokeh: 26, stars: 160, fog: 6 }
+const COUNTS = { rain: 220, storm: 380, snow: 140, blizzard: 420, wind: 70, sakura: 70, leaves: 40, fireflies: 46, embers: 90, dust: 60, bokeh: 26, stars: 160, fog: 6, sparkles: 60, bubbles: 50 }
 const rand = (a, b) => a + Math.random() * (b - a)
 
 function spawn(kind, w, h, initial) {
@@ -11,6 +11,16 @@ function spawn(kind, w, h, initial) {
       return { ...p, vx: kind === 'storm' ? -7 : -2.4, vy: rand(16, 26) * (kind === 'storm' ? 1.25 : 1), len: rand(12, 26), a: rand(0.18, 0.45) }
     case 'snow':
       return { ...p, vx: rand(-0.4, 0.4), vy: rand(0.5, 1.6), r: rand(1, 3.6), a: rand(0.5, 0.95), ph: rand(0, 6.28) }
+    case 'blizzard':
+      return { ...p, x: initial ? rand(0, w) : rand(-w * 0.1, w * 1.2), vx: -rand(5, 11), vy: rand(2.2, 4.5), r: rand(0.8, 2.8), a: rand(0.45, 0.95), ph: rand(0, 6.28) }
+    case 'wind': {
+      const len = rand(60, 180)
+      return { ...p, x: initial ? rand(0, w) : -len - rand(0, w * 0.5), y: rand(0, h), vx: rand(16, 30), vy: rand(0.6, 2), len, a: rand(0.05, 0.16) }
+    }
+    case 'sparkles':
+      return { ...p, y: initial ? rand(0, h) : h + 10, vx: rand(-0.2, 0.2), vy: -rand(0.15, 0.6), r: rand(1.5, 4.2), ph: rand(0, 6.28), sp: rand(0.03, 0.08), hue: Math.random() < 0.6 ? rand(40, 55) : rand(180, 220) }
+    case 'bubbles':
+      return { ...p, y: initial ? rand(0, h) : h + 12, vx: rand(-0.2, 0.2), vy: -rand(0.5, 1.8), r: rand(1.6, 8), ph: rand(0, 6.28) }
     case 'sakura': case 'leaves':
       return { ...p, x: rand(-w * 0.2, w), vx: rand(0.6, 1.8), vy: rand(0.7, 1.7), r: rand(5, 10) * (kind === 'leaves' ? 1.3 : 1), rot: rand(0, 6.28), vr: rand(-0.05, 0.05), ph: rand(0, 6.28), hue: kind === 'leaves' ? rand(18, 44) : rand(330, 352) }
     case 'fireflies':
@@ -42,6 +52,42 @@ function step(kind, p, w, h, t, ctx) {
       ctx.fillStyle = `rgba(255, 255, 255, ${p.a})`
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill()
       return p.y < h + 10
+    }
+    case 'blizzard': {
+      p.ph += 0.05; p.x += p.vx + Math.sin(p.ph) * 0.8; p.y += p.vy
+      ctx.fillStyle = `rgba(245, 248, 255, ${p.a})`
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill()
+      return p.y < h + 10 && p.x > -20
+    }
+    case 'wind': {
+      p.x += p.vx; p.y += p.vy
+      const g = ctx.createLinearGradient(p.x - p.len, p.y - p.len * 0.07, p.x, p.y)
+      g.addColorStop(0, 'rgba(235, 240, 255, 0)'); g.addColorStop(1, `rgba(235, 240, 255, ${p.a})`)
+      ctx.strokeStyle = g; ctx.lineWidth = 1.2
+      ctx.beginPath(); ctx.moveTo(p.x - p.len, p.y - p.len * 0.07); ctx.lineTo(p.x, p.y); ctx.stroke()
+      return p.x - p.len < w + 10
+    }
+    case 'sparkles': {
+      p.ph += p.sp; p.x += p.vx + Math.sin(p.ph * 0.6) * 0.2; p.y += p.vy
+      const a = Math.max(0, Math.sin(p.ph)) * 0.9
+      if (a > 0.02) {
+        const r = p.r * (0.6 + a * 0.6)
+        ctx.fillStyle = `hsla(${p.hue}, 100%, 85%, ${a})`
+        ctx.beginPath(); ctx.moveTo(p.x, p.y - r * 2); ctx.lineTo(p.x + r * 0.35, p.y - r * 0.35); ctx.lineTo(p.x + r * 2, p.y); ctx.lineTo(p.x + r * 0.35, p.y + r * 0.35)
+        ctx.lineTo(p.x, p.y + r * 2); ctx.lineTo(p.x - r * 0.35, p.y + r * 0.35); ctx.lineTo(p.x - r * 2, p.y); ctx.lineTo(p.x - r * 0.35, p.y - r * 0.35); ctx.closePath(); ctx.fill()
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3)
+        g.addColorStop(0, `hsla(${p.hue}, 100%, 80%, ${a * 0.35})`); g.addColorStop(1, `hsla(${p.hue}, 100%, 80%, 0)`)
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 3, 0, 6.283); ctx.fill()
+      }
+      return p.y > -20
+    }
+    case 'bubbles': {
+      p.ph += 0.04; p.x += p.vx + Math.sin(p.ph) * 0.5; p.y += p.vy
+      ctx.strokeStyle = 'rgba(220, 250, 255, .45)'; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.stroke()
+      ctx.fillStyle = 'rgba(255, 255, 255, .55)'
+      ctx.beginPath(); ctx.arc(p.x - p.r * 0.35, p.y - p.r * 0.35, p.r * 0.25, 0, 6.283); ctx.fill()
+      return p.y > -p.r - 4
     }
     case 'sakura': case 'leaves': {
       p.ph += 0.03; p.rot += p.vr; p.x += p.vx + Math.sin(p.ph) * 0.8; p.y += p.vy
