@@ -536,8 +536,8 @@ function playedUnits(units, script) {
   return skip.size ? (units || []).filter((u) => !skip.has(u.id)) : units || [];
 }
 var ALL = /* @__PURE__ */ new Set(["*", "全部", "所有人", "all"]);
-function stageWalk(script, units, carry = []) {
-  if (!script) return { steps: units.map(() => ({ cast: carry, entered: [], left: [] })), end: carry };
+function stageWalk(script, units, carry = [], inside = null) {
+  if (!script) return { steps: units.map(() => ({ cast: carry, entered: [], left: [] })), end: carry, inside: null };
   const lines = script.lines || {};
   const home = new Map((script.cast || []).map((c) => [c.name, c.pos]));
   const first = /* @__PURE__ */ new Map();
@@ -557,9 +557,16 @@ function stageWalk(script, units, carry = []) {
     if (!layerSeen) for (const name2 of speakersOf(line.sp)) early.add(name2);
   }
   const carried = new Set(carry.map((c) => c.name));
-  const onAtStart = (name2) => first.has(name2) ? first.get(name2) === "exit" : !inLayer.has(name2) || inLayer.get(name2) === "exit" || carried.has(name2) || early.has(name2);
+  const opening = units.length ? lines[units[0].id]?.mode : "";
+  const goingOn = inside && opening && opening !== "real" ? inside : null;
+  const onlyInside = new Set((goingOn || []).map((c) => c.name).filter((name2) => !carried.has(name2)));
+  const onAtStart = (name2) => first.has(name2) ? first.get(name2) === "exit" : !onlyInside.has(name2) && (!inLayer.has(name2) || inLayer.get(name2) === "exit" || carried.has(name2) || early.has(name2));
   let cast = (script.cast || []).filter((c) => onAtStart(c.name));
   let saved = null;
+  if (goingOn) {
+    saved = cast;
+    cast = goingOn;
+  }
   const steps = units.map((u) => {
     const line = lines[u.id] || {};
     const before = cast;
@@ -581,7 +588,7 @@ function stageWalk(script, units, carry = []) {
     const entered = cast.filter((c) => !before.some((x) => x.name === c.name)).map((c) => c.name);
     return { cast, entered, left };
   });
-  return { steps, end: saved || cast };
+  return { steps, end: saved || cast, inside: saved ? cast : null };
 }
 
 // lib/scenes.js
@@ -1082,6 +1089,7 @@ function buildBeats(view) {
   let scene = EMPTY_SCENE;
   let layer = null;
   let cast = [];
+  let inside = null;
   const emotions = {};
   const turns = view.turns || [];
   const images = view.images || [];
@@ -1095,11 +1103,12 @@ function buildBeats(view) {
     if (script) scene = { ...EMPTY_SCENE, ...script.scene };
     const all = t.units || [];
     const units = playedUnits(all, script);
-    const walk = stageWalk(script, units, cast);
-    const steps = walk.steps;
-    cast = walk.end;
     const lines = units.map((u) => script && script.lines && script.lines[u.id] || {});
     const keep = script && layer && lines.length && lines[0].mode === layer.mode ? layer : null;
+    const walk = stageWalk(script, units, cast, keep ? inside : null);
+    const steps = walk.steps;
+    cast = walk.end;
+    inside = walk.inside;
     const scenes = walkScenes({ scene, bgm, amb, layer: keep }, lines);
     const unitIndex = new Map(units.map((u, i) => [u.id, i]));
     const indexOf = (id) => {

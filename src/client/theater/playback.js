@@ -42,6 +42,7 @@ export function buildBeats(view) {
   let scene = EMPTY_SCENE // 现实里的场景：这一轮开场时的样子；导演还没整理的轮次沿用上一轮结束时的
   let layer = null // 上一轮结束时还在的特殊段落：这一轮第一句接着演同一种段落才留着
   let cast = [] // 上一轮结束时在场的人：导演还没整理的轮次沿用
+  let inside = null // 上一轮结束时还在段落里的话，段落里在场的人：这一轮接着演同一种段落时接着是他们
   const emotions = {}
   const turns = view.turns || []
   const images = view.images || []
@@ -55,11 +56,12 @@ export function buildBeats(view) {
     if (script) scene = { ...EMPTY_SCENE, ...script.scene }
     const all = t.units || []
     const units = playedUnits(all, script)
-    const walk = stageWalk(script, units, cast)
-    const steps = walk.steps
-    cast = walk.end
     const lines = units.map(u => (script && script.lines && script.lines[u.id]) || {})
     const keep = script && layer && lines.length && lines[0].mode === layer.mode ? layer : null
+    const walk = stageWalk(script, units, cast, keep ? inside : null)
+    const steps = walk.steps
+    cast = walk.end
+    inside = walk.inside
     const scenes = walkScenes({ scene, bgm, amb, layer: keep }, lines)
     const unitIndex = new Map(units.map((u, i) => [u.id, i]))
     // 挂在不演的单元上的插画（导演整理前就有的、手动配的）：算到它前面最近一个要演的单元。
