@@ -12,7 +12,7 @@ import { stinger } from './audio.js'
 const TRANSITION = {
   dissolve: ['fg-dissolve', '1.1s'], fade: ['fg-fade-slow', '2.6s'], cinematic: ['fg-cinematic', '1.5s'], wipe: ['fg-wipe', '1s'], iris: ['fg-iris', '1.2s'],
   strips: ['fg-wipe', '.8s'], black: ['fg-black-in', '1.8s'], flash: ['fg-flash-in', '1s'], blink: ['fg-blink-in', '1.5s'], glitch: ['fg-glitch-in', '.7s'],
-  swirl: ['fg-swirl-in', '1.9s'], none: ['none', '0s'],
+  swirl: ['fg-swirl-in', '1.9s'], haze: ['fg-haze-in', '2.6s'], none: ['none', '0s'],
 }
 
 export function backgroundFor(scene, view) {
@@ -77,7 +77,7 @@ export function Backdrop({ scene, view, transition = 'dissolve' }) {
   React.useEffect(() => {
     setLayers(list => {
       if (list[list.length - 1].id === id) return list.map((l, i) => (i === list.length - 1 ? { ...l, scene } : l))
-      return [...list.slice(-1).map(l => ({ ...l, leaving: true })), { id, bg, scene, enter: true, tr: transition }]
+      return [...list.slice(-1).map(l => ({ ...l, leaving: true, out: transition })), { id, bg, scene, enter: true, tr: transition }]
     })
   }, [id, scene.time])
   React.useEffect(() => {
@@ -91,7 +91,7 @@ export function Backdrop({ scene, view, transition = 'dissolve' }) {
         const [anim, dur] = TRANSITION[layer.tr] || TRANSITION.dissolve
         const cls = ['fg-bg', layer.bg.src ? 'is-image' : '', layer.enter && layer.tr !== 'none' ? 'is-enter' : '', layer.leaving ? 'is-leave' : ''].join(' ')
         return (
-          <div key={layer.id} className={cls} data-tr={layer.tr} style={{ '--enter-anim': anim, '--enter-dur': dur, backgroundImage: layer.bg.src ? `url("${layer.bg.src}")` : undefined }}>
+          <div key={layer.id} className={cls} data-tr={layer.tr} data-out={layer.leaving ? layer.out : undefined} style={{ '--enter-anim': anim, '--enter-dur': dur, backgroundImage: layer.bg.src ? `url("${layer.bg.src}")` : undefined }}>
             {!layer.bg.src && <Sky scene={layer.scene} />}
           </div>
         )
@@ -332,11 +332,13 @@ export function SplitPanel({ beat, view, talk }) {
   )
 }
 
-const RECALL_LEAVE_MS = 500
+// 短闪回慢慢沉进去、慢慢浮出来：现在的画面先暗下去、失焦，闪回里的人再浮出来（样式在 theater.css 的 .fg-recall）
+const RECALL_IN_MS = 1200
+const RECALL_LEAVE_MS = 1000
 
 /**
  * 短闪回：现在的画面（背景、在场的人、插画、分屏）压暗、褪色、模糊，这一段开口的人以当时的样子半透明浮在前面，说话的亮一点。
- * 进出时白闪一下（Flash 按 recallEdge），离开时淡出。没有档案的人（路人、「我」）不浮出来。
+ * 进出时起一层薄雾（Flash 按 recallEdge），离开时淡出。没有档案的人（路人、「我」）不浮出来。
  */
 export function RecallLayer({ beat, view, talk }) {
   const recall = beat.recall || null
@@ -355,7 +357,7 @@ export function RecallLayer({ beat, view, talk }) {
   const ghosts = stageLayout(shown.recall.who.filter(name => people.has(name)).map(name => ({ name, pos: 'center' })))
   const ghostBeat = { ...shown.beat, then: shown.recall.then, ...(leaving ? { speaker: '', speakers: null, sym: '' } : {}) }
   return (
-    <div className={`fg-recall${leaving ? ' is-leave' : ''}`} style={{ '--fade': RECALL_LEAVE_MS + 'ms' }} aria-hidden="true">
+    <div className={`fg-recall${leaving ? ' is-leave' : ''}`} style={{ '--fade': (leaving ? RECALL_LEAVE_MS : RECALL_IN_MS) + 'ms' }} aria-hidden="true">
       <div className="fg-recall-veil" />
       {ghosts.map(entry => (
         <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={ghostBeat} emo={shown.beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={leaving ? null : talk} />
@@ -515,6 +517,13 @@ export function TitleCard({ beat, delay = 0 }) {
 /** 过场字卡停留多久（毫秒）：这段时间里这句先不出字，点一下跳过。 */
 export const CUT_MS = 2300
 
+/**
+ * 画面在变的时候这句先不出字（毫秒），留一点酝酿情绪的时间，点一下跳过：
+ * 起雾转场（进出回忆）等雾散开一些；短闪回沉进去、浮出来时等画面暗下去 / 亮回来。
+ */
+export const HAZE_MS = 1800
+export const RECALL_HOLD_MS = { in: 1100, out: 800 }
+
 /** 过场字卡：时间跳跃、日期、章节、与此同时。全屏压暗，字卡收起后再出这句的字。 */
 export function CutCard({ beat, out }) {
   const cut = beat.cut
@@ -595,13 +604,13 @@ export function useCamera(beat) {
   return cam
 }
 
-const TRANSITION_OVERLAY = { flash: '', black: 'is-black', blink: 'is-blink', glitch: 'is-glitch' }
+const TRANSITION_OVERLAY = { flash: '', black: 'is-black', blink: 'is-blink', glitch: 'is-glitch', haze: 'is-haze' }
 
 export function Flash({ beat }) {
   if (!beat) return null
   const kind = beat.cam === 'flash' ? '' : beat.cam === 'redflash' ? 'is-red' : beat.cam === 'fadeblack' ? 'is-black' : null
   const tr = TRANSITION_OVERLAY[beat.transition] ?? null
-  const cls = kind ?? tr ?? (beat.recallEdge ? 'is-soft' : null)
+  const cls = kind ?? tr ?? (beat.recallEdge ? 'is-mist' : null)
   if (cls === null) return null
   return <div key={beat.key} className={`fg-flash ${cls}`} />
 }

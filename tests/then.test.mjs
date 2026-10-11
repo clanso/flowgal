@@ -205,7 +205,7 @@ test('gate: 引擎：进回忆写了当时的样子 → 当时的衣服进衣橱
   }
 })
 
-test('gate: 短闪回：导演给闪回的几句写 recall（不换场景）；连着的算一段，段里开口的人和当时的样子；进出时白闪一下；闪回里开口的人不算在场', async () => {
+test('gate: 短闪回：导演给闪回的几句写 recall（不换场景）；连着的算一段，段里开口的人和当时的样子；进出时起一层薄雾；台词用回忆里的声音；闪回里开口的人不算在场', async () => {
   const { recallRuns } = await import('../lib/scenes.js')
   const { stageWalk } = await import('../lib/staging.js')
   const units = segmentTurn(['发带被她小心地取下来。', '是柯萝伊亲手绣的。', '“那个，阿黛尔。生日快乐。”', '“哎呀……是铃兰呢。”', '“是那家伙的吗？”'].join('\n'))
@@ -228,7 +228,7 @@ test('gate: 短闪回：导演给闪回的几句写 recall（不换场景）；�
   assert.deepEqual(runs.map(r => (r ? r.who.join('+') : '-')), ['-', '-', '柯萝伊+阿黛尔', '柯萝伊+阿黛尔', '-'])
   assert.equal(runs[2], runs[3], '同一段共用')
   assert.equal(runs[2].then.柯萝伊.outfit, '魔导师长袍')
-  // 剧场：闪回那两拍带着这一段；进出各白闪一下；台上还是现在的人（阿黛尔不上台）
+  // 剧场：闪回那两拍带着这一段；进出各起一层薄雾；台上还是现在的人（阿黛尔不上台）
   const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: plain }], images: [] })
   assert.deepEqual(beats.map(b => [b.recall ? b.recall.who.join('+') : '', b.recallEdge || '', b.cast.map(c => c.name).join('+')]), [
     ['', '', '柯萝伊+布琳希尔德'],
@@ -237,6 +237,10 @@ test('gate: 短闪回：导演给闪回的几句写 recall（不换场景）；�
     ['柯萝伊+阿黛尔', '', '柯萝伊+布琳希尔德'],
     ['', 'out', '柯萝伊+布琳希尔德'],
   ])
+  // 闪回里的台词用回忆里的声音（导演照老规矩写的回声也换掉）；闪回外照旧
+  assert.deepEqual(beats.map(b => b.voice || ''), ['', '', 'memory', 'memory', ''])
+  const phoned = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: { ...plain, lines: { ...plain.lines, U4: { ...plain.lines.U4, voice: 'phone' } } } }], images: [] }).beats
+  assert.equal(phoned[3].voice, 'phone', '闪回里隔着电话的还是电话')
   // 导演把只在闪回里开口的人也列进了 cast：她不上台，只在闪回里浮出来
   const listed = { ...plain, cast: [...plain.cast, { name: '阿黛尔', pos: 'center' }] }
   const before = [{ name: '柯萝伊', pos: 'left' }, { name: '布琳希尔德', pos: 'right' }]
