@@ -83,6 +83,9 @@
 .fg-grade[data-time="night"] { background: linear-gradient(180deg, rgba(10, 20, 80, .78), rgba(20, 10, 60, .7)); mix-blend-mode: multiply; }
 .fg-grade[data-time="midnight"] { background: linear-gradient(180deg, rgba(4, 6, 40, .86), rgba(10, 4, 30, .8)); mix-blend-mode: multiply; }
 .fg-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, .55)); }
+/* 回忆：整个画面泛黄褪色、四角发白发虚（导演标 flash: in 到 out 之间） */
+.fg-memory { position: absolute; inset: 0; z-index: 9; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; backdrop-filter: sepia(.8) saturate(.7) contrast(.9) brightness(1.08); -webkit-backdrop-filter: sepia(.8) saturate(.7) contrast(.9) brightness(1.08); background: radial-gradient(115% 85% at 50% 45%, transparent 48%, rgba(255, 240, 214, .55)), linear-gradient(rgba(255, 210, 150, .1), rgba(255, 210, 150, .1)); }
+.fg-memory.is-on { opacity: 1; }
 .fg-letterbox::before, .fg-letterbox::after { content: ""; position: absolute; left: 0; right: 0; height: 9%; background: #000; z-index: 30; animation: fg-bars .8s cubic-bezier(.6, 0, .2, 1) both; }
 .fg-letterbox::before { top: 0; transform-origin: top; } .fg-letterbox::after { bottom: 0; transform-origin: bottom; }
 @keyframes fg-bars { from { transform: scaleY(0); } }

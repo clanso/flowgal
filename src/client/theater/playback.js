@@ -62,8 +62,15 @@ export function buildBeats(view) {
       })
       .sort((a, b) => a.at - b.at)
     let lastSpeaker = ''
+    // 回忆：flash: in 那一句起换成回忆里的场景（画面加回忆滤镜），flash: out 那一句起回到现在，配乐、环境音换回进回忆前的。
+    // 一轮结束时还在回忆里也回到现在（下一轮还在回忆就再标一次 in）。
+    let memory = null // { scene, bgm, amb }：回忆里的场景，和进回忆前在放的
+    let enterAt = -1
+    const leaveMemory = () => { if (memory) { bgm = memory.bgm; amb = memory.amb; memory = null } }
     units.forEach((unit, ui) => {
       const line = (script && script.lines && script.lines[unit.id]) || {}
+      if (line.flash === 'in' && !memory) { memory = { scene: { ...scene, ...(line.memory || {}) }, bgm, amb }; enterAt = ui }
+      else if (line.flash === 'out' && memory) { leaveMemory(); enterAt = ui }
       if (line.bgm) bgm = line.bgm
       if (line.amb) amb = line.amb
       let speaker = ''
@@ -92,12 +99,13 @@ export function buildBeats(view) {
         say: line.say || '',
         stress: line.stress || '',
         card: line.card || '',
-        scene,
+        scene: memory ? memory.scene : scene,
+        ...(memory ? { flashback: true } : {}),
         bgm,
         amb,
         sfx: line.sfx || '',
-        sceneEnter: ui === 0 && changed,
-        transition: ui === 0 && changed ? scene.transition || 'dissolve' : 'none',
+        sceneEnter: (ui === 0 && changed) || ui === enterAt,
+        transition: ui === enterAt ? 'flash' : ui === 0 && changed ? scene.transition || 'dissolve' : 'none',
         cast: steps[ui].cast,
         entered: steps[ui].entered,
         left: steps[ui].left,
@@ -112,6 +120,7 @@ export function buildBeats(view) {
         choices: ti === turns.length - 1 && ui === units.length - 1 && script ? script.choices || [] : [],
       })
     })
+    leaveMemory()
   })
   return { beats, byKey: new Map(beats.map((b, i) => [b.key, i])) }
 }
