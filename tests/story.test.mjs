@@ -389,6 +389,29 @@ test('gate: 只在回忆里出场的人不会在开头站上台：回忆之前�
   assert.equal(who(stageWalk(script, units, [{ name: '阿黛尔', pos: 'left' }]).steps)[0], '柯萝伊+阿黛尔')
 })
 
+test('gate: 回到现实那一句写「全部离开」再让现实里的人 enter：这些人开场就在，不会从回忆前消失', () => {
+  // 照玩家存档里的一轮：主角开场就在，布琳希尔德后来登场，回忆里有阿黛尔，回到现实那一句清场再让大家 enter
+  const units = ['narration', 'dialogue', 'dialogue', 'dialogue', 'dialogue', 'narration', 'dialogue'].map((type, i) => ({ id: 'U' + (i + 1), type }))
+  const script = {
+    cast: [{ name: '柯萝伊', pos: 'center' }, { name: '布琳希尔德', pos: 'left' }, { name: '伊薇特', pos: 'right' }, { name: '阿黛尔', pos: 'center' }],
+    lines: {
+      U2: { sp: '阿黛尔', voice: 'echo' },
+      U3: { sp: '柯萝伊' },
+      U4: { sp: '布琳希尔德', enter: [{ name: '布琳希尔德', pos: 'left' }] },
+      U5: { sp: '布琳希尔德', mode: 'memory', exit: ['*'], enter: [{ name: '阿黛尔' }, { name: '布琳希尔德' }, { name: '柯萝伊', pos: 'right' }] },
+      U6: { mode: 'real', exit: ['*'], enter: [{ name: '柯萝伊', pos: 'center' }, { name: '布琳希尔德', pos: 'left' }, { name: '伊薇特', pos: 'right' }] },
+    },
+  }
+  const who = steps => steps.map(s => s.cast.map(c => c.name).sort().join('+') || '-')
+  assert.deepEqual(who(stageWalk(script, units).steps), [
+    '伊薇特+柯萝伊', '伊薇特+柯萝伊', '伊薇特+柯萝伊', '伊薇特+布琳希尔德+柯萝伊',
+    '布琳希尔德+柯萝伊+阿黛尔', '伊薇特+布琳希尔德+柯萝伊', '伊薇特+布琳希尔德+柯萝伊',
+  ])
+  // 没进过段落时写的 real 照常算现实里的进出
+  const stray = { cast: [{ name: '柯萝伊' }], lines: { U3: { mode: 'real', enter: [{ name: '柯萝伊' }] } } }
+  assert.equal(who(stageWalk(stray, units).steps)[0], '-')
+})
+
 test('gate: 回忆演到下一轮：接着演的那几句台上还是回忆里的人，现在的人等回到现实再上来', () => {
   const first = segmentTurn('“走吧。”\n“嗯。”\n三年前。\n“这是中奖了吧？”')
   const second = segmentTurn('“嗯。”\n“你也来了？”\n她回过神来。\n“发什么呆？”')
