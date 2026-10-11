@@ -7,6 +7,8 @@
 // 第 3 轮的原文像很多角色卡那样夹着状态栏、变量更新和章节尾巴（raw），导演把它们标成不演。
 // 场景逐句变：第 3 轮闪电那句路灯闪烁、苏晴跑走后暗下来；第 4 轮先出「翌日 放学后」字卡，中途进入三年前的回忆，
 // 回到现实时灯一盏盏熄灭（换成诡异、停掉音乐），林岚在黑暗里出现时打上一束光。
+// 特效：第 3 轮苏晴说出「掉下去了」时慢动作，林岚打来电话时分屏、她的声音隔着电话；
+// 插画的出现和消失：第 1 轮从局部拉开，第 2 轮柔光渐显、轻轻起伏、溶回场景，第 4 轮的回忆像照片一样落下，回到现实时碎裂。
 export const CARD = { id: 'preview-card', name: '放学后的约定' }
 
 export const TURNS = [
@@ -48,6 +50,11 @@ export const TURNS = [
 “因为三年前……那、那间教室里……”她的声音一下子乱了，“有人从窗口……掉下去了……”
 一道闪电劈开夜空，路灯跟着闪了两下。
 苏晴咬了咬嘴唇，什么也没说，撑开伞跑进了雨里。
+口袋里的手机震了起来，屏幕上是林岚的名字。
+“信，看到了吗？”
+“学姐，旧校舍到底……”
+“明天你就知道了。”电话那头，琴声隐约响着，“晚安。”
+电话挂断了。
 （林岚学姐，你到底想告诉我什么？）
 <hr>
 <p class="tail">—— 第三章 · 完 —— 本轮 312 字</p>
@@ -94,7 +101,7 @@ export function directorReply(turn, units) {
       L('不许走神', { sp: '林岚', emo: 'pout', sym: 'anger', say: 'menace' }),
     ],
     choices: [],
-    images: [{ after: find(units, '那就罚你'), title: '午后的琴房', moment: '林岚坐在琴凳上回过头，带着捉弄人的笑，要罚我听她弹完这一首', who: ['林岚'] }],
+    images: [{ after: find(units, '那就罚你'), title: '午后的琴房', moment: '林岚坐在琴凳上回过头，带着捉弄人的笑，要罚我听她弹完这一首', who: ['林岚'], in: 'zoom' }],
     people: [
       { name: '林岚', gender: 'female', appearance: '1girl, long black hair, blue eyes, hair ornament, slender', outfit: '校服', outfitTags: 'sailor school uniform, navy serafuku, red neckerchief, black pantyhose' },
     ],
@@ -115,7 +122,7 @@ export function directorReply(turn, units) {
     ],
     choices: [],
     emotions: [{ name: '害羞地强装镇定', desc: '脸颊泛红却板着脸，目光移开，嘴唇抿紧，手指捏着衣角', base: 'shy' }],
-    images: [{ after: find(units, '悄悄把一个小信封'), until: find(units, '她小声说'), title: '萤火与信封', moment: '萤火虫飞舞的竹林小径，林岚别过脸把信封递过来，苏晴还扶着膝盖喘气，惊讶地看着', who: ['林岚', '苏晴'] }],
+    images: [{ after: find(units, '悄悄把一个小信封'), until: find(units, '她小声说'), title: '萤火与信封', moment: '萤火虫飞舞的竹林小径，林岚别过脸把信封递过来，苏晴还扶着膝盖喘气，惊讶地看着', who: ['林岚', '苏晴'], in: 'bloom', motion: 'breathe', out: 'dissolve' }],
     people: [
       { name: '林岚', temp: 'holding small envelope' },
       { name: '苏晴', gender: 'female', appearance: '1girl, short brown hair, side ponytail, amber eyes', outfit: '开衫校服', outfitTags: 'school uniform, beige cardigan, white shirt, red ribbon' },
@@ -133,9 +140,14 @@ export function directorReply(turn, units) {
       L('……为什么', { sp: '我', emo: 'confused' }),
       L('那、那间教室里', { sp: '苏晴', emo: 'scared', sym: 'sweat' }),
       L('她的声音一下子乱了', { sp: '苏晴', emo: 'scared' }),
-      L('有人从窗口', { sp: '苏晴', emo: 'cry', say: 'breakdown', stress: '掉下去了' }),
-      L('一道闪电', { cam: 'flash', scene: { light: 'flicker' } }),
+      L('有人从窗口', { sp: '苏晴', emo: 'cry', say: 'breakdown', stress: '掉下去了', scene: { fx: 'slowmo' } }),
+      L('一道闪电', { cam: 'flash', scene: { light: 'flicker', fx: 'none' } }),
       L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: ['苏晴'], scene: { light: 'dim', mood: 'sad' } }),
+      L('口袋里的手机震了起来', { split: { who: ['林岚'], location: '琴房', bg: 'music room, grand piano, night, moonlight through window, scenery, no humans' } }),
+      L('信，看到了吗', { sp: '林岚', emo: 'smile', voice: 'phone' }),
+      L('学姐，旧校舍到底', { sp: '我', emo: 'worried', say: 'hesitant' }),
+      L('明天你就知道了', { sp: '林岚', emo: 'serious', voice: 'phone', say: 'whisper' }),
+      L('电话挂断了', { split: 'off' }),
       L('到底想告诉我什么', { sp: '我', sym: 'gloom' }),
     ],
     skip: [find(units, '状态栏'), find(units, '19:40'), find(units, '林岚 52'), find(units, '第三章 · 完')],
@@ -152,11 +164,11 @@ export function directorReply(turn, units) {
       L('三年前的那个黄昏', { mode: 'memory', scene: { location: '音乐教室（三年前）', time: 'dusk', weather: 'sakura', mood: 'touching', bg: 'school music room, grand piano, sunset through window, cherry blossoms outside, scenery, no humans' }, enter: [{ name: '林岚', pos: 'center' }] }),
       L('学姐，这是什么曲子', { sp: '我' }),
       L('一首还没写完的曲子', { sp: '林岚', emo: 'smile' }),
-      L('琴声戛然而止', { mode: 'real', scene: { light: 'dark', mood: 'eerie', transition: 'black' } }),
+      L('琴声戛然而止', { mode: 'real', scene: { light: 'dark', mood: 'eerie', transition: 'none' } }),
       L('你来了', { sp: '林岚', emo: 'serious', cam: 'zoom', enter: [{ name: '林岚' }], scene: { light: 'spot', fx: 'drift' } }),
     ],
     choices: ['走进音乐教室', '先在门口叫她的名字'],
-    images: [],
+    images: [{ after: find(units, '学姐，这是什么曲子'), until: find(units, '一首还没写完的曲子'), title: '三年前的黄昏', moment: '三年前的音乐教室，夕阳和樱花，林岚坐在钢琴前回头微笑', who: ['林岚'], in: 'photo', motion: 'still', out: 'shatter' }],
     people: [{ name: '林岚', outfit: '冬季制服', outfitTags: 'winter school uniform, brown duffel coat, red checkered scarf, black pantyhose' }],
     summary: '旧校舍里传来琴声。',
   }
@@ -176,6 +188,12 @@ export const CG_DRAFTS = {
       tag: 'girl, sitting on piano bench, sailor school uniform, navy serafuku, red neckerchief, black pantyhose, teasing smile, light blush, head tilt, looking back, hands on piano keys',
       nl: 'She turns back from the keys with a teasing smile, as if she had been waiting the whole time.',
     }],
+  },
+  '三年前的黄昏': {
+    size: 'landscape',
+    tag: 'indoors, school music room, grand piano, sunset, orange sky, cherry blossoms outside window, petals, medium shot, warm colors, nostalgic, detailed background',
+    nl: 'A school music room at sunset three years ago, petals drifting past the window.',
+    characters: [{ name: '林岚', tag: 'girl, sailor school uniform, sitting at piano, looking back, gentle smile', nl: 'She looks back from the piano with a gentle smile.' }],
   },
   '萤火与信封': {
     size: 'landscape',

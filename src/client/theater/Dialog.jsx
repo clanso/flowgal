@@ -1,7 +1,7 @@
 // 对话框（逐字显现 + 打字音）、情境卡片（短信 / 信件 / 便签……）、选项。
 import React from 'react'
 import { blip, sfx } from './audio.js'
-import { CARD_LABEL } from './playback.js'
+import { CARD_LABEL, VOICE_LABEL } from './playback.js'
 import { SILENT, planLine } from '../../../lib/typing.js'
 
 const CARD_HEAD = { sms: '新消息', letter: '', note: '', news: '号外', terminal: '> SYSTEM', notice: '告示', diary: '', scroll: '' }
@@ -74,13 +74,16 @@ export function DialogBox({ beat, chars, plan, done, waiting, color, quick, prog
   const speed = quick.speed
   const times = plan ? plan.times : null
   const marks = plan ? plan.marks : []
+  // 声音的样子：名牌旁边一个小标（带跳动的音量条），对话框和字也换个样子（样式在 theater.css 的 data-voice）
+  const voiceChip = beat.voice && VOICE_LABEL[beat.voice] ? <div className="fg-voice-chip" data-voice={beat.voice}><i /><i /><i /><span>{VOICE_LABEL[beat.voice]}</span></div> : null
   return (
-    <div className="fg-dialog" style={{ '--speaker': color || undefined }}>
+    <div className="fg-dialog" data-voice={beat.voice || undefined} style={{ '--speaker': color || undefined }}>
       <div className="fg-box" />
-      {showName && (
-        <div className="fg-name" key={beat.speaker + beat.alias}>
-          <div className="fg-name-plate">{speaker}</div>
-          {beat.emo && quick.emoLabel && <div className="fg-name-sub">{quick.emoLabel}</div>}
+      {(showName || voiceChip) && (
+        <div className="fg-name" key={beat.speaker + beat.alias + (beat.voice || '')}>
+          {showName && <div className="fg-name-plate">{speaker}</div>}
+          {voiceChip}
+          {showName && beat.emo && quick.emoLabel && <div className="fg-name-sub">{quick.emoLabel}</div>}
         </div>
       )}
       {hiddenText && <div className="fg-text is-cardhint">〔 {CARD_LABEL[beat.card] || '卡片'} 〕</div>}

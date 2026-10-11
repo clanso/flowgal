@@ -129,7 +129,7 @@ function noise(ac) {
  * 照配方发声（配方格式见 lib/sounds.js）：rate 整体移调（打字音的角色音高），volume 音量倍数，
  * at 什么时候开始（AudioContext 的时间，排一串字的试听用）。
  */
-function playParts(ac, parts, { rate = 1, volume = 1, at = ac.currentTime } = {}) {
+function playParts(ac, parts, { rate = 1, volume = 1, at = ac.currentTime, out = ac.destination } = {}) {
   if (!(volume > 0)) return
   for (const part of parts) {
     const t = at + (part.at || 0)
@@ -157,7 +157,7 @@ function playParts(ac, parts, { rate = 1, volume = 1, at = ac.currentTime } = {}
     freq.setValueAtTime(part.f * rate, t)
     if (part.to && part.to !== part.f) freq.exponentialRampToValueAtTime(part.to * rate, end)
     if (part.lp) { const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = part.lp; head.connect(lp); head = lp }
-    head.connect(g).connect(ac.destination)
+    head.connect(g).connect(out)
     src.start(t)
     src.stop(end + 0.02)
   }
@@ -224,16 +224,111 @@ function playSound(sound, volume) {
   else playParts(ac, sound.parts, { volume })
 }
 
+// ───────────── 声音的样子 ─────────────
+// 隔着电话、广播喇叭、心灵感应、画外音、回声、机械音：打字音先过一条效果链再出声。每种链在一个 AudioContext 里只建一次。
+
+/** 混响用的脉冲响应：衰减的噪声，seconds 越长越空旷。 */
+function impulse(ac, seconds, decay = 2.5) {
+  const len = Math.floor(ac.sampleRate * seconds)
+  const buffer = ac.createBuffer(2, len, ac.sampleRate)
+  for (let ch = 0; ch < 2; ch += 1) {
+    const data = buffer.getChannelData(ch)
+    for (let i = 0; i < len; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** decay
+  }
+  return buffer
+}
+/** 削波失真：amount 越大越破（电话、喇叭的那种毛边）。 */
+function shaper(ac, amount) {
+  const node = ac.createWaveShaper()
+  const curve = new Float32Array(1024)
+  for (let i = 0; i < curve.length; i += 1) { const x = (i / (curve.length - 1)) * 2 - 1; curve[i] = ((1 + amount) * x) / (1 + amount * Math.abs(x)) }
+  node.curve = curve
+  return node
+}
+function filter(ac, type, frequency, q = 0.7, gain = 0) {
+  const node = ac.createBiquadFilter()
+  node.type = type
+  node.frequency.value = frequency
+  node.Q.value = q
+  node.gain.value = gain
+  return node
+}
+function amp(ac, value) { const node = ac.createGain(); node.gain.value = value; return node }
+
+const VOICE_CHAINS = {
+  // 电话：只剩中频，有点破
+  phone: (ac, input, out) => { input.connect(filter(ac, 'highpass', 420)).connect(filter(ac, 'lowpass', 3000)).connect(filter(ac, 'peaking', 1700, 1, 6)).connect(shaper(ac, 6)).connect(amp(ac, 0.75)).connect(out) },
+  // 广播 / 对讲机：更窄更破，每个字带一点电流声（见 blip）
+  radio: (ac, input, out) => { input.connect(filter(ac, 'highpass', 600)).connect(filter(ac, 'lowpass', 2500)).connect(shaper(ac, 24)).connect(amp(ac, 0.6)).connect(out) },
+  // 心灵感应：大混响，干声很轻，像在脑子里回响
+  telepathy: (ac, input, out) => {
+    input.connect(amp(ac, 0.35)).connect(out)
+    const verb = ac.createConvolver(); verb.buffer = impulse(ac, 2.6, 2)
+    input.connect(filter(ac, 'highpass', 300)).connect(verb).connect(amp(ac, 1.1)).connect(out)
+  },
+  // 画外音：门外、隔壁、远处，闷一点、远一点
+  offscreen: (ac, input, out) => {
+    const muffled = input.connect(filter(ac, 'lowpass', 1300))
+    muffled.connect(amp(ac, 0.6)).connect(out)
+    const room = ac.createConvolver(); room.buffer = impulse(ac, 0.9, 3)
+    muffled.connect(room).connect(amp(ac, 0.45)).connect(out)
+  },
+  // 回声：山谷、空旷的大厅，每个字后面跟着越来越远的几声
+  echo: (ac, input, out) => {
+    input.connect(out)
+    const delay = ac.createDelay(1); delay.delayTime.value = 0.23
+    const feedback = amp(ac, 0.48)
+    input.connect(delay).connect(filter(ac, 'lowpass', 2200)).connect(feedback).connect(delay)
+    delay.connect(amp(ac, 0.7)).connect(out)
+  },
+  // 机械音：环形调制 + 削波，像机器人、AI、变声器
+  machine: (ac, input, out) => {
+    const ring = ac.createGain(); ring.gain.value = 0
+    const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 95
+    lfo.connect(ring.gain); lfo.start()
+    input.connect(ring).connect(shaper(ac, 10)).connect(filter(ac, 'highpass', 180)).connect(amp(ac, 0.9)).connect(out)
+    input.connect(amp(ac, 0.25)).connect(out)
+  },
+}
+const chains = new Map() // 样子 → 链的入口
+function chainFor(ac, style) {
+  const build = VOICE_CHAINS[style]
+  if (!build) return ac.destination
+  const known = chains.get(style)
+  if (known && known.context === ac) return known
+  const input = ac.createGain()
+  build(ac, input, ac.destination)
+  chains.set(style, input)
+  return input
+}
+
 /**
- * 打字音：voice 是 lib/sounds.js 的 lineVoice 算出来的 { id 音色, pitch 升降几个半音, gain }；
+ * 打字音：voice 是 lib/sounds.js 的 lineVoice 算出来的 { id 音色, pitch 升降几个半音, gain }，
+ * 再带上这句的声音样子 style（电话、广播、心灵感应、齐声……见 lib/vocab.js 的 VOICES）；齐声时 also 是另外几个人的声音。
  * pitch / gain 是演法给的倍数（威压低沉、激动尖细、低语轻）。每个字音高随机抖一点，不那么机械。
  */
 export function blip(voice, { pitch = 1, gain = 1 } = {}) {
   const v = voice && voiceById(voice.id)
   const ac = v && audioCtx()
   if (!ac) return
-  const rate = 2 ** ((voice.pitch || 0) / 12) * pitch * (0.96 + Math.random() * 0.08)
-  playParts(ac, v.parts, { rate, volume: (sounds.blipVolume ?? 1) * gain * (voice.gain ?? 1) })
+  const style = voice.style || ''
+  const jitter = pitch * (0.96 + Math.random() * 0.08)
+  const volume = (sounds.blipVolume ?? 1) * gain
+  const rateOf = who => 2 ** ((who.pitch || 0) / 12) * jitter
+  if (style === 'chorus') {
+    // 齐声：每个人的声音各响一下，错开几毫秒；只有一个人的声音时叠两个错开音高的分身
+    const others = (voice.also || []).filter(o => voiceById(o.id))
+    const group = others.length ? [voice, ...others] : [voice, { ...voice, pitch: (voice.pitch || 0) - 3 }, { ...voice, pitch: (voice.pitch || 0) + 4 }]
+    const share = 1 / Math.sqrt(group.length)
+    group.forEach((who, i) => playParts(ac, voiceById(who.id).parts, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014 }))
+    return
+  }
+  const out = chainFor(ac, style)
+  const rate = rateOf(voice) * (style === 'telepathy' ? 1.08 : style === 'machine' ? 0.94 : 1)
+  playParts(ac, v.parts, { rate, volume: volume * (voice.gain ?? 1), out })
+  // 心灵感应：高八度的一层虚影；广播：一点电流声
+  if (style === 'telepathy') playParts(ac, v.parts, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out })
+  if (style === 'radio') playParts(ac, [{ wave: 'noise', f: 3200, q: 0.8, gain: 0.05, dur: 0.06 }], { volume, out })
 }
 
 /** 试听一个音色：按打字音音量念一小段（三个字、一个停顿、再四个字）。ui 是当前设置。 */

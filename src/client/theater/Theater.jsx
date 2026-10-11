@@ -2,7 +2,7 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio } from './playback.js'
-import { Backdrop, Cast, CgLayer, TitleCard, CutCard, CUT_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, Cast, CgLayer, SplitPanel, TitleCard, CutCard, CUT_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -15,6 +15,9 @@ import { castVoices, lineVoice } from '../../../lib/sounds.js'
 const POS_KEY = gameId => 'flowgal:pos:' + gameId
 const readPos = gameId => { try { return localStorage.getItem(POS_KEY(gameId)) || '' } catch { return '' } }
 const writePos = (gameId, key) => { try { localStorage.setItem(POS_KEY(gameId), key) } catch {} }
+
+/** 慢动作、时间停止时雨雪这些粒子的流速。 */
+const TIME_FLOW = { slowmo: 0.12, timestop: 0 }
 
 /** 提前下载后面几拍要用的字形分片。 */
 const GLYPH_AHEAD = 12
@@ -145,7 +148,15 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const people = React.useMemo(() => new Map(((view && view.cast) || []).map(p => [p.name, p])), [view])
   // 这句用谁的声音念：旁白按设置，台词和心声按说话人档案里的声音（没指定时按性别自动分，一局里尽量不撞）
   const voices = React.useMemo(() => castVoices((view && view.cast) || [], ui0), [view, ui0])
-  const voice = React.useMemo(() => (beat ? lineVoice(beat.type, beat.speaker, voices, ui0) : null), [beat && beat.type, beat && beat.speaker, voices, ui0])
+  // 声音的样子（电话里、广播、心灵感应……）跟着这句走；齐声时几个人的声音一起响
+  const voice = React.useMemo(() => {
+    if (!beat) return null
+    const names = beat.speakers || [beat.speaker]
+    const main = lineVoice(beat.type, names[0], voices, ui0)
+    if (!main || !beat.voice) return main
+    const also = beat.voice === 'chorus' ? names.slice(1).map(name => lineVoice(beat.type, name, voices, ui0)).filter(Boolean) : []
+    return { ...main, style: beat.voice, ...(also.length ? { also } : {}) }
+  }, [beat && beat.type, beat && beat.speaker, beat && beat.voice, voices, ui0])
   const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : hit })
   // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
   React.useEffect(() => { if (panel && !done) finish() }, [panel, done])
@@ -259,7 +270,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const directing = view && view.turns.some(t => t.status === 'directing')
   const queue = (view && view.queue) || { running: [], waiting: [] }
   const drawing = queue.running.filter(id => id.includes(':' + gameId + ':')).length + queue.waiting.filter(id => id.includes(':' + gameId + ':')).length
-  const speakerPerson = beat && people.get(beat.speaker)
+  const speakerPerson = beat && people.get((beat.speakers || [beat.speaker])[0])
   const color = beat && beat.speaker === '我' ? 'var(--accent2)' : speakerPerson ? speakerPerson.color : ''
   const progressInTurn = beat ? (() => { const all = beats.filter(b => b.turn === beat.turn); return (all.indexOf(beat) + 1) / all.length })() : 0
   const status = beat ? (beat.status === 'directing' ? `第 ${beat.turn} 轮 · 导演整理中，先按原文演` : beat.status === 'failed' ? `第 ${beat.turn} 轮 · 没整理好，按原文演` : '') : ''
@@ -314,8 +325,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
               {stageBeat && <Cast beat={title ? { ...stageBeat, speaker: '', sym: '' } : stageBeat} view={view} talk={title ? null : talk} />}
               <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} />
               <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} />
-              {stageBeat && !title && <CgLayer beat={stageBeat} />}
-              <Particles weather={stageScene.weather} enabled={ui0.particles !== false} />
+              {stageBeat && !title && <CgLayer beat={stageBeat} sound={sfxOn} />}
+              <Particles weather={stageScene.weather} enabled={ui0.particles !== false} speed={atmosphere ? TIME_FLOW[stageScene.fx] ?? 1 : 1} />
+              {stageBeat && !title && <SplitPanel beat={stageBeat} view={view} talk={talk} />}
               <FadeLayer name="fxlayer" value={atmosphere && stageScene.fx !== 'none' ? stageScene.fx : ''} ms={900} />
               <div className="fg-vignette" />
             </div>
@@ -378,7 +390,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
           </div>
         )}
 
-        {panel === 'log' && <Backlog beats={beats} index={index} gameId={gameId} onClose={() => setPanel('')} onJump={i => { go(i); setPanel(''); setTitle(false) }} />}
+        {panel === 'log' && <Backlog beats={beats} index={index} gameId={gameId} onClose={() => setPanel('')} onJump={i => { go(i); setPanel(''); setTitle(false); setChoosing(false) }} />}
         {panel === 'gallery' && <Gallery view={view} gameId={gameId} focusId={panelArg} onClose={() => setPanel('')} />}
         {panel === 'cast' && <CastPanel view={view} gameId={gameId} onClose={() => setPanel('')} />}
         {panel === 'director' && <DirectorLog gameId={gameId} focusTurn={panelArg} onClose={() => setPanel('')} />}

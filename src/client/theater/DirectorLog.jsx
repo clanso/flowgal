@@ -5,7 +5,7 @@ import React from 'react'
 import { api, toast, useDirectorLog, hostName } from '../api.js'
 import { Panel } from './Panels.jsx'
 import { formatLook } from '../../../lib/look.js'
-import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL } from './playback.js'
+import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL, VOICE_LABEL, CG_IN_LABEL, CG_OUT_LABEL, CG_MOTION_LABEL } from './playback.js'
 
 /** 导演写的外貌：新版是字段，老日志里是一整串。 */
 const lookText = v => (typeof v === 'string' ? v : v ? formatLook(v) : '')
@@ -135,6 +135,8 @@ function ScriptView({ script, units }) {
               l.type && <Chip key="type" k="改判">{TYPE_LABEL[l.type] || l.type}</Chip>,
               l.sp && <Chip key="sp" k="说话">{l.sp}{l.as ? `（显示为 ${l.as}）` : ''}</Chip>,
               l.emo && <Chip key="emo" k="情绪">{emotionLabel(l.emo)}</Chip>,
+              l.voice && <Chip key="voice" k="声音">{VOICE_LABEL[l.voice] || l.voice}</Chip>,
+              l.split && <Chip key="split" k="分屏">{l.split === 'off' ? '收起' : l.split.who.join('、') + (l.split.location ? ` @ ${l.split.location}` : '')}</Chip>,
               l.sym && <Chip key="sym" k="符号">{SYMBOL_LABEL[l.sym] || l.sym}</Chip>,
               l.cam && <Chip key="cam" k="镜头">{CAMERA_LABEL[l.cam] || l.cam}</Chip>,
               l.card && <Chip key="card" k="卡片">{CARD_LABEL[l.card] || l.card}</Chip>,
@@ -164,7 +166,7 @@ function ScriptView({ script, units }) {
       <Block label={`插画分镜 · ${script.images.length}`}>
         {script.images.map((img, i) => (
           <div key={i} className="fg-dlog-card">
-            <div className="fg-dlog-chips"><Chip k="标题">{img.title || '—'}</Chip><Chip k="显示">{img.after}{img.until && img.until !== img.after ? ` → ${img.until}` : img.until ? '' : ' → 本轮结束'}</Chip>{img.who && img.who.length ? <Chip k="入画">{img.who.join('、')}</Chip> : null}{img.shape && <Chip k="画幅">{SHAPE_LABEL[img.shape] || img.shape}</Chip>}</div>
+            <div className="fg-dlog-chips"><Chip k="标题">{img.title || '—'}</Chip><Chip k="显示">{img.after}{img.until && img.until !== img.after ? ` → ${img.until}` : img.until ? '' : ' → 本轮结束'}</Chip>{img.who && img.who.length ? <Chip k="入画">{img.who.join('、')}</Chip> : null}{img.shape && <Chip k="画幅">{SHAPE_LABEL[img.shape] || img.shape}</Chip>}{img.enter && <Chip k="出现">{CG_IN_LABEL[img.enter] || img.enter}</Chip>}{img.motion && <Chip k="停留">{CG_MOTION_LABEL[img.motion] || img.motion}</Chip>}{img.leave && <Chip k="消失">{CG_OUT_LABEL[img.leave] || img.leave}</Chip>}</div>
             {img.moment && <div>{img.moment}</div>}
             {img.tags && <div className="fg-dlog-mono">{img.tags}</div>}
             {img.desc && <div className="fg-note">{img.desc}</div>}

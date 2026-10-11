@@ -387,3 +387,43 @@ test('gate: 场景逐句变：换地方、天色变化、天气光线基调、�
   const next = normalizeScript({ scene: {} }, segmentTurn('第二天。'), { previous: s, trackIds: ['T1', 'T2', 'T3'] })
   assert.deepEqual([next.scene.location, next.scene.time, next.scene.bg, next.scene.bgm, next.scene.transition], ['教室', 'night', 'classroom, scenery, no humans', 'T1', 'none'])
 })
+
+test('gate: 声音的样子、分屏、慢动作和时间停止、插画的出现消失方式：导演写了才收，写错的不收；剧场里分屏一直开到 off', () => {
+  const units = segmentTurn(['林岚拨通了电话。', '“喂？”', '“我们一起说！”', '门外传来脚步声。', '“系统启动。”', '“再见。”', '她挂断了电话，世界静止了。'].join('\n'))
+  const raw = {
+    scene: { location: '房间', time: 'night' },
+    cast: [{ name: '林岚', pos: 'center' }],
+    lines: [
+      { u: 'U1', sp: '林岚', split: { who: ['苏晴', '苏晴', ''], location: '咖啡店', bg: 'cafe interior, scenery, no humans' } },
+      { u: 'U2', sp: '苏晴', voice: 'phone', emo: 'happy' },
+      { u: 'U3', sp: '林岚、苏晴', voice: 'chorus', emo: 'laugh' },
+      { u: 'U4', sp: '门外的人', voice: 'offscreen' },
+      { u: 'U5', sp: '机器', voice: 'robot', scene: { fx: 'slowmo' } },
+      { u: 'U6', sp: '苏晴', voice: 'phone', split: 'off', scene: { fx: 'timestop' } },
+    ],
+    images: [
+      { after: 'U3', until: 'U4', title: '两头', moment: '两人隔着电话笑', in: 'bloom', motion: 'breathe', out: 'shatter' },
+      { after: 'U6', title: '静止', moment: '世界静止', in: 'spin', out: 'cut' },
+    ],
+  }
+  const s = normalizeScript(raw, units, { maxImages: 2 })
+  assert.deepEqual(s.lines.U1.split, { who: ['苏晴'], location: '咖啡店', bg: 'cafe interior, scenery, no humans' }, '重复和空的名字去掉')
+  assert.equal(s.lines.U2.voice, 'phone')
+  assert.equal(s.lines.U5.voice, undefined, '不认得的声音样子不收')
+  assert.equal(s.lines.U5.scene.fx, 'slowmo')
+  assert.equal(s.lines.U6.split, 'off')
+  assert.equal(s.lines.U6.scene.fx, 'timestop')
+  assert.deepEqual([s.images[0].enter, s.images[0].motion, s.images[0].leave], ['bloom', 'breathe', 'shatter'])
+  assert.deepEqual([s.images[1].enter, s.images[1].motion, s.images[1].leave], [undefined, undefined, 'cut'], '写错的出现方式不收，用默认')
+  // 分屏另一头的地方也要出背景
+  assert.deepEqual(scriptScenes(s).map(x => `${x.location}|${x.time}|${x.bg}`), ['房间|night|', '咖啡店|night|cafe interior, scenery, no humans'])
+
+  const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: s }], images: [] })
+  assert.deepEqual(beats.map(b => b.split ? b.split.who.join('、') : ''), ['苏晴', '苏晴', '苏晴', '苏晴', '苏晴', '', ''], '分屏一直开到写 off 那句')
+  assert.deepEqual(beats.map(b => b.voice || ''), ['', 'phone', 'chorus', 'offscreen', '', 'phone', ''])
+  assert.deepEqual(beats[2].speakers, ['林岚', '苏晴'], '齐声的几个人一起高亮')
+  assert.equal(beats[2].emotions['林岚'], 'laugh')
+  assert.equal(beats[2].emotions['苏晴'], 'laugh')
+  assert.equal(beats[1].speakers, undefined)
+  assert.deepEqual(beats.map(b => b.scene.fx), ['none', 'none', 'none', 'none', 'slowmo', 'timestop', 'timestop'])
+})

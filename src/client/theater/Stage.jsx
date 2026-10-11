@@ -196,7 +196,7 @@ function spriteFor(person, turn, emo, emotions) {
 const SIDE = { farleft: '-40%', left: '-28%', center: '0%', right: '28%', farright: '40%' }
 
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
-  const speaking = !leaving && beat.speaker === entry.name
+  const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name)
   const sprite = spriteFor(person, beat.turn, emo, emotions)
   const src = sprite ? assetUrl(sprite) : ''
   const color = (person && person.color) || '#9b7bff'
@@ -257,16 +257,70 @@ export function Cast({ beat, view, talk }) {
   let cast = beat.cast || []
   // 导演还没整理、也没有上一幕站位时：说话的已知人物临时站到中间。整理过的轮次台上没人就是没人（便条、画外音）。
   if (!beat.directed && !cast.length && beat.speaker && beat.speaker !== '我' && people.has(beat.speaker)) cast = [{ name: beat.speaker, pos: 'center' }]
+  // 分屏时另一头的人只在分屏里出现，主舞台的人往左挪让出右边
+  const split = beat.split || null
+  if (split) cast = cast.filter(c => !split.who.includes(c.name))
   const leaving = useLeaving(cast)
   // 插画全屏盖住舞台：立绘照常在下面，插画收起时直接露出来。
   return (
-    <div className="fg-cast">
+    <div className="fg-cast" data-split={split ? 'on' : undefined}>
       {cast.map(entry => (
         <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={talk} />
       ))}
       {leaving.map(entry => (
         <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} leaving />
       ))}
+    </div>
+  )
+}
+
+/** 分屏另一头的背景：那个地点这个时段的背景，没有就用同一地点别的时段，再没有就画天空。 */
+function splitBackground(location, time, view) {
+  const places = (view && view.places) || {}
+  if (!location) return ''
+  const exact = places[placeKey({ location, time })]
+  if (exact && exact.assetId) return assetUrl(exact.assetId)
+  const other = Object.entries(places).find(([key, place]) => key.startsWith(location + '|') && place.assetId)
+  return other ? assetUrl(other[1].assetId) : ''
+}
+
+const SPLIT_LEAVE_MS = 600
+const SPLIT_POS = [['center'], ['left', 'right']]
+
+/**
+ * 分屏：电话、视频通话、心灵感应的另一头在画面右边单独一格，斜切着滑进来；有插画时让开。
+ * 另一头的人按这一句的情绪换表情，说话时一样高亮、对口型。导演写 split: off 或这一轮结束时收起。
+ */
+export function SplitPanel({ beat, view, talk }) {
+  const split = beat.split || null
+  const sig = split ? split.who.join('、') + '|' + (split.location || '') : ''
+  const last = React.useRef(null)
+  const [, refresh] = React.useReducer(n => n + 1, 0)
+  const leaving = !split && Boolean(last.current)
+  if (split) last.current = { split, sig }
+  React.useEffect(() => {
+    if (split || !last.current) return undefined
+    const t = setTimeout(() => { last.current = null; refresh() }, SPLIT_LEAVE_MS)
+    return () => clearTimeout(t)
+  }, [sig])
+  const shown = split ? { split, sig } : last.current
+  if (!shown) return null
+  const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
+  const { who, location } = shown.split
+  const src = splitBackground(location, beat.scene.time, view)
+  const slots = SPLIT_POS[who.length - 1] || SPLIT_POS[1]
+  const covered = Boolean(beat.cg && cgSrc(beat.cg, assetUrl))
+  return (
+    <div className={`fg-split${leaving ? ' is-leaving' : ''}${covered ? ' is-under' : ''}`} key={shown.sig} aria-hidden="true">
+      <div className="fg-split-inner">
+        <div className="fg-split-bg" style={src ? { backgroundImage: `url("${src}")` } : null}>{!src && <Sky scene={{ time: beat.scene.time, location: location || who[0] }} />}</div>
+        <div className="fg-split-cast">
+          {who.map((name, i) => (
+            <Actor key={name} entry={{ name, pos: slots[i] || 'center' }} person={people.get(name)} beat={beat} emo={beat.emotions[name] || 'neutral'} emotions={view && view.emotions} talk={talk} />
+          ))}
+        </div>
+        {location && <div className="fg-split-label"><i />{location}</div>}
+      </div>
     </div>
   )
 }
@@ -301,37 +355,108 @@ function usePanRatio(ref, src, version) {
   return state.src === src ? state.ratio : 0
 }
 
-const CG_LEAVE_MS = 800
+/**
+ * 插画收起要演多久（毫秒），按导演选的消失方式：直接切掉不留，碎裂、拉远这类久一点。
+ * 出现方式（data-in）、停留时的动态（data-motion）只是样式，写在 theater.css。
+ */
+const CG_LEAVE_MS = { fade: 800, dissolve: 1300, flash: 700, black: 1300, blur: 1100, slide: 750, shatter: 1300, glitch: 650, pull: 1200, cut: 0 }
+const leaveMs = img => CG_LEAVE_MS[img.leave] ?? CG_LEAVE_MS.fade
 
-export function CgLayer({ beat }) {
+/** 碎裂用的玻璃碎片：5×4 的格子斜切成三角形，顶点错开一点；从中间往外飞，外圈的晚一点。 */
+const SHARDS = (() => {
+  let seed = 7
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+  const cols = 5, rows = 4
+  const grid = []
+  for (let r = 0; r <= rows; r += 1) {
+    grid.push([])
+    for (let c = 0; c <= cols; c += 1) {
+      const edgeX = c === 0 || c === cols, edgeY = r === 0 || r === rows
+      grid[r].push([(c + (edgeX ? 0 : (rnd() - 0.5) * 0.6)) / cols * 100, (r + (edgeY ? 0 : (rnd() - 0.5) * 0.6)) / rows * 100])
+    }
+  }
+  const list = []
+  for (let r = 0; r < rows; r += 1) for (let c = 0; c < cols; c += 1) {
+    const [a, b, d, e] = [grid[r][c], grid[r][c + 1], grid[r + 1][c + 1], grid[r + 1][c]]
+    const tris = (r + c) % 2 ? [[a, b, d], [a, d, e]] : [[a, b, e], [b, d, e]]
+    for (const tri of tris) {
+      const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3, cy = (tri[0][1] + tri[1][1] + tri[2][1]) / 3
+      const dx = cx - 50, dy = cy - 50, dist = Math.hypot(dx, dy) || 1
+      const fly = 0.35 + rnd() * 0.5
+      list.push({
+        clip: `polygon(${tri.map(([x, y]) => `${x.toFixed(2)}% ${y.toFixed(2)}%`).join(', ')})`,
+        origin: `${cx.toFixed(1)}% ${cy.toFixed(1)}%`,
+        dx: `${(dx / dist * fly * 60).toFixed(1)}%`, dy: `${(dy / dist * fly * 45 + 18 + rnd() * 20).toFixed(1)}%`,
+        rot: `${((rnd() - 0.5) * 120).toFixed(0)}deg`, delay: `${Math.round(dist * 4 + rnd() * 60)}ms`,
+      })
+    }
+  }
+  return list
+})()
+
+/** 一张插画：出现、停留、收起都在同一个元素上演（收起时 leaving 为真，样式换成消失的那段动画）。 */
+function CgFrame({ img, src, leaving, sound }) {
+  const box = React.useRef(null)
+  const out = img.leave || 'fade'
+  // 冲击着出现时「咚」一声，碎裂时「咔」一声（跟着音效开关，快进时不响）
+  React.useEffect(() => { if (sound && !leaving && img.enter === 'impact') stinger('impact') }, [])
+  React.useEffect(() => { if (sound && leaving && out === 'shatter') stinger('stab') }, [leaving])
+  const ratio = usePanRatio(box, src, img.versions && img.versions[img.current])
+  // 竖版：停在顶上 → 慢慢摇到底 → 拉远露出全貌 → 倒着放回去；越长摇得越久。横版按导演选的动态（默认缓慢推拉）。
+  const pan = ratio ? { '--r': ratio.toFixed(4), '--pan': `${Math.round(16 + (1 - ratio) * 16)}s` } : null
+  return (
+    <div className={`fg-cg${ratio ? ' is-tall' : ''}${leaving ? ' is-leaving' : ''}`} ref={box} style={pan}
+      data-in={img.enter || 'sweep'} data-out={out} data-motion={img.motion || 'drift'}>
+      <div className="fg-cg-art">
+        {ratio
+          ? <><div className="fg-cg-back" style={{ backgroundImage: `url("${src}")` }} /><img className="fg-cg-pan" src={src} alt="" draggable={false} /></>
+          : <div className="fg-cg-img" style={{ backgroundImage: `url("${src}")` }} />}
+      </div>
+      {img.title && <div className="fg-cg-caption"><i /><span>CG</span><b>{img.title}</b></div>}
+      {leaving && out === 'shatter' && (
+        <div className="fg-cg-shards" aria-hidden="true">
+          {SHARDS.map((p, i) => (
+            <div key={i} className="fg-cg-shard" style={{ clipPath: p.clip, WebkitClipPath: p.clip, transformOrigin: p.origin, backgroundImage: `url("${src}")`, '--dx': p.dx, '--dy': p.dy, '--rot': p.rot, animationDelay: p.delay }} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * 插画层：出现、消失、停留时的动态按导演给这张插画写的 enter / leave / motion（见 lib/vocab.js 的 CG_INS 等）。
+ * 收起或被下一张顶掉的那张留着演完消失动画再移除；渲染时就记好，免得先空一帧。同一张换了版本直接换，不演消失。
+ */
+export function CgLayer({ beat, sound = false }) {
   const img = beat.cg
   const src = cgSrc(img, assetUrl)
-  // 插画收起时淡出：同一个元素留着演完，不是直接消失。渲染时就记好上一张，免得先空一帧。
-  const last = React.useRef(null)
+  const cur = src ? { img, src, key: img.id + ':' + img.current } : null
+  const prev = React.useRef(null)
+  const ghosts = React.useRef([])
   const [, refresh] = React.useReducer(n => n + 1, 0)
-  if (src) last.current = { img, src }
-  const shown = src ? { img, src } : last.current
-  React.useEffect(() => {
-    if (src || !last.current) return undefined
-    const t = setTimeout(() => { last.current = null; refresh() }, CG_LEAVE_MS)
-    return () => clearTimeout(t)
-  }, [src])
-  const box = React.useRef(null)
-  const ratio = usePanRatio(box, shown ? shown.src : '', shown && shown.img.versions && shown.img.versions[shown.img.current])
-  if (!shown) {
-    if (!img || img.status === 'failed' || img.status === 'cancelled') return null
-    return <div className="fg-cg-wait"><i />{img.status === 'writing' ? '插画分镜中' : '插画绘制中'}{img.title ? `「${img.title}」` : ''}</div>
+  const was = prev.current
+  if (was && (!cur || was.key !== cur.key)) {
+    ghosts.current = ghosts.current.filter(g => g.key !== was.key)
+    const ms = leaveMs(was.img)
+    if (ms && (!cur || was.img.id !== cur.img.id)) ghosts.current.push({ ...was, until: Date.now() + ms })
   }
-  // 竖版：停在顶上 → 慢慢摇到底 → 拉远露出全貌 → 倒着放回去；越长摇得越久。横版照旧缓慢推拉。
-  const pan = ratio ? { '--r': ratio.toFixed(4), '--pan': `${Math.round(16 + (1 - ratio) * 16)}s` } : null
-  const title = shown.img.title
+  prev.current = cur
+  if (cur) ghosts.current = ghosts.current.filter(g => g.key !== cur.key)
+  const pending = ghosts.current.length
+  React.useEffect(() => {
+    if (!pending) return undefined
+    const wait = Math.max(0, Math.min(...ghosts.current.map(g => g.until)) - Date.now())
+    const t = setTimeout(() => { const now = Date.now() + 16; ghosts.current = ghosts.current.filter(g => g.until > now); refresh() }, wait)
+    return () => clearTimeout(t)
+  })
+  const frames = [...ghosts.current.map(g => ({ ...g, leaving: true })), ...(cur ? [{ ...cur, leaving: false }] : [])]
+  const waiting = !cur && img && img.status !== 'failed' && img.status !== 'cancelled'
   return (
-    <div className={`fg-cg${ratio ? ' is-tall' : ''}${src ? '' : ' is-leaving'}`} key={shown.img.id + ':' + shown.img.current} ref={box} style={pan}>
-      {ratio
-        ? <><div className="fg-cg-back" style={{ backgroundImage: `url("${shown.src}")` }} /><img className="fg-cg-pan" src={shown.src} alt="" draggable={false} /></>
-        : <div className="fg-cg-img" style={{ backgroundImage: `url("${shown.src}")` }} />}
-      {title && <div className="fg-cg-caption"><i /><span>CG</span><b>{title}</b></div>}
-    </div>
+    <>
+      {frames.map(f => <CgFrame key={f.key} img={f.img} src={f.src} leaving={f.leaving} sound={sound} />)}
+      {waiting && <div className="fg-cg-wait"><i />{img.status === 'writing' ? '插画分镜中' : '插画绘制中'}{img.title ? `「${img.title}」` : ''}</div>}
+    </>
   )
 }
 
