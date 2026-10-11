@@ -281,13 +281,12 @@ const VOICE_CHAINS = {
     input.connect(delay).connect(filter(ac, 'lowpass', 2200)).connect(feedback).connect(delay)
     delay.connect(amp(ac, 0.7)).connect(out)
   },
-  // 回忆：隔着一层时间。高频收掉一些、声音退后半步，后面拖一条柔和的混响（不是一下一下弹回来的回声）
+  // 回忆：隔着一层时间。高频收掉一些（3 kHz 以上）、轻 2～3 dB，带一点短短的小房间混响，不拖尾、不弹回来（不是回声）
   memory: (ac, input, out) => {
-    const soft = input.connect(filter(ac, 'highpass', 160)).connect(filter(ac, 'lowpass', 2600))
-    soft.connect(amp(ac, 0.62)).connect(out)
-    const pre = ac.createDelay(0.2); pre.delayTime.value = 0.045
-    const hall = ac.createConvolver(); hall.buffer = impulse(ac, 1.9, 3.4)
-    soft.connect(pre).connect(hall).connect(filter(ac, 'lowpass', 1700)).connect(amp(ac, 0.55)).connect(out)
+    const soft = input.connect(filter(ac, 'highpass', 140)).connect(filter(ac, 'lowpass', 3000))
+    soft.connect(amp(ac, 0.75)).connect(out)
+    const room = ac.createConvolver(); room.buffer = impulse(ac, 0.7, 3.5)
+    soft.connect(room).connect(filter(ac, 'lowpass', 2200)).connect(amp(ac, 0.3)).connect(out)
   },
   // 机械音：环形调制 + 削波，像机器人、AI、变声器
   machine: (ac, input, out) => {
