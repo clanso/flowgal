@@ -106,9 +106,9 @@
 @keyframes fg-split-in { from { transform: translateX(105%); } }
 @keyframes fg-split-out { to { transform: translateX(105%); } }
 .fg-actor {
-  position: absolute; bottom: -2%; height: 92%; width: 34%;
+  position: absolute; bottom: -2%; height: calc(92% * var(--s, 1)); width: calc(34% * var(--s, 1));
   left: var(--x, 50%); transform: translateX(-50%);
-  transition: left .55s cubic-bezier(.4, .1, .2, 1), filter .4s ease, opacity .45s ease;
+  transition: left .55s cubic-bezier(.4, .1, .2, 1), height .55s cubic-bezier(.4, .1, .2, 1), width .55s cubic-bezier(.4, .1, .2, 1), filter .4s ease, opacity .45s ease;
   filter: brightness(.7) saturate(.78);
   animation: fg-actor-in .6s cubic-bezier(.2, .7, .2, 1) both;
 }
@@ -954,7 +954,7 @@
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
 @container stage (max-aspect-ratio: 4/5) {
-  .fg-actor { width: 60%; height: 60%; bottom: 23%; }
+  .fg-actor { width: calc(60% * var(--s, 1)); height: calc(60% * var(--s, 1)); bottom: 23%; }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
   .fg-text { font-size: 4.6cqw; top: 18%; bottom: 26%; }
   .fg-progress { bottom: 12%; right: 4.2%; }

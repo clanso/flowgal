@@ -1350,6 +1350,12 @@ export function LookSection({ data }) {
           <option value="wide">16:9 宽屏</option>
         </select>
       </Field>
+      <Field label="同屏最多几人" hint="台上的人多于这个数时，最久没说话、没登场的先下场，轮到他说话再回来。人越多立绘越小，按站位从左到右排开。">
+        <select className="fg-select" style={{ width: 'auto' }} value={String(cfg.ui.maxOnStage ?? 5)} onChange={e => p({ maxOnStage: Number(e.target.value) })}>
+          {[2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={String(n)}>{n} 人</option>)}
+          <option value="0">不限</option>
+        </select>
+      </Field>
       <div className="fg-section">演出</div>
       <Field label="文字速度" hint="每字毫秒，0 为瞬间显示。"><input type="range" min="0" max="80" value={cfg.ui.textSpeed} onChange={e => p({ textSpeed: Number(e.target.value) })} style={{ width: '100%' }} /></Field>
       <Field label="自动播放间隔"><input type="range" min="400" max="4000" step="100" value={cfg.ui.autoDelay} onChange={e => p({ autoDelay: Number(e.target.value) })} style={{ width: '100%' }} /></Field>

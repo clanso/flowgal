@@ -3,7 +3,7 @@
 import React from 'react'
 import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
-import { SKY, placeKey, actorX, cgSrc, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
+import { SKY, placeKey, actorX, onStage, stageLayout, cgSrc, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite, thenLook } from '../../../lib/look.js'
 import { AaSprite } from './AaSprite.jsx'
@@ -222,7 +222,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const aa = (person && Object.values(person.sprites || {}).find(r => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null
   const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
   return (
-    <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}${aa ? ' is-aa' : ''}`} style={{ '--x': actorX(entry.pos) + '%', '--side': SIDE[entry.pos] || '0%' }} data-name={entry.name}>
+    <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}${aa ? ' is-aa' : ''}`} style={{ '--x': (entry.x ?? actorX(entry.pos)) + '%', '--s': entry.scale ?? 1, '--side': SIDE[entry.pos] || '0%' }} data-name={entry.name}>
       <div className="fg-actor-body">
         {aa ? <AaSprite aa={aa} talk={speaking && talk && talk.key === beat.key ? talk : null} fallback={still} className="fg-aa" label={entry.name} /> : still}
       </div>
@@ -257,7 +257,7 @@ function useLeaving(cast) {
   return [...leaving.current.values()].map(l => l.entry)
 }
 
-export function Cast({ beat, view, talk }) {
+export function Cast({ beat, view, talk, max = 5 }) {
   const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
   let cast = beat.cast || []
   // 导演还没整理、也没有上一幕站位时：说话的已知人物临时站到中间。整理过的轮次台上没人就是没人（便条、画外音）。
@@ -265,6 +265,8 @@ export function Cast({ beat, view, talk }) {
   // 分屏时另一头的人只在分屏里出现，主舞台的人往左挪让出右边
   const split = beat.split || null
   if (split) cast = cast.filter(c => !split.who.includes(c.name))
+  // 人太多时最久没动静的先下场，剩下的按站位均匀排开
+  cast = stageLayout(onStage(cast, beat.recent, max))
   const leaving = useLeaving(cast)
   // 插画全屏盖住舞台：立绘照常在下面，插画收起时直接露出来。
   return (
