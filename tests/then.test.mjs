@@ -251,6 +251,44 @@ test('gate: 短闪回：导演给闪回的几句写 recall（不换场景）；�
   assert.equal(stageWalk(listed, units).steps[0].cast.length, 3)
 })
 
+test('gate: 正文用【闪回】…【闪回结束】框起来的一段、回忆里的声音：导演没写 recall 也按短闪回演；导演写成回忆段落的不动', async () => {
+  const { markRecalls } = await import('../lib/scenes.js')
+  const units = segmentTurn(['是柯萝伊亲手绣的。', '【闪回演出：一瞬】', '“那个，阿黛尔。生日快乐。”', '“哎呀……是铃兰呢。”', '【闪回结束】', '“是那家伙的吗？”', '理由很简单：', '“在迷宫里，要好好吃饭哦。”'].join('\n'))
+  assert.equal(units.length, 8)
+  const [, open, a, b, close, c, , quote] = units.map(u => u.id)
+  const s = normalizeScript({
+    scene: { location: '回廊' },
+    cast: [{ name: '柯萝伊', pos: 'left' }, { name: '布琳希尔德', pos: 'right' }],
+    skip: [open, close],
+    lines: [
+      { u: a, sp: '柯萝伊', voice: 'echo' },
+      { u: b, sp: '阿黛尔', voice: 'echo' },
+      { u: c, sp: '布琳希尔德' },
+      { u: quote, sp: '阿黛尔', voice: 'memory' },
+    ],
+  }, units)
+  const marked = markRecalls(s, units)
+  assert.deepEqual(units.map(u => Boolean(marked.lines[u.id]?.recall)), [false, false, true, true, false, false, false, true])
+  assert.equal(s.lines[a].recall, undefined, '不改原来的脚本')
+  // 剧场：框起来的两句是一段闪回，台词用回忆里的声音；引用的那一句自己是一段
+  const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: s }], images: [] })
+  assert.deepEqual(beats.map(b => [b.recall ? b.recall.who.join('+') : '', b.recallEdge || '', b.voice || '']), [
+    ['', '', ''],
+    ['柯萝伊+阿黛尔', 'in', 'memory'],
+    ['柯萝伊+阿黛尔', '', 'memory'],
+    ['', 'out', ''],
+    ['', '', ''],
+    ['阿黛尔', 'in', 'memory'],
+  ])
+  // 导演把框起来的一段写成了回忆段落：照导演的演
+  const asMemory = { ...s, lines: { ...s.lines, [a]: { ...s.lines[a], mode: 'memory' }, [c]: { ...s.lines[c], mode: 'real' } } }
+  assert.equal(markRecalls(asMemory, units).lines[b].recall, undefined)
+  // 没写结束的：只算开头之后连着的台词，遇到旁白就停
+  const loose = segmentTurn(['【回忆】', '“你来了。”', '“嗯。”', '她回过神来。', '“走吧。”'].join('\n'))
+  const looseScript = { scene: {}, cast: [], lines: {}, skip: [loose[0].id] }
+  assert.deepEqual(loose.map(u => Boolean(markRecalls(looseScript, loose).lines[u.id]?.recall)), [false, true, true, false, false])
+})
+
 test('gate: 引擎：短闪回里开口的人要立绘——写了当时样子的按当时的画（不带现在的黑眼圈），没写的按现在的', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-recall-'))
   try {
