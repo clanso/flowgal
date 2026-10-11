@@ -57,6 +57,13 @@
 .fg-bg.is-enter[data-tr="strips"] { -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 8%, transparent 8% 8.0001%); mask-image: linear-gradient(#000, #000); -webkit-mask-repeat: no-repeat; }
 @keyframes fg-flash-in { 0% { opacity: 0; filter: brightness(4); } 30% { opacity: 1; filter: brightness(3); } 100% { filter: none; } }
 @keyframes fg-black-in { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }
+/* 起雾（进出回忆）：旧画面失焦、泛白着退下去，新画面从一片朦胧里慢慢清晰过来；配合 .fg-flash.is-haze 的白雾 */
+@keyframes fg-haze-in { 0% { opacity: 0; filter: blur(18px) brightness(1.5) saturate(.6); } 40% { opacity: 1; filter: blur(10px) brightness(1.3) saturate(.75); } 100% { opacity: 1; filter: none; } }
+.fg-bg.is-leave[data-out="haze"] { animation: fg-haze-out 1.4s ease-in both; }
+@keyframes fg-haze-out { to { opacity: 0; filter: blur(14px) brightness(1.4) saturate(.7); } }
+/* 起雾的那一句：新上台的人等雾起来了再慢慢浮出来，不在旧画面上先冒出来 */
+.fg-world-in[data-tr="haze"] .fg-actor:not(.is-leaving) { animation-duration: 1.3s; animation-delay: .8s; }
+.fg-world-in[data-tr="haze"] .fg-actor.is-leaving { animation-duration: .9s; }
 
 /* 没有背景图时的程序化舞台：天色渐变 + 远景剪影 + 光斑。 */
 .fg-sky { position: absolute; inset: 0; transition: background 1.6s ease; }
@@ -82,6 +89,9 @@
 .fg-grade[data-time="evening"] { background: linear-gradient(180deg, rgba(90, 60, 200, .6), rgba(255, 110, 120, .35)); mix-blend-mode: overlay; }
 .fg-grade[data-time="night"] { background: linear-gradient(180deg, rgba(10, 20, 80, .78), rgba(20, 10, 60, .7)); mix-blend-mode: multiply; }
 .fg-grade[data-time="midnight"] { background: linear-gradient(180deg, rgba(4, 6, 40, .86), rgba(10, 4, 30, .8)); mix-blend-mode: multiply; }
+/* 画好的背景本来就按日 / 黄昏 / 夜画过（出图时带着时段）：只在同一档里轻轻推一下，不再压一遍（夜景再压一层夜色就黑透了） */
+.fg-grade.is-drawn:is([data-time="dusk"], [data-time="evening"], [data-time="night"]) { opacity: .3; }
+.fg-grade.is-drawn[data-time="midnight"] { opacity: .45; }
 .fg-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, .55)); }
 .fg-letterbox::before, .fg-letterbox::after { content: ""; position: absolute; left: 0; right: 0; height: 9%; background: #000; z-index: 30; animation: fg-bars .8s cubic-bezier(.6, 0, .2, 1) both; }
 .fg-letterbox::before { top: 0; transform-origin: top; } .fg-letterbox::after { bottom: 0; transform-origin: bottom; }
@@ -329,7 +339,12 @@
 .fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }
 .fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }
 .fg-flash.is-black { background: #000; animation: fg-black 1.6s ease both; }
-.fg-flash.is-soft { background: radial-gradient(90% 80% at 50% 45%, rgba(255, 250, 238, .9), rgba(255, 236, 210, .55)); animation-duration: .5s; }
+/* 起雾：整个画面慢慢起一层白雾、失焦，再散开（进出回忆）；薄雾是短闪回进出时的淡一层。都在对话框下面 */
+.fg-flash.is-haze, .fg-flash.is-mist { z-index: 15; background: radial-gradient(100% 90% at 50% 45%, rgba(255, 251, 242, .95), rgba(255, 238, 214, .75));
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: fg-haze-veil 2.6s ease-in-out both; }
+.fg-flash.is-mist { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); animation: fg-mist 1.5s ease-in-out both; }
+@keyframes fg-haze-veil { 0% { opacity: 0; } 38% { opacity: .92; } 55% { opacity: .8; } 100% { opacity: 0; } }
+@keyframes fg-mist { 0% { opacity: 0; } 40% { opacity: .38; } 100% { opacity: 0; } }
 /* 短闪回：现在的画面压暗、褪色、模糊，闪回里开口的人半透明浮在前面 */
 /* 滤镜写在这一层自己身上（子元素的 backdrop-filter 会被这一层的淡入淡出截住，滤不到下面的画面），浮出来的人是子元素，不被滤到 */
 .fg-recall { position: absolute; inset: 0; z-index: 9; pointer-events: none; animation: fg-layer-in var(--fade, .5s) ease both;
@@ -338,6 +353,9 @@
 .fg-recall.is-leave { animation: fg-layer-out var(--fade, .5s) ease both; }
 .fg-recall-veil { position: absolute; inset: 0; background-image: var(--fg-noise); opacity: .12; mix-blend-mode: overlay; }
 .fg-recall .fg-actor { filter: sepia(.5) brightness(.8) saturate(.8); opacity: .72; }
+/* 闪回里的人等画面暗下去了再慢慢浮出来 */
+.fg-recall .fg-actor { animation: fg-ghost-in 1.1s .45s ease-out both; }
+@keyframes fg-ghost-in { from { opacity: 0; transform: translateX(-50%) translateY(1.5%); } }
 .fg-recall .fg-actor.is-speaking { filter: sepia(.32) brightness(1.04) drop-shadow(0 0 2cqw rgba(255, 238, 210, .55)); opacity: .95; }
 @keyframes fg-flash { from { opacity: .95; } to { opacity: 0; } }
 /* 落字特效的闪光层：平时透明，由演出计划在某个字上点亮（Stage.jsx 的 useHits） */
@@ -375,11 +393,12 @@
 
 /* 光线：关灯、停电、烛光、手电……压在背景和立绘上，插画不受影响。 */
 .fg-light { z-index: 5; }
-.fg-light[data-v="dim"] { background: rgba(20, 22, 50, .38); mix-blend-mode: multiply; }
+.fg-light[data-v="dim"] { background: rgba(20, 22, 50, .3); mix-blend-mode: multiply; }
 .fg-light[data-v="dark"] { background: rgba(8, 12, 40, .74); mix-blend-mode: multiply; backdrop-filter: saturate(.6); -webkit-backdrop-filter: saturate(.6); }
 .fg-light[data-v="black"] { background: #000; opacity: .93; }
 .fg-light[data-v="black"]::after { background: radial-gradient(40% 30% at 50% 60%, rgba(40, 40, 70, .25), transparent 70%); }
-.fg-light[data-v="candle"] { background: radial-gradient(58% 68% at 50% 80%, rgb(255, 196, 128), rgb(120, 52, 14) 55%, rgb(22, 8, 2) 92%); mix-blend-mode: multiply; }
+/* 烛光、篝火：人脸被火映成暖色、看得清，暗下去的是画面四角 */
+.fg-light[data-v="candle"] { background: radial-gradient(80% 90% at 50% 70%, rgb(255, 234, 204), rgb(232, 168, 112) 55%, rgb(110, 62, 34) 100%); mix-blend-mode: multiply; }
 .fg-light[data-v="candle"]::after { background: radial-gradient(34% 40% at 50% 82%, rgba(255, 150, 50, .42), transparent 72%); mix-blend-mode: screen; transform-origin: 50% 82%; animation: fg-candle 2.6s ease-in-out infinite; }
 @keyframes fg-candle { 0%, 100% { opacity: .85; transform: scale(1); } 22% { opacity: 1; transform: scale(1.03); } 41% { opacity: .78; } 63% { opacity: .95; transform: scale(.99); } 80% { opacity: .82; } }
 .fg-light[data-v="spot"] { background: radial-gradient(30% 62% at 50% 52%, transparent 30%, rgba(0, 0, 0, .55) 70%, rgba(0, 0, 0, .92) 100%); }
@@ -578,6 +597,7 @@
 .fg-voice-chip[data-voice="chorus"] { color: #ffe6f2; border-color: rgba(255, 190, 220, .45); }
 .fg-voice-chip[data-voice="offscreen"] { color: rgba(255, 255, 255, .75); border-style: dashed; }
 .fg-voice-chip[data-voice="echo"] { color: #c6e0ff; border-color: rgba(170, 210, 255, .4); }
+.fg-voice-chip[data-voice="memory"] { color: #f2dcb4; border-color: rgba(240, 210, 160, .4); }
 .fg-voice-chip[data-voice="machine"] { color: #7dffd8; border-color: rgba(90, 255, 200, .5); border-radius: .2cqw; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .fg-voice-chip[data-voice="machine"] i { animation-timing-function: steps(3); }
 /* 电话：字偏冷、对话框里一道道细横纹，像隔着听筒 */
@@ -599,6 +619,8 @@
 .fg-dialog[data-voice="offscreen"] .fg-name-plate { outline: 1px dashed rgba(255, 255, 255, .5); outline-offset: .2cqw; opacity: .85; }
 /* 回声：每个字后面拖着两层渐远的影子 */
 .fg-dialog[data-voice="echo"] .fg-text { text-shadow: .35cqw 0 0 rgba(255, 255, 255, .2), .75cqw 0 .1cqw rgba(255, 255, 255, .1), 0 1px 2px rgba(0, 0, 0, .45); }
+/* 回忆：字泛旧纸的暖色，外面一圈很淡的光晕，像隔着一层时间 */
+.fg-dialog[data-voice="memory"] .fg-text { color: color-mix(in oklab, var(--ink) 74%, #f0d2a0); text-shadow: 0 0 .9cqw rgba(255, 220, 170, .3), 0 1px 2px rgba(0, 0, 0, .45); }
 /* 机械音：等宽字、青色、扫描线 */
 .fg-dialog[data-voice="machine"] .fg-text { font-family: ui-monospace, Menlo, Consolas, monospace; color: color-mix(in oklab, var(--ink) 55%, #10d0a0); letter-spacing: .08em; text-shadow: 0 0 .5cqw rgba(60, 255, 200, .5); }
 .fg-dialog[data-voice="machine"] .fg-box { background: repeating-linear-gradient(0deg, rgba(80, 255, 200, .07) 0 1px, transparent 1px 3px), var(--box-bg); }

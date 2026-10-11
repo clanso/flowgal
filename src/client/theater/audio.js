@@ -225,7 +225,7 @@ function playSound(sound, volume) {
 }
 
 // ───────────── 声音的样子 ─────────────
-// 隔着电话、广播喇叭、心灵感应、画外音、回声、机械音：打字音先过一条效果链再出声。每种链在一个 AudioContext 里只建一次。
+// 隔着电话、广播喇叭、心灵感应、画外音、回声、回忆、机械音：打字音先过一条效果链再出声。每种链在一个 AudioContext 里只建一次。
 
 /** 混响用的脉冲响应：衰减的噪声，seconds 越长越空旷。 */
 function impulse(ac, seconds, decay = 2.5) {
@@ -280,6 +280,14 @@ const VOICE_CHAINS = {
     const feedback = amp(ac, 0.48)
     input.connect(delay).connect(filter(ac, 'lowpass', 2200)).connect(feedback).connect(delay)
     delay.connect(amp(ac, 0.7)).connect(out)
+  },
+  // 回忆：隔着一层时间。高频收掉一些、声音退后半步，后面拖一条柔和的混响（不是一下一下弹回来的回声）
+  memory: (ac, input, out) => {
+    const soft = input.connect(filter(ac, 'highpass', 160)).connect(filter(ac, 'lowpass', 2600))
+    soft.connect(amp(ac, 0.62)).connect(out)
+    const pre = ac.createDelay(0.2); pre.delayTime.value = 0.045
+    const hall = ac.createConvolver(); hall.buffer = impulse(ac, 1.9, 3.4)
+    soft.connect(pre).connect(hall).connect(filter(ac, 'lowpass', 1700)).connect(amp(ac, 0.55)).connect(out)
   },
   // 机械音：环形调制 + 削波，像机器人、AI、变声器
   machine: (ac, input, out) => {

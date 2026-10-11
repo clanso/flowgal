@@ -2,7 +2,7 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio } from './playback.js'
-import { Backdrop, Cast, CgLayer, SplitPanel, RecallLayer, TitleCard, CutCard, CUT_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -127,15 +127,18 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
   const beat = index >= 0 ? beats[index] : null
   const speed = skip ? 0 : ui0.textSpeed
-  // 过场字卡（三小时后、与此同时……）：字卡收起前这句先不出字；点一下跳过，快进时不出字卡。
-  const [cutSeen, setCutSeen] = React.useState('')
-  const cutting = Boolean(beat && beat.cut && !title && speed > 0 && cutSeen !== beat.key)
+  // 过场字卡（三小时后、与此同时……）：字卡收起前这句先不出字；起雾转场（进出回忆）、短闪回的进出也等画面变过去再出字。
+  // 点一下跳过，快进时不等。
+  const pauseMs = !beat || title || speed <= 0 ? 0 : beat.cut ? CUT_MS : beat.transition === 'haze' ? HAZE_MS : RECALL_HOLD_MS[beat.recallEdge] || 0
+  const [pauseSeen, setPauseSeen] = React.useState('')
+  const pausing = pauseMs > 0 && pauseSeen !== beat.key
+  const cutting = pausing && Boolean(beat.cut)
   React.useEffect(() => {
-    if (!cutting) return undefined
-    const t = setTimeout(() => setCutSeen(beat.key), CUT_MS)
+    if (!pausing) return undefined
+    const t = setTimeout(() => setPauseSeen(beat.key), pauseMs)
     return () => clearTimeout(t)
-  }, [cutting, beat && beat.key])
-  const holdText = (Boolean(beat) && glyphKey !== beat.key) || cutting
+  }, [pausing, beat && beat.key])
+  const holdText = (Boolean(beat) && glyphKey !== beat.key) || pausing
   // 打开回想、设置这类面板时不把字速改成 0：改成 0 再改回来，关面板时这句会从头再打一遍（还带着打字音）。
   // 面板一打开就把这句直接打完（见下面的 effect），关掉后停在打完的样子。
   const typeSpeed = title ? 0 : speed
@@ -212,12 +215,12 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
   const advance = React.useCallback(() => {
     if (!beat) return
-    if (cutting) { setCutSeen(beat.key); return }
+    if (pausing) { setPauseSeen(beat.key); return }
     if (!done) { finish(); return }
     if (atEnd) { setAuto(false); setSkip(false); setChoosing(true); return }
     sfx('page')
     go(index + 1)
-  }, [beat, done, atEnd, index, go, finish, cutting])
+  }, [beat, done, atEnd, index, go, finish, pausing])
 
   // 自动 / 快进。
   React.useEffect(() => {
@@ -319,9 +322,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         <div className="fg-camera" data-cam={cam}>
           {/* 画面效果（船上摇晃、车里颠簸、心跳……）和特殊段落（梦里飘、幻觉里扭曲）各动一层，叠在一起不互相顶掉 */}
           <div className="fg-world" data-fx={atmosphere ? stageScene.fx : ''}>
-            <div className="fg-world-in" data-mode={atmosphere ? stageMode : ''}>
+            <div className="fg-world-in" data-mode={atmosphere ? stageMode : ''} data-tr={stageBeat && stageBeat.transition === 'haze' ? 'haze' : undefined}>
               <Backdrop scene={stageScene} view={view} transition={(stageBeat && stageBeat.transition) || 'dissolve'} />
-              <div className="fg-grade" data-time={stageScene.time} />
+              <div className={`fg-grade${backgroundFor(stageScene, view).src ? ' is-drawn' : ''}`} data-time={stageScene.time} />
               {/* 短闪回时说话的是闪回里的人：现在台上的人不高亮、不对口型 */}
               {stageBeat && <Cast beat={title || stageBeat.recall ? { ...stageBeat, speaker: '', speakers: null, sym: '' } : stageBeat} view={view} talk={title || stageBeat.recall ? null : talk} max={ui0.maxOnStage ?? 5} />}
               <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} />
@@ -336,7 +339,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
           </div>
         </div>
         {/* 特殊段落的滤镜放在镜头外面：推镜头时录像框、REC 这些不跟着放大，对话框和标题卡也不被滤到 */}
-        <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={1200} />
+        <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageBeat && stageBeat.transition === 'haze' ? 2400 : 1200} />
         {beat && !title && <Flash beat={beat} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
         {!panel && <RestartNotice floating />}

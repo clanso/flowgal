@@ -322,8 +322,8 @@ test('gate: 特殊段落：进入回忆换场景和配乐、在场的人，写 r
     ['U6', '第88层·长楼梯', '', 'T1', '柯萝伊'],
     ['U1', '第88层·长楼梯', '', 'T1', '柯萝伊'],
   ])
-  assert.ok(beats[1].sceneEnter && beats[1].transition === 'flash', '进回忆默认白闪')
-  assert.ok(beats[4].sceneEnter && beats[4].transition === 'dissolve')
+  assert.ok(beats[1].sceneEnter && beats[1].transition === 'haze', '进回忆默认起雾')
+  assert.ok(beats[4].sceneEnter && beats[4].transition === 'haze', '从回忆里出来也是起雾')
   assert.deepEqual([beats[4].entered, beats[4].left], [['柯萝伊'], ['阿黛尔']])
   // 段落没写 real：一轮结束时回到现实，下一轮没接着演就是现实
   const open = normalizeScript({ scene: { location: '楼梯', bgm: 'T1' }, cast: [{ name: '柯萝伊' }], lines: [{ u: 'U2', mode: 'dream', bgm: 'T2', exit: ['柯萝伊'] }] }, units, { trackIds: ['T1', 'T2'] })

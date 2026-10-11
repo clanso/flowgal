@@ -18,7 +18,7 @@ export const LIGHT_LABEL = { normal: '', dim: '昏暗', dark: '熄灯', black: '
 export const FX_LABEL = { none: '', sway: '摇晃', ride: '颠簸', handheld: '手持', drift: '推近', woozy: '晕眩', heat: '热浪', underwater: '水下', rumble: '震动', speed: '疾驰', heartbeat: '心跳', slowmo: '慢动作', timestop: '时间停止' }
 export const MODE_LABEL = { ...MODE_NAMES, real: '回到现实' }
 export const CUT_LABEL = { time: 'Time Skip', date: 'Date', chapter: 'Chapter', meanwhile: 'Meanwhile' }
-export const VOICE_LABEL = { phone: '电话', radio: '广播', telepathy: '心灵感应', chorus: '齐声', offscreen: '画外音', echo: '回声', machine: '机械音' }
+export const VOICE_LABEL = { phone: '电话', radio: '广播', telepathy: '心灵感应', chorus: '齐声', offscreen: '画外音', echo: '回声', memory: '回忆', machine: '机械音' }
 export const CG_IN_LABEL = { sweep: '光扫入场', dissolve: '溶入', flash: '白闪', black: '从黑暗中浮现', zoom: '从局部拉开', focus: '失焦到对焦', slide: '滑入', iris: '圆形展开', glitch: '画面撕裂', photo: '照片落下', bloom: '柔光渐显', impact: '冲击' }
 export const CG_OUT_LABEL = { fade: '淡出', dissolve: '溶回场景', flash: '白闪消失', black: '暗下去', blur: '模糊消散', slide: '滑出', shatter: '碎裂', glitch: '撕裂消失', pull: '拉远消失', cut: '直接切掉' }
 export const CG_MOTION_LABEL = { drift: '缓慢推拉', still: '静止', push: '缓慢推近', pull: '缓慢拉远', pan: '横摇', shake: '持续震动', breathe: '轻轻起伏' }
@@ -26,7 +26,7 @@ export const CARD_LABEL = { sms: '短信', letter: '信', note: '便条', news: 
 export const POS_LABEL = { farleft: '最左', left: '左', center: '中', right: '右', farright: '最右' }
 export const CAMERA_LABEL = { shake: '震动', zoom: '推近', zoomout: '拉远', flash: '闪白', pan: '平移', blur: '虚焦', fadeblack: '黑场', redflash: '红闪', tilt: '倾斜' }
 export const SYMBOL_LABEL = { heart: '爱心', anger: '怒筋', sweat: '汗滴', sparkle: '闪光', surprise: '惊叹', gloom: '阴云', note: '音符', zzz: '睡着', bulb: '灵光', heartbreak: '心碎', sigh: '叹气', dizzy: '眩晕', fire: '燃起', blush: '红晕', bloom: '开花', silence: '无语' }
-export const TRANSITION_LABEL = { dissolve: '溶解', fade: '慢慢变化', cinematic: '电影黑边', wipe: '横扫', iris: '圆形收缩', strips: '百叶', black: '黑场', flash: '白闪', blink: '闭眼睁眼', glitch: '画面撕裂', swirl: '旋转入梦', none: '直接切' }
+export const TRANSITION_LABEL = { dissolve: '溶解', fade: '慢慢变化', cinematic: '电影黑边', wipe: '横扫', iris: '圆形收缩', strips: '百叶', black: '黑场', flash: '白闪', blink: '闭眼睁眼', glitch: '画面撕裂', swirl: '旋转入梦', haze: '起雾', none: '直接切' }
 const POS_X = { farleft: 14, left: 28, center: 50, right: 72, farright: 86 }
 
 const EMPTY_SCENE = { ...SCENE_DEFAULTS, transition: 'dissolve' }
@@ -110,6 +110,8 @@ export function buildBeats(view) {
       shown = at
       for (const name of [...speakers, ...steps[ui].entered]) active.set(name, beats.length)
       const recall = recalls[ui]
+      // 短闪回里开口的人用回忆里的声音（老脚本写的是回声，一并换掉）
+      const voice = recall && type !== 'narration' && (!line.voice || line.voice === 'echo') ? 'memory' : line.voice
       const recallEdge = recall === recalled ? '' : recall ? 'in' : 'out'
       recalled = recall
       beats.push({
@@ -122,7 +124,7 @@ export function buildBeats(view) {
         ...(unit.orig ? { orig: unit.orig } : {}), // 双语对照的原文（剧场上方小字）
         speaker,
         ...(speakers.length > 1 ? { speakers } : {}), // 齐声：几个人一起高亮
-        ...(line.voice ? { voice: line.voice } : {}), // 声音的样子：电话里、广播、心灵感应……
+        ...(voice ? { voice } : {}), // 声音的样子：电话里、广播、心灵感应……
         ...(split ? { split } : {}),
         alias: line.as || '',
         emo: line.emo || '',
