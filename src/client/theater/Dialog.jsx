@@ -68,7 +68,8 @@ function origChars(orig, times, count, speed) {
   return list.map((ch, j) => [ch, count ? at(Math.floor((j / list.length) * count)) : 0])
 }
 
-export function DialogBox({ beat, chars, plan, done, waiting, color, quick, progress, status, hiddenText }) {
+/** away：插画正在出现这类时候对话框先让开（淡出），过后再回来。 */
+export function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quick, progress, status, hiddenText }) {
   const speaker = beat.alias || beat.speaker
   const showName = speaker && beat.type !== 'narration'
   const speed = quick.speed
@@ -77,7 +78,7 @@ export function DialogBox({ beat, chars, plan, done, waiting, color, quick, prog
   // 声音的样子：名牌旁边一个小标（带跳动的音量条），对话框和字也换个样子（样式在 theater.css 的 data-voice）
   const voiceChip = beat.voice && VOICE_LABEL[beat.voice] ? <div className="fg-voice-chip" data-voice={beat.voice}><i /><i /><i /><span>{VOICE_LABEL[beat.voice]}</span></div> : null
   return (
-    <div className="fg-dialog" data-voice={beat.voice || undefined} style={{ '--speaker': color || undefined }}>
+    <div className={`fg-dialog${away ? ' is-away' : ''}`} data-voice={beat.voice || undefined} style={{ '--speaker': color || undefined }}>
       <div className="fg-box" />
       {(showName || voiceChip) && (
         <div className="fg-name" key={beat.speaker + beat.alias + (beat.voice || '')}>

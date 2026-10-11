@@ -8,7 +8,7 @@ import { cleanTurnText } from '../lib/clean.js'
 import { segmentTurn, joinUnits, pairUnits } from '../lib/segment.js'
 import { normalizeScript, rawSection, scriptScenes, sceneAfter, playingAfter, previousBrief } from '../lib/director.js'
 import { playedUnits, castAtEnd, stageWalk } from '../lib/staging.js'
-import { buildBeats } from '../src/client/theater/playback.js'
+import { buildBeats, cgEntrance, cgExit, cgStay, cgHoldMs, CG_IN_MS, beatHold, PAUSE_MS, TRANSITION_MS } from '../src/client/theater/playback.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 
@@ -511,19 +511,21 @@ test('gate: 声音的样子、分屏、慢动作和时间停止、插画的出�
       { u: 'U6', sp: '苏晴', voice: 'phone', split: 'off', scene: { fx: 'timestop' } },
     ],
     images: [
-      { after: 'U3', until: 'U4', title: '两头', moment: '两人隔着电话笑', in: 'bloom', motion: 'breathe', out: 'shatter' },
+      { after: 'U3', until: 'U4', title: '两头', moment: '两人隔着电话笑', in: 'slow', motion: 'push', out: 'black' },
       { after: 'U6', title: '静止', moment: '世界静止', in: 'spin', out: 'cut' },
+      { after: 'U1', title: '老写法', moment: '以前那套花哨的写法', in: 'bloom', motion: 'breathe', out: 'shatter' },
     ],
   }
-  const s = normalizeScript(raw, units, { maxImages: 2 })
+  const s = normalizeScript(raw, units, { maxImages: 3 })
   assert.deepEqual(s.lines.U1.split, { who: ['苏晴'], location: '咖啡店', bg: 'cafe interior, scenery, no humans' }, '重复和空的名字去掉')
   assert.equal(s.lines.U2.voice, 'phone')
   assert.equal(s.lines.U5.voice, undefined, '不认得的声音样子不收')
   assert.equal(s.lines.U5.scene.fx, 'slowmo')
   assert.equal(s.lines.U6.split, 'off')
   assert.equal(s.lines.U6.scene.fx, 'timestop')
-  assert.deepEqual([s.images[0].enter, s.images[0].motion, s.images[0].leave], ['bloom', 'breathe', 'shatter'])
+  assert.deepEqual([s.images[0].enter, s.images[0].motion, s.images[0].leave], ['slow', 'push', 'black'])
   assert.deepEqual([s.images[1].enter, s.images[1].motion, s.images[1].leave], [undefined, undefined, 'cut'], '写错的出现方式不收，用默认')
+  assert.deepEqual([s.images[2].enter, s.images[2].motion, s.images[2].leave], ['slow', 'still', 'flash'], '以前那套花哨的写法换成最接近的一种')
   // 分屏另一头的地方也要出背景
   assert.deepEqual(scriptScenes(s).map(x => `${x.location}|${x.time}|${x.bg}`), ['房间|night|', '咖啡店|night|cafe interior, scenery, no humans'])
 
@@ -535,4 +537,69 @@ test('gate: 声音的样子、分屏、慢动作和时间停止、插画的出�
   assert.equal(beats[2].emotions['苏晴'], 'laugh')
   assert.equal(beats[1].speakers, undefined)
   assert.deepEqual(beats.map(b => b.scene.fx), ['none', 'none', 'none', 'none', 'slowmo', 'timestop', 'timestop'])
+})
+
+test('插画像 galgame 那样出现：默认溶入、静止，快慢跟着基调；对话框先让开，画面出来就接着念；老存档的花哨写法换成最接近的', () => {
+  assert.equal(cgEntrance({}, 'daily'), 'dissolve')
+  assert.equal(cgEntrance({}, 'sad'), 'slow', '感伤：慢慢溶入')
+  assert.equal(cgEntrance({}, 'comic'), 'quick', '滑稽：快一点')
+  assert.equal(cgExit({}, 'touching'), 'slow')
+  assert.equal(cgEntrance({ enter: 'flash' }, 'sad'), 'flash', '导演写了就照写的')
+  assert.equal(cgStay({}), 'still')
+  // 老存档
+  assert.equal(cgEntrance({ enter: 'sweep' }, 'daily'), 'dissolve')
+  assert.equal(cgEntrance({ enter: 'photo' }, 'daily'), 'slow')
+  assert.equal(cgEntrance({ enter: 'glitch' }, 'daily'), 'cut')
+  assert.equal(cgExit({ leave: 'shatter' }, 'daily'), 'flash')
+  assert.equal(cgExit({ leave: 'fade' }, 'sad'), 'dissolve')
+  assert.equal(cgStay({ motion: 'breathe' }), 'still')
+  assert.equal(cgStay({ motion: 'push' }), 'push')
+  // 对话框让开的时间：出现的过程，再多一点点让对话框淡回来——原版脚本里插画出来后不另加等待
+  const extra = cgHoldMs({}, 'daily') - CG_IN_MS.dissolve
+  assert.ok(extra > 0 && extra <= 300, '只多留一小点')
+  assert.equal(cgHoldMs({}, 'sad'), CG_IN_MS.slow + extra)
+  assert.equal(cgHoldMs({ enter: 'cut' }, 'daily'), extra, '直接切入只停那一小点')
+})
+
+test('gate: 「間」——导演写的停顿只收 beat / silence，写在不演的舞台指示上挪到下一句，一轮最多 6 处', () => {
+  const units = segmentTurn(['【沉默】', '“……我知道了。”', '她笑了一下。', ...Array.from({ length: 8 }, (_, i) => `第${i + 1}句。`)].join('\n'))
+  const raw = {
+    skip: ['U1'],
+    lines: [
+      { u: 'U1', pause: 'silence' },
+      { u: 'U3', pause: 'forever' },
+      ...units.slice(3).map(u => ({ u: u.id, pause: 'beat' })),
+    ],
+  }
+  const s = normalizeScript(raw, units)
+  assert.equal(s.lines.U2.pause, 'silence', '舞台指示上的停顿挪到下一句要演的')
+  assert.equal(s.lines.U3.pause, undefined, '不认得的停顿不收')
+  assert.equal(Object.values(s.lines).filter(l => l.pause).length, 6)
+  const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: s }], images: [] })
+  assert.equal(beats[0].pause, 'silence')
+  assert.equal(beats[1].pause, undefined)
+})
+
+test('「間」：插画这一句才出现、换了地方时对话框先让开，等画面出来再接着念；导演的 silence 也让开，beat 只顿一下；进出回忆另算', () => {
+  const base = { key: 't:U2', scene: { location: '教室', mood: 'daily' }, mode: '', sceneEnter: false, transition: '' }
+  const img = { id: 'cg1' }
+  // 插画这一句才出现
+  assert.deepEqual(beatHold({ ...base, cg: img }, { cg: 'cg1', was: { cg: '', place: '教室', mode: '' } }), { ms: cgHoldMs(img, 'daily'), away: true })
+  // 插画已经在画面上（往回翻）：不停
+  assert.deepEqual(beatHold({ ...base, cg: img }, { cg: 'cg1', was: { cg: 'cg1', place: '教室', mode: '' } }), { ms: 0, away: false })
+  // 有过场字卡：字卡就是停顿
+  assert.equal(beatHold({ ...base, cg: img, cut: { kind: 'time' } }, { cg: 'cg1', was: { cg: '', place: '教室' } }).ms, 0)
+  // 换了地方
+  const moved = { ...base, scene: { location: '天台', mood: 'daily' }, sceneEnter: true, transition: 'dissolve' }
+  const sceneHold = beatHold(moved, { was: { place: '教室', mode: '' } })
+  assert.equal(sceneHold.away, true)
+  assert.ok(sceneHold.ms > TRANSITION_MS.dissolve && sceneHold.ms <= TRANSITION_MS.dissolve + 500, '转场演完再停一小拍')
+  assert.equal(beatHold({ ...moved, transition: 'none' }, { was: { place: '教室', mode: '' } }).ms, 0, '直接切不等')
+  assert.equal(beatHold(moved, { was: { place: '天台', mode: '' } }).ms, 0, '往回翻到换场那一句，画面没变就不等')
+  assert.equal(beatHold({ ...moved, mode: 'memory' }, { was: { place: '教室', mode: '' } }).ms, 0, '进回忆的转场另算')
+  // 导演写的停顿
+  assert.deepEqual(beatHold({ ...base, pause: 'silence' }, { was: { place: '教室' } }), { ms: PAUSE_MS.silence, away: true })
+  assert.deepEqual(beatHold({ ...base, pause: 'beat' }, { was: { place: '教室' } }), { ms: PAUSE_MS.beat, away: false })
+  // 几样同时有取最长的
+  assert.equal(beatHold({ ...base, cg: img, pause: 'silence' }, { cg: 'cg1', was: { place: '教室' } }).ms, Math.max(PAUSE_MS.silence, cgHoldMs(img, 'daily')))
 })

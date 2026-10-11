@@ -3,7 +3,7 @@
 // 立绘按导演标的登场 / 退场逐句增减；插画从 after 那一句显示到 until 那一句（没写就到这一轮结束）。
 // 场景逐句变：导演在某一句写的地点、时段、天气、光线、基调、画面效果从那一句起生效，特殊段落（回忆、梦境……）进出见 lib/scenes.js。
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
-import { placeKey, speakersOf, MODE_NAMES } from '../../../lib/vocab.js'
+import { placeKey, speakersOf, MODE_NAMES, cgIn, cgOut, cgMotion } from '../../../lib/vocab.js'
 import { stageWalk, playedUnits } from '../../../lib/staging.js'
 import { walkScenes, recallRuns, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
@@ -19,9 +19,9 @@ export const FX_LABEL = { none: '', sway: '摇晃', ride: '颠簸', handheld: '�
 export const MODE_LABEL = { ...MODE_NAMES, real: '回到现实' }
 export const CUT_LABEL = { time: 'Time Skip', date: 'Date', chapter: 'Chapter', meanwhile: 'Meanwhile' }
 export const VOICE_LABEL = { phone: '电话', radio: '广播', telepathy: '心灵感应', chorus: '齐声', offscreen: '画外音', echo: '回声', memory: '回忆', machine: '机械音' }
-export const CG_IN_LABEL = { sweep: '光扫入场', dissolve: '溶入', flash: '白闪', black: '从黑暗中浮现', zoom: '从局部拉开', focus: '失焦到对焦', slide: '滑入', iris: '圆形展开', glitch: '画面撕裂', photo: '照片落下', bloom: '柔光渐显', impact: '冲击' }
-export const CG_OUT_LABEL = { fade: '淡出', dissolve: '溶回场景', flash: '白闪消失', black: '暗下去', blur: '模糊消散', slide: '滑出', shatter: '碎裂', glitch: '撕裂消失', pull: '拉远消失', cut: '直接切掉' }
-export const CG_MOTION_LABEL = { drift: '缓慢推拉', still: '静止', push: '缓慢推近', pull: '缓慢拉远', pan: '横摇', shake: '持续震动', breathe: '轻轻起伏' }
+export const CG_IN_LABEL = { dissolve: '溶入', slow: '慢慢溶入', black: '暗场后浮现', flash: '白闪', focus: '由虚到实', cut: '直接切入', impact: '冲击' }
+export const CG_OUT_LABEL = { dissolve: '溶回场景', slow: '慢慢淡去', black: '暗下去', flash: '白闪', cut: '直接切掉' }
+export const CG_MOTION_LABEL = { still: '静止', push: '极慢推近', pan: '横移一遍' }
 export const CARD_LABEL = { sms: '短信', letter: '信', note: '便条', news: '报纸', terminal: '终端', notice: '告示', diary: '日记', scroll: '卷轴' }
 export const POS_LABEL = { farleft: '最左', left: '左', center: '中', right: '右', farright: '最右' }
 export const CAMERA_LABEL = { shake: '震动', zoom: '推近', zoomout: '拉远', flash: '闪白', pan: '平移', blur: '虚焦', fadeblack: '黑场', redflash: '红闪', tilt: '倾斜' }
@@ -142,6 +142,7 @@ export function buildBeats(view) {
         bgm: at.bgm,
         amb: at.amb,
         sfx: line.sfx || '',
+        ...(line.pause ? { pause: line.pause } : {}), // 「間」：这句的字出来之前先停一下
         sceneEnter: enter,
         transition,
         cast: steps[ui].cast,
@@ -200,6 +201,55 @@ export function stageRatio(cfg) {
 
 export function cgSrc(img, assetUrl) {
   return imageReady(img) ? assetUrl(img.versions[img.current].assetId) : ''
+}
+
+// ───────────── 插画 ─────────────
+/**
+ * 插画怎么出现、收起，演多久（毫秒）。照 galgame 的做法，默认就是溶入、溶回场景；
+ * 导演没写时快慢跟着这一刻的基调走：感伤、感动、静谧这类余韵长的慢一点，滑稽、轻快、激战快一点。
+ * 老存档里的花哨写法（光扫、照片落下、碎裂……）按 lib/vocab.js 换成最接近的一种。样式在 theater.css，时长要对上。
+ */
+export const CG_IN_MS = { dissolve: 800, quick: 400, slow: 1500, black: 1800, flash: 600, focus: 1500, cut: 0, impact: 600 }
+export const CG_OUT_MS = { dissolve: 800, quick: 400, slow: 1500, black: 1500, flash: 600, cut: 0 }
+const SLOW_MOODS = new Set(['sad', 'touching', 'calm', 'solemn', 'despair', 'silence'])
+const QUICK_MOODS = new Set(['comic', 'cheerful', 'battle'])
+const paced = mood => (SLOW_MOODS.has(mood) ? 'slow' : QUICK_MOODS.has(mood) ? 'quick' : 'dissolve')
+export const cgEntrance = (img, mood) => cgIn(img && img.enter) || paced(mood)
+export const cgExit = (img, mood) => cgOut(img && img.leave) || paced(mood)
+export const cgStay = img => cgMotion(img && img.motion) || 'still'
+/**
+ * 这张插画出现时对话框让开多久（毫秒）：像 galgame 那样先藏起对话框，画面出来了就接着念——
+ * 原版脚本里插画出来后几乎从不另加等待，转场本身就是那一拍；这里只多留一点让对话框淡回来。
+ */
+const CG_BEAT_MS = 150
+export function cgHoldMs(img, mood) {
+  return CG_IN_MS[cgEntrance(img, mood)] + CG_BEAT_MS
+}
+
+// ───────────── 「間」：字出来之前先停一下 ─────────────
+/** 转场演多久（毫秒），样式在 Stage.jsx 的 TRANSITION / theater.css，时长要对上。 */
+export const TRANSITION_MS = { dissolve: 1100, fade: 2600, cinematic: 1500, wipe: 1000, iris: 1200, strips: 800, black: 1800, flash: 1000, blink: 1500, glitch: 700, swirl: 1900, haze: 2600, none: 0 }
+/** 导演写的停顿：beat 顿一拍（对话框留着，先不出字），silence 沉默（对话框让开，只剩画面和环境声）。 */
+export const PAUSE_MS = { beat: 900, silence: 2400 }
+/** 换了地方：转场演完再停这么久才出字。 */
+const SCENE_BEAT_MS = 300
+
+/**
+ * 这一拍的字出来之前停多久、对话框要不要先让开：{ ms, away }。
+ * - 插画这一句才出现：对话框让开，出现的过程 + 一拍（cgHoldMs）；
+ * - 换了地方（转场不是直接切）：对话框让开，转场 + 一拍。进出回忆这类特殊段落不在这里算；
+ * - 导演写了 pause：beat 顿一拍，silence 让开对话框沉默一会儿。
+ * 几样同时有取最长的。有过场字卡的那一句字卡本身就是停顿，插画和换场不再另停。
+ * cg：这一拍画面上的插画（还没画好为空）；was：上一拍画面上的 { cg, place, mode }（刚打开剧场时为空）。
+ */
+export function beatHold(beat, { cg = '', was = {} } = {}) {
+  let ms = 0, away = false
+  if (cg && cg !== was.cg && !beat.cut) { ms = Math.max(ms, cgHoldMs(beat.cg, beat.scene.mood)); away = true }
+  const sameLayer = (beat.mode || '') === (was.mode || '')
+  const moved = beat.sceneEnter && beat.scene.location !== was.place && sameLayer
+  if (moved && !beat.cut && TRANSITION_MS[beat.transition]) { ms = Math.max(ms, TRANSITION_MS[beat.transition] + SCENE_BEAT_MS); away = true }
+  if (PAUSE_MS[beat.pause]) { ms = Math.max(ms, PAUSE_MS[beat.pause]); if (beat.pause === 'silence') away = true }
+  return { ms, away }
 }
 
 // ───────────── 我的配乐 ─────────────

@@ -101,7 +101,7 @@ export function directorReply(turn, units) {
       L('不许走神', { sp: '林岚', emo: 'pout', sym: 'anger', say: 'menace' }),
     ],
     choices: [],
-    images: [{ after: find(units, '那就罚你'), title: '午后的琴房', moment: '林岚坐在琴凳上回过头，带着捉弄人的笑，要罚我听她弹完这一首', who: ['林岚'], in: 'zoom' }],
+    images: [{ after: find(units, '那就罚你'), title: '午后的琴房', moment: '林岚坐在琴凳上回过头，带着捉弄人的笑，要罚我听她弹完这一首', who: ['林岚'] }],
     people: [
       { name: '林岚', gender: 'female', appearance: '1girl, long black hair, blue eyes, hair ornament, slender', outfit: '校服', outfitTags: 'sailor school uniform, navy serafuku, red neckerchief, black pantyhose' },
     ],
@@ -122,7 +122,7 @@ export function directorReply(turn, units) {
     ],
     choices: [],
     emotions: [{ name: '害羞地强装镇定', desc: '脸颊泛红却板着脸，目光移开，嘴唇抿紧，手指捏着衣角', base: 'shy' }],
-    images: [{ after: find(units, '悄悄把一个小信封'), until: find(units, '她小声说'), title: '萤火与信封', moment: '萤火虫飞舞的竹林小径，林岚别过脸把信封递过来，苏晴还扶着膝盖喘气，惊讶地看着', who: ['林岚', '苏晴'], in: 'bloom', motion: 'breathe', out: 'dissolve' }],
+    images: [{ after: find(units, '悄悄把一个小信封'), until: find(units, '她小声说'), title: '萤火与信封', moment: '萤火虫飞舞的竹林小径，林岚别过脸把信封递过来，苏晴还扶着膝盖喘气，惊讶地看着', who: ['林岚', '苏晴'], in: 'slow' }],
     people: [
       { name: '林岚', temp: 'holding small envelope' },
       { name: '苏晴', gender: 'female', appearance: '1girl, short brown hair, side ponytail, amber eyes', outfit: '开衫校服', outfitTags: 'school uniform, beige cardigan, white shirt, red ribbon' },
@@ -168,7 +168,7 @@ export function directorReply(turn, units) {
       L('你来了', { sp: '林岚', emo: 'serious', cam: 'zoom', enter: [{ name: '林岚' }], scene: { light: 'spot', fx: 'drift' } }),
     ],
     choices: ['走进音乐教室', '先在门口叫她的名字'],
-    images: [{ after: find(units, '学姐，这是什么曲子'), until: find(units, '一首还没写完的曲子'), title: '三年前的黄昏', moment: '三年前的音乐教室，夕阳和樱花，林岚坐在钢琴前回头微笑', who: ['林岚'], in: 'photo', motion: 'still', out: 'shatter' }],
+    images: [{ after: find(units, '学姐，这是什么曲子'), until: find(units, '一首还没写完的曲子'), title: '三年前的黄昏', moment: '三年前的音乐教室，夕阳和樱花，林岚坐在钢琴前回头微笑', who: ['林岚'] }],
     people: [{ name: '林岚', outfit: '冬季制服', outfitTags: 'winter school uniform, brown duffel coat, red checkered scarf, black pantyhose', states: [{ name: '手腕绷带', tags: 'bandaged wrist' }] }],
     summary: '旧校舍里传来琴声。',
   }
