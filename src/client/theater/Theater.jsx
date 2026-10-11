@@ -125,7 +125,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const beat = index >= 0 ? beats[index] : null
   const speed = skip ? 0 : ui0.textSpeed
   const holdText = Boolean(beat) && glyphKey !== beat.key
-  const typeSpeed = title || panel ? 0 : speed
+  // 打开回想、设置这类面板时不把字速改成 0：改成 0 再改回来，关面板时这句会从头再打一遍（还带着打字音）。
+  // 面板一打开就把这句直接打完（见下面的 effect），关掉后停在打完的样子。
+  const typeSpeed = title ? 0 : speed
   const blipOn = Boolean(ui0.blip) && !skip && !title
   const sfxOn = ui0.sfx !== false && !skip && !title
   React.useEffect(() => { configureSounds(cfg && cfg.ui) }, [cfg])
@@ -138,6 +140,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const voice = React.useMemo(() => (beat ? lineVoice(beat.type, beat.speaker, voices, ui0) : null), [beat && beat.type, beat && beat.speaker, voices, ui0])
   const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : hit })
   // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
+  React.useEffect(() => { if (panel && !done) finish() }, [panel, done])
   const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])
   // 灵光一闪（漫画符号是灯泡）：逆转裁判那一声「叮」
   React.useEffect(() => { if (beat && beat.sym === 'bulb' && sfxOn) stinger('ding') }, [beat && beat.key])

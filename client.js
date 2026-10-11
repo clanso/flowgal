@@ -5484,7 +5484,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const beat = index >= 0 ? beats[index] : null;
   const speed = skip ? 0 : ui0.textSpeed;
   const holdText = Boolean(beat) && glyphKey !== beat.key;
-  const typeSpeed = title || panel ? 0 : speed;
+  const typeSpeed = title ? 0 : speed;
   const blipOn = Boolean(ui0.blip) && !skip && !title;
   const sfxOn = ui0.sfx !== false && !skip && !title;
   import_react11.default.useEffect(() => {
@@ -5497,6 +5497,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const voices = import_react11.default.useMemo(() => castVoices(view && view.cast || [], ui0), [view, ui0]);
   const voice = import_react11.default.useMemo(() => beat ? lineVoice(beat.type, beat.speaker, voices, ui0) : null, [beat && beat.type, beat && beat.speaker, voices, ui0]);
   const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : hit });
+  import_react11.default.useEffect(() => {
+    if (panel && !done) finish();
+  }, [panel, done]);
   const talk = import_react11.default.useMemo(() => beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null, [beat, chars, typed, typeSpeed, typedAt, done]);
   import_react11.default.useEffect(() => {
     if (beat && beat.sym === "bulb" && sfxOn) stinger("ding");
