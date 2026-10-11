@@ -252,9 +252,8 @@
 .fg-text.is-thought { font-style: italic; color: color-mix(in oklab, var(--ink) 70%, var(--accent2)); }
 .fg-text.is-cardhint { color: var(--ink-dim); font-size: 1.3cqw; letter-spacing: .4em; text-align: center; }
 .fg-text.is-thought .fg-line::before { content: "（"; } .fg-text.is-thought .fg-line::after { content: "）"; }
-/* 双语对照：像注音一样，上方小字原文，下方是打出来的翻译 */
-.fg-orig { font-size: .62em; line-height: 1.45; letter-spacing: .02em; opacity: 0; margin-bottom: .2em; animation: fg-orig-in .4s ease forwards; font-style: normal; }
-@keyframes fg-orig-in { to { opacity: .72; } }
+/* 双语对照：像注音一样，上方小字原文，下方是打出来的翻译；原文的字跟着翻译的进度一起出（Dialog.jsx 的 origChars） */
+.fg-orig { font-size: .62em; line-height: 1.45; letter-spacing: .02em; opacity: .72; margin-bottom: .2em; font-style: normal; font-weight: normal; }
 .fg-char { opacity: 0; animation: fg-char-in .22s ease forwards; animation-delay: var(--d); display: inline; }
 .fg-text.is-done .fg-char { animation: none; opacity: 1; }
 .fg-text.is-wait .fg-char { animation: none; }
