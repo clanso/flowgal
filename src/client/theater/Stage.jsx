@@ -339,7 +339,7 @@ export function TitleCard({ beat }) {
     <div className="fg-titlecard" key={beat.key}>
       <div className="fg-titlecard-line" />
       <div className="fg-titlecard-name">{beat.scene.location}</div>
-      <div className="fg-titlecard-sub">{[TIME_LABEL[beat.scene.time], WEATHER_LABEL[beat.scene.weather]].filter(Boolean).join(' · ')} — Turn {beat.turn}</div>
+      <div className="fg-titlecard-sub">{[beat.flashback ? '回忆' : '', TIME_LABEL[beat.scene.time], WEATHER_LABEL[beat.scene.weather]].filter(Boolean).join(' · ')} — Turn {beat.turn}</div>
       <div className="fg-titlecard-line" style={{ width: '14cqw', marginTop: '1cqw' }} />
     </div>
   )

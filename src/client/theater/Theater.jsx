@@ -300,6 +300,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
           {stageBeat && !title && <CgLayer beat={stageBeat} />}
           <Particles weather={stageScene.weather} enabled={ui0.particles !== false} />
           <div className="fg-vignette" />
+          <div className={`fg-memory${stageBeat && stageBeat.flashback && !title ? ' is-on' : ''}`} aria-hidden="true" />
         </div>
         {beat && !title && <Flash beat={beat} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
