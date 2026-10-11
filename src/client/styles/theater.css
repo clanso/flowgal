@@ -393,7 +393,7 @@
 
 /* 光线：关灯、停电、烛光、手电……压在背景和立绘上，插画不受影响。 */
 .fg-light { z-index: 5; }
-.fg-light[data-v="dim"] { background: rgba(20, 22, 50, .3); mix-blend-mode: multiply; }
+.fg-light[data-v="dim"] { background: rgba(20, 22, 50, .22); mix-blend-mode: multiply; }
 .fg-light[data-v="dark"] { background: rgba(8, 12, 40, .74); mix-blend-mode: multiply; backdrop-filter: saturate(.6); -webkit-backdrop-filter: saturate(.6); }
 .fg-light[data-v="black"] { background: #000; opacity: .93; }
 .fg-light[data-v="black"]::after { background: radial-gradient(40% 30% at 50% 60%, rgba(40, 40, 70, .25), transparent 70%); }
