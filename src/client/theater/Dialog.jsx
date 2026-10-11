@@ -58,6 +58,16 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
   return [done, chars, () => setShown({ key, done: true }), start.key === key ? start.at : NaN, plan]
 }
 
+/**
+ * 双语对照的原文跟着翻译一起逐字出来：按进度对齐，翻译打到几成，原文就出到几成（两边字数不同也同时开始、同时打完）。
+ * 返回 [[字, 出现的毫秒], ...]。
+ */
+function origChars(orig, times, count, speed) {
+  const list = Array.from(orig)
+  const at = i => (times && times.length ? times[Math.min(times.length - 1, i)] : i * speed)
+  return list.map((ch, j) => [ch, count ? at(Math.floor((j / list.length) * count)) : 0])
+}
+
 export function DialogBox({ beat, chars, plan, done, waiting, color, quick, progress, status, hiddenText }) {
   const speaker = beat.alias || beat.speaker
   const showName = speaker && beat.type !== 'narration'
@@ -76,7 +86,7 @@ export function DialogBox({ beat, chars, plan, done, waiting, color, quick, prog
       {hiddenText && <div className="fg-text is-cardhint">〔 {CARD_LABEL[beat.card] || '卡片'} 〕</div>}
       {!hiddenText && (
         <div className={`fg-text is-${beat.type}${plan && plan.say ? ' say-' + plan.say : ''}${done ? ' is-done' : waiting ? ' is-wait' : ''}`} key={beat.key} aria-live="polite">
-          {beat.orig && <div className="fg-orig" lang="und">{beat.orig}</div>}
+          {beat.orig && <div className="fg-orig" lang="und">{origChars(beat.orig, times, chars.length, speed).map(([ch, d], i) => <span key={i} className="fg-char" style={{ '--d': d + 'ms' }}>{ch}</span>)}</div>}
           <span className="fg-line">{chars.map((ch, i) => <span key={i} className={marks[i] ? 'fg-char is-' + marks[i] : 'fg-char'} style={{ '--d': (times ? times[i] : i * speed) + 'ms' }}>{ch}</span>)}</span>
         </div>
       )}
