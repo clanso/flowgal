@@ -70,8 +70,12 @@ export function cgReply(request) {
   })
 }
 const isCgWriter = request => request.system.includes('你是视觉小说的插画分镜师')
-/** 导演、立绘设计师和插画分镜师共用一个假模型：按系统提示词分流。 */
-export const routedReply = director => request => (request.system.includes('立绘设计师') ? spriteReply(request) : isCgWriter(request) ? cgReply(request) : typeof director === 'function' ? director(request) : director)
+export const isActingWriter = request => request.system.includes('你是视觉小说的角色表演设计师')
+/**
+ * 导演、立绘设计师和插画分镜师共用一个假模型：按系统提示词分流。
+ * 动作与表情设计默认回空（设计不出来，按通用动作组画）：这里测的是没有设计时的老路，设计的整条流程在 tests/acting.test.mjs。
+ */
+export const routedReply = (director, acting = () => '{}') => request => (request.system.includes('立绘设计师') ? spriteReply(request) : isActingWriter(request) ? acting(request) : isCgWriter(request) ? cgReply(request) : typeof director === 'function' ? director(request) : director)
 
 test('gate: 一整轮的后台整理与出图', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
@@ -389,7 +393,7 @@ test('gate: 导演新造的复合情绪进情绪库，按这身衣服和长期�
     assert.match(writer, /睡衣」（pajamas）；长期状态 怀孕（pregnant, round belly）；情绪「带着烦躁思考」：皱眉撇嘴，手托下巴；接近 思考/)
     // 导演下一轮能在情绪库里看到它。
     await engine.onTurnSettled({ gameId: 'g', turn: 4, textVersion: 'v4', text: '“嗯。”' })
-    const next = llm.calls.filter(c => !c.system.includes('立绘设计师')).at(-1).messages[0].content[0].text
+    const next = llm.calls.filter(c => c.system.includes('后台导演')).at(-1).messages[0].content[0].text
     assert.match(next, /【情绪库】[\s\S]*- 带着烦躁思考：皱眉撇嘴，手托下巴/)
     engine.dispose()
   } finally {

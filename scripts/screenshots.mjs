@@ -1,4 +1,4 @@
-// 截图：起一个预览服务，用 Playwright 走一遍聊天页 → 标题画面 → 剧场 → 各面板 → 皮肤 → 立绘差分 → 手机竖屏。
+// 截图：起一个预览服务，用 Playwright 走一遍聊天页 → 标题画面 → 剧场 → 各面板 → 皮肤 → 立绘差分 → 动作与表情 → 手机竖屏。
 //   node scripts/screenshots.mjs [输出目录]
 // 需要 playwright（本仓库不装；用全局的或 PLAYWRIGHT_MODULE 指定路径）。字体想走本地镜像时设 FLOWGAL_FONT_DIR（见 preview-server.mjs）。
 import { spawn, execSync } from 'node:child_process'
@@ -189,10 +189,15 @@ try {
   await click('.fg-btn:has-text("衣橱与状态")', 800)
   await page.locator('.fg-wardrobe').scrollIntoViewIfNeeded(); await sleep(300)
   await shot('32-wardrobe')
+  // 动作与表情：画立绘前给林岚设计的专属动作（每个动作一张底图）和每种情绪的表情
+  await click('.fg-btn:has-text("动作与表情")', 800)
+  await page.locator('.fg-acting').scrollIntoViewIfNeeded(); await sleep(300)
+  await shot('46-acting-sheet')
   await click('.fg-tab:has-text("情绪库")', 800); await shot('33-emotion-library')
   await page.keyboard.press('Escape'); await sleep(300)
   await click('.fg-quick button:has-text("DIR")', 1400)
   await click('.fg-dlog-row:has-text("立绘 · 林岚")', 900); await shot('34-director-sprite')
+  await click('.fg-dlog-row:has-text("动作与表情 · 林岚")', 900); await shot('47-director-acting')
   await click('.fg-dlog-row:has-text("插画 · 第 2 轮")', 900); await shot('38-director-cg')
   await page.keyboard.press('Escape'); await sleep(300)
   // NovelAI V5：透明底立绘、引导缩放、种子
