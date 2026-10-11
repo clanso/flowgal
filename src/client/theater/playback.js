@@ -49,6 +49,7 @@ export function buildBeats(view) {
   let bgm = '' // 当前在放的曲子（导演选的编号 / none）；没整理的轮次沿用上一轮
   let amb = '' // 当前的环境音，同上
   let shown = null // 上一拍画面上的场景和段落：判断新一轮开场要不要转场
+  const active = new Map() // 每个人最近一次说话、登场是第几拍：台上人太多时，最久没动静的先下场
   turns.forEach((t, ti) => {
     const script = t.script
     if (script && script.scene && script.scene.bgm) bgm = script.scene.bgm
@@ -105,6 +106,7 @@ export function buildBeats(view) {
         transition = !opened ? '' : at.transition || (at.mode && (!shown || at.mode !== shown.mode) ? MODE_TRANSITION[at.mode] : enter ? opening : 'fade')
       }
       shown = at
+      for (const name of [...speakers, ...steps[ui].entered]) active.set(name, beats.length)
       beats.push({
         key: `${t.turn}:${unit.id}`,
         turn: t.turn,
@@ -134,6 +136,7 @@ export function buildBeats(view) {
         sceneEnter: enter,
         transition,
         cast: steps[ui].cast,
+        recent: steps[ui].cast.map(c => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)), // 台上的人，最近有动静的在前
         entered: steps[ui].entered,
         left: steps[ui].left,
         emotions: { ...emotions },
@@ -156,6 +159,27 @@ export function buildBeats(view) {
 }
 
 export function actorX(pos) { return POS_X[pos] ?? 50 }
+
+/** 同屏最多站几个人：超出的，最久没说话、没登场的先下场（还算在场，轮到他说话就回来）。max 为 0 不限。 */
+export function onStage(cast, recent, max) {
+  if (!max || cast.length <= max) return cast
+  const keep = new Set((recent || []).filter(name => cast.some(c => c.name === name)).concat(cast.map(c => c.name)).slice(0, max))
+  return cast.filter(c => keep.has(c.name))
+}
+
+// 两个人以上时从中间往两边排开的半宽（舞台宽度的百分比），以及人多时立绘缩小的比例（像站远了一点）。
+const SPREAD = [0, 0, 20, 30, 36, 38]
+const SHRINK = [1, 1, 1, 1, 0.92, 0.84, 0.76, 0.7, 0.64]
+
+/** 站位：一个人照导演写的站；两个人以上按站位从左到右均匀排开，人越多立绘越小，不挤成一团。返回带 x（百分比）和 scale 的条目。 */
+export function stageLayout(cast) {
+  const n = cast.length
+  if (n <= 1) return cast.map(c => ({ ...c, x: actorX(c.pos), scale: 1 }))
+  const half = SPREAD[Math.min(n, SPREAD.length - 1)]
+  const scale = SHRINK[Math.min(n, SHRINK.length - 1)]
+  const order = cast.map((c, i) => ({ name: c.name, x: actorX(c.pos), i })).sort((a, b) => a.x - b.x || a.i - b.i).map(c => c.name)
+  return cast.map(c => ({ ...c, x: Math.round((50 - half + (2 * half * order.indexOf(c.name)) / (n - 1)) * 10) / 10, scale }))
+}
 
 /** 舞台的宽高比：默认跟横版插画一样（NovelAI 常用的 1216×832），插画正好铺满；也可以选 16:9。 */
 export function stageRatio(cfg) {

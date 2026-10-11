@@ -322,7 +322,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
             <div className="fg-world-in" data-mode={atmosphere ? stageMode : ''}>
               <Backdrop scene={stageScene} view={view} transition={(stageBeat && stageBeat.transition) || 'dissolve'} />
               <div className="fg-grade" data-time={stageScene.time} />
-              {stageBeat && <Cast beat={title ? { ...stageBeat, speaker: '', sym: '' } : stageBeat} view={view} talk={title ? null : talk} />}
+              {stageBeat && <Cast beat={title ? { ...stageBeat, speaker: '', sym: '' } : stageBeat} view={view} talk={title ? null : talk} max={ui0.maxOnStage ?? 5} />}
               <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} />
               <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} />
               {stageBeat && !title && <CgLayer beat={stageBeat} sound={sfxOn} />}
