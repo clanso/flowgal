@@ -1,16 +1,18 @@
-// 舞台：背景（生成图 / 程序化天空）、时段调色、天气粒子、立绘、漫画符号、CG、镜头与闪光、地点标题卡。
+// 舞台：背景（生成图 / 程序化天空）、时段调色、天气粒子、立绘、漫画符号、CG、镜头与闪光、地点标题卡，
+// 以及逐句可变的气氛：基调色调、光线、画面效果、特殊段落的滤镜、过场字卡。
 import React from 'react'
 import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
-import { SKY, placeKey, actorX, cgSrc, TIME_LABEL, WEATHER_LABEL } from './playback.js'
+import { SKY, placeKey, actorX, cgSrc, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite } from '../../../lib/look.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger } from './audio.js'
 
 const TRANSITION = {
-  dissolve: ['fg-dissolve', '1.1s'], cinematic: ['fg-cinematic', '1.5s'], wipe: ['fg-wipe', '1s'], iris: ['fg-iris', '1.2s'],
-  strips: ['fg-wipe', '.8s'], black: ['fg-black-in', '1.8s'], flash: ['fg-flash-in', '1s'], none: ['none', '0s'],
+  dissolve: ['fg-dissolve', '1.1s'], fade: ['fg-fade-slow', '2.6s'], cinematic: ['fg-cinematic', '1.5s'], wipe: ['fg-wipe', '1s'], iris: ['fg-iris', '1.2s'],
+  strips: ['fg-wipe', '.8s'], black: ['fg-black-in', '1.8s'], flash: ['fg-flash-in', '1s'], blink: ['fg-blink-in', '1.5s'], glitch: ['fg-glitch-in', '.7s'],
+  swirl: ['fg-swirl-in', '1.9s'], none: ['none', '0s'],
 }
 
 export function backgroundFor(scene, view) {
@@ -333,16 +335,57 @@ export function CgLayer({ beat }) {
   )
 }
 
-export function TitleCard({ beat }) {
+/** 地点标题卡：换了地方、进出特殊段落时出现；有过场字卡时等字卡收起再出。 */
+export function TitleCard({ beat, delay = 0 }) {
   if (!beat.sceneEnter || !beat.scene.location) return null
   return (
-    <div className="fg-titlecard" key={beat.key}>
+    <div className="fg-titlecard" key={beat.key} style={delay ? { animationDelay: delay + 'ms' } : null}>
       <div className="fg-titlecard-line" />
       <div className="fg-titlecard-name">{beat.scene.location}</div>
-      <div className="fg-titlecard-sub">{[beat.flashback ? '回忆' : '', TIME_LABEL[beat.scene.time], WEATHER_LABEL[beat.scene.weather]].filter(Boolean).join(' · ')} — Turn {beat.turn}</div>
+      <div className="fg-titlecard-sub">{[MODE_LABEL[beat.mode], TIME_LABEL[beat.scene.time], beat.scene.weather !== 'clear' ? WEATHER_LABEL[beat.scene.weather] : ''].filter(Boolean).join(' · ')} — Turn {beat.turn}</div>
       <div className="fg-titlecard-line" style={{ width: '14cqw', marginTop: '1cqw' }} />
     </div>
   )
+}
+
+/** 过场字卡停留多久（毫秒）：这段时间里这句先不出字，点一下跳过。 */
+export const CUT_MS = 2300
+
+/** 过场字卡：时间跳跃、日期、章节、与此同时。全屏压暗，字卡收起后再出这句的字。 */
+export function CutCard({ beat, out }) {
+  const cut = beat.cut
+  if (!cut) return null
+  return (
+    <div className={`fg-cut${out ? ' is-out' : ''}`} data-kind={cut.kind} key={beat.key} aria-live="polite">
+      <div className="fg-cut-inner">
+        <div className="fg-cut-kicker"><i />{CUT_LABEL[cut.kind] || ''}<i /></div>
+        <div className="fg-cut-text">{cut.text}</div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 气氛层：值变了时新的一层淡入、旧的一层淡出（基调色调、光线、画面效果、特殊段落滤镜都用它）。
+ * value 为空就是没有这一层；className 下的 data-v 决定样子，样式在 theater.css。
+ */
+export function FadeLayer({ name, value, ms = 1200 }) {
+  const [layers, setLayers] = React.useState(() => [{ id: 0, value }])
+  React.useEffect(() => {
+    setLayers(list => {
+      const top = list[list.length - 1]
+      if (top.value === value) return list
+      return [...list.filter(l => !l.leaving).map(l => ({ ...l, leaving: true })), { id: top.id + 1, value }]
+    })
+  }, [value])
+  React.useEffect(() => {
+    if (!layers.some(l => l.leaving)) return undefined
+    const t = setTimeout(() => setLayers(list => list.filter(l => !l.leaving)), ms)
+    return () => clearTimeout(t)
+  }, [layers])
+  return layers.filter(l => l.value).map(l => (
+    <div key={l.id} className={`fg-${name}${l.leaving ? ' is-leave' : ''}`} data-v={l.value} style={{ '--fade': ms + 'ms' }} aria-hidden="true" />
+  ))
 }
 
 /** 震动强度 1~3：位移（占元素宽高的百分比）和时长。 */
@@ -388,10 +431,12 @@ export function useCamera(beat) {
   return cam
 }
 
+const TRANSITION_OVERLAY = { flash: '', black: 'is-black', blink: 'is-blink', glitch: 'is-glitch' }
+
 export function Flash({ beat }) {
   if (!beat) return null
   const kind = beat.cam === 'flash' ? '' : beat.cam === 'redflash' ? 'is-red' : beat.cam === 'fadeblack' ? 'is-black' : null
-  const tr = beat.transition === 'flash' ? '' : beat.transition === 'black' ? 'is-black' : null
+  const tr = TRANSITION_OVERLAY[beat.transition] ?? null
   const cls = kind ?? tr
   if (cls === null) return null
   return <div key={beat.key} className={`fg-flash ${cls}`} />

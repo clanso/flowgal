@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { cleanTurnText } from '../lib/clean.js'
 import { segmentTurn, joinUnits, pairUnits } from '../lib/segment.js'
-import { normalizeScript, rawSection, scriptScenes } from '../lib/director.js'
-import { playedUnits } from '../lib/staging.js'
+import { normalizeScript, rawSection, scriptScenes, sceneAfter, playingAfter, previousBrief } from '../lib/director.js'
+import { playedUnits, castAtEnd } from '../lib/staging.js'
 import { buildBeats } from '../src/client/theater/playback.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
@@ -290,43 +290,100 @@ test('gate: 双语对照由导演标 dual：原文、翻译合成一句（text �
   }
 })
 
-test('gate: 回忆：flash in 起换成回忆里的场景和配乐、画面标回忆，flash out 起回到现在、配乐换回去；一轮结束自动回到现在', () => {
+test('gate: 特殊段落：进入回忆换场景和配乐、在场的人，写 real 时场景、配乐、在场的人自动换回来；一轮结束也回到现实', () => {
   const units = segmentTurn(['长楼梯上，她一直握着那颗宝石。', '三年前。', '“稍等一下哦。”', '“那一方死了会怎样？”', '她回过神来。', '下一句。'].join('\n'))
   const raw = {
     scene: { location: '第88层·长楼梯', time: 'night', bgm: 'T1' },
     cast: [{ name: '柯萝伊', pos: 'center' }],
     lines: [
-      { u: 'U2', flash: 'in', memory: { location: '第60层·深层（三年前）', time: 'weird', bg: 'cave, crystals, scenery, no humans' }, bgm: 'T2', exit: ['柯萝伊'], enter: [{ name: '阿黛尔', pos: 'left' }] },
+      { u: 'U2', mode: 'memory', scene: { location: '第60层·深层（三年前）', time: 'weird', bg: 'cave, crystals, scenery, no humans' }, bgm: 'T2', exit: ['*'], enter: [{ name: '阿黛尔', pos: 'left' }] },
       { u: 'U3', sp: '阿黛尔' },
       { u: 'U4', sp: '布琳希尔德', bgm: 'T3' },
-      { u: 'U5', flash: 'out', exit: ['阿黛尔'], enter: [{ name: '柯萝伊' }] },
-      { u: 'U6', flash: 'sideways' },
+      { u: 'U5', mode: 'real' },
+      { u: 'U6', mode: 'sideways' },
     ],
   }
   const s = normalizeScript(raw, units, { trackIds: ['T1', 'T2', 'T3'] })
-  assert.deepEqual(s.lines.U2.memory, { location: '第60层·深层（三年前）', bg: 'cave, crystals, scenery, no humans' }, '写错的时段不收')
-  assert.equal(s.lines.U2.bgm, 'T2', '进回忆换的歌不占一轮一次的名额')
-  assert.equal(s.lines.U4.bgm, 'T3')
-  assert.equal(s.lines.U6.flash, undefined)
+  assert.deepEqual(s.lines.U2.scene, { location: '第60层·深层（三年前）', bg: 'cave, crystals, scenery, no humans' }, '写错的时段不收')
+  assert.equal(s.lines.U2.bgm, 'T2', '进段落换的歌不占名额')
+  assert.equal(s.lines.U4.bgm, 'T3', '段落外一轮还能换一次')
+  assert.equal(s.lines.U6.mode, undefined, '认不得的段落不收')
   assert.deepEqual(scriptScenes(s).map(x => x.location), ['第88层·长楼梯', '第60层·深层（三年前）'])
-  assert.equal(scriptScenes(s)[1].time, 'night', '回忆里没写的项沿用本轮的')
+  assert.equal(scriptScenes(s)[1].time, 'night', '段落里没写的项沿用现在的')
+  assert.equal(playingAfter(s), 'T1', '段落里换的歌不算一幕结束时在放的')
 
   const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: s }, { turn: 2, textVersion: 'v2', units: segmentTurn('第二轮。'), script: null }], images: [] })
-  assert.deepEqual(beats.map(b => [b.unitId, b.scene.location, Boolean(b.flashback), b.bgm]), [
-    ['U1', '第88层·长楼梯', false, 'T1'],
-    ['U2', '第60层·深层（三年前）', true, 'T2'],
-    ['U3', '第60层·深层（三年前）', true, 'T2'],
-    ['U4', '第60层·深层（三年前）', true, 'T3'],
-    ['U5', '第88层·长楼梯', false, 'T1'],
-    ['U6', '第88层·长楼梯', false, 'T1'],
-    ['U1', '第88层·长楼梯', false, 'T1'],
+  assert.deepEqual(beats.map(b => [b.unitId, b.scene.location, b.mode, b.bgm, b.cast.map(c => c.name).join()]), [
+    ['U1', '第88层·长楼梯', '', 'T1', '柯萝伊'],
+    ['U2', '第60层·深层（三年前）', 'memory', 'T2', '阿黛尔'],
+    ['U3', '第60层·深层（三年前）', 'memory', 'T2', '阿黛尔'],
+    ['U4', '第60层·深层（三年前）', 'memory', 'T3', '阿黛尔'],
+    ['U5', '第88层·长楼梯', '', 'T1', '柯萝伊'],
+    ['U6', '第88层·长楼梯', '', 'T1', '柯萝伊'],
+    ['U1', '第88层·长楼梯', '', 'T1', '柯萝伊'],
   ])
-  assert.ok(beats[1].sceneEnter && beats[1].transition === 'flash' && beats[4].sceneEnter)
-  assert.deepEqual(beats[1].cast.map(c => c.name), ['阿黛尔'])
-  assert.deepEqual(beats[4].cast.map(c => c.name), ['柯萝伊'])
-  // 回忆没写 out：一轮结束时回到现在
-  const open = normalizeScript({ scene: { location: '楼梯', bgm: 'T1' }, lines: [{ u: 'U2', flash: 'in', bgm: 'T2' }] }, units, { trackIds: ['T1', 'T2'] })
-  const next = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: open }, { turn: 2, textVersion: 'v2', units: segmentTurn('第二轮。'), script: null }], images: [] }).beats.at(-1)
-  assert.equal(next.flashback, undefined)
-  assert.equal(next.bgm, 'T1')
+  assert.ok(beats[1].sceneEnter && beats[1].transition === 'flash', '进回忆默认白闪')
+  assert.ok(beats[4].sceneEnter && beats[4].transition === 'dissolve')
+  assert.deepEqual([beats[4].entered, beats[4].left], [['柯萝伊'], ['阿黛尔']])
+  // 段落没写 real：一轮结束时回到现实，下一轮没接着演就是现实
+  const open = normalizeScript({ scene: { location: '楼梯', bgm: 'T1' }, cast: [{ name: '柯萝伊' }], lines: [{ u: 'U2', mode: 'dream', bgm: 'T2', exit: ['柯萝伊'] }] }, units, { trackIds: ['T1', 'T2'] })
+  assert.deepEqual(castAtEnd(open).map(c => c.name), ['柯萝伊'], '给下一轮看的是现实里在场的人')
+  assert.match(previousBrief(open), /结束时还在特殊段落 dream 里/)
+  const two = (second, script) => buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: open }, { turn: 2, textVersion: 'v2', units: segmentTurn(second), script }], images: [] }).beats
+  const back = two('第二轮。', null).at(-1)
+  assert.deepEqual([back.mode, back.bgm, back.sceneEnter], ['', 'T1', true])
+  // 下一轮第一句接着演同一种段落：不转场、不出标题卡，接着在梦里
+  const still = two('还在梦里。\n醒了。', { scene: { location: '楼梯', bgm: 'T1' }, cast: [], lines: { U1: { mode: 'dream' }, U2: { mode: 'real', scene: { transition: 'blink' } } } })
+  assert.deepEqual(still.slice(-2).map(b => [b.mode, b.bgm, b.sceneEnter, b.transition]), [['dream', 'T2', false, ''], ['', 'T1', true, 'blink']])
+})
+
+test('gate: 场景逐句变：换地方、天色变化、天气光线基调、画面效果、过场字卡；不演的舞台指示上的变化挪到下一句', () => {
+  const units = segmentTurn(['教室里只剩两个人。', '【场景：走廊】', '她们走到走廊。', '窗外的天渐渐黑了。', '啪，灯灭了。', '三小时后。', '回到教室，雨已经下起来了。', '“与此同时……”'].join('\n'))
+  const raw = {
+    scene: { location: '教室', time: 'afternoon', mood: 'daily', bg: 'classroom, scenery, no humans', bgm: 'T1', light: 'warm' },
+    skip: ['U2'],
+    cast: [{ name: '晓铃', pos: 'left' }, { name: '林岚', pos: 'right' }],
+    lines: [
+      { u: 'U2', scene: { location: '走廊', bg: 'school hallway, scenery, no humans' }, bgm: 'T2' },
+      { u: 'U3', sp: '晓铃', scene: { fx: 'drift' } },
+      { u: 'U4', scene: { time: 'dusk' } },
+      { u: 'U5', scene: { light: 'dark', mood: 'eerie' }, bgm: 'T3', exit: ['*'] },
+      { u: 'U6', cut: '三小时后', scene: { location: '教室', time: 'night', weather: 'rain', light: 'bogus' } },
+      { u: 'U7', bgm: 'T1' },
+      { u: 'U8', cut: { kind: 'meanwhile' } },
+    ],
+  }
+  const s = normalizeScript(raw, units, { trackIds: ['T1', 'T2', 'T3'] })
+  assert.equal(s.scene.light, 'warm')
+  assert.equal(s.scene.fx, 'none')
+  assert.deepEqual(s.lines.U3.scene, { location: '走廊', bg: 'school hallway, scenery, no humans', fx: 'drift' }, '舞台指示上的场景挪到下一句要演的')
+  assert.equal(s.lines.U3.bgm, 'T2')
+  assert.equal(s.lines.U5.bgm, 'T3', '基调转折那句可以换歌')
+  assert.deepEqual(s.lines.U6.cut, { kind: 'time', text: '三小时后' })
+  assert.equal(s.lines.U6.scene.light, undefined, '写错的光线不收')
+  assert.equal(s.lines.U7.bgm, 'T1', '平常的句子一轮还能换一次')
+  assert.deepEqual(s.lines.U8.cut, { kind: 'meanwhile', text: '与此同时' })
+
+  const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: s }], images: [] })
+  assert.deepEqual(beats.map(b => [b.unitId, b.scene.location, b.scene.time, b.scene.light, b.scene.fx, b.scene.mood, b.sceneEnter, b.transition]), [
+    ['U1', '教室', 'afternoon', 'warm', 'none', 'daily', true, 'dissolve'],
+    ['U3', '走廊', 'afternoon', 'normal', 'drift', 'daily', true, 'dissolve'],
+    ['U4', '走廊', 'dusk', 'normal', 'drift', 'daily', false, 'fade'],
+    ['U5', '走廊', 'dusk', 'dark', 'drift', 'eerie', false, ''],
+    ['U6', '教室', 'night', 'normal', 'none', 'eerie', true, 'dissolve'],
+    ['U7', '教室', 'night', 'normal', 'none', 'eerie', false, ''],
+    ['U8', '教室', 'night', 'normal', 'none', 'eerie', false, ''],
+  ])
+  assert.equal(beats[4].scene.bg, 'classroom, scenery, no humans', '回到这一轮去过的地方，背景接着用')
+  assert.equal(beats[4].scene.weather, 'rain')
+  assert.deepEqual(beats[4].cut, { kind: 'time', text: '三小时后' })
+  assert.deepEqual(beats[3].cast, [], '全部离开')
+  assert.deepEqual(beats.map(b => b.bgm), ['T1', 'T2', 'T2', 'T3', 'T3', 'T1', 'T1'])
+  // 出背景图：开场、换过去的走廊、走廊黄昏（同一处换了时段要另一张）、夜里的教室
+  assert.deepEqual(scriptScenes(s).map(x => `${x.location}|${x.time}`), ['教室|afternoon', '走廊|afternoon', '走廊|dusk', '教室|night'])
+  // 下一轮接着上一轮最后的样子演
+  assert.deepEqual([sceneAfter(s).location, sceneAfter(s).time, sceneAfter(s).weather], ['教室', 'night', 'rain'])
+  assert.match(previousBrief(s), /地点：教室；时段：night；天气：rain；基调：eerie/)
+  const next = normalizeScript({ scene: {} }, segmentTurn('第二天。'), { previous: s, trackIds: ['T1', 'T2', 'T3'] })
+  assert.deepEqual([next.scene.location, next.scene.time, next.scene.bg, next.scene.bgm, next.scene.transition], ['教室', 'night', 'classroom, scenery, no humans', 'T1', 'none'])
 })

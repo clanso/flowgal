@@ -1,8 +1,8 @@
 // 剧场：全屏 galgame 播放器。读宿主整理好的场景脚本，逐拍演出；导演没整理完的部分先按原文演。
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
-import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, emotionLabel, pickTrack, stageRatio } from './playback.js'
-import { Backdrop, Cast, CgLayer, TitleCard, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio } from './playback.js'
+import { Backdrop, Cast, CgLayer, TitleCard, CutCard, CUT_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -23,7 +23,7 @@ const GLYPH_WAIT = 1200
 /** 正文字体画台词；标题字体画名牌、地点和信件类卡片。 */
 const glyphsOf = list => ({
   body: list.map(b => b.text).join(''),
-  display: list.map(b => (b.alias || b.speaker) + b.scene.location + (b.card ? b.text : '')).join(''),
+  display: list.map(b => (b.alias || b.speaker) + b.scene.location + (b.card ? b.text : '') + (b.cut ? b.cut.text : '')).join(''),
 })
 
 /** 把选项 / 自由输入填进 Tavern 的输入框（尽力而为），同时复制到剪贴板。 */
@@ -124,7 +124,15 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
   const beat = index >= 0 ? beats[index] : null
   const speed = skip ? 0 : ui0.textSpeed
-  const holdText = Boolean(beat) && glyphKey !== beat.key
+  // 过场字卡（三小时后、与此同时……）：字卡收起前这句先不出字；点一下跳过，快进时不出字卡。
+  const [cutSeen, setCutSeen] = React.useState('')
+  const cutting = Boolean(beat && beat.cut && !title && speed > 0 && cutSeen !== beat.key)
+  React.useEffect(() => {
+    if (!cutting) return undefined
+    const t = setTimeout(() => setCutSeen(beat.key), CUT_MS)
+    return () => clearTimeout(t)
+  }, [cutting, beat && beat.key])
+  const holdText = (Boolean(beat) && glyphKey !== beat.key) || cutting
   // 打开回想、设置这类面板时不把字速改成 0：改成 0 再改回来，关面板时这句会从头再打一遍（还带着打字音）。
   // 面板一打开就把这句直接打完（见下面的 effect），关掉后停在打完的样子。
   const typeSpeed = title ? 0 : speed
@@ -193,11 +201,12 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
   const advance = React.useCallback(() => {
     if (!beat) return
+    if (cutting) { setCutSeen(beat.key); return }
     if (!done) { finish(); return }
     if (atEnd) { setAuto(false); setSkip(false); setChoosing(true); return }
     sfx('page')
     go(index + 1)
-  }, [beat, done, atEnd, index, go, finish])
+  }, [beat, done, atEnd, index, go, finish, cutting])
 
   // 自动 / 快进。
   React.useEffect(() => {
@@ -270,7 +279,10 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }
 
   const stageBeat = beat || (beats.length ? beats[beats.length - 1] : null)
-  const stageScene = stageBeat ? stageBeat.scene : { location: '', time: 'night', weather: 'stars', mood: 'calm' }
+  const stageScene = stageBeat ? stageBeat.scene : { location: '', time: 'night', weather: 'stars', mood: 'calm', light: 'normal', fx: 'none' }
+  const stageMode = (stageBeat && stageBeat.mode) || ''
+  // 标题画面上不加光线、滤镜、晃动这些气氛层，只留背景、天色和天气
+  const atmosphere = Boolean(stageBeat) && !title
   const latest = beats.length ? beats[beats.length - 1] : null
   const cardTitle = (view && view.card && view.card.name) || 'FlowGal'
 
@@ -294,18 +306,28 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       <div className="fg-stage" ref={stageRef} onClick={() => { if (hidden) { setHidden(false); return } if (!title && !panel && !choosing) advance() }}
         onWheel={e => { if (!title && !panel && e.deltaY < -30) setPanel('log') }}>
         <div className="fg-camera" data-cam={cam}>
-          <Backdrop scene={stageScene} view={view} transition={stageBeat ? (stageBeat.sceneEnter ? stageBeat.transition : 'dissolve') : 'dissolve'} />
-          <div className="fg-grade" data-time={stageScene.time} />
-          {stageBeat && <Cast beat={title ? { ...stageBeat, speaker: '', sym: '' } : stageBeat} view={view} talk={title ? null : talk} />}
-          {stageBeat && !title && <CgLayer beat={stageBeat} />}
-          <Particles weather={stageScene.weather} enabled={ui0.particles !== false} />
-          <div className="fg-vignette" />
-          <div className={`fg-memory${stageBeat && stageBeat.flashback && !title ? ' is-on' : ''}`} aria-hidden="true" />
+          {/* 画面效果（船上摇晃、车里颠簸、心跳……）和特殊段落（梦里飘、幻觉里扭曲）各动一层，叠在一起不互相顶掉 */}
+          <div className="fg-world" data-fx={atmosphere ? stageScene.fx : ''}>
+            <div className="fg-world-in" data-mode={atmosphere ? stageMode : ''}>
+              <Backdrop scene={stageScene} view={view} transition={(stageBeat && stageBeat.transition) || 'dissolve'} />
+              <div className="fg-grade" data-time={stageScene.time} />
+              {stageBeat && <Cast beat={title ? { ...stageBeat, speaker: '', sym: '' } : stageBeat} view={view} talk={title ? null : talk} />}
+              <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} />
+              <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} />
+              {stageBeat && !title && <CgLayer beat={stageBeat} />}
+              <Particles weather={stageScene.weather} enabled={ui0.particles !== false} />
+              <FadeLayer name="fxlayer" value={atmosphere && stageScene.fx !== 'none' ? stageScene.fx : ''} ms={900} />
+              <div className="fg-vignette" />
+            </div>
+          </div>
         </div>
+        {/* 特殊段落的滤镜放在镜头外面：推镜头时录像框、REC 这些不跟着放大，对话框和标题卡也不被滤到 */}
+        <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={1200} />
         {beat && !title && <Flash beat={beat} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
         {!panel && <RestartNotice floating />}
-        {beat && !title && <TitleCard beat={beat} />}
+        {beat && !title && <TitleCard beat={beat} delay={beat.cut && speed > 0 ? CUT_MS : 0} />}
+        {beat && !title && beat.cut && speed > 0 && <CutCard beat={beat} out={!cutting} />}
 
         {!title && beat && (
           <div className="fg-hud">
@@ -313,8 +335,11 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
             <div>
               <div className="fg-hud-place">{beat.scene.location || `第 ${beat.turn} 轮`}</div>
               <div className="fg-hud-meta">
+                {beat.mode && <span className="fg-hud-mode">{MODE_LABEL[beat.mode]}</span>}
                 <span>{TIME_LABEL[beat.scene.time] || ''}</span>
                 {beat.scene.weather && beat.scene.weather !== 'clear' && <span>{WEATHER_LABEL[beat.scene.weather]}</span>}
+                {LIGHT_LABEL[beat.scene.light] && <span>{LIGHT_LABEL[beat.scene.light]}</span>}
+                {FX_LABEL[beat.scene.fx] && <span>{FX_LABEL[beat.scene.fx]}</span>}
                 {beat.scene.mood && <span>♪ {MOOD_LABEL[beat.scene.mood]}</span>}
               </div>
             </div>

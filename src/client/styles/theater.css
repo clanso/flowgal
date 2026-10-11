@@ -83,9 +83,6 @@
 .fg-grade[data-time="night"] { background: linear-gradient(180deg, rgba(10, 20, 80, .78), rgba(20, 10, 60, .7)); mix-blend-mode: multiply; }
 .fg-grade[data-time="midnight"] { background: linear-gradient(180deg, rgba(4, 6, 40, .86), rgba(10, 4, 30, .8)); mix-blend-mode: multiply; }
 .fg-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, .55)); }
-/* 回忆：整个画面泛黄褪色、四角发白发虚（导演标 flash: in 到 out 之间） */
-.fg-memory { position: absolute; inset: 0; z-index: 9; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; backdrop-filter: sepia(.8) saturate(.7) contrast(.9) brightness(1.08); -webkit-backdrop-filter: sepia(.8) saturate(.7) contrast(.9) brightness(1.08); background: radial-gradient(115% 85% at 50% 45%, transparent 48%, rgba(255, 240, 214, .55)), linear-gradient(rgba(255, 210, 150, .1), rgba(255, 210, 150, .1)); }
-.fg-memory.is-on { opacity: 1; }
 .fg-letterbox::before, .fg-letterbox::after { content: ""; position: absolute; left: 0; right: 0; height: 9%; background: #000; z-index: 30; animation: fg-bars .8s cubic-bezier(.6, 0, .2, 1) both; }
 .fg-letterbox::before { top: 0; transform-origin: top; } .fg-letterbox::after { bottom: 0; transform-origin: bottom; }
 @keyframes fg-bars { from { transform: scaleY(0); } }
@@ -216,6 +213,176 @@
 .fg-hitflash { position: absolute; inset: 0; z-index: 41; pointer-events: none; opacity: 0; background: #fff; }
 .fg-hitflash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .25), rgba(160, 0, 20, .8)); }
 @keyframes fg-black { 0% { opacity: 0; } 35%, 60% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ───────────── 气氛：逐句可变 ─────────────
+   层次（都在 .fg-world-in 里）：背景 → 时段调色 → 立绘 → 基调色调 .fg-tone → 光线 .fg-light → 插画 → 天气粒子
+   → 画面效果叠层 .fg-fxlayer → 暗角；特殊段落滤镜 .fg-mode 在镜头外面（推镜头时不跟着放大）。每层由 FadeLayer 换值时淡入淡出（--fade）。 */
+.fg-world, .fg-world-in { position: absolute; inset: 0; transform-origin: 50% 50%; }
+.fg-tone, .fg-light, .fg-fxlayer, .fg-mode { position: absolute; inset: 0; pointer-events: none; animation: fg-layer-in var(--fade, 1.2s) ease both; }
+.fg-tone.is-leave, .fg-light.is-leave, .fg-fxlayer.is-leave, .fg-mode.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }
+.fg-tone::before, .fg-tone::after, .fg-light::before, .fg-light::after, .fg-fxlayer::before, .fg-fxlayer::after, .fg-mode::before, .fg-mode::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+@keyframes fg-layer-in { from { opacity: 0; } }
+@keyframes fg-layer-out { to { opacity: 0; } }
+.fg-theater { --fg-noise: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27><filter id=%27n%27><feTurbulence type=%27fractalNoise%27 baseFrequency=%27.85%27 numOctaves=%272%27 stitchTiles=%27stitch%27/><feColorMatrix values=%270 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .9 0%27/></filter><rect width=%27100%%27 height=%27100%%27 filter=%27url(%23n)%27/></svg>"); }
+
+/* 基调色调：很淡的一层，让「甜」「悲」「诡异」看得出来，不抢戏。立绘也在下面。 */
+.fg-tone { z-index: 5; }
+.fg-tone[data-v="cheerful"] { backdrop-filter: saturate(1.12) brightness(1.04); -webkit-backdrop-filter: saturate(1.12) brightness(1.04); }
+.fg-tone[data-v="comic"] { backdrop-filter: saturate(1.28) brightness(1.06) contrast(1.05); -webkit-backdrop-filter: saturate(1.28) brightness(1.06) contrast(1.05); }
+.fg-tone[data-v="sweet"] { backdrop-filter: saturate(1.1) brightness(1.04); -webkit-backdrop-filter: saturate(1.1) brightness(1.04); background: radial-gradient(110% 90% at 50% 45%, rgba(255, 190, 220, .06) 40%, rgba(255, 150, 200, .42)); }
+.fg-tone[data-v="touching"] { backdrop-filter: saturate(1.05); -webkit-backdrop-filter: saturate(1.05); background: radial-gradient(80% 70% at 50% 25%, rgba(255, 226, 180, .32), rgba(255, 200, 150, .14) 60%, rgba(120, 70, 40, .22)); }
+.fg-tone[data-v="calm"] { backdrop-filter: saturate(.92); -webkit-backdrop-filter: saturate(.92); background: linear-gradient(180deg, rgba(190, 215, 255, .2), rgba(160, 190, 230, .08) 70%); }
+.fg-tone[data-v="solemn"] { backdrop-filter: saturate(.82) contrast(1.06); -webkit-backdrop-filter: saturate(.82) contrast(1.06); background: linear-gradient(180deg, rgba(255, 236, 190, .22), transparent 55%); }
+.fg-tone[data-v="sad"] { backdrop-filter: saturate(.68) brightness(.95); -webkit-backdrop-filter: saturate(.68) brightness(.95); background: linear-gradient(180deg, rgba(60, 90, 150, .22), rgba(30, 40, 80, .18)); mix-blend-mode: multiply; }
+.fg-tone[data-v="despair"] { backdrop-filter: saturate(.4) brightness(.82) contrast(1.12); -webkit-backdrop-filter: saturate(.4) brightness(.82) contrast(1.12); background: radial-gradient(100% 80% at 50% 45%, transparent 35%, rgba(0, 0, 0, .62)); }
+.fg-tone[data-v="tense"] { backdrop-filter: saturate(.8) contrast(1.15); -webkit-backdrop-filter: saturate(.8) contrast(1.15); background: radial-gradient(90% 75% at 50% 45%, transparent 35%, rgba(20, 4, 4, .45) 75%, rgba(10, 0, 0, .75)); }
+.fg-tone[data-v="mystery"] { backdrop-filter: saturate(.8) brightness(.9); -webkit-backdrop-filter: saturate(.8) brightness(.9); background: radial-gradient(110% 85% at 50% 45%, rgba(70, 50, 140, .12) 30%, rgba(20, 10, 50, .55)); }
+.fg-tone[data-v="eerie"] { backdrop-filter: saturate(.55) contrast(1.08); -webkit-backdrop-filter: saturate(.55) contrast(1.08); background: radial-gradient(100% 80% at 50% 45%, rgba(40, 110, 90, .16) 30%, rgba(0, 18, 12, .6)); }
+.fg-tone[data-v="battle"] { backdrop-filter: contrast(1.18) saturate(1.18); -webkit-backdrop-filter: contrast(1.18) saturate(1.18); background: radial-gradient(100% 85% at 50% 50%, transparent 40%, rgba(220, 50, 10, .32) 80%, rgba(120, 10, 0, .55)); }
+.fg-tone[data-v="heroic"] { backdrop-filter: contrast(1.1) saturate(1.15) brightness(1.04); -webkit-backdrop-filter: contrast(1.1) saturate(1.15) brightness(1.04); background: linear-gradient(0deg, rgba(255, 160, 50, .34), rgba(255, 200, 120, .08) 55%, transparent); }
+.fg-tone[data-v="silence"] { backdrop-filter: saturate(.5) brightness(.94); -webkit-backdrop-filter: saturate(.5) brightness(.94); }
+
+/* 光线：关灯、停电、烛光、手电……压在背景和立绘上，插画不受影响。 */
+.fg-light { z-index: 5; }
+.fg-light[data-v="dim"] { background: rgba(20, 22, 50, .38); mix-blend-mode: multiply; }
+.fg-light[data-v="dark"] { background: rgba(8, 12, 40, .74); mix-blend-mode: multiply; backdrop-filter: saturate(.6); -webkit-backdrop-filter: saturate(.6); }
+.fg-light[data-v="black"] { background: #000; opacity: .93; }
+.fg-light[data-v="black"]::after { background: radial-gradient(40% 30% at 50% 60%, rgba(40, 40, 70, .25), transparent 70%); }
+.fg-light[data-v="candle"] { background: radial-gradient(58% 68% at 50% 80%, rgb(255, 196, 128), rgb(120, 52, 14) 55%, rgb(22, 8, 2) 92%); mix-blend-mode: multiply; }
+.fg-light[data-v="candle"]::after { background: radial-gradient(34% 40% at 50% 82%, rgba(255, 150, 50, .42), transparent 72%); mix-blend-mode: screen; transform-origin: 50% 82%; animation: fg-candle 2.6s ease-in-out infinite; }
+@keyframes fg-candle { 0%, 100% { opacity: .85; transform: scale(1); } 22% { opacity: 1; transform: scale(1.03); } 41% { opacity: .78; } 63% { opacity: .95; transform: scale(.99); } 80% { opacity: .82; } }
+.fg-light[data-v="spot"] { background: radial-gradient(30% 62% at 50% 52%, transparent 30%, rgba(0, 0, 0, .55) 70%, rgba(0, 0, 0, .92) 100%); }
+.fg-light[data-v="spot"]::after { background: linear-gradient(180deg, rgba(255, 250, 225, .22), rgba(255, 250, 225, 0) 80%); clip-path: polygon(44% 0, 56% 0, 72% 100%, 28% 100%); mix-blend-mode: screen; }
+.fg-light[data-v="neon"] { background: rgba(10, 6, 40, .55); mix-blend-mode: multiply; }
+.fg-light[data-v="neon"]::after { background: linear-gradient(115deg, rgba(255, 40, 200, .45), transparent 45%, transparent 55%, rgba(30, 220, 255, .45)); mix-blend-mode: screen; animation: fg-breathe-light 5s ease-in-out infinite; }
+.fg-light[data-v="screen"] { background: rgba(4, 8, 30, .78); mix-blend-mode: multiply; }
+.fg-light[data-v="screen"]::after { background: radial-gradient(45% 55% at 50% 85%, rgba(120, 180, 255, .55), transparent 75%); mix-blend-mode: screen; animation: fg-screenglow 3.2s steps(1) infinite; }
+@keyframes fg-screenglow { 0%, 100% { opacity: .9; } 30% { opacity: .75; } 31% { opacity: 1; } 70% { opacity: .82; } }
+.fg-light[data-v="alarm"] { background: rgba(20, 0, 0, .55); mix-blend-mode: multiply; }
+.fg-light[data-v="alarm"]::after { background: radial-gradient(120% 90% at 50% 0%, rgba(255, 30, 30, .6), rgba(160, 0, 0, .25) 70%); mix-blend-mode: screen; animation: fg-alarm 1.3s ease-in-out infinite; }
+@keyframes fg-alarm { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
+.fg-light[data-v="moon"] { background: linear-gradient(180deg, rgba(40, 60, 150, .55), rgba(10, 20, 70, .7)); mix-blend-mode: multiply; }
+.fg-light[data-v="moon"]::after { background: radial-gradient(60% 50% at 70% 15%, rgba(190, 210, 255, .35), transparent 70%); mix-blend-mode: screen; }
+.fg-light[data-v="warm"] { background: linear-gradient(180deg, rgb(255, 214, 160), rgb(255, 176, 110)); mix-blend-mode: multiply; opacity: .55; }
+.fg-light[data-v="warm"]::after { background: radial-gradient(60% 55% at 35% 30%, rgba(255, 190, 110, .35), transparent 70%); mix-blend-mode: screen; }
+.fg-light[data-v="cold"] { background: linear-gradient(180deg, rgb(170, 200, 255), rgb(130, 160, 230)); mix-blend-mode: multiply; opacity: .6; backdrop-filter: saturate(.75); -webkit-backdrop-filter: saturate(.75); }
+.fg-light[data-v="glare"] { background: radial-gradient(70% 60% at 50% 40%, rgba(255, 255, 255, .75), rgba(255, 255, 255, .15) 80%); mix-blend-mode: screen; backdrop-filter: brightness(1.15) contrast(.9); -webkit-backdrop-filter: brightness(1.15) contrast(.9); }
+.fg-light[data-v="flicker"] { background: rgba(6, 8, 24, .78); mix-blend-mode: multiply; }
+.fg-light[data-v="flicker"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-flicker 4.5s steps(1) infinite; }
+@keyframes fg-flicker { 0%, 100% { opacity: 1; } 8% { opacity: .25; } 9% { opacity: 1; } 11% { opacity: .35; } 12% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .15; } 50% { opacity: .9; } 51% { opacity: .3; } 53% { opacity: 1; } 78% { opacity: .45; } 79% { opacity: 1; } }
+
+/* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。 */
+.fg-world[data-fx="sway"] { animation: fg-fx-sway 7s ease-in-out infinite; }
+.fg-world[data-fx="ride"] { animation: fg-fx-ride 1.7s ease-in-out infinite; }
+.fg-world[data-fx="handheld"] { animation: fg-fx-handheld 6.5s ease-in-out infinite; }
+.fg-world[data-fx="drift"] { animation: fg-fx-drift 26s ease-in-out infinite alternate; }
+.fg-world[data-fx="woozy"] { animation: fg-fx-woozy 5.5s ease-in-out infinite; }
+.fg-world[data-fx="heat"] { animation: fg-fx-heat 2.6s ease-in-out infinite; }
+.fg-world[data-fx="underwater"] { animation: fg-fx-water 6s ease-in-out infinite; }
+.fg-world[data-fx="rumble"] { animation: fg-fx-rumble .16s linear infinite; }
+.fg-world[data-fx="heartbeat"] { animation: fg-fx-beat 1.05s ease-out infinite; }
+@keyframes fg-fx-sway { 0%, 100% { transform: scale(1.05) rotate(-.7deg) translateY(-.5%); } 50% { transform: scale(1.05) rotate(.7deg) translateY(.5%); } }
+@keyframes fg-fx-ride { 0%, 100% { transform: scale(1.03) translateY(0); } 18% { transform: scale(1.03) translateY(-.35%); } 30% { transform: scale(1.03) translateY(.1%); } 62% { transform: scale(1.03) translateY(-.15%); } 74% { transform: scale(1.03) translateY(.12%); } }
+@keyframes fg-fx-handheld { 0%, 100% { transform: scale(1.045) translate(0, 0) rotate(0); } 20% { transform: scale(1.045) translate(-.5%, .3%) rotate(-.25deg); } 45% { transform: scale(1.045) translate(.4%, -.35%) rotate(.2deg); } 70% { transform: scale(1.045) translate(-.25%, -.2%) rotate(-.1deg); } 85% { transform: scale(1.045) translate(.3%, .3%) rotate(.15deg); } }
+@keyframes fg-fx-drift { from { transform: scale(1); } to { transform: scale(1.09); } }
+@keyframes fg-fx-woozy { 0%, 100% { transform: scale(1.05) rotate(-1deg); filter: blur(.4px); } 35% { transform: scale(1.07) rotate(.8deg) translateX(.6%); filter: blur(1.8px) saturate(1.2); } 65% { transform: scale(1.05) rotate(-.4deg) translateX(-.5%); filter: blur(.8px); } }
+@keyframes fg-fx-heat { 0%, 100% { transform: scale(1.02) skewX(0); } 25% { transform: scale(1.02) skewX(.35deg) scaleY(1.004); } 75% { transform: scale(1.02) skewX(-.35deg); } }
+@keyframes fg-fx-water { 0%, 100% { transform: scale(1.05) skewX(-.6deg) translateY(.4%); } 50% { transform: scale(1.05) skewX(.6deg) translateY(-.4%); } }
+@keyframes fg-fx-rumble { 0% { transform: scale(1.03) translate(.25%, -.2%); } 25% { transform: scale(1.03) translate(-.3%, .15%); } 50% { transform: scale(1.03) translate(.2%, .25%); } 75% { transform: scale(1.03) translate(-.15%, -.25%); } 100% { transform: scale(1.03) translate(.25%, -.2%); } }
+@keyframes fg-fx-beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.022); } 24% { transform: scale(1.004); } 36% { transform: scale(1.014); } 60% { transform: scale(1); } }
+.fg-fxlayer { z-index: 8; }
+.fg-fxlayer[data-v="speed"] { background: repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 3.4deg, rgba(255, 255, 255, .5) 3.4deg 3.9deg, transparent 3.9deg 7.1deg, rgba(255, 255, 255, .28) 7.1deg 7.4deg);
+  -webkit-mask-image: radial-gradient(42% 46% at 50% 50%, transparent 55%, #000 100%); mask-image: radial-gradient(42% 46% at 50% 50%, transparent 55%, #000 100%); }
+.fg-fxlayer[data-v="speed"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-speedlines .24s steps(3) infinite; }
+@keyframes fg-speedlines { 0% { transform: rotate(0); } 100% { transform: rotate(6deg); } }
+.fg-fxlayer[data-v="underwater"] { background: linear-gradient(180deg, rgba(40, 170, 200, .35), rgba(10, 40, 90, .55)); mix-blend-mode: multiply; }
+.fg-fxlayer[data-v="underwater"]::before { inset: -20%; background: radial-gradient(14% 9% at 30% 30%, rgba(200, 255, 255, .5), transparent 70%), radial-gradient(10% 7% at 70% 20%, rgba(200, 255, 255, .45), transparent 70%), radial-gradient(18% 10% at 55% 60%, rgba(200, 255, 255, .35), transparent 70%), radial-gradient(12% 8% at 15% 75%, rgba(200, 255, 255, .35), transparent 70%); background-size: 50% 50%; mix-blend-mode: screen; animation: fg-caustics 9s ease-in-out infinite alternate; }
+.fg-fxlayer[data-v="underwater"]::after { background: linear-gradient(170deg, rgba(220, 255, 255, .3), transparent 40%); clip-path: polygon(20% 0, 30% 0, 50% 100%, 35% 100%, 55% 0, 62% 0, 80% 100%, 70% 100%); mix-blend-mode: screen; opacity: .6; animation: fg-breathe-light 6s ease-in-out infinite; }
+@keyframes fg-caustics { from { transform: translate(0, 0) rotate(0); } to { transform: translate(6%, 4%) rotate(4deg); } }
+.fg-fxlayer[data-v="heat"] { background: linear-gradient(0deg, rgba(255, 140, 40, .22), transparent 55%); mix-blend-mode: screen; }
+.fg-fxlayer[data-v="heat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-breathe-light 2.6s ease-in-out infinite; }
+.fg-fxlayer[data-v="woozy"] { backdrop-filter: blur(.5px); -webkit-backdrop-filter: blur(.5px); background: radial-gradient(100% 80% at 50% 50%, transparent 40%, rgba(80, 40, 90, .35)); }
+.fg-fxlayer[data-v="heartbeat"] { background: radial-gradient(95% 80% at 50% 48%, transparent 38%, rgba(140, 0, 24, .5) 75%, rgba(90, 0, 14, .85)); }
+.fg-fxlayer[data-v="heartbeat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-beat-vignette 1.05s ease-out infinite; }
+@keyframes fg-beat-vignette { 0%, 60%, 100% { opacity: .45; } 12% { opacity: 1; } 24% { opacity: .6; } 36% { opacity: .85; } }
+.fg-fxlayer[data-v="rumble"] { background: radial-gradient(110% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, .35)); }
+.fg-fxlayer[data-v="drift"], .fg-fxlayer[data-v="sway"], .fg-fxlayer[data-v="ride"], .fg-fxlayer[data-v="handheld"] { display: none; }
+
+/* 特殊段落：回忆、梦境、幻觉、想象、主观视角、内心世界、画面里、故事中、预见、虚拟世界。盖住插画在内的整个画面。 */
+.fg-mode { z-index: 9; }
+.fg-mode[data-v="memory"] { backdrop-filter: sepia(.8) saturate(.7) contrast(.9) brightness(1.08); -webkit-backdrop-filter: sepia(.8) saturate(.7) contrast(.9) brightness(1.08); background: radial-gradient(115% 85% at 50% 45%, transparent 48%, rgba(255, 240, 214, .55)), linear-gradient(rgba(255, 210, 150, .1), rgba(255, 210, 150, .1)); }
+.fg-mode[data-v="memory"]::before { backdrop-filter: blur(2.5px); -webkit-backdrop-filter: blur(2.5px); -webkit-mask-image: radial-gradient(85% 75% at 50% 45%, transparent 55%, #000 100%); mask-image: radial-gradient(85% 75% at 50% 45%, transparent 55%, #000 100%); }
+.fg-mode[data-v="memory"]::after, .fg-mode[data-v="tale"]::after { background-image: var(--fg-noise); opacity: .16; mix-blend-mode: overlay; animation: fg-grain .5s steps(4) infinite; }
+@keyframes fg-grain { 0% { transform: translate(0, 0); } 25% { transform: translate(-2%, 1%); } 50% { transform: translate(1%, -2%); } 75% { transform: translate(2%, 2%); } 100% { transform: translate(0, 0); } }
+.fg-mode[data-v="dream"] { backdrop-filter: saturate(1.2) brightness(1.08) contrast(.9) hue-rotate(-12deg); -webkit-backdrop-filter: saturate(1.2) brightness(1.08) contrast(.9) hue-rotate(-12deg); background: radial-gradient(110% 85% at 50% 45%, transparent 42%, rgba(235, 215, 255, .6)), linear-gradient(160deg, rgba(255, 190, 230, .12), rgba(160, 200, 255, .14)); }
+.fg-mode[data-v="dream"]::before { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); -webkit-mask-image: radial-gradient(80% 70% at 50% 45%, transparent 45%, #000 95%); mask-image: radial-gradient(80% 70% at 50% 45%, transparent 45%, #000 95%); }
+.fg-mode[data-v="dream"]::after { inset: -10%; background: radial-gradient(30% 22% at 20% 30%, rgba(255, 255, 255, .28), transparent 70%), radial-gradient(26% 20% at 78% 64%, rgba(255, 230, 255, .24), transparent 70%), radial-gradient(22% 18% at 60% 18%, rgba(220, 240, 255, .22), transparent 70%); mix-blend-mode: screen; animation: fg-haze 14s ease-in-out infinite alternate; }
+@keyframes fg-haze { from { transform: translate(-3%, 2%) scale(1); } to { transform: translate(3%, -2%) scale(1.08); } }
+.fg-mode[data-v="illusion"] { background: linear-gradient(90deg, rgba(255, 0, 120, .16), transparent 25%, transparent 75%, rgba(0, 255, 200, .16)); }
+.fg-mode[data-v="illusion"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-hueshift 7s ease-in-out infinite; }
+@keyframes fg-hueshift { 0%, 100% { backdrop-filter: saturate(1.5) contrast(1.1) hue-rotate(0deg); -webkit-backdrop-filter: saturate(1.5) contrast(1.1) hue-rotate(0deg); } 33% { backdrop-filter: saturate(1.7) contrast(1.15) hue-rotate(45deg); -webkit-backdrop-filter: saturate(1.7) contrast(1.15) hue-rotate(45deg); } 66% { backdrop-filter: saturate(1.4) contrast(1.05) hue-rotate(-35deg); -webkit-backdrop-filter: saturate(1.4) contrast(1.05) hue-rotate(-35deg); } }
+.fg-mode[data-v="illusion"]::before { background: radial-gradient(100% 80% at 50% 50%, transparent 45%, rgba(40, 0, 60, .55)); animation: fg-breathe-light 2.4s ease-in-out infinite; }
+.fg-mode[data-v="imagine"] { backdrop-filter: saturate(1.4) brightness(1.1); -webkit-backdrop-filter: saturate(1.4) brightness(1.1); background: radial-gradient(76% 70% at 50% 46%, transparent 72%, rgba(255, 255, 255, .92) 88%); }
+.fg-mode[data-v="imagine"]::after { background: radial-gradient(1.2% 1.6% at 18% 22%, #fff, transparent), radial-gradient(1% 1.4% at 82% 30%, #fff, transparent), radial-gradient(.8% 1.1% at 70% 78%, #fff, transparent), radial-gradient(1.1% 1.5% at 26% 70%, #fff, transparent), radial-gradient(.7% 1% at 50% 12%, #fff, transparent); animation: fg-breathe-light 2.2s ease-in-out infinite; }
+.fg-mode[data-v="pov"] { background: radial-gradient(92% 68% at 50% 50%, transparent 52%, rgba(0, 0, 0, .55) 80%, rgba(0, 0, 0, .95) 100%); }
+.fg-mode[data-v="pov"]::before { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); -webkit-mask-image: radial-gradient(85% 65% at 50% 50%, transparent 55%, #000 95%); mask-image: radial-gradient(85% 65% at 50% 50%, transparent 55%, #000 95%); }
+.fg-mode[data-v="inner"] { backdrop-filter: grayscale(.55) brightness(.58) contrast(1.12); -webkit-backdrop-filter: grayscale(.55) brightness(.58) contrast(1.12); background: radial-gradient(42% 58% at 50% 56%, rgba(130, 150, 255, .1), rgba(2, 2, 16, .78) 100%); }
+.fg-mode[data-v="screen"] { backdrop-filter: contrast(1.12) saturate(.75) brightness(1.04); -webkit-backdrop-filter: contrast(1.12) saturate(.75) brightness(1.04); background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .2) 0 1px, transparent 1px 3px), radial-gradient(110% 100% at 50% 50%, transparent 60%, rgba(0, 0, 0, .6)); }
+.fg-mode[data-v="screen"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-screenflick 4s steps(1) infinite; }
+@keyframes fg-screenflick { 0%, 100% { opacity: 1; } 40% { opacity: .93; } 41% { opacity: 1; } 77% { opacity: .96; } }
+.fg-mode[data-v="screen"]::before { content: "● REC"; inset: auto auto auto auto; left: 4%; top: 5%; font: 700 1.7cqw/1 var(--font-latin); letter-spacing: .2em; color: #ff3b3b; text-shadow: 0 0 .6cqw rgba(255, 0, 0, .7); animation: fg-pulse 1.4s steps(1) infinite; }
+.fg-mode[data-v="screen"]::after { inset: 3%; background:
+  linear-gradient(#fff, #fff) top left / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) top left / 2px 3cqw no-repeat,
+  linear-gradient(#fff, #fff) top right / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) top right / 2px 3cqw no-repeat,
+  linear-gradient(#fff, #fff) bottom left / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) bottom left / 2px 3cqw no-repeat,
+  linear-gradient(#fff, #fff) bottom right / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) bottom right / 2px 3cqw no-repeat; opacity: .7; }
+.fg-mode[data-v="tale"] { backdrop-filter: sepia(.4) saturate(.8) contrast(1.06); -webkit-backdrop-filter: sepia(.4) saturate(.8) contrast(1.06); background: radial-gradient(100% 85% at 50% 48%, transparent 50%, rgba(70, 40, 10, .62)); box-shadow: inset 0 0 0 1.2cqw rgba(40, 24, 8, .35), inset 0 0 0 1.4cqw rgba(220, 190, 140, .35); }
+.fg-mode[data-v="vision"] { backdrop-filter: grayscale(.7) brightness(1.1) contrast(1.22); -webkit-backdrop-filter: grayscale(.7) brightness(1.1) contrast(1.22); background: radial-gradient(110% 90% at 50% 50%, rgba(140, 240, 255, .14) 40%, rgba(220, 255, 255, .55)); }
+.fg-mode[data-v="vision"]::after { background: repeating-linear-gradient(0deg, transparent 0 22px, rgba(180, 255, 255, .25) 22px 23px); animation: fg-scan 3s linear infinite; }
+@keyframes fg-scan { from { background-position: 0 0; } to { background-position: 0 92px; } }
+.fg-mode[data-v="digital"] { backdrop-filter: saturate(1.3) contrast(1.08) hue-rotate(-12deg); -webkit-backdrop-filter: saturate(1.3) contrast(1.08) hue-rotate(-12deg); background: linear-gradient(rgba(0, 255, 230, .2) 1px, transparent 1px) 0 0 / 100% 6%, linear-gradient(90deg, rgba(0, 255, 230, .2) 1px, transparent 1px) 0 0 / 4% 100%, radial-gradient(110% 90% at 50% 50%, transparent 55%, rgba(0, 30, 50, .55)); }
+.fg-mode[data-v="digital"]::after { background: linear-gradient(180deg, transparent 0, rgba(120, 255, 240, .22) 50%, transparent 100%) 0 0 / 100% 18% no-repeat; animation: fg-sweep 4s linear infinite; }
+@keyframes fg-sweep { from { background-position: 0 -20%; } to { background-position: 0 120%; } }
+/* 段落里整个画面也跟着动：梦里轻飘、幻觉里扭曲、主观视角随呼吸起伏 */
+.fg-world-in[data-mode="dream"] { animation: fg-mode-float 9s ease-in-out infinite; }
+.fg-world-in[data-mode="illusion"] { animation: fg-mode-warp 4.4s ease-in-out infinite; }
+.fg-world-in[data-mode="pov"] { animation: fg-mode-breath 4.2s ease-in-out infinite; }
+@keyframes fg-mode-float { 0%, 100% { transform: scale(1.04) translateY(-.4%); } 50% { transform: scale(1.04) translateY(.5%); } }
+@keyframes fg-mode-warp { 0%, 100% { transform: scale(1.05) skew(0, 0); } 25% { transform: scale(1.07) skew(1.2deg, -.4deg); } 50% { transform: scale(1.05) skew(-.6deg, .6deg); } 75% { transform: scale(1.06) skew(-1deg, -.3deg); } }
+@keyframes fg-mode-breath { 0%, 100% { transform: scale(1.035) translateY(0); } 50% { transform: scale(1.035) translateY(-.45%); } }
+@media (prefers-reduced-motion: reduce) {
+  .fg-world, .fg-world-in, .fg-fxlayer, .fg-mode, .fg-light { animation: none !important; }
+}
+
+/* 转场：慢慢变过去（时间流逝）、闭眼睁眼、画面撕裂、旋转入梦。 */
+@keyframes fg-fade-slow { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fg-blink-in { 0%, 42% { opacity: 0; } 50%, 100% { opacity: 1; } }
+@keyframes fg-glitch-in { 0% { opacity: 0; transform: translateX(3%); filter: hue-rotate(90deg) contrast(2); } 20% { opacity: 1; transform: translateX(-2%); } 40% { transform: translateX(1.5%) skewX(4deg); filter: hue-rotate(-60deg) contrast(1.6); } 60% { transform: translateX(-.8%); } 80% { transform: none; filter: hue-rotate(20deg); } 100% { filter: none; } }
+@keyframes fg-swirl-in { from { opacity: 0; transform: rotate(-14deg) scale(1.45); filter: blur(16px) brightness(1.4); } to { opacity: 1; transform: none; filter: none; } }
+.fg-flash.is-blink { background: none; animation: none; }
+.fg-flash.is-blink::before, .fg-flash.is-blink::after { content: ""; position: absolute; left: -5%; right: -5%; height: 56%; background: #000; animation: fg-lid 1.5s cubic-bezier(.6, 0, .3, 1) both; }
+.fg-flash.is-blink::before { top: 0; border-radius: 0 0 50% 50% / 0 0 30% 30%; transform-origin: top; }
+.fg-flash.is-blink::after { bottom: 0; border-radius: 50% 50% 0 0 / 30% 30% 0 0; transform-origin: bottom; }
+@keyframes fg-lid { 0% { transform: scaleY(0); } 35%, 55% { transform: scaleY(1); } 100% { transform: scaleY(0); } }
+.fg-flash.is-glitch { background: linear-gradient(transparent 0 22%, rgba(255, 0, 90, .5) 22% 25%, transparent 25% 51%, rgba(0, 255, 220, .45) 51% 53%, transparent 53% 78%, rgba(255, 255, 255, .6) 78% 79.5%, transparent 79.5%); mix-blend-mode: screen; animation: fg-glitch .7s steps(6) both; }
+@keyframes fg-glitch { 0% { opacity: 1; transform: translate(0, 0); } 30% { transform: translate(-4%, 8%); } 60% { transform: translate(5%, -12%); opacity: .8; } 100% { opacity: 0; transform: translate(0, 20%); } }
+
+/* 过场字卡：时间跳跃、日期、章节、与此同时。 */
+.fg-cut { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: #05040c; animation: fg-cut-in .5s ease both; pointer-events: none; }
+.fg-cut.is-out { animation: fg-cut-out .6s ease both; }
+.fg-cut[data-kind="meanwhile"] { background: linear-gradient(100deg, rgba(5, 4, 12, .96) 0 58%, rgba(5, 4, 12, .9)); }
+.fg-cut-inner { text-align: center; animation: fg-cut-text 2.3s ease both; }
+.fg-cut-kicker { display: flex; align-items: center; justify-content: center; gap: 1.2cqw; font-family: var(--font-latin); font-size: 1.15cqw; letter-spacing: .6em; text-transform: uppercase; color: rgba(255, 255, 255, .6); }
+.fg-cut-kicker i { width: 6cqw; height: 1px; background: linear-gradient(90deg, transparent, var(--accent2)); }
+.fg-cut-kicker i:last-child { background: linear-gradient(270deg, transparent, var(--accent2)); }
+.fg-cut-text { margin-top: 1.4cqw; font-family: var(--font-display); font-size: 3.6cqw; font-weight: 700; letter-spacing: .3em; color: var(--ink); text-shadow: 0 0 3cqw rgba(155, 123, 255, .45); }
+.fg-cut[data-kind="chapter"] .fg-cut-text { font-size: 4.4cqw; }
+.fg-cut[data-kind="date"] .fg-cut-text { font-family: var(--font-latin), var(--font-display); letter-spacing: .18em; }
+.fg-cut[data-kind="meanwhile"] .fg-cut-inner { text-align: left; transform: translateX(-12%); }
+@keyframes fg-cut-in { from { opacity: 0; } }
+@keyframes fg-cut-out { to { opacity: 0; } }
+@keyframes fg-cut-text { 0% { opacity: 0; transform: translateY(.8cqw); letter-spacing: .5em; } 30% { opacity: 1; transform: none; } 100% { letter-spacing: .3em; } }
+.fg-hud-mode { color: var(--accent); }
 
 /* ── 地点标题卡 ── */
 .fg-titlecard { position: absolute; left: 6%; top: 34%; z-index: 25; pointer-events: none; animation: fg-titlecard 3.2s ease both; }
@@ -354,6 +521,8 @@
 .fg-log-item:hover { background: linear-gradient(90deg, rgba(255, 255, 255, .04), transparent); }
 .fg-log-name { font-family: var(--font-display); font-weight: 700; text-align: right; letter-spacing: .1em; }
 .fg-log-turn { grid-column: 1 / -1; font-family: var(--font-latin); font-size: .95cqw; letter-spacing: .5em; color: var(--accent); padding-top: 1.4cqw; }
+.fg-log-scene { grid-column: 1 / -1; display: flex; align-items: center; gap: 1cqw; font-size: .9cqw; letter-spacing: .3em; color: var(--ink-dim); padding: .6cqw 0 .2cqw; }
+.fg-log-scene::before, .fg-log-scene::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .18), transparent); }
 
 /* 导演日志：左边历次记录，右边详情（实时输出 / 整理结果 / 原始输出 / 提示词）。两栏各自滚动。 */
 .fg-dlog { display: grid; grid-template-columns: 22cqw minmax(0, 1fr); gap: 2cqw; height: 100%; }

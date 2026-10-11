@@ -62,17 +62,23 @@ const tavern = {
 }
 
 // ───────── 假模型：按单元编号回放写好的导演输出，像真模型一样先「思考」再分段流式吐字；
-// 第 4 轮故意慢，演示「先文本后整理」和导演日志里的实时输出。配乐按轮次从示例曲里选，第 3 轮在闪电那句换歌 ─────────
+// 第 4 轮故意慢，演示「先文本后整理」和导演日志里的实时输出。配乐按轮次从示例曲里选，第 3 轮在闪电那句换歌，第 4 轮回忆里换成琴房那首、灯灭时停下 ─────────
 const trackIds = {}
 function withMusic(turn, units, reply) {
   if (!trackIds.room) return reply
-  const pick = { 1: 'room', 2: 'path', 3: 'path', 4: 'room' }[turn]
+  const pick = { 1: 'room', 2: 'path', 3: 'path', 4: 'path' }[turn]
   reply.scene.bgm = trackIds[pick]
   if (turn === 3) {
     const flash = units.find(u => u.text.includes('一道闪电'))
     const line = reply.lines.find(l => l.u === flash.id)
     if (line) line.bgm = trackIds.rain
     else reply.lines.push({ u: flash.id, bgm: trackIds.rain })
+  }
+  // 第 4 轮：回忆里放琴房那首，回到现实灯灭时音乐停下
+  if (turn === 4) {
+    const at = needle => reply.lines.find(l => l.u === units.find(u => u.text.includes(needle))?.id)
+    if (at('三年前的那个黄昏')) at('三年前的那个黄昏').bgm = trackIds.room
+    if (at('琴声戛然而止')) at('琴声戛然而止').bgm = 'none'
   }
   return reply
 }
