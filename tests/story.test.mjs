@@ -358,6 +358,40 @@ test('gate: 进回忆那一句写「全部离开」再让段落里的人登场�
   assert.deepEqual(who(stageWalk(later, units).steps).at(-1), '柯萝伊+阿黛尔')
 })
 
+test('gate: 回忆演到下一轮：接着演的那几句台上还是回忆里的人，现在的人等回到现实再上来', () => {
+  const first = segmentTurn('“走吧。”\n“嗯。”\n三年前。\n“这是中奖了吧？”')
+  const second = segmentTurn('“嗯。”\n“你也来了？”\n她回过神来。\n“发什么呆？”')
+  const turns = [
+    { turn: 1, textVersion: 'v1', units: first, script: { scene: { location: '楼梯' }, cast: [{ name: '柯萝伊', pos: 'center' }, { name: '阿黛尔', pos: 'left' }, { name: '少女', pos: 'right' }], lines: {
+      U1: { sp: '阿黛尔' },
+      U2: { sp: '柯萝伊' },
+      U3: { mode: 'memory', scene: { location: '深层（三年前）' }, exit: ['*'], enter: [{ name: '少女', pos: 'right' }, { name: '柯萝伊', pos: 'left' }] },
+      U4: { sp: '少女' },
+    } } },
+    // 第二轮：导演把回忆里的人也列进 cast，第一句接着写 memory，没再写 exit / enter
+    { turn: 2, textVersion: 'v1', units: second, script: { scene: { location: '楼梯' }, cast: [{ name: '少女', pos: 'right' }, { name: '柯萝伊', pos: 'center' }, { name: '阿黛尔', pos: 'left' }], lines: {
+      U1: { mode: 'memory', sp: '少女' },
+      U2: { sp: '柯萝伊' },
+      U3: { mode: 'real' },
+      U4: { sp: '阿黛尔' },
+    } } },
+  ]
+  const { beats } = buildBeats({ turns, images: [] })
+  assert.deepEqual(beats.map(b => [b.turn, b.mode, b.cast.map(c => `${c.name}@${c.pos}`).sort().join('+')]), [
+    [1, '', '柯萝伊@center+阿黛尔@left'],
+    [1, '', '柯萝伊@center+阿黛尔@left'],
+    [1, 'memory', '少女@right+柯萝伊@left'],
+    [1, 'memory', '少女@right+柯萝伊@left'],
+    [2, 'memory', '少女@right+柯萝伊@left'],
+    [2, 'memory', '少女@right+柯萝伊@left'],
+    [2, '', '柯萝伊@center+阿黛尔@left'],
+    [2, '', '柯萝伊@center+阿黛尔@left'],
+  ])
+  // 第二轮没接着演回忆：照常是现实里的人
+  const real = buildBeats({ turns: [turns[0], { ...turns[1], script: { ...turns[1].script, lines: { U4: { sp: '阿黛尔' } } } }], images: [] }).beats
+  assert.deepEqual(real.slice(4).map(b => b.cast.map(c => c.name).sort().join('+')), ['少女+柯萝伊+阿黛尔', '少女+柯萝伊+阿黛尔', '少女+柯萝伊+阿黛尔', '少女+柯萝伊+阿黛尔'])
+})
+
 test('gate: 场景逐句变：换地方、天色变化、天气光线基调、画面效果、过场字卡；不演的舞台指示上的变化挪到下一句', () => {
   const units = segmentTurn(['教室里只剩两个人。', '【场景：走廊】', '她们走到走廊。', '窗外的天渐渐黑了。', '啪，灯灭了。', '三小时后。', '回到教室，雨已经下起来了。', '“与此同时……”'].join('\n'))
   const raw = {
