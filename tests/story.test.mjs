@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { cleanTurnText } from '../lib/clean.js'
-import { segmentTurn } from '../lib/segment.js'
+import { segmentTurn, joinUnits } from '../lib/segment.js'
 import { normalizeScript, rawSection } from '../lib/director.js'
 import { playedUnits } from '../lib/staging.js'
 import { buildBeats } from '../src/client/theater/playback.js'
@@ -207,4 +207,43 @@ test('gate: 嵌在旁白里的引号（引用、强调、刻的字）留在这�
     ['dialogue', '林岚', '好'],
     ['narration', '', '……'],
   ])
+})
+
+test('gate: 导演用 join 把切断的一句合并回旁白：按原文一字不改拼回（带引号和被省掉的提示），编号用第一个，旧编号的插画和台词跟过去', async () => {
+  const text = '雨停了。\n门口立着块牌子上“闲人免进，违者后果自负”几个大字。\n“走吧。”'
+  const units = segmentTurn(text)
+  assert.deepEqual(units.map(u => u.text), ['雨停了。', '门口立着块牌子上', '闲人免进，违者后果自负', '几个大字。', '走吧。'])
+  const { units: joined, alias } = joinUnits(units, ['U2-U4', 'U1-U2', 'U4-U5', 'U9-U10'])
+  assert.deepEqual(joined.map(u => [u.id, u.type, u.text]), [
+    ['U1', 'narration', '雨停了。'],
+    ['U2', 'narration', '门口立着块牌子上“闲人免进，违者后果自负”几个大字。'],
+    ['U5', 'dialogue', '走吧。'],
+  ], '重叠的、跨段的、编号不存在的 join 不算')
+  assert.deepEqual([...alias], [['U3', 'U2'], ['U4', 'U2']])
+  assert.equal(joinUnits(units, []).units, units, '没写 join 原样返回')
+  // 被省掉的说话人提示也拼回去
+  const cue = segmentTurn('布琳希尔德「おう」（好。）')
+  assert.equal(joinUnits(cue, 'U1-U2').units[0].text, '布琳希尔德「おう」（好。）')
+
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
+  try {
+    const store = createStore(dir)
+    const tavern = fakeTavern()
+    const reply = JSON.stringify({ join: ['U2-U4'], cast: [{ name: '林岚', pos: 'center' }], lines: [{ u: 'U3', sp: '林岚', emo: 'smile' }, { u: 'U5', sp: '林岚' }], choices: [], images: [{ after: 'U4', moment: '门口的牌子' }], people: [] })
+    const llm = fakeLlm(reply)
+    const engine = createEngine({ store, services: { tavern, llm }, logger: { warn() {}, info() {} } })
+    const turn = { gameId: 'g', turn: 1, textVersion: 'v1', text, rawText: text, card: { name: '林岚' } }
+    tavern.turns.set('g:1', turn)
+    await engine.onTurnSettled(turn)
+    const view = await engine.gameView('g')
+    assert.deepEqual(view.turns[0].units.map(u => u.id + ' ' + u.text), ['U1 雨停了。', 'U2 门口立着块牌子上“闲人免进，违者后果自负”几个大字。', 'U5 走吧。'])
+    const script = view.turns[0].script
+    assert.equal(script.lines.U2.sp, '林岚', '写在被并掉的编号上的 lines 挪到合并后的编号')
+    assert.equal(script.images[0].after, 'U2')
+    const { beats } = buildBeats({ turns: view.turns, images: [] })
+    assert.deepEqual(beats.map(b => b.unitId), ['U1', 'U2', 'U5'])
+    engine.dispose()
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
 })
