@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { cleanTurnText } from '../lib/clean.js'
 import { segmentTurn, joinUnits, pairUnits } from '../lib/segment.js'
 import { normalizeScript, rawSection, scriptScenes, sceneAfter, playingAfter, previousBrief } from '../lib/director.js'
-import { playedUnits, castAtEnd } from '../lib/staging.js'
+import { playedUnits, castAtEnd, stageWalk } from '../lib/staging.js'
 import { buildBeats } from '../src/client/theater/playback.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
@@ -335,6 +335,27 @@ test('gate: 特殊段落：进入回忆换场景和配乐、在场的人，写 r
   // 下一轮第一句接着演同一种段落：不转场、不出标题卡，接着在梦里
   const still = two('还在梦里。\n醒了。', { scene: { location: '楼梯', bgm: 'T1' }, cast: [], lines: { U1: { mode: 'dream' }, U2: { mode: 'real', scene: { transition: 'blink' } } } })
   assert.deepEqual(still.slice(-2).map(b => [b.mode, b.bgm, b.sceneEnter, b.transition]), [['dream', 'T2', false, ''], ['', 'T1', true, 'blink']])
+})
+
+test('gate: 进回忆那一句写「全部离开」再让段落里的人登场：开场就在的人不会从回忆前的几句里消失，只在回忆里的人开场不在', () => {
+  const units = ['U1', 'U2', 'U3', 'U4', 'U5', 'U6'].map(id => ({ id }))
+  const script = {
+    cast: [{ name: '柯萝伊', pos: 'center' }, { name: '阿黛尔', pos: 'left' }, { name: '卡西安', pos: 'right' }, { name: '晓铃', pos: 'farleft' }],
+    lines: {
+      U1: { sp: '柯萝伊' },
+      U3: { mode: 'memory', exit: ['*'], enter: [{ name: '阿黛尔' }, { name: '卡西安' }, { name: '柯萝伊' }, { name: '晓铃' }] },
+      U4: { sp: '卡西安' },
+      U5: { mode: 'real' },
+    },
+  }
+  const who = steps => steps.map(s => s.cast.map(c => c.name).join('+') || '-')
+  // 晓铃上一轮结束时在场（没开口也在）；阿黛尔、卡西安只在回忆里
+  const walk = stageWalk(script, units, [{ name: '晓铃', pos: 'farleft' }])
+  assert.deepEqual(who(walk.steps), ['柯萝伊+晓铃', '柯萝伊+晓铃', '阿黛尔+卡西安+柯萝伊+晓铃', '阿黛尔+卡西安+柯萝伊+晓铃', '柯萝伊+晓铃', '柯萝伊+晓铃'])
+  assert.deepEqual(castAtEnd(script).map(c => c.name), ['柯萝伊'], '给下一轮导演看的：回忆前就有戏的人')
+  // 段落外写了 enter 的照旧：开场不在，到那一句才上场
+  const later = { ...script, lines: { ...script.lines, U6: { enter: [{ name: '阿黛尔' }] } } }
+  assert.deepEqual(who(stageWalk(later, units).steps).at(-1), '柯萝伊+阿黛尔')
 })
 
 test('gate: 场景逐句变：换地方、天色变化、天气光线基调、画面效果、过场字卡；不演的舞台指示上的变化挪到下一句', () => {

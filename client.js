@@ -540,11 +540,24 @@ function stageWalk(script, units, carry = []) {
   const lines = script.lines || {};
   const home = new Map((script.cast || []).map((c) => [c.name, c.pos]));
   const first = /* @__PURE__ */ new Map();
+  const inLayer = /* @__PURE__ */ new Map();
+  const early = /* @__PURE__ */ new Set();
+  let layer = false, layerSeen = false;
   for (const u of units) {
-    for (const name2 of lines[u.id]?.exit || []) if (!first.has(name2)) first.set(name2, "exit");
-    for (const e of lines[u.id]?.enter || []) if (!first.has(e.name)) first.set(e.name, "enter");
+    const line = lines[u.id] || {};
+    if (line.mode === "real") layer = false;
+    else if (line.mode) layer = layerSeen = true;
+    const note = (name2, kind) => {
+      const seen = layer ? inLayer : first;
+      if (!seen.has(name2)) seen.set(name2, kind);
+    };
+    for (const name2 of line.exit || []) note(name2, "exit");
+    for (const e of line.enter || []) note(e.name, "enter");
+    if (!layerSeen) for (const name2 of speakersOf(line.sp)) early.add(name2);
   }
-  let cast = (script.cast || []).filter((c) => first.get(c.name) !== "enter");
+  const carried = new Set(carry.map((c) => c.name));
+  const onAtStart = (name2) => first.has(name2) ? first.get(name2) === "exit" : !inLayer.has(name2) || inLayer.get(name2) === "exit" || carried.has(name2) || early.has(name2);
+  let cast = (script.cast || []).filter((c) => onAtStart(c.name));
   let saved = null;
   const steps = units.map((u) => {
     const line = lines[u.id] || {};
