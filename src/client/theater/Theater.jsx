@@ -7,7 +7,7 @@ import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
 import { useFaceFramer } from './faceFramer.js'
-import { playBgm, stopBgm, playAmbience, stopAmbience, playLibSound, sfx, stinger, configureSounds } from './audio.js'
+import { playBgm, playAmbience, stopAll, playLibSound, sfx, stinger, configureSounds } from './audio.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
 import { castVoices, lineVoice } from '../../../lib/sounds.js'
 
@@ -75,7 +75,7 @@ export function TheaterRoot() {
     if ((s.resume && s.resume.gameId === gameId && maxTurn > s.resume.afterTurn) || (cfg && cfg.ui.autoOpen)) openTheater(gameId, { turn: maxTurn })
   }, [view, maxTurn, s.open])
 
-  React.useEffect(() => { if (!s.open) { stopBgm(); stopAmbience() } }, [s.open])
+  React.useEffect(() => { if (!s.open) stopAll() }, [s.open])
   if (!s.open) return null
   return <Theater key={s.gameId} gameId={s.gameId} view={view} viewError={error} cfg={cfg} startTurn={s.startTurn} panel={s.panel} panelArg={s.panelArg} />
 }
@@ -93,6 +93,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const [hidden, setHidden] = React.useState(false)
   const [choosing, setChoosing] = React.useState(false)
   const [closing, setClosing] = React.useState(false)
+  const closingRef = React.useRef(false) // 关闭动画那 320ms 里不再开始放任何声音
+  // 剧场不管怎么被卸载（关掉、换局），声音都停下
+  React.useEffect(() => () => stopAll(), [])
   const anchor = React.useRef('') // 当前拍的 key：视图刷新后按 key 找回位置
   const rootRef = React.useRef(null)
   const [glyphKey, setGlyphKey] = React.useState('') // 字形已经就绪的那一拍
@@ -159,15 +162,17 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   // 配乐：放导演选的曲子；导演还没整理到的轮次按曲目描述粗配，换场才换歌。
   const scene = beat ? beat.scene : (beats[beats.length - 1] || {}).scene
   const tracks = useMusic()
-  const musicBeat = beat || beats[beats.length - 1]
+  // 定好从哪一拍开始演之前不放：不然先按最后一拍放一首，定位后又换一首，一进剧场声音就卡一下。
+  const musicBeat = beat
   const track = React.useMemo(() => (ui0.bgm ? pickTrack(musicBeat, tracks, assetUrl) : null), [ui0.bgm, tracks, musicBeat && musicBeat.bgm, scene && scene.mood, scene && scene.location])
-  React.useEffect(() => { if (track || !ui0.bgm) playBgm(track, ui0.bgmVolume) }, [track && track.id, ui0.bgm, ui0.bgmVolume])
+  React.useEffect(() => { if (!closingRef.current && (track || !ui0.bgm)) playBgm(track, ui0.bgmVolume) }, [track && track.id, ui0.bgm, ui0.bgmVolume])
   // 环境音和剧情音效：导演从音效库里配的（音效库是空的就什么都不响）。剧情音效读到那句时响一次，快进时不响。
   const soundlib = useSoundlib()
   const soundById = React.useMemo(() => new Map((soundlib || []).map(s => [s.id, s])), [soundlib])
   const ambId = ui0.amb !== false && musicBeat && musicBeat.amb !== 'none' ? musicBeat.amb : ''
   const ambSound = (ambId && soundById.get(ambId)) || null
   React.useEffect(() => {
+    if (closingRef.current) return
     playAmbience(ambSound ? { id: ambSound.id, url: assetUrl(ambSound.assetId) } : null, (ui0.ambVolume ?? 0.35) * (ambSound ? ambSound.volume ?? 1 : 1))
   }, [ambSound && ambSound.id, ambSound && ambSound.volume, ui0.ambVolume])
   React.useEffect(() => {
@@ -208,8 +213,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
   const close = React.useCallback(() => {
     setClosing(true)
-    stopBgm()
-    stopAmbience()
+    closingRef.current = true
+    stopAll()
     setTimeout(() => ui.set({ open: false }), 320)
   }, [])
 

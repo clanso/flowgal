@@ -30,7 +30,9 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
   const voiceRef = React.useRef(voice)
   voiceRef.current = voice
   const pending = React.useRef([])
-  const dropPending = () => { pending.current.forEach(clearTimeout); pending.current = [] }
+  const ticking = React.useRef(null)
+  // 点一下打完时：还没放的特效丢掉，打字音也停下（不然字已经全出来了还在嘟嘟嘟）
+  const dropPending = () => { pending.current.forEach(clearTimeout); pending.current = []; clearInterval(ticking.current); ticking.current = null }
   React.useEffect(() => {
     if (!speed || !chars.length || hold) return undefined
     const t0 = performance.now()
@@ -48,9 +50,10 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
       }
       if (next >= chars.length) clearInterval(tick)
     }, Math.max(8, Math.min(speed, plan.gap))) : null
+    ticking.current = tick
     return () => { clearTimeout(finish); dropPending(); if (tick) clearInterval(tick) }
   }, [key, chars, plan, speed, sound, hold])
-  // 点一下直接打完：还没轮到的震屏、闪光、音效不再补放
+  // 点一下直接打完：还没轮到的震屏、闪光、音效不再补放，打字音停下
   React.useEffect(() => { if (done) dropPending() }, [done])
   return [done, chars, () => setShown({ key, done: true }), start.key === key ? start.at : NaN, plan]
 }

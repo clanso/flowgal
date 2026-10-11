@@ -46,8 +46,8 @@ test('gate: 嘴型只在台词出字时动；打完、旁白、心里话、还�
 test('gate: 嘴型跟着时间轴的停顿：标点停顿整段闭嘴，下一个字出来重新从半张开口', () => {
   const t = talk('那天晚上，你真的在家吗？')
   const comma = t.times[4] // “，”出现
-  const resume = t.times[5] // “你”出现（逗号后停了 180ms）
-  assert.equal(resume - comma, 30 + 180)
+  const resume = t.times[5] // “你”出现（逗号后停了 120ms，旁白 × 0.8）
+  assert.equal(resume - comma, 30 + 96)
   assert.equal(mouthAt(LOOP, t, 1000 + comma + 1), 'closed')
   assert.equal(mouthAt(LOOP, t, 1000 + resume - 1), 'closed')
   assert.equal(mouthAt(LOOP, t, 1000 + resume), 'half')

@@ -1326,10 +1326,15 @@ var import_react3 = __toESM(require("react"), 1);
 
 // lib/typing.js
 var PAUSE = [
-  [/^[，、,；;：:]$/u, 6],
-  [/^[。！？!?.]$/u, 12],
-  [/^[…—～~]$/u, 5]
+  [/^[、]$/u, 2.5],
+  [/^[，,]$/u, 4],
+  [/^[；;：:]$/u, 5.5],
+  [/^[。！？!?.]$/u, 10],
+  [/^[…～~]$/u, 4],
+  [/^[—]$/u, 2.5]
 ];
+var DOTTED_MAX = 10;
+var NARRATION_PAUSE = 0.8;
 var DOTTED = /^[…—～~]$/u;
 var CLOSER = /^[”’」』）)\]】》〉"']$/u;
 var SILENT = /[\s，、,；;：:。！？!?.…—～~“”‘’「」『』（）()\[\]【】《》〈〉"']/u;
@@ -1341,13 +1346,17 @@ function pauseFactor(ch) {
 function pausesAfter(chars, speed) {
   const out = new Array(chars.length).fill(0);
   let pending = 0;
+  let dotted = 0;
   for (let i = 0; i < chars.length; i += 1) {
     const ch = chars[i];
     if (DOTTED.test(ch)) {
-      out[i] = speed * pauseFactor(ch);
+      const f = Math.min(pauseFactor(ch), DOTTED_MAX - dotted);
+      dotted += f;
+      out[i] = speed * Math.max(0, f);
       pending = 0;
       continue;
     }
+    dotted = 0;
     pending = Math.max(pending, pauseFactor(ch));
     if (!pending) continue;
     const next = chars[i + 1];
@@ -1430,7 +1439,7 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
       let gap = base;
       if (S.chunk && !inStress(i)) gap = i % S.chunk === 0 || SILENT.test(prev) || inStress(i - 1) ? base * S.chunk : 0;
       if (S.jitter) gap = base * (0.4 + rand2() * 1.4) + (rand2() < 0.12 ? speed * 5 : 0);
-      gap += pauses[i - 1] * S.pause;
+      gap += pauses[i - 1] * S.pause * (spoken ? 1 : NARRATION_PAUSE);
       if (S.stall && !SILENT.test(prev) && !SILENT.test(chars[i]) && rand2() < 0.2) gap += Math.max(speed * 4, 90);
       if (i === s0) gap += speed * 8;
       if (i > s0 && i <= s1) gap = Math.max(gap, base, speed * 3.5, 100);
@@ -2149,16 +2158,30 @@ function audioCtx() {
 function fade(el, to, ms, done) {
   const from = el.volume;
   const start = performance.now();
+  let over = false;
+  const end = () => {
+    if (over) return;
+    over = true;
+    el.volume = Math.max(0, Math.min(1, to));
+    if (done) done();
+  };
   const tick = (now) => {
+    if (over) return;
     const k = Math.min(1, (now - start) / ms);
     el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
     if (k < 1) requestAnimationFrame(tick);
-    else if (done) done();
+    else end();
   };
   requestAnimationFrame(tick);
+  setTimeout(end, ms + 150);
 }
 function loopPlayer() {
   let cur = null;
+  const halt = (el) => {
+    el._fgStopped = true;
+    el.pause();
+    el.src = "";
+  };
   return {
     get current() {
       return cur;
@@ -2181,22 +2204,24 @@ function loopPlayer() {
       el.src = item.url;
       el.loop = true;
       el.volume = 0;
-      el.play().then(() => fade(el, preview ? 0 : volume, 1800)).catch(() => {
+      el.play().then(() => {
+        if (el._fgStopped) halt(el);
+        else if (!el._fgFading) fade(el, preview ? 0 : volume, 1800);
+      }).catch(() => {
       });
       cur = { el, id: item.id, volume };
-      if (old) fade(old.el, 0, 1400, () => {
-        old.el.pause();
-        old.el.src = "";
-      });
+      if (old) {
+        old.el._fgFading = true;
+        fade(old.el, 0, 1400, () => halt(old.el));
+      }
     },
     stop() {
-      if (!cur) return;
       const old = cur;
       cur = null;
-      fade(old.el, 0, 900, () => {
-        old.el.pause();
-        old.el.src = "";
-      });
+      if (old) {
+        old.el._fgFading = true;
+        fade(old.el, 0, 900, () => halt(old.el));
+      }
     }
   };
 }
@@ -2206,14 +2231,20 @@ var loops = () => [music.current, ambience.current].filter(Boolean);
 function playBgm(track, volume = 0.45) {
   music.play(track, volume);
 }
-function stopBgm() {
-  music.stop();
-}
 function playAmbience(sound, volume = 0.35) {
   ambience.play(sound, volume);
 }
-function stopAmbience() {
+function stopAll() {
+  music.stop();
   ambience.stop();
+  stopPreview();
+  for (const src of [...oneShots]) {
+    try {
+      src.stop();
+    } catch {
+    }
+  }
+  oneShots.clear();
 }
 function previewTrack(track, onEnd) {
   stopPreview();
@@ -2337,11 +2368,14 @@ function playFile(ac, id, volume) {
   });
 }
 var MAX_STORY_SECONDS = 12;
+var oneShots = /* @__PURE__ */ new Set();
 function playLibSound(assetId, volume = 1) {
   const ac = assetId && volume > 0 && audioCtx();
   if (!ac) return;
   decoded(ac, assetId).then((buffer) => {
     const src = ac.createBufferSource();
+    oneShots.add(src);
+    src.onended = () => oneShots.delete(src);
     const g = ac.createGain();
     const t = ac.currentTime;
     src.buffer = buffer;
@@ -2705,9 +2739,12 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
   const voiceRef = import_react5.default.useRef(voice);
   voiceRef.current = voice;
   const pending = import_react5.default.useRef([]);
+  const ticking = import_react5.default.useRef(null);
   const dropPending = () => {
     pending.current.forEach(clearTimeout);
     pending.current = [];
+    clearInterval(ticking.current);
+    ticking.current = null;
   };
   import_react5.default.useEffect(() => {
     if (!speed || !chars.length || hold) return void 0;
@@ -2727,6 +2764,7 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
       }
       if (next >= chars.length) clearInterval(tick);
     }, Math.max(8, Math.min(speed, plan.gap))) : null;
+    ticking.current = tick;
     return () => {
       clearTimeout(finish);
       dropPending();
@@ -5392,10 +5430,7 @@ function TheaterRoot() {
     if (s.resume && s.resume.gameId === gameId && maxTurn > s.resume.afterTurn || cfg && cfg.ui.autoOpen) openTheater(gameId, { turn: maxTurn });
   }, [view, maxTurn, s.open]);
   import_react11.default.useEffect(() => {
-    if (!s.open) {
-      stopBgm();
-      stopAmbience();
-    }
+    if (!s.open) stopAll();
   }, [s.open]);
   if (!s.open) return null;
   return /* @__PURE__ */ import_react11.default.createElement(Theater, { key: s.gameId, gameId: s.gameId, view, viewError: error, cfg, startTurn: s.startTurn, panel: s.panel, panelArg: s.panelArg });
@@ -5413,6 +5448,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const [hidden, setHidden] = import_react11.default.useState(false);
   const [choosing, setChoosing] = import_react11.default.useState(false);
   const [closing, setClosing] = import_react11.default.useState(false);
+  const closingRef = import_react11.default.useRef(false);
+  import_react11.default.useEffect(() => () => stopAll(), []);
   const anchor = import_react11.default.useRef("");
   const rootRef = import_react11.default.useRef(null);
   const [glyphKey, setGlyphKey] = import_react11.default.useState("");
@@ -5478,16 +5515,17 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }, [index, beats, ui0.skin, ui0.fontBase]);
   const scene = beat ? beat.scene : (beats[beats.length - 1] || {}).scene;
   const tracks = useMusic();
-  const musicBeat = beat || beats[beats.length - 1];
+  const musicBeat = beat;
   const track = import_react11.default.useMemo(() => ui0.bgm ? pickTrack(musicBeat, tracks, assetUrl) : null, [ui0.bgm, tracks, musicBeat && musicBeat.bgm, scene && scene.mood, scene && scene.location]);
   import_react11.default.useEffect(() => {
-    if (track || !ui0.bgm) playBgm(track, ui0.bgmVolume);
+    if (!closingRef.current && (track || !ui0.bgm)) playBgm(track, ui0.bgmVolume);
   }, [track && track.id, ui0.bgm, ui0.bgmVolume]);
   const soundlib = useSoundlib();
   const soundById = import_react11.default.useMemo(() => new Map((soundlib || []).map((s) => [s.id, s])), [soundlib]);
   const ambId = ui0.amb !== false && musicBeat && musicBeat.amb !== "none" ? musicBeat.amb : "";
   const ambSound = ambId && soundById.get(ambId) || null;
   import_react11.default.useEffect(() => {
+    if (closingRef.current) return;
     playAmbience(ambSound ? { id: ambSound.id, url: assetUrl(ambSound.assetId) } : null, (ui0.ambVolume ?? 0.35) * (ambSound ? ambSound.volume ?? 1 : 1));
   }, [ambSound && ambSound.id, ambSound && ambSound.volume, ui0.ambVolume]);
   import_react11.default.useEffect(() => {
@@ -5538,8 +5576,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }, [beats.length]);
   const close = import_react11.default.useCallback(() => {
     setClosing(true);
-    stopBgm();
-    stopAmbience();
+    closingRef.current = true;
+    stopAll();
     setTimeout(() => ui.set({ open: false }), 320);
   }, []);
   const choose = (text) => {
