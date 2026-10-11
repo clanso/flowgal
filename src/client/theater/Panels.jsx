@@ -98,7 +98,10 @@ export function Backlog({ beats, index, onJump, onClose, gameId }) {
               )}
               <div className={`fg-log-item${i === index ? ' is-current' : ''}`} onClick={() => onJump(i)} style={i === index ? { background: 'rgba(255,255,255,.06)' } : null}>
                 <div className="fg-log-name">{b.type === 'narration' ? '' : b.alias || b.speaker}</div>
-                <div style={b.type === 'thought' ? { fontStyle: 'italic', opacity: 0.8 } : null}>{b.type === 'dialogue' ? `「${b.text}」` : b.type === 'thought' ? `（${b.text}）` : b.text}</div>
+                <div style={b.type === 'thought' ? { fontStyle: 'italic', opacity: 0.8 } : null}>
+                  {b.orig && <div className="fg-orig" style={{ animation: 'none', opacity: 0.75 }}>{b.orig}</div>}
+                  {b.type === 'dialogue' ? `「${b.text}」` : b.type === 'thought' ? `（${b.text}）` : b.text}
+                </div>
               </div>
             </React.Fragment>
           )

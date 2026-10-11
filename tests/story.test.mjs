@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { cleanTurnText } from '../lib/clean.js'
-import { segmentTurn, joinUnits } from '../lib/segment.js'
+import { segmentTurn, joinUnits, pairUnits } from '../lib/segment.js'
 import { normalizeScript, rawSection } from '../lib/director.js'
 import { playedUnits } from '../lib/staging.js'
 import { buildBeats } from '../src/client/theater/playback.js'
@@ -242,6 +242,48 @@ test('gate: 导演用 join 把切断的一句合并回旁白：按原文一字�
     assert.equal(script.images[0].after, 'U2')
     const { beats } = buildBeats({ turns: view.turns, images: [] })
     assert.deepEqual(beats.map(b => b.unitId), ['U1', 'U2', 'U5'])
+    engine.dispose()
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
+})
+
+test('gate: 双语对照由导演标 dual：原文、翻译合成一句（text 是翻译、orig 是原文），格式不限，标的必须是原文里有的', async () => {
+  const text = '门开了。\n罗伊「……なんか、いい匂いしないか？」 （……是不是有股香味？）\nI love you.\n我爱你。\nHello / 你好'
+  const units = segmentTurn(text)
+  const { units: paired, alias } = pairUnits(units, [
+    { orig: 'U2', tr: 'U3' },
+    { tr: 'U5', orig: 'U4' },
+    { u: 'U6', orig: 'Hello', tr: '你好' },
+    { orig: 'U1', tr: 'U2' }, // 跟上面重叠，不算
+    { u: 'U1', orig: '门', tr: '编造的翻译' }, // 不是原文照抄，不算
+  ])
+  assert.deepEqual(paired.map(u => [u.id, u.type, u.hint || '', u.text, u.orig || '']), [
+    ['U1', 'narration', '', '门开了。', ''],
+    ['U2', 'dialogue', '罗伊', '……是不是有股香味？', '……なんか、いい匂いしないか？'],
+    ['U4', 'narration', '', '我爱你。', 'I love you.'],
+    ['U6', 'narration', '', '你好', 'Hello'],
+  ])
+  assert.deepEqual([...alias], [['U3', 'U2'], ['U5', 'U4']])
+  assert.equal(pairUnits(units, undefined).units, units)
+
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
+  try {
+    const store = createStore(dir)
+    const tavern = fakeTavern()
+    const reply = JSON.stringify({ dual: [{ orig: 'U2', tr: 'U3' }], cast: [{ name: '罗伊', pos: 'center' }], lines: [{ u: 'U3', sp: '罗伊', emo: 'smile' }], choices: [], images: [], people: [] })
+    const llm = fakeLlm(reply)
+    const engine = createEngine({ store, services: { tavern, llm }, logger: { warn() {}, info() {} } })
+    const turn = { gameId: 'g', turn: 1, textVersion: 'v1', text, rawText: text, card: { name: '罗伊' } }
+    tavern.turns.set('g:1', turn)
+    await engine.onTurnSettled(turn)
+    const view = await engine.gameView('g')
+    const { beats } = buildBeats({ turns: view.turns, images: [] })
+    const line = beats.find(b => b.unitId === 'U2')
+    assert.equal(line.text, '……是不是有股香味？')
+    assert.equal(line.orig, '……なんか、いい匂いしないか？')
+    assert.equal(line.speaker, '罗伊')
+    assert.equal(view.turns[0].script.lines.U2.emo, 'smile', '写在翻译那个编号上的也跟过来')
     engine.dispose()
   } finally {
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
