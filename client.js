@@ -1932,6 +1932,24 @@ function stateRects(rects, part, state2, height = Infinity) {
   return list2.map(([x0, y0, x1, y1]) => [x0, y0, x1, Math.min(height, y1 + Math.max(8, snap8((y1 - y0) / 2)))]);
 }
 var snap8 = (v) => Math.round(v / 8) * 8;
+function cleanRects(rects, width, height) {
+  const out = {};
+  let area2 = 0;
+  for (const [part, max] of [["eyes", 2], ["mouth", 1]]) {
+    const list2 = Array.isArray(rects?.[part]) ? rects[part].slice(0, max) : [];
+    out[part] = list2.map((r) => {
+      const [x0, y0, x1, y1] = (Array.isArray(r) ? r : []).map(Number);
+      if (![x0, y0, x1, y1].every(Number.isFinite)) throw new Error(`${AA_PARTS[part].label}的框不对`);
+      const a = [Math.max(0, snap8(Math.min(x0, x1))), Math.max(0, snap8(Math.min(y0, y1))), Math.min(width, snap8(Math.max(x0, x1))), Math.min(height, snap8(Math.max(y0, y1)))];
+      if (a[2] - a[0] < 8 || a[3] - a[1] < 8) throw new Error(`${AA_PARTS[part].label}的框太小`);
+      area2 += (a[2] - a[0]) * (a[3] - a[1]);
+      return a;
+    });
+    if (!out[part].length) throw new Error(`还没框${AA_PARTS[part].label}`);
+  }
+  if (area2 > width * height / 8) throw new Error("框太大了：只框眼睛和嘴就够，重画范围越小越不容易走样");
+  return out;
+}
 function rectsBox(list2) {
   return [Math.min(...list2.map((r) => r[0])), Math.min(...list2.map((r) => r[1])), Math.max(...list2.map((r) => r[2])), Math.max(...list2.map((r) => r[3]))];
 }
@@ -3369,9 +3387,10 @@ function labToRgb(L, a, b) {
   const out = [3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z, -0.969266 * X + 1.8760108 * Y + 0.041556 * Z, 0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z];
   return out.map((c) => Math.max(0, Math.min(255, Math.round(unlin(c)))));
 }
+var clamp01 = (v) => Math.min(1, Math.max(0, v));
 function classWeights(L, a, b) {
-  const iris = Math.min(1, Math.max(0, (Math.hypot(a, b) - 6) / 8)) * Math.min(1, Math.max(0, (-b - 4) / 8));
-  const line = Math.min(1, Math.max(0, (55 - L) / 15)) * (1 - iris);
+  const iris = clamp01((Math.hypot(a, b) - 6) / 8) * clamp01((Math.max(-a, -b) - 2) / 6);
+  const line = clamp01((55 - L) / 15) * (1 - iris);
   return [iris, line, Math.max(0, 1 - iris - line)];
 }
 function rankFilter(src, w, h, size, pick) {
@@ -3416,13 +3435,6 @@ function blur(m, w, h, sigma) {
     return out;
   };
   return pass(pass(m, 1, 0), 0, 1);
-}
-function hairMask(lab, w, h) {
-  let m = new Float32Array(w * h);
-  for (let i = 0; i < w * h; i++) m[i] = lab[i * 3 + 2] > 10.5 && lab[i * 3] > 58 ? 1 : 0;
-  m = minF(maxF(m, w, h, 3), w, h, 3);
-  m = maxF(minF(m, w, h, 5), w, h, 5);
-  return blur(maxF(m, w, h, 7), w, h, 1);
 }
 var median = (values) => {
   if (!values.length) return 0;
@@ -3479,6 +3491,7 @@ function cleanPatch(base, gen, rects, { classes = true, keepHair = false, thresh
     }
     return { mu, sd: sd.map((x) => Math.max(0.5, Math.sqrt(x / s))) };
   };
+  const ratio = (b, g) => Math.min(1.25, Math.max(0.8, b / g));
   const maps = classes ? [0, 1].map((k) => {
     const sb = stats(bl, wb, k), sg = stats(g2, wg, k);
     return sb && sg ? { sb, sg } : null;
@@ -3489,7 +3502,7 @@ function cleanPatch(base, gen, rects, { classes = true, keepHair = false, thresh
       let v = g2[i * 3 + c] * wg[i * 3 + 2];
       for (let k = 0; k < 2; k++) {
         const m = maps[k];
-        const mapped = m ? (g2[i * 3 + c] - m.sg.mu[c]) * (m.sb.sd[c] / m.sg.sd[c]) + m.sb.mu[c] : g2[i * 3 + c];
+        const mapped = m ? (g2[i * 3 + c] - m.sg.mu[c]) * ratio(m.sb.sd[c], m.sg.sd[c]) + m.sb.mu[c] : g2[i * 3 + c];
         v += mapped * wg[i * 3 + k];
       }
       fixed[i * 3 + c] = v;
@@ -3499,8 +3512,19 @@ function cleanPatch(base, gen, rects, { classes = true, keepHair = false, thresh
   for (let i = 0; i < n; i++) used[i] = inside[i] && de(i) > threshold ? 1 : 0;
   used = maxF(minF(maxF(used, w, h, grow2 * 2 + 1), w, h, 3), w, h, 3);
   used = blur(used, w, h, feather);
-  const hair = keepHair ? hairMask(bl, w, h) : null;
-  for (let i = 0; i < n; i++) used[i] = Math.min(1, used[i]) * inside[i] * (hair ? 1 - hair[i] : 1);
+  if (keepHair) {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const X = x0 + x + 0.5, Y = y0 + y + 0.5;
+      let k = 0;
+      for (const r of rects) {
+        const rx = (r[2] - r[0]) / 2, ry = (r[3] - r[1]) / 2;
+        const d = ((X - (r[0] + rx)) / rx) ** 2 + ((Y - (r[1] + ry)) / ry) ** 2;
+        k = Math.max(k, clamp01((1.08 - d) / 0.16));
+      }
+      used[y * w + x] *= k;
+    }
+  }
+  for (let i = 0; i < n; i++) used[i] = Math.min(1, used[i]) * inside[i];
   const data = new Uint8ClampedArray(n * 4);
   for (let i = 0; i < n; i++) {
     if (used[i] <= 4e-3) continue;
@@ -3822,9 +3846,9 @@ function AaWorkbench({ gameId, person, onClose }) {
     await run(ok, null, Object.fromEntries(Object.entries(results).map(([k, r]) => [k, r.rects])));
   };
   const make = async (v, only = null, given = null) => {
-    const rects = given || rectsOf(v.key);
     job(v.key, { status: "running", step: 0, error: "" });
     const prep = await prepare(v.record);
+    const rects = cleanRects(given || rectsOf(v.key), prep.padW, prep.padH);
     setSizes((s) => ({ ...s, [v.key]: { w: prep.w, h: prep.h } }));
     const patches = only ? await storedPatches(v.record) : {};
     const todo = only ? [only] : steps;

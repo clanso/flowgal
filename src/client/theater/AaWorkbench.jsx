@@ -9,7 +9,7 @@ import { api, assetUrl, toast, hostName } from '../api.js'
 import { PlayView, useDemoTalk, SpriteViewer } from './AaPreview.jsx'
 import { emotionLabel } from './playback.js'
 import { visionApi, frameSprite, followSprite, holdVision, releaseVisionLater } from './vision.js'
-import { AA_PARTS, AA_STEPS, AA_STEPS_LITE, defaultRects, rectsBox, stateRects, motionPack, packLevel } from '../../../lib/aa-sprite.js'
+import { AA_PARTS, AA_STEPS, AA_STEPS_LITE, defaultRects, rectsBox, stateRects, motionPack, packLevel, cleanRects } from '../../../lib/aa-sprite.js'
 import { cleanPatch } from '../../../lib/aa-patch.js'
 
 const BOX_NAMES = { eyes: ['左眼', '右眼'], mouth: ['嘴'] }
@@ -344,9 +344,10 @@ export function AaWorkbench({ gameId, person, onClose }) {
    * 洗成贴片，存成 v2 素材包。
    */
   const make = async (v, only = null, given = null) => {
-    const rects = given || rectsOf(v.key)
     job(v.key, { status: 'running', step: 0, error: '' })
     const prep = await prepare(v.record)
+    // 跟宿主画遮罩用同一个框（对齐 8 像素、夹在垫好的图里），洗贴片时才对得上
+    const rects = cleanRects(given || rectsOf(v.key), prep.padW, prep.padH)
     setSizes(s => ({ ...s, [v.key]: { w: prep.w, h: prep.h } }))
     const patches = only ? await storedPatches(v.record) : {}
     const todo = only ? [only] : steps

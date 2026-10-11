@@ -50,6 +50,26 @@ test('gate: 洗贴片：只留变了的像素；虹膜颜色拉回原图；刘�
   assert.ok(Math.abs(inside[0] - 150) < 6 && inside[3] > 200, '嘴里的颜色保持：' + inside)
 })
 
+test('gate: 腮红跟头发同色时，闭眼不留原来的下睫毛；青绿色的眼睛算虹膜，颜色拉回原图、不会更艳', () => {
+  const W = 96, H = 64
+  const BLUSH = [221, 174, 164] // 跟头发一个颜色（真实遇到的：浅米粉的头发 + 明显的腮红）
+  const AQUA = [140, 215, 200], LASH = [90, 50, 40]
+  const iris = (x, y) => (x - 48) ** 2 + (y - 32) ** 2 < 11 ** 2
+  const base = picture(W, H, (x, y) => (y === 46 && x % 4 < 2 && x > 30 && x < 66 ? LASH : y > 42 ? BLUSH : iris(x, y) ? AQUA : SKIN))
+  // 闭眼：眼线画在中间，下面整片是腮红（原来的下睫毛没了）
+  const closed = picture(W, H, (x, y) => (y >= 30 && y <= 33 && x > 26 && x < 70 ? LASH : y > 42 ? BLUSH : SKIN))
+  const c = cleanPatch(base, closed, [[16, 12, 80, 56]], { classes: true, keepHair: true })
+  const dot = at(c, 32 - c.x, 46 - c.y)
+  assert.ok(dot[3] > 200 && dot[0] > 180, '原来的下睫毛被盖掉了：' + dot)
+  // 半闭：重画的虹膜更深更艳，洗完往原图拉回
+  const half = picture(W, H, (x, y) => (iris(x, y) ? (y < 28 ? SKIN : [40, 200, 185]) : y > 42 ? BLUSH : SKIN))
+  const h = cleanPatch(base, half, [[16, 12, 80, 56]], { classes: true, keepHair: true })
+  const px = at(h, 48 - h.x, 36 - h.y)
+  const [, ga, gb] = rgbToLab(40, 200, 185), [, ba, bb] = rgbToLab(...AQUA), [, oa, ob] = rgbToLab(px[0], px[1], px[2])
+  assert.ok(Math.hypot(oa, ob) <= Math.hypot(ga, gb) + 1, '没有更艳')
+  assert.ok(Math.hypot(oa - ba, ob - bb) < Math.hypot(ga - ba, gb - bb), '比重画的更接近原图的青绿：' + px)
+})
+
 test('gate: 侧身动作组：底图整张按侧身构图画，同组表情在它上面换脸；正面的照旧', () => {
   assert.equal(poseOf('pout'), 'side')
   assert.equal(anchorOf('side'), 'pout')
