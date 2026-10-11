@@ -3,7 +3,7 @@
 // 立绘按导演标的登场 / 退场逐句增减；插画从 after 那一句显示到 until 那一句（没写就到这一轮结束）。
 // 场景逐句变：导演在某一句写的地点、时段、天气、光线、基调、画面效果从那一句起生效，特殊段落（回忆、梦境……）进出见 lib/scenes.js。
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
-import { placeKey } from '../../../lib/vocab.js'
+import { placeKey, speakersOf } from '../../../lib/vocab.js'
 import { stageWalk, playedUnits } from '../../../lib/staging.js'
 import { walkScenes, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
@@ -15,9 +15,13 @@ export const TIME_LABEL = { dawn: '黎明', morning: '清晨', noon: '正午', a
 export const WEATHER_LABEL = { clear: '晴', rain: '雨', storm: '暴雨', snow: '雪', blizzard: '暴风雪', wind: '狂风', sakura: '樱吹雪', leaves: '落叶', fireflies: '萤火', fog: '雾', embers: '余烬', dust: '浮尘', bokeh: '光斑', stars: '星空', sparkles: '光点', bubbles: '气泡' }
 export const MOOD_LABEL = { daily: '日常', cheerful: '轻快', comic: '滑稽', sweet: '甜蜜', touching: '感动', calm: '静谧', solemn: '庄严', sad: '感伤', despair: '绝望', tense: '紧张', mystery: '悬疑', eerie: '诡异', battle: '激战', heroic: '热血', silence: '寂静' }
 export const LIGHT_LABEL = { normal: '', dim: '昏暗', dark: '熄灯', black: '漆黑', candle: '烛光', spot: '聚光', neon: '霓虹', screen: '屏幕光', alarm: '警报红光', moon: '月光', warm: '暖光', cold: '冷光', glare: '强光', flicker: '灯光闪烁' }
-export const FX_LABEL = { none: '', sway: '摇晃', ride: '颠簸', handheld: '手持', drift: '推近', woozy: '晕眩', heat: '热浪', underwater: '水下', rumble: '震动', speed: '疾驰', heartbeat: '心跳' }
+export const FX_LABEL = { none: '', sway: '摇晃', ride: '颠簸', handheld: '手持', drift: '推近', woozy: '晕眩', heat: '热浪', underwater: '水下', rumble: '震动', speed: '疾驰', heartbeat: '心跳', slowmo: '慢动作', timestop: '时间停止' }
 export const MODE_LABEL = { memory: '回忆', dream: '梦境', illusion: '幻觉', imagine: '想象', pov: '主观视角', inner: '内心世界', screen: '画面中', tale: '故事中', vision: '预见', digital: '虚拟世界', real: '回到现实' }
 export const CUT_LABEL = { time: 'Time Skip', date: 'Date', chapter: 'Chapter', meanwhile: 'Meanwhile' }
+export const VOICE_LABEL = { phone: '电话', radio: '广播', telepathy: '心灵感应', chorus: '齐声', offscreen: '画外音', echo: '回声', machine: '机械音' }
+export const CG_IN_LABEL = { sweep: '光扫入场', dissolve: '溶入', flash: '白闪', black: '从黑暗中浮现', zoom: '从局部拉开', focus: '失焦到对焦', slide: '滑入', iris: '圆形展开', glitch: '画面撕裂', photo: '照片落下', bloom: '柔光渐显', impact: '冲击' }
+export const CG_OUT_LABEL = { fade: '淡出', dissolve: '溶回场景', flash: '白闪消失', black: '暗下去', blur: '模糊消散', slide: '滑出', shatter: '碎裂', glitch: '撕裂消失', pull: '拉远消失', cut: '直接切掉' }
+export const CG_MOTION_LABEL = { drift: '缓慢推拉', still: '静止', push: '缓慢推近', pull: '缓慢拉远', pan: '横摇', shake: '持续震动', breathe: '轻轻起伏' }
 export const CARD_LABEL = { sms: '短信', letter: '信', note: '便条', news: '报纸', terminal: '终端', notice: '告示', diary: '日记', scroll: '卷轴' }
 export const POS_LABEL = { farleft: '最左', left: '左', center: '中', right: '右', farright: '最右' }
 export const CAMERA_LABEL = { shake: '震动', zoom: '推近', zoomout: '拉远', flash: '闪白', pan: '平移', blur: '虚焦', fadeblack: '黑场', redflash: '红闪', tilt: '倾斜' }
@@ -72,6 +76,7 @@ export function buildBeats(view) {
       })
       .sort((a, b) => a.at - b.at)
     let lastSpeaker = ''
+    let split = null // 分屏：电话另一头的人在画面一侧，写 off 或这一轮结束时收起
     units.forEach((unit, ui) => {
       const line = lines[ui]
       const at = scenes[ui]
@@ -81,7 +86,10 @@ export function buildBeats(view) {
       if (type === 'dialogue') { speaker = line.sp || (line.type ? '' : unit.hint) || lastSpeaker; lastSpeaker = speaker }
       else if (type === 'thought') speaker = line.sp || '我'
       else if (line.sp) speaker = line.sp
-      if (speaker && line.emo) emotions[speaker] = line.emo
+      const speakers = speakersOf(speaker)
+      if (line.emo) for (const name of speakers) emotions[name] = line.emo
+      if (line.split === 'off') split = null
+      else if (line.split) split = line.split
       // 同时有几张在显示时，后出现的盖住先出现的。
       const cgEntry = [...turnImages].reverse().find(e => e.at <= ui && ui <= e.end)
       const cg = cgEntry ? cgEntry.img : null
@@ -104,6 +112,9 @@ export function buildBeats(view) {
         text: unit.text,
         ...(unit.orig ? { orig: unit.orig } : {}), // 双语对照的原文（剧场上方小字）
         speaker,
+        ...(speakers.length > 1 ? { speakers } : {}), // 齐声：几个人一起高亮
+        ...(line.voice ? { voice: line.voice } : {}), // 声音的样子：电话里、广播、心灵感应……
+        ...(split ? { split } : {}),
         alias: line.as || '',
         emo: line.emo || '',
         sym: line.sym || '',
