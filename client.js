@@ -522,6 +522,20 @@ var EMOTION_POSE = {
   confused: "chin",
   teasing: "chin"
 };
+var MODE_ALIASES = {
+  memory: ["回忆", "闪回", "回想", "往事", "过去", "flashback", "recollection", "recall", "past"],
+  dream: ["梦", "梦境", "梦里", "梦中", "噩梦", "nightmare"],
+  illusion: ["幻觉", "幻象", "幻境", "错乱", "催眠", "hallucination"],
+  imagine: ["想象", "妄想", "脑补", "脑内", "脑内小剧场", "fantasy", "daydream", "imagination"],
+  pov: ["主观", "主观视角", "subjective"],
+  inner: ["内心", "内心世界", "精神世界", "精神空间", "心象", "mind"],
+  screen: ["画面", "画面中", "录像", "监控", "直播", "视频", "video", "tv", "monitor"],
+  tale: ["故事", "故事中", "传说", "讲述", "story", "legend"],
+  vision: ["预见", "预知", "预知梦", "预言", "未来", "future", "prophecy", "foresight", "premonition"],
+  digital: ["虚拟", "虚拟世界", "游戏", "游戏里", "网络", "网络空间", "virtual", "game", "cyber", "cyberspace"],
+  real: ["现实", "回到现实", "返回现实", "reality", "present"]
+};
+var MODE_BY_ALIAS = new Map(Object.entries(MODE_ALIASES).flatMap(([mode, words]) => words.map((w) => [w, mode])));
 var CG_MAX_CHARACTERS = 6;
 var DAYPART = { dawn: "day", morning: "day", noon: "day", afternoon: "day", dusk: "dusk", evening: "night", night: "night", midnight: "night" };
 var daypart = (time) => DAYPART[time] || "day";

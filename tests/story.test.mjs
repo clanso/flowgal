@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { cleanTurnText } from '../lib/clean.js'
 import { segmentTurn, joinUnits, pairUnits } from '../lib/segment.js'
-import { normalizeScript, rawSection, scriptScenes, sceneAfter, playingAfter, previousBrief } from '../lib/director.js'
+import { normalizeScript, rawSection, scriptScenes, sceneAfter, playingAfter, previousBrief, cueSection } from '../lib/director.js'
 import { playedUnits, castAtEnd } from '../lib/staging.js'
 import { buildBeats } from '../src/client/theater/playback.js'
 import { createStore } from '../lib/dsh/store.js'
@@ -335,6 +335,27 @@ test('gate: 特殊段落：进入回忆换场景和配乐、在场的人，写 r
   // 下一轮第一句接着演同一种段落：不转场、不出标题卡，接着在梦里
   const still = two('还在梦里。\n醒了。', { scene: { location: '楼梯', bgm: 'T1' }, cast: [], lines: { U1: { mode: 'dream' }, U2: { mode: 'real', scene: { transition: 'blink' } } } })
   assert.deepEqual(still.slice(-2).map(b => [b.mode, b.bgm, b.sceneEnter, b.transition]), [['dream', 'T2', false, ''], ['', 'T1', true, 'blink']])
+})
+
+test('gate: 段落名写成中文、近义词、对象或写进 scene 里都认；正文里像是进出回忆、时间跳跃的旁白列给导演逐句判断', () => {
+  const units = segmentTurn(['长楼梯上，她一直握着那颗宝石。', '拿到它的那天，也是这样一条往下延伸的楼梯。', '三年前。晓铃刚升上A级。', '“我三年前就说过了。”', '那时她还穿着那件长袍。', '她回过神来。', '第二天清晨，她们出发了。', '做了一个梦。'].join('\n'))
+  const s = normalizeScript({
+    scene: { location: '楼梯' },
+    lines: [
+      { u: 'U3', mode: '回忆' },
+      { u: 'U4', mode: { kind: 'Flashback' } },
+      { u: 'U5', scene: { mode: 'dream', location: '梦里' } },
+      { u: 'U6', mode: '回到现实' },
+      { u: 'U7', mode: 'none' },
+    ],
+  }, units)
+  assert.deepEqual(['U3', 'U4', 'U5', 'U6', 'U7'].map(id => s.lines[id]?.mode), ['memory', 'memory', 'dream', 'real', undefined])
+  assert.equal(s.lines.U5.scene.location, '梦里')
+
+  const cues = cueSection(units)
+  assert.match(cues, /【可能的转折】/)
+  assert.deepEqual(cues.split('\n').filter(l => /^U\d/.test(l)).map(l => l.match(/^(U\d+)（(.+?)？）/).slice(1).join(' ')), ['U2 回忆', 'U3 回忆', 'U6 回到现实', 'U7 时间跳跃', 'U8 梦境'], '台词里提到的不算')
+  assert.equal(cueSection(segmentTurn('今天天气很好。\n“走吧。”')), '', '没有就不附')
 })
 
 test('gate: 场景逐句变：换地方、天色变化、天气光线基调、画面效果、过场字卡；不演的舞台指示上的变化挪到下一句', () => {
