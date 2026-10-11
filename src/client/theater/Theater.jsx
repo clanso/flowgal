@@ -2,7 +2,7 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio } from './playback.js'
-import { Backdrop, Cast, CgLayer, SplitPanel, TitleCard, CutCard, CUT_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, Cast, CgLayer, SplitPanel, RecallLayer, TitleCard, CutCard, CUT_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -322,12 +322,14 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
             <div className="fg-world-in" data-mode={atmosphere ? stageMode : ''}>
               <Backdrop scene={stageScene} view={view} transition={(stageBeat && stageBeat.transition) || 'dissolve'} />
               <div className="fg-grade" data-time={stageScene.time} />
-              {stageBeat && <Cast beat={title ? { ...stageBeat, speaker: '', sym: '' } : stageBeat} view={view} talk={title ? null : talk} max={ui0.maxOnStage ?? 5} />}
+              {/* 短闪回时说话的是闪回里的人：现在台上的人不高亮、不对口型 */}
+              {stageBeat && <Cast beat={title || stageBeat.recall ? { ...stageBeat, speaker: '', speakers: null, sym: '' } : stageBeat} view={view} talk={title || stageBeat.recall ? null : talk} max={ui0.maxOnStage ?? 5} />}
               <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} />
               <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} />
               {stageBeat && !title && <CgLayer beat={stageBeat} sound={sfxOn} />}
               <Particles weather={stageScene.weather} enabled={ui0.particles !== false} speed={atmosphere ? TIME_FLOW[stageScene.fx] ?? 1 : 1} />
               {stageBeat && !title && <SplitPanel beat={stageBeat} view={view} talk={talk} />}
+              {stageBeat && !title && <RecallLayer beat={stageBeat} view={view} talk={talk} />}
               <FadeLayer name="fxlayer" value={atmosphere && stageScene.fx !== 'none' ? stageScene.fx : ''} ms={900} />
               <div className="fg-vignette" />
             </div>

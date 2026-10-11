@@ -332,6 +332,38 @@ export function SplitPanel({ beat, view, talk }) {
   )
 }
 
+const RECALL_LEAVE_MS = 500
+
+/**
+ * 短闪回：现在的画面（背景、在场的人、插画、分屏）压暗、褪色、模糊，这一段开口的人以当时的样子半透明浮在前面，说话的亮一点。
+ * 进出时白闪一下（Flash 按 recallEdge），离开时淡出。没有档案的人（路人、「我」）不浮出来。
+ */
+export function RecallLayer({ beat, view, talk }) {
+  const recall = beat.recall || null
+  const last = React.useRef(null)
+  const [, refresh] = React.useReducer(n => n + 1, 0)
+  const leaving = !recall && Boolean(last.current)
+  if (recall) last.current = { recall, beat }
+  React.useEffect(() => {
+    if (recall || !last.current) return undefined
+    const t = setTimeout(() => { last.current = null; refresh() }, RECALL_LEAVE_MS)
+    return () => clearTimeout(t)
+  }, [recall])
+  const shown = recall ? { recall, beat } : last.current
+  if (!shown) return null
+  const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
+  const ghosts = stageLayout(shown.recall.who.filter(name => people.has(name)).map(name => ({ name, pos: 'center' })))
+  const ghostBeat = { ...shown.beat, then: shown.recall.then, ...(leaving ? { speaker: '', speakers: null, sym: '' } : {}) }
+  return (
+    <div className={`fg-recall${leaving ? ' is-leave' : ''}`} style={{ '--fade': RECALL_LEAVE_MS + 'ms' }} aria-hidden="true">
+      <div className="fg-recall-veil" />
+      {ghosts.map(entry => (
+        <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={ghostBeat} emo={shown.beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={leaving ? null : talk} />
+      ))}
+    </div>
+  )
+}
+
 /** 竖版插画比舞台高得多时露出的比例（舞台高 ÷ 铺满宽度后的图高）；够矮、用铺满就行的返回 0。 */
 const PAN_BELOW = 0.85
 function usePanRatio(ref, src, version) {
@@ -569,7 +601,7 @@ export function Flash({ beat }) {
   if (!beat) return null
   const kind = beat.cam === 'flash' ? '' : beat.cam === 'redflash' ? 'is-red' : beat.cam === 'fadeblack' ? 'is-black' : null
   const tr = TRANSITION_OVERLAY[beat.transition] ?? null
-  const cls = kind ?? tr
+  const cls = kind ?? tr ?? (beat.recallEdge ? 'is-soft' : null)
   if (cls === null) return null
   return <div key={beat.key} className={`fg-flash ${cls}`} />
 }

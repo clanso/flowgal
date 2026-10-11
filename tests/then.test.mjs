@@ -204,3 +204,85 @@ test('gate: 引擎：进回忆写了当时的样子 → 当时的衣服进衣橱
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
   }
 })
+
+test('gate: 短闪回：导演给闪回的几句写 recall（不换场景）；连着的算一段，段里开口的人和当时的样子；进出时白闪一下；闪回里开口的人不算在场', async () => {
+  const { recallRuns } = await import('../lib/scenes.js')
+  const { stageWalk } = await import('../lib/staging.js')
+  const units = segmentTurn(['发带被她小心地取下来。', '是柯萝伊亲手绣的。', '“那个，阿黛尔。生日快乐。”', '“哎呀……是铃兰呢。”', '“是那家伙的吗？”'].join('\n'))
+  const s = normalizeScript({
+    scene: { location: '楼梯' },
+    cast: [{ name: '柯萝伊', pos: 'left' }, { name: '布琳希尔德', pos: 'right' }],
+    lines: [
+      { u: 'U3', sp: '柯萝伊', voice: 'echo', recall: true, then: [ROBE] },
+      { u: 'U4', sp: '阿黛尔', voice: 'echo', emo: 'happy', recall: true },
+      { u: 'U5', sp: '布琳希尔德' },
+      { u: 'U1', recall: 'yes' },
+      { u: 'U2', mode: 'memory', recall: true },
+    ],
+  }, units)
+  assert.equal(s.lines.U3.recall, true)
+  assert.equal(s.lines.U1?.recall, undefined, '只收 true')
+  assert.equal(s.lines.U2.recall, undefined, '写了 mode 的就是段落，不算短闪回')
+  const plain = { ...s, lines: { ...s.lines, U2: {} } }
+  const runs = recallRuns(plain, units)
+  assert.deepEqual(runs.map(r => (r ? r.who.join('+') : '-')), ['-', '-', '柯萝伊+阿黛尔', '柯萝伊+阿黛尔', '-'])
+  assert.equal(runs[2], runs[3], '同一段共用')
+  assert.equal(runs[2].then.柯萝伊.outfit, '魔导师长袍')
+  // 剧场：闪回那两拍带着这一段；进出各白闪一下；台上还是现在的人（阿黛尔不上台）
+  const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: plain }], images: [] })
+  assert.deepEqual(beats.map(b => [b.recall ? b.recall.who.join('+') : '', b.recallEdge || '', b.cast.map(c => c.name).join('+')]), [
+    ['', '', '柯萝伊+布琳希尔德'],
+    ['', '', '柯萝伊+布琳希尔德'],
+    ['柯萝伊+阿黛尔', 'in', '柯萝伊+布琳希尔德'],
+    ['柯萝伊+阿黛尔', '', '柯萝伊+布琳希尔德'],
+    ['', 'out', '柯萝伊+布琳希尔德'],
+  ])
+  // 导演把只在闪回里开口的人也列进了 cast：她不上台，只在闪回里浮出来
+  const listed = { ...plain, cast: [...plain.cast, { name: '阿黛尔', pos: 'center' }] }
+  const before = [{ name: '柯萝伊', pos: 'left' }, { name: '布琳希尔德', pos: 'right' }]
+  assert.deepEqual(stageWalk(listed, units, before).steps.map(st => st.cast.map(c => c.name).join('+')), Array(5).fill('柯萝伊+布琳希尔德'))
+  // 闪回外也当面说了话的照旧在；第一幕（没有上一轮的名单）照 cast 来
+  const spoke = { ...listed, lines: { ...listed.lines, U5: { sp: '阿黛尔' } } }
+  assert.equal(stageWalk(spoke, units, before).steps[0].cast.map(c => c.name).join('+'), '柯萝伊+布琳希尔德+阿黛尔')
+  assert.equal(stageWalk(listed, units).steps[0].cast.length, 3)
+})
+
+test('gate: 引擎：短闪回里开口的人要立绘——写了当时样子的按当时的画（不带现在的黑眼圈），没写的按现在的', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-recall-'))
+  try {
+    const store = createStore(dir)
+    const tavern = fakeTavern()
+    const { requests, fetchImpl } = fakeNai()
+    const director = {
+      scene: { location: '第88层·长楼梯', time: 'night' },
+      cast: [{ name: '柯萝伊', pos: 'center' }],
+      people: [
+        { name: '柯萝伊', gender: 'female', appearance: { sex: '1girl', hair: 'long red hair' }, outfit: '炼金术师短外套', outfitTags: 'short alchemist coat', states: [{ name: '消瘦黑眼圈', tags: 'dark circles, gaunt' }] },
+        { name: '阿黛尔', gender: 'female', appearance: { sex: '1girl', hair: 'long blonde hair' }, outfit: '修女服', outfitTags: 'nun habit, white veil' },
+      ],
+      lines: [
+        { u: 'U1', sp: '柯萝伊' },
+        { u: 'U2', sp: '柯萝伊', voice: 'echo', recall: true, then: [ROBE] },
+        { u: 'U3', sp: '阿黛尔', voice: 'echo', recall: true },
+      ],
+    }
+    const engine = createEngine({ store, services: { tavern, llm: fakeLlm(JSON.stringify(director)) }, fetchImpl, logger: { warn() {}, info() {} } })
+    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, faceSwap: false, maxPerTurn: 0, portraits: true, expressions: false, sizes: { portrait: [64, 96] } } })
+    await engine.setSecret('novelai', 'official', 'k')
+    const text = '“走吧。”\n“那个，阿黛尔。生日快乐。”\n“哎呀……是铃兰呢。”'
+    const turn = { gameId: 'g', turn: 1, textVersion: 'v1', text, rawText: text, card: { name: '柯萝伊' } }
+    tavern.turns.set('g:1', turn)
+    await engine.onTurnSettled(turn)
+    for (const end = Date.now() + 6000; requests.length < 3;) {
+      if (Date.now() > end) throw new Error('等太久：三张立绘，只有 ' + requests.length)
+      await new Promise(r => setTimeout(r, 20))
+    }
+    const prompts = requests.map(r => JSON.stringify(r))
+    assert.equal(prompts.filter(t => t.includes('dark green robe')).length, 1, '柯萝伊闪回里那套')
+    assert.ok(!prompts.find(t => t.includes('dark green robe')).includes('dark circles'))
+    assert.equal(prompts.filter(t => t.includes('nun habit')).length, 1, '阿黛尔不在台上，闪回里开口也要一张')
+    engine.dispose()
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
+})

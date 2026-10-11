@@ -329,6 +329,16 @@
 .fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }
 .fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }
 .fg-flash.is-black { background: #000; animation: fg-black 1.6s ease both; }
+.fg-flash.is-soft { background: radial-gradient(90% 80% at 50% 45%, rgba(255, 250, 238, .9), rgba(255, 236, 210, .55)); animation-duration: .5s; }
+/* 短闪回：现在的画面压暗、褪色、模糊，闪回里开口的人半透明浮在前面 */
+/* 滤镜写在这一层自己身上（子元素的 backdrop-filter 会被这一层的淡入淡出截住，滤不到下面的画面），浮出来的人是子元素，不被滤到 */
+.fg-recall { position: absolute; inset: 0; z-index: 9; pointer-events: none; animation: fg-layer-in var(--fade, .5s) ease both;
+  backdrop-filter: sepia(.65) saturate(.55) brightness(.5) blur(4px); -webkit-backdrop-filter: sepia(.65) saturate(.55) brightness(.5) blur(4px);
+  background: radial-gradient(110% 85% at 50% 42%, rgba(255, 236, 205, .12), rgba(24, 14, 4, .5)); }
+.fg-recall.is-leave { animation: fg-layer-out var(--fade, .5s) ease both; }
+.fg-recall-veil { position: absolute; inset: 0; background-image: var(--fg-noise); opacity: .12; mix-blend-mode: overlay; }
+.fg-recall .fg-actor { filter: sepia(.5) brightness(.8) saturate(.8); opacity: .72; }
+.fg-recall .fg-actor.is-speaking { filter: sepia(.32) brightness(1.04) drop-shadow(0 0 2cqw rgba(255, 238, 210, .55)); opacity: .95; }
 @keyframes fg-flash { from { opacity: .95; } to { opacity: 0; } }
 /* 落字特效的闪光层：平时透明，由演出计划在某个字上点亮（Stage.jsx 的 useHits） */
 .fg-hitflash { position: absolute; inset: 0; z-index: 41; pointer-events: none; opacity: 0; background: #fff; }
