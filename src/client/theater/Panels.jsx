@@ -10,6 +10,7 @@ import { framedResult } from './faceFramer.js'
 import { SpriteArt, SpriteViewer } from './AaPreview.jsx'
 import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn, LOOK_FIELDS, LOOK_FIELD_LABELS, lookTags } from '../../../lib/look.js'
 import { Silhouette } from './Stage.jsx'
+import { stateSpans } from '../../../lib/cast.js'
 import { SKINS } from './skins.js'
 import { previewTrack, stopPreview, previewVoice, previewSound } from './audio.js'
 import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, voiceById, castVoices } from '../../../lib/sounds.js'
@@ -323,7 +324,7 @@ export function Gallery({ view, gameId, onClose, focusId }) {
 // ───────────────────────── 人物志 ─────────────────────────
 const SPRITE_STATUS = { writing: '写词中', queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消', face: '等认脸' }
 const WRITER_LABEL = { ai: '立绘设计师写的', fallback: '按档案拼的（模型没写出来）', user: '你改的', upload: '你上传的' }
-const LOG_ACTION = { create: 'AI 建档', change: '外貌变化', temp: '临时状态', edit: '手动修改', wear: '换装', states: '长期状态', outfit: '新衣服' }
+const LOG_ACTION = { create: 'AI 建档', change: '外貌变化', temp: '临时状态', edit: '手动修改', wear: '换装', states: '长期状态', outfit: '新衣服', span: '状态改轮次', 'wear-edit': '换装改轮次' }
 const GENDERS = [['', '未知'], ['female', '女'], ['male', '男'], ['other', '其他']]
 
 function readFile(file) {
@@ -354,13 +355,16 @@ async function readAaFolder(files) {
   return { manifest, files: images }
 }
 
-/** 一个人的各套样子：当前这套在最前，其余是已经有立绘的。 */
+/** 一个人的各套样子：当前这套在最前，其余是已经有立绘的；回忆、梦境里当时的那套标上段落（era）。 */
 function lookGroups(person) {
   const now = lookAt(person.timeline, Infinity)
   const groups = new Map([[lookKey(now), { key: lookKey(now), look: now, current: true }]])
   for (const [key, r] of Object.entries(person.sprites || {})) {
     const prefix = key.split('|').slice(0, 3).join('|')
-    if (!groups.has(prefix)) groups.set(prefix, { key: prefix, look: { outfit: r.outfit || '', states: (r.states || []).map(name => ({ name })) }, current: false })
+    const era = r && r.then ? r.era || 'memory' : ''
+    const group = groups.get(prefix)
+    if (!group) groups.set(prefix, { key: prefix, look: { outfit: r.outfit || '', states: (r.states || []).map(name => ({ name })) }, current: false, era })
+    else if (!era) group.era = '' // 平时也用到这一套（比如回忆里的样子和以前某一轮一样），不算回忆里的
   }
   return [...groups.values()]
 }
@@ -490,8 +494,63 @@ function WardrobeEditor({ gameId, person }) {
         </div>
       </div>
       <div className="fg-field"><label>临时状态</label><Text value={person.temp || ''} placeholder="wet hair, bandaged arm（只影响插画）" onCommit={v => run('t', () => look({ temp: v }), '已保存')} /></div>
-      <div className="fg-note">长期状态和换装从最新一轮起生效，立绘按「服装 × 长期状态 × 情绪」各画一套；临时状态只进插画。</div>
+      <LookTimeline gameId={gameId} person={person} />
+      <div className="fg-note">上面加减的长期状态和换装从最新一轮起生效；以前的轮次在「哪几轮有」「哪一轮起穿」里改。立绘按「服装 × 长期状态 × 情绪」各画一套，改了以前的轮次，用到的那几套会按新样子补画；临时状态只进插画。</div>
     </div>
+  )
+}
+
+/**
+ * 状态和换装的时间线：每个长期状态哪几轮有（可以断断续续几段），每次换装从哪一轮起。
+ * 导演按资料把后来才有的饰物提前加上了、或者记错了轮次，就在这里改；结束那一格空着表示一直到现在。
+ */
+function LookTimeline({ gameId, person }) {
+  const [, run] = useBusy()
+  const look = patch => api.cast(gameId, 'look', { name: person.name, patch })
+  const timeline = person.timeline || {}
+  const spans = stateSpans(timeline.states)
+  const names = Object.keys(spans)
+  const turnOf = v => { const t = String(v).trim(); return t === '' || !Number.isFinite(Number(t)) ? null : Math.max(0, Math.round(Number(t))) }
+  const setSpans = (name, list) => run('sp' + name, () => look({ stateSpans: { name, spans: list.map(sp => [sp.from, sp.to]) } }), '已改，用到的立绘会按新样子补画')
+  const edit = (name, i, change) => setSpans(name, spans[name].map((sp, j) => (j === i ? { ...sp, ...change } : sp)))
+  const wear = timeline.wear || []
+  return (
+    <>
+      <div className="fg-field"><label>状态哪几轮有</label>
+        <div className="fg-spans">
+          {names.map(name => spans[name].map((sp, i) => (
+            <div key={name + i} className="fg-span">
+              <b title={sp.tags}>{name}</b>
+              <span>第</span>
+              <Text value={sp.from} style={{ width: '5cqw' }} onCommit={v => { const t = turnOf(v); if (t != null) edit(name, i, { from: t }) }} />
+              <span>轮到第</span>
+              <Text value={sp.to == null ? '' : sp.to - 1} placeholder="现在" style={{ width: '5cqw' }} onCommit={v => { const t = turnOf(v); edit(name, i, { to: t == null ? null : t + 1 }) }} />
+              <span>轮</span>
+              <button type="button" className="fg-btn is-mini" title="这一段没有" onClick={() => setSpans(name, spans[name].filter((_, j) => j !== i))}>✕</button>
+            </div>
+          )))}
+          {!names.length && <span className="fg-note">还没有长期状态</span>}
+        </div>
+      </div>
+      <div className="fg-field"><label>哪一轮起穿</label>
+        <div className="fg-spans">
+          {wear.map((w, i) => (
+            <div key={w.fromTurn + '|' + w.outfit} className="fg-span">
+              <b>{w.outfit}</b>
+              {person.global && i === 0 && !w.source ? <span className="fg-note">全局角色的默认服装</span> : (
+                <>
+                  <span>第</span>
+                  <Text value={w.fromTurn} style={{ width: '5cqw' }} onCommit={v => { const t = turnOf(v); if (t != null && t !== w.fromTurn) run('w' + i, () => look({ wearMove: { from: w.fromTurn, to: t } }), '已改') }} />
+                  <span>轮起</span>
+                  <button type="button" className="fg-btn is-mini" title="删掉这次换装" onClick={() => run('wd' + i, () => look({ wearDrop: w.fromTurn }), '已删掉这次换装')}>✕</button>
+                </>
+              )}
+            </div>
+          ))}
+          {!wear.length && <span className="fg-note">还没有换装记录</span>}
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -587,8 +646,9 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
   const aaRef = React.useRef(null)
   React.useEffect(() => { setTags(record ? record.tags || '' : '') }, [key, record && record.tags])
   const entry = emotionEntry(emotion, emotions)
-  const reachable = group.current || turn != null
-  const at = group.current ? {} : { turn }
+  // 段落里当时的那套不在时间线上：按那套立绘记着的样子画（look 是这套的差分前缀）
+  const reachable = group.current || turn != null || Boolean(group.era)
+  const at = group.current ? {} : group.era ? { look: group.key } : { turn }
   const label = `${person.name} · ${lookLabel(group.look)} · ${entry.label}`
   const [viewing, setViewing] = React.useState(false)
   return (
@@ -684,7 +744,7 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
         <div className="fg-looks">
           {groups.map(g => (
             <button key={g.key} type="button" className={`fg-look${g.key === group.key ? ' is-on' : ''}`} onClick={() => { setGroupKey(g.key); setEmotion(''); setPicked(new Set()) }}>
-              {lookLabel(g.look)}{g.current ? <i>现在</i> : null}
+              {g.era ? <i>{MODE_LABEL[g.era] || '回忆'}里</i> : null}{lookLabel(g.look)}{g.current ? <i>现在</i> : null}
             </button>
           ))}
           <span className="fg-note">已画 {drawn} 种情绪</span>

@@ -5,7 +5,7 @@ import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
 import { SKY, placeKey, actorX, cgSrc, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
-import { lookAt, pickSprite } from '../../../lib/look.js'
+import { lookAt, pickSprite, thenLook } from '../../../lib/look.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger } from './audio.js'
 
@@ -185,11 +185,16 @@ export function MangaSymbol({ kind, life = 2.6 }) {
   return <span className="fg-symbol" data-kind={kind} style={{ '--life': life + 's' }}><span className="fg-symbol-art" dangerouslySetInnerHTML={{ __html: svg }} /></span>
 }
 
-/** 这一拍该用的立绘：按这一轮的样子（外貌、服装、长期状态）找对应情绪的差分，新情绪没画好时先用它的基础情绪。 */
-function spriteFor(person, turn, emo, emotions) {
+/**
+ * 这一拍该用的立绘：按这一轮的样子（外貌、服装、长期状态）找对应情绪的差分，新情绪没画好时先用它的基础情绪。
+ * 段落里导演写了这个人当时的样子（then）就按当时的找；还没画好时先显示剪影，不借现在那套。
+ */
+function spriteFor(person, turn, emo, emotions, then = null) {
   if (!person || !person.timeline) return ''
   const custom = (emotions || []).find(e => e.id === emo)
-  return pickSprite(person.sprites, lookAt(person.timeline, turn), emo, custom ? custom.base : '')
+  const now = lookAt(person.timeline, turn)
+  const look = then ? thenLook(now, then, person.timeline.outfits) : now
+  return pickSprite(person.sprites, look, emo, custom ? custom.base : '', { strict: Boolean(then) })
 }
 
 /** 登场从靠近的那一侧滑进来，退场往同一侧淡出。 */
@@ -197,7 +202,7 @@ const SIDE = { farleft: '-40%', left: '-28%', center: '0%', right: '28%', farrig
 
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name)
-  const sprite = spriteFor(person, beat.turn, emo, emotions)
+  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name])
   const src = sprite ? assetUrl(sprite) : ''
   const color = (person && person.color) || '#9b7bff'
   const [shown, setShown] = React.useState(src)

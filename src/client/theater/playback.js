@@ -3,7 +3,7 @@
 // 立绘按导演标的登场 / 退场逐句增减；插画从 after 那一句显示到 until 那一句（没写就到这一轮结束）。
 // 场景逐句变：导演在某一句写的地点、时段、天气、光线、基调、画面效果从那一句起生效，特殊段落（回忆、梦境……）进出见 lib/scenes.js。
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
-import { placeKey, speakersOf } from '../../../lib/vocab.js'
+import { placeKey, speakersOf, MODE_NAMES } from '../../../lib/vocab.js'
 import { stageWalk, playedUnits } from '../../../lib/staging.js'
 import { walkScenes, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
@@ -16,7 +16,7 @@ export const WEATHER_LABEL = { clear: '晴', rain: '雨', storm: '暴雨', snow:
 export const MOOD_LABEL = { daily: '日常', cheerful: '轻快', comic: '滑稽', sweet: '甜蜜', touching: '感动', calm: '静谧', solemn: '庄严', sad: '感伤', despair: '绝望', tense: '紧张', mystery: '悬疑', eerie: '诡异', battle: '激战', heroic: '热血', silence: '寂静' }
 export const LIGHT_LABEL = { normal: '', dim: '昏暗', dark: '熄灯', black: '漆黑', candle: '烛光', spot: '聚光', neon: '霓虹', screen: '屏幕光', alarm: '警报红光', moon: '月光', warm: '暖光', cold: '冷光', glare: '强光', flicker: '灯光闪烁' }
 export const FX_LABEL = { none: '', sway: '摇晃', ride: '颠簸', handheld: '手持', drift: '推近', woozy: '晕眩', heat: '热浪', underwater: '水下', rumble: '震动', speed: '疾驰', heartbeat: '心跳', slowmo: '慢动作', timestop: '时间停止' }
-export const MODE_LABEL = { memory: '回忆', dream: '梦境', illusion: '幻觉', imagine: '想象', pov: '主观视角', inner: '内心世界', screen: '画面中', tale: '故事中', vision: '预见', digital: '虚拟世界', real: '回到现实' }
+export const MODE_LABEL = { ...MODE_NAMES, real: '回到现实' }
 export const CUT_LABEL = { time: 'Time Skip', date: 'Date', chapter: 'Chapter', meanwhile: 'Meanwhile' }
 export const VOICE_LABEL = { phone: '电话', radio: '广播', telepathy: '心灵感应', chorus: '齐声', offscreen: '画外音', echo: '回声', machine: '机械音' }
 export const CG_IN_LABEL = { sweep: '光扫入场', dissolve: '溶入', flash: '白闪', black: '从黑暗中浮现', zoom: '从局部拉开', focus: '失焦到对焦', slide: '滑入', iris: '圆形展开', glitch: '画面撕裂', photo: '照片落下', bloom: '柔光渐显', impact: '冲击' }
@@ -124,6 +124,7 @@ export function buildBeats(view) {
         card: line.card || '',
         scene: at.scene,
         mode: at.mode,
+        ...(at.layer && at.layer.then ? { then: at.layer.then } : {}), // 段落里的人当时的样子（回忆里还没受伤、穿着当时的衣服……）
         ...(at.cut ? { cut: at.cut } : {}),
         bgm: at.bgm,
         amb: at.amb,
