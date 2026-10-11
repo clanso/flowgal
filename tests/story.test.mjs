@@ -358,6 +358,37 @@ test('gate: 进回忆那一句写「全部离开」再让段落里的人登场�
   assert.deepEqual(who(stageWalk(later, units).steps).at(-1), '柯萝伊+阿黛尔')
 })
 
+test('gate: 只在回忆里出场的人不会在开头站上台：回忆之前只是被描写到、隔着回响引一句他说过的话、导演漏写了 enter 都不算他开场就在', () => {
+  const units = ['narration', 'dialogue', 'dialogue', 'narration', 'dialogue', 'narration', 'dialogue'].map((type, i) => ({ id: 'U' + (i + 1), type }))
+  const who = steps => steps.map(s => s.cast.map(c => c.name).join('+') || '-')
+  const script = {
+    cast: [{ name: '柯萝伊', pos: 'center' }, { name: '阿黛尔', pos: 'left' }],
+    lines: {
+      U1: { sp: '阿黛尔' }, // 旁白：「字是阿黛尔刻的」
+      U2: { sp: '阿黛尔', voice: 'echo' }, // 引一句她以前说过的话
+      U3: { sp: '柯萝伊' },
+      U4: { mode: 'memory', exit: ['*'], enter: [{ name: '阿黛尔' }, { name: '柯萝伊' }] },
+      U5: { sp: '阿黛尔' },
+      U6: { mode: 'real' },
+      U7: { sp: '柯萝伊' },
+    },
+  }
+  assert.deepEqual(who(stageWalk(script, units).steps), ['柯萝伊', '柯萝伊', '柯萝伊', '阿黛尔+柯萝伊', '阿黛尔+柯萝伊', '柯萝伊', '柯萝伊'])
+  // 回忆前当面说过话的照旧算开场就在
+  const spoke = { ...script, lines: { ...script.lines, U2: { sp: '阿黛尔' } } }
+  assert.deepEqual(who(stageWalk(spoke, units).steps).slice(0, 3), ['柯萝伊+阿黛尔', '柯萝伊+阿黛尔', '柯萝伊+阿黛尔'])
+  // 导演漏写了阿黛尔的 enter：她只在回忆里开口，进回忆时跟着登场，回到现实就不在
+  const missed = { ...script, lines: { ...script.lines, U4: { mode: 'memory' } } }
+  assert.deepEqual(who(stageWalk(missed, units).steps), ['柯萝伊', '柯萝伊', '柯萝伊', '柯萝伊+阿黛尔', '柯萝伊+阿黛尔', '柯萝伊', '柯萝伊'])
+  // 电话那头、分屏那头的人也不算在场
+  const phone = { ...script, lines: { ...script.lines, U2: { sp: '阿黛尔', voice: 'phone' } } }
+  assert.equal(who(stageWalk(phone, units).steps)[0], '柯萝伊')
+  const split = { ...script, lines: { ...script.lines, U2: { sp: '阿黛尔', split: { who: ['阿黛尔'] } }, U3: { sp: '柯萝伊', split: 'off' } } }
+  assert.equal(who(stageWalk(split, units).steps)[0], '柯萝伊')
+  // 上一轮结束时在场的照旧在
+  assert.equal(who(stageWalk(script, units, [{ name: '阿黛尔', pos: 'left' }]).steps)[0], '柯萝伊+阿黛尔')
+})
+
 test('gate: 回忆演到下一轮：接着演的那几句台上还是回忆里的人，现在的人等回到现实再上来', () => {
   const first = segmentTurn('“走吧。”\n“嗯。”\n三年前。\n“这是中奖了吧？”')
   const second = segmentTurn('“嗯。”\n“你也来了？”\n她回过神来。\n“发什么呆？”')
