@@ -17,6 +17,8 @@ const WRITER = { ai: '模型写的', fallback: '按档案拼的', user: '玩家�
 const sourceLabel = source => ({ tavern: hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern 后台模型', plugin: '插件设置里指定' })[source]
 const USAGE_LABEL = { inputTokens: '输入', outputTokens: '输出', reasoningTokens: '思考', cachedInputTokens: '缓存命中', cacheReadTokens: '缓存读', cacheWriteTokens: '缓存写', totalTokens: '合计' }
 const SHAPE_LABEL = { landscape: '横版', portrait: '竖版', square: '方形' }
+/** 段落里一个人当时的样子：「柯萝伊 魔导师长袍 · 无状态 · 外貌另写」。 */
+const thenText = t => [t.name, t.outfit, t.states ? (t.states.length ? t.states.map(s => s.name).join('、') : '无状态') : '', t.change ? '外貌另写' : ''].filter(Boolean).join(' ')
 /** 一条记录的标题：导演按轮次，立绘按人，插画按轮次。 */
 const entryTitle = e => (e.kind === 'sprite' ? `立绘 · ${e.name}` : e.kind === 'cg' ? `插画 · 第 ${e.turn} 轮` : `第 ${e.turn} 轮`)
 
@@ -142,6 +144,7 @@ function ScriptView({ script, units }) {
               l.card && <Chip key="card" k="卡片">{CARD_LABEL[l.card] || l.card}</Chip>,
               l.cut && <Chip key="cut" k="字卡">{l.cut.text}</Chip>,
               l.mode && <Chip key="mode" k="段落">{MODE_LABEL[l.mode] || l.mode}</Chip>,
+              l.then && <Chip key="then" k="当时的样子">{l.then.map(thenText).join('；')}</Chip>,
               l.scene && <Chip key="scene" k="场景">{sceneChange(l.scene)}</Chip>,
               l.bgm && <Chip key="bgm" k="换歌">{l.bgm === 'none' ? '停' : l.bgm}</Chip>,
               l.amb && <Chip key="amb" k="环境音">{l.amb === 'none' ? '停' : l.amb}</Chip>,

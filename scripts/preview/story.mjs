@@ -161,7 +161,7 @@ export function directorReply(turn, units) {
     cast: [{ name: '林岚', pos: 'center' }],
     lines: [
       L('第二天放学', { cut: { kind: 'time', text: '翌日 放学后' } }),
-      L('三年前的那个黄昏', { mode: 'memory', scene: { location: '音乐教室（三年前）', time: 'dusk', weather: 'sakura', mood: 'touching', bg: 'school music room, grand piano, sunset through window, cherry blossoms outside, scenery, no humans' }, enter: [{ name: '林岚', pos: 'center' }] }),
+      L('三年前的那个黄昏', { mode: 'memory', scene: { location: '音乐教室（三年前）', time: 'dusk', weather: 'sakura', mood: 'touching', bg: 'school music room, grand piano, sunset through window, cherry blossoms outside, scenery, no humans' }, enter: [{ name: '林岚', pos: 'center' }], then: [{ name: '林岚', outfit: '校服', states: [] }] }),
       L('学姐，这是什么曲子', { sp: '我' }),
       L('一首还没写完的曲子', { sp: '林岚', emo: 'smile' }),
       L('琴声戛然而止', { mode: 'real', scene: { light: 'dark', mood: 'eerie', transition: 'none' } }),
@@ -169,7 +169,7 @@ export function directorReply(turn, units) {
     ],
     choices: ['走进音乐教室', '先在门口叫她的名字'],
     images: [{ after: find(units, '学姐，这是什么曲子'), until: find(units, '一首还没写完的曲子'), title: '三年前的黄昏', moment: '三年前的音乐教室，夕阳和樱花，林岚坐在钢琴前回头微笑', who: ['林岚'], in: 'photo', motion: 'still', out: 'shatter' }],
-    people: [{ name: '林岚', outfit: '冬季制服', outfitTags: 'winter school uniform, brown duffel coat, red checkered scarf, black pantyhose' }],
+    people: [{ name: '林岚', outfit: '冬季制服', outfitTags: 'winter school uniform, brown duffel coat, red checkered scarf, black pantyhose', states: [{ name: '手腕绷带', tags: 'bandaged wrist' }] }],
     summary: '旧校舍里传来琴声。',
   }
 }

@@ -806,6 +806,10 @@
 .fg-state { display: inline-flex; align-items: center; gap: .4cqw; padding: .3cqw .5cqw .3cqw .9cqw; border-radius: 99px; font-size: 1cqw; background: color-mix(in oklab, var(--accent2) 22%, transparent); border: 1px solid color-mix(in oklab, var(--accent2) 55%, transparent); }
 .fg-state button { width: 1.5cqw; height: 1.5cqw; border-radius: 50%; font-size: .8cqw; color: var(--ink-dim); }
 .fg-state button:hover { color: #fff; background: rgba(255, 255, 255, .15); }
+.fg-spans { display: flex; flex-direction: column; gap: .5cqw; }
+.fg-span { display: flex; align-items: center; gap: .6cqw; font-size: 1cqw; color: var(--ink-dim); }
+.fg-span b { min-width: 9cqw; color: var(--ink); font-weight: 600; }
+.fg-span .fg-input { text-align: center; padding-inline: .4cqw; }
 .fg-looks { display: flex; flex-wrap: wrap; align-items: center; gap: .5cqw; margin-top: 1cqw; }
 .fg-look { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1.1cqw; border-radius: 99px; font-size: 1cqw; letter-spacing: .08em; border: 1px solid var(--box-border); color: var(--ink-dim); background: rgba(255, 255, 255, .04); }
 .fg-look i { font-style: normal; font-size: .8cqw; padding: .05cqw .5cqw; border-radius: 99px; background: var(--accent); color: #111; }
