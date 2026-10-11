@@ -144,6 +144,7 @@ function ScriptView({ script, units }) {
               l.card && <Chip key="card" k="卡片">{CARD_LABEL[l.card] || l.card}</Chip>,
               l.cut && <Chip key="cut" k="字卡">{l.cut.text}</Chip>,
               l.mode && <Chip key="mode" k="段落">{MODE_LABEL[l.mode] || l.mode}</Chip>,
+              l.recall && <Chip key="recall" k="段落">短闪回</Chip>,
               l.then && <Chip key="then" k="当时的样子">{l.then.map(thenText).join('；')}</Chip>,
               l.scene && <Chip key="scene" k="场景">{sceneChange(l.scene)}</Chip>,
               l.bgm && <Chip key="bgm" k="换歌">{l.bgm === 'none' ? '停' : l.bgm}</Chip>,

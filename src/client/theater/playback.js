@@ -5,7 +5,7 @@
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
 import { placeKey, speakersOf, MODE_NAMES } from '../../../lib/vocab.js'
 import { stageWalk, playedUnits } from '../../../lib/staging.js'
-import { walkScenes, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
+import { walkScenes, recallRuns, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
 
 export { placeKey }
@@ -50,6 +50,7 @@ export function buildBeats(view) {
   let amb = '' // 当前的环境音，同上
   let shown = null // 上一拍画面上的场景和段落：判断新一轮开场要不要转场
   const active = new Map() // 每个人最近一次说话、登场是第几拍：台上人太多时，最久没动静的先下场
+  let recalled = null // 上一拍所在的短闪回：进出闪回时白闪一下
   turns.forEach((t, ti) => {
     const script = t.script
     if (script && script.scene && script.scene.bgm) bgm = script.scene.bgm
@@ -64,6 +65,7 @@ export function buildBeats(view) {
     cast = walk.end
     inside = walk.inside
     const scenes = walkScenes({ scene, bgm, amb, layer: keep }, lines)
+    const recalls = recallRuns(script, units)
     const unitIndex = new Map(units.map((u, i) => [u.id, i]))
     // 挂在不演的单元上的插画（导演整理前就有的、手动配的）：算到它前面最近一个要演的单元。
     const indexOf = id => {
@@ -107,6 +109,9 @@ export function buildBeats(view) {
       }
       shown = at
       for (const name of [...speakers, ...steps[ui].entered]) active.set(name, beats.length)
+      const recall = recalls[ui]
+      const recallEdge = recall === recalled ? '' : recall ? 'in' : 'out'
+      recalled = recall
       beats.push({
         key: `${t.turn}:${unit.id}`,
         turn: t.turn,
@@ -130,6 +135,8 @@ export function buildBeats(view) {
         mode: at.mode,
         ...(at.layer && at.layer.then ? { then: at.layer.then } : {}), // 段落里的人当时的样子（回忆里还没受伤、穿着当时的衣服……）
         ...(at.cut ? { cut: at.cut } : {}),
+        ...(recall ? { recall } : {}), // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
+        ...(recallEdge ? { recallEdge } : {}),
         bgm: at.bgm,
         amb: at.amb,
         sfx: line.sfx || '',
