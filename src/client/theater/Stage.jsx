@@ -3,17 +3,19 @@
 import React from 'react'
 import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
-import { SKY, placeKey, actorX, onStage, stageLayout, cgSrc, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
+import { SKY, placeKey, actorX, onStage, stageLayout, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite, thenLook } from '../../../lib/look.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger } from './audio.js'
 
-const TRANSITION = {
-  dissolve: ['fg-dissolve', '1.1s'], fade: ['fg-fade-slow', '2.6s'], cinematic: ['fg-cinematic', '1.5s'], wipe: ['fg-wipe', '1s'], iris: ['fg-iris', '1.2s'],
-  strips: ['fg-wipe', '.8s'], black: ['fg-black-in', '1.8s'], flash: ['fg-flash-in', '1s'], blink: ['fg-blink-in', '1.5s'], glitch: ['fg-glitch-in', '.7s'],
-  swirl: ['fg-swirl-in', '1.9s'], haze: ['fg-haze-in', '2.6s'], none: ['none', '0s'],
+/** 转场的动画；时长在 playback.js 的 TRANSITION_MS（换场时对话框按它让开）。 */
+const TRANSITION_ANIM = {
+  dissolve: 'fg-dissolve', fade: 'fg-fade-slow', cinematic: 'fg-cinematic', wipe: 'fg-wipe', iris: 'fg-iris',
+  strips: 'fg-wipe', black: 'fg-black-in', flash: 'fg-flash-in', blink: 'fg-blink-in', glitch: 'fg-glitch-in',
+  swirl: 'fg-swirl-in', haze: 'fg-haze-in', none: 'none',
 }
+const TRANSITION = Object.fromEntries(Object.entries(TRANSITION_ANIM).map(([k, anim]) => [k, [anim, TRANSITION_MS[k] / 1000 + 's']]))
 
 export function backgroundFor(scene, view) {
   const place = view && view.places && view.places[placeKey(scene)]
@@ -396,94 +398,50 @@ function usePanRatio(ref, src, version) {
   return state.src === src ? state.ratio : 0
 }
 
-/**
- * 插画收起要演多久（毫秒），按导演选的消失方式：直接切掉不留，碎裂、拉远这类久一点。
- * 出现方式（data-in）、停留时的动态（data-motion）只是样式，写在 theater.css。
- */
-const CG_LEAVE_MS = { fade: 800, dissolve: 1300, flash: 700, black: 1300, blur: 1100, slide: 750, shatter: 1300, glitch: 650, pull: 1200, cut: 0 }
-const leaveMs = img => CG_LEAVE_MS[img.leave] ?? CG_LEAVE_MS.fade
-
-/** 碎裂用的玻璃碎片：5×4 的格子斜切成三角形，顶点错开一点；从中间往外飞，外圈的晚一点。 */
-const SHARDS = (() => {
-  let seed = 7
-  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
-  const cols = 5, rows = 4
-  const grid = []
-  for (let r = 0; r <= rows; r += 1) {
-    grid.push([])
-    for (let c = 0; c <= cols; c += 1) {
-      const edgeX = c === 0 || c === cols, edgeY = r === 0 || r === rows
-      grid[r].push([(c + (edgeX ? 0 : (rnd() - 0.5) * 0.6)) / cols * 100, (r + (edgeY ? 0 : (rnd() - 0.5) * 0.6)) / rows * 100])
-    }
-  }
-  const list = []
-  for (let r = 0; r < rows; r += 1) for (let c = 0; c < cols; c += 1) {
-    const [a, b, d, e] = [grid[r][c], grid[r][c + 1], grid[r + 1][c + 1], grid[r + 1][c]]
-    const tris = (r + c) % 2 ? [[a, b, d], [a, d, e]] : [[a, b, e], [b, d, e]]
-    for (const tri of tris) {
-      const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3, cy = (tri[0][1] + tri[1][1] + tri[2][1]) / 3
-      const dx = cx - 50, dy = cy - 50, dist = Math.hypot(dx, dy) || 1
-      const fly = 0.35 + rnd() * 0.5
-      list.push({
-        clip: `polygon(${tri.map(([x, y]) => `${x.toFixed(2)}% ${y.toFixed(2)}%`).join(', ')})`,
-        origin: `${cx.toFixed(1)}% ${cy.toFixed(1)}%`,
-        dx: `${(dx / dist * fly * 60).toFixed(1)}%`, dy: `${(dy / dist * fly * 45 + 18 + rnd() * 20).toFixed(1)}%`,
-        rot: `${((rnd() - 0.5) * 120).toFixed(0)}deg`, delay: `${Math.round(dist * 4 + rnd() * 60)}ms`,
-      })
-    }
-  }
-  return list
-})()
-
 /** 一张插画：出现、停留、收起都在同一个元素上演（收起时 leaving 为真，样式换成消失的那段动画）。 */
-function CgFrame({ img, src, leaving, sound }) {
+function CgFrame({ img, src, mood, leaving, sound }) {
   const box = React.useRef(null)
-  const out = img.leave || 'fade'
-  // 冲击着出现时「咚」一声，碎裂时「咔」一声（跟着音效开关，快进时不响）
-  React.useEffect(() => { if (sound && !leaving && img.enter === 'impact') stinger('impact') }, [])
-  React.useEffect(() => { if (sound && leaving && out === 'shatter') stinger('stab') }, [leaving])
+  const enter = cgEntrance(img, mood)
+  // 冲击着出现时「咚」一声（跟着音效开关，快进时不响）
+  React.useEffect(() => { if (sound && !leaving && enter === 'impact') stinger('impact') }, [])
   const ratio = usePanRatio(box, src, img.versions && img.versions[img.current])
-  // 竖版：停在顶上 → 慢慢摇到底 → 拉远露出全貌 → 倒着放回去；越长摇得越久。横版按导演选的动态（默认缓慢推拉）。
+  // 竖版：停在顶上 → 慢慢看到底 → 拉远露出全貌，停在全貌；越长看得越久，只看一遍。横版按导演选的动态（默认静止）。
   const pan = ratio ? { '--r': ratio.toFixed(4), '--pan': `${Math.round(16 + (1 - ratio) * 16)}s` } : null
   return (
     <div className={`fg-cg${ratio ? ' is-tall' : ''}${leaving ? ' is-leaving' : ''}`} ref={box} style={pan}
-      data-in={img.enter || 'sweep'} data-out={out} data-motion={img.motion || 'drift'}>
+      data-in={enter} data-out={cgExit(img, mood)} data-motion={cgStay(img)}>
       <div className="fg-cg-art">
         {ratio
           ? <><div className="fg-cg-back" style={{ backgroundImage: `url("${src}")` }} /><img className="fg-cg-pan" src={src} alt="" draggable={false} /></>
           : <div className="fg-cg-img" style={{ backgroundImage: `url("${src}")` }} />}
       </div>
-      {img.title && <div className="fg-cg-caption"><i /><span>CG</span><b>{img.title}</b></div>}
-      {leaving && out === 'shatter' && (
-        <div className="fg-cg-shards" aria-hidden="true">
-          {SHARDS.map((p, i) => (
-            <div key={i} className="fg-cg-shard" style={{ clipPath: p.clip, WebkitClipPath: p.clip, transformOrigin: p.origin, backgroundImage: `url("${src}")`, '--dx': p.dx, '--dy': p.dy, '--rot': p.rot, animationDelay: p.delay }} />
-          ))}
-        </div>
-      )}
     </div>
   )
 }
 
 /**
- * 插画层：出现、消失、停留时的动态按导演给这张插画写的 enter / leave / motion（见 lib/vocab.js 的 CG_INS 等）。
+ * 插画层：出现、消失、停留时的动态按导演给这张插画写的 enter / leave / motion（见 lib/vocab.js 的 CG_INS 等），没写的按基调定快慢。
  * 收起或被下一张顶掉的那张留着演完消失动画再移除；渲染时就记好，免得先空一帧。同一张换了版本直接换，不演消失。
  */
 export function CgLayer({ beat, sound = false }) {
   const img = beat.cg
   const src = cgSrc(img, assetUrl)
-  const cur = src ? { img, src, key: img.id + ':' + img.current } : null
+  const cur = src ? { img, src, key: img.id + ':' + img.current, mood: beat.scene && beat.scene.mood } : null
   const prev = React.useRef(null)
   const ghosts = React.useRef([])
   const [, refresh] = React.useReducer(n => n + 1, 0)
   const was = prev.current
   if (was && (!cur || was.key !== cur.key)) {
     ghosts.current = ghosts.current.filter(g => g.key !== was.key)
-    const ms = leaveMs(was.img)
+    const ms = CG_OUT_MS[cgExit(was.img, was.mood)]
     if (ms && (!cur || was.img.id !== cur.img.id)) ghosts.current.push({ ...was, until: Date.now() + ms })
   }
   prev.current = cur
-  if (cur) ghosts.current = ghosts.current.filter(g => g.key !== cur.key)
+  if (cur) {
+    // 同一张插画接着显示：出现时的基调留着，免得读到中途基调变了、收起的快慢跟着变
+    if (was && was.key === cur.key) cur.mood = was.mood
+    ghosts.current = ghosts.current.filter(g => g.key !== cur.key)
+  }
   const pending = ghosts.current.length
   React.useEffect(() => {
     if (!pending) return undefined
@@ -495,7 +453,7 @@ export function CgLayer({ beat, sound = false }) {
   const waiting = !cur && img && img.status !== 'failed' && img.status !== 'cancelled'
   return (
     <>
-      {frames.map(f => <CgFrame key={f.key} img={f.img} src={f.src} leaving={f.leaving} sound={sound} />)}
+      {frames.map(f => <CgFrame key={f.key} img={f.img} src={f.src} mood={f.mood} leaving={f.leaving} sound={sound} />)}
       {waiting && <div className="fg-cg-wait"><i />{img.status === 'writing' ? '插画分镜中' : '插画绘制中'}{img.title ? `「${img.title}」` : ''}</div>}
     </>
   )

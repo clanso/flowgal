@@ -1,7 +1,7 @@
 // 剧场：全屏 galgame 播放器。读宿主整理好的场景脚本，逐拍演出；导演没整理完的部分先按原文演。
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
-import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio } from './playback.js'
+import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold } from './playback.js'
 import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
@@ -127,9 +127,19 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
   const beat = index >= 0 ? beats[index] : null
   const speed = skip ? 0 : ui0.textSpeed
-  // 过场字卡（三小时后、与此同时……）：字卡收起前这句先不出字；起雾转场（进出回忆）、短闪回的进出也等画面变过去再出字。
-  // 点一下跳过，快进时不等。
-  const pauseMs = !beat || title || speed <= 0 ? 0 : beat.cut ? CUT_MS : beat.transition === 'haze' ? HAZE_MS : RECALL_HOLD_MS[beat.recallEdge] || 0
+  // 「間」：像 galgame 那样，这一句的字出来之前先停一下，点一下跳过，快进时不等——
+  // 过场字卡（三小时后、与此同时……）收起前、起雾转场（进出回忆）和短闪回的进出，等画面变过去再出字；
+  // 插画出现、换了地方时对话框先让开，等画面出来再接着念；导演写的停顿（pause）按它写的停。后三样的规则在 playback.js 的 beatHold，
+  // 跟上一拍画面上的比：往回翻到插画已经在画面上的那句、读到一半插画才画好，都不等。几样同时有取最长的。
+  const cgOn = beat && !title && beat.cg && cgSrc(beat.cg, assetUrl) ? beat.cg.id : ''
+  const shownRef = React.useRef({ key: '', cg: '', place: '', mode: '', hold: { ms: 0, away: false } })
+  if (beat && shownRef.current.key !== beat.key) {
+    const was = shownRef.current
+    shownRef.current = { key: beat.key, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was }) }
+  } else if (shownRef.current.cg !== cgOn) shownRef.current = { ...shownRef.current, cg: cgOn }
+  const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false }
+  const edgeMs = !beat || title ? 0 : beat.cut ? CUT_MS : beat.transition === 'haze' ? HAZE_MS : RECALL_HOLD_MS[beat.recallEdge] || 0
+  const pauseMs = speed > 0 ? Math.max(edgeMs, hold.ms) : 0
   const [pauseSeen, setPauseSeen] = React.useState('')
   const pausing = pauseMs > 0 && pauseSeen !== beat.key
   const cutting = pausing && Boolean(beat.cut)
@@ -374,7 +384,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
         {beat && !title && beat.card && <SceneCard beat={beat} />}
         {beat && !title && (
-          <DialogBox beat={beat} chars={chars} plan={typed} done={done} waiting={holdText} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)} />
+          <DialogBox beat={beat} chars={chars} plan={typed} done={done} waiting={holdText} away={pausing && hold.away} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)} />
         )}
         {!beat && !title && (
           <div className="fg-choices"><div className="fg-choices-title">{view ? '这一局还没有可以演的内容' : '读取中'}</div></div>
