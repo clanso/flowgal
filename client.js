@@ -542,6 +542,7 @@ function stageWalk(script, units, carry = [], inside = null) {
   const home = new Map((script.cast || []).map((c) => [c.name, c.pos]));
   const first = /* @__PURE__ */ new Map();
   const inLayer = /* @__PURE__ */ new Map();
+  const back = /* @__PURE__ */ new Map();
   const early = /* @__PURE__ */ new Set();
   const realVoices = /* @__PURE__ */ new Set();
   const layerVoices = /* @__PURE__ */ new Map();
@@ -549,6 +550,7 @@ function stageWalk(script, units, carry = [], inside = null) {
   let layer = false, layerSeen = false, layerStart = -1, split = null;
   units.forEach((u, i) => {
     const line = lines[u.id] || {};
+    const returning = line.mode === "real" && layer;
     if (line.mode === "real") layer = false;
     else if (line.mode) {
       if (!layer) layerStart = i;
@@ -557,7 +559,7 @@ function stageWalk(script, units, carry = [], inside = null) {
     if (line.split === "off") split = null;
     else if (line.split) split = line.split;
     const note = (name2, kind) => {
-      const seen = layer ? inLayer : first;
+      const seen = returning ? back : layer ? inLayer : first;
       if (!seen.has(name2)) seen.set(name2, kind);
     };
     for (const name2 of line.exit || []) note(name2, "exit");
@@ -585,6 +587,7 @@ function stageWalk(script, units, carry = [], inside = null) {
     if (first.has(name2)) return first.get(name2) === "exit";
     if (onlyInside.has(name2)) return false;
     if (carried.has(name2)) return true;
+    if (back.has(name2)) return true;
     if (inLayer.has(name2)) return inLayer.get(name2) === "exit" || early.has(name2);
     if (layerVoices.has(name2) && !realVoices.has(name2)) {
       const at2 = layerVoices.get(name2);
