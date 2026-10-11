@@ -1677,6 +1677,45 @@ function walkScenes(start, lines) {
     return { scene, mode, bgm: now.bgm, amb: now.amb, real, layer, moved, transition, ...line.cut ? { cut: line.cut } : {} };
   });
 }
+var STAGE_NOTE = /^[【\[]([^】\]]*)[】\]]$/;
+var FLASHBACK = "(?:闪回|閃回|回忆|回憶|回想|フラッシュバック|flashback)";
+var FLASHBACK_START = new RegExp(`^\\s*${FLASHBACK}`, "i");
+var FLASHBACK_END = new RegExp(`^\\s*${FLASHBACK}(?:演出|篇|シーン)?[\\s・·：:\\-—~～]*(?:结束|結束|终了|終了|终|終|完|おわり|end)|^\\s*(?:回到现实|回到現實|現実に戻)`, "i");
+var OPEN_FLASHBACK_MAX = 6;
+function markRecalls(script, units) {
+  if (!script?.lines || !units?.length) return script;
+  const skip = new Set(script.skip || []);
+  const spans = [];
+  let open = null;
+  for (const u of units) {
+    const note = STAGE_NOTE.exec(String(u.text || "").trim())?.[1] || "";
+    const ends = FLASHBACK_END.test(note);
+    if (ends || FLASHBACK_START.test(note)) {
+      if (open) {
+        open.closed = ends;
+        spans.push(open);
+        open = null;
+      }
+      if (!ends) open = { ids: [], closed: false };
+      continue;
+    }
+    if (open && !skip.has(u.id)) open.ids.push({ id: u.id, type: script.lines[u.id]?.type || u.type });
+  }
+  if (open) spans.push(open);
+  const want = /* @__PURE__ */ new Set();
+  for (const span of spans) {
+    const cut = span.ids.findIndex((x) => x.type === "narration");
+    const ids = span.closed ? span.ids : span.ids.slice(0, Math.min(cut < 0 ? span.ids.length : cut, OPEN_FLASHBACK_MAX));
+    if (ids.some((x) => script.lines[x.id]?.mode)) continue;
+    for (const x of ids) want.add(x.id);
+  }
+  for (const [id, line] of Object.entries(script.lines)) if (line?.voice === "memory" && !line.mode) want.add(id);
+  const add = [...want].filter((id) => !script.lines[id]?.recall);
+  if (!add.length) return script;
+  const lines = { ...script.lines };
+  for (const id of add) lines[id] = { ...lines[id] || {}, recall: true };
+  return { ...script, lines };
+}
 function recallRuns(script, units) {
   const lines = units.map((u) => script?.lines?.[u.id] || {});
   const out = lines.map(() => null);
@@ -2150,7 +2189,7 @@ function buildBeats(view) {
   const active = /* @__PURE__ */ new Map();
   let recalled = null;
   turns.forEach((t, ti) => {
-    const script = t.script;
+    const script = markRecalls(t.script, t.units);
     if (script && script.scene && script.scene.bgm) bgm = script.scene.bgm;
     if (script && script.scene && script.scene.amb) amb = script.scene.amb;
     if (script) scene = { ...EMPTY_SCENE, ...script.scene };

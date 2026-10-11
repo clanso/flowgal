@@ -5,7 +5,7 @@
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
 import { placeKey, speakersOf, MODE_NAMES, cgIn, cgOut, cgMotion } from '../../../lib/vocab.js'
 import { stageWalk, playedUnits } from '../../../lib/staging.js'
-import { walkScenes, recallRuns, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
+import { walkScenes, recallRuns, markRecalls, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
 
 export { placeKey }
@@ -52,7 +52,8 @@ export function buildBeats(view) {
   const active = new Map() // 每个人最近一次说话、登场是第几拍：台上人太多时，最久没动静的先下场
   let recalled = null // 上一拍所在的短闪回：进出闪回时白闪一下
   turns.forEach((t, ti) => {
-    const script = t.script
+    // 正文里框起来的闪回、回忆里的声音：导演没写 recall 也按短闪回演
+    const script = markRecalls(t.script, t.units)
     if (script && script.scene && script.scene.bgm) bgm = script.scene.bgm
     if (script && script.scene && script.scene.amb) amb = script.scene.amb
     if (script) scene = { ...EMPTY_SCENE, ...script.scene }
