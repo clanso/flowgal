@@ -7,7 +7,9 @@ import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
 import { useFaceFramer } from './faceFramer.js'
-import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds } from './audio.js'
+import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros } from './audio.js'
+import { ErosPeak, useErosPulse } from './Eros.jsx'
+import { EROS_SFX } from '../../../lib/eros.js'
 import { ONOMATOPOEIA } from '../../../lib/foley.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
 import { castVoices, lineVoice } from '../../../lib/sounds.js'
@@ -148,7 +150,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const shownRef = React.useRef({ key: '', beat: null, was: null, cg: '', place: '', mode: '', hold: { ms: 0, away: false } })
   if (beat && shownRef.current.key !== beat.key) {
     const was = shownRef.current
-    shownRef.current = { key: beat.key, beat, was: was.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was }) }
+    shownRef.current = { key: beat.key, beat, was: was.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was, eros: ui0.eros !== false }) }
   } else if (shownRef.current.cg !== cgOn) shownRef.current = { ...shownRef.current, cg: cgOn }
   const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false }
   // 短闪回的演法（设置）：只有「压暗画面」进出时起雾、等画面变过去；另外两种画面不动，直接出字
@@ -248,7 +250,21 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     const sound = soundById.get(beat.sfx)
     if (sound) playLibSound(sound.assetId, (ui0.storySfxVolume ?? 0.8) * (sound.volume ?? 1))
     else if (ONOMATOPOEIA[beat.sfx]) storyFoley(ONOMATOPOEIA[beat.sfx].id, (ui0.storySfxVolume ?? 0.8) / 0.8)
+    else if (EROS_SFX[beat.sfx] && ui0.eros !== false) erosFoley(EROS_SFX[beat.sfx].id, (ui0.storySfxVolume ?? 0.8) / 0.8)
   }, [sfxKey])
+  // 亲密场面（lib/eros.js）：节奏底跟着场景的 eros（抽插的快慢）和 tentacle（触手）一直响，镜头跟着每一下轻轻一送；
+  // 高潮那一下（beat.peak）见下面的 ErosPeak。开关是设置里的「亲密音效」，音量跟剧情音效走；快进、标题画面时停。
+  const erosOn = ui0.eros !== false && ui0.storySfx !== false && !skip && !title
+  const erosVolume = (ui0.storySfxVolume ?? 0.8) / 0.8
+  const bedScene = erosOn && musicBeat ? musicBeat.scene : null
+  const bedPace = bedScene && bedScene.eros !== 'none' ? bedScene.eros || '' : ''
+  const bedTentacle = bedScene && bedScene.tentacle !== 'none' ? bedScene.tentacle || '' : ''
+  React.useEffect(() => {
+    if (closingRef.current) return
+    if (bedPace || bedTentacle) playEros(bedPace, bedTentacle, erosVolume)
+    else stopEros()
+  }, [bedPace, bedTentacle, erosVolume])
+  useErosPulse(cameraRef, Boolean(bedPace))
 
   const go = React.useCallback(i => {
     if (!beats.length) return
@@ -383,6 +399,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
               <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} />
               <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} />
               <FadeLayer name="romance" value={atmosphere ? romance : ''} ms={1600} />
+              <FadeLayer name="eros" value={atmosphere && ui0.eros !== false && stageScene.eros !== 'none' ? stageScene.eros || '' : ''} ms={1400} />
+              <FadeLayer name="tentacle" value={atmosphere && ui0.eros !== false && stageScene.tentacle !== 'none' ? stageScene.tentacle || '' : ''} ms={1800} />
               {stageBeat && !title && <CgLayer beat={stageBeat} sound={sfxOn} />}
               <Particles weather={stageScene.weather} enabled={ui0.particles !== false} speed={atmosphere ? (TIME_FLOW[stageScene.fx] ?? 1) * (SENSE_FLOW[sense] ?? 1) : 1} />
               {stageBeat && !title && <SplitPanel beat={stageBeat} view={view} talk={talk} />}
@@ -400,6 +418,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} />
         {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
+        {beat && !title && !skip && !cutting && beat.peak && ui0.eros !== false && <ErosPeak key={beat.key} beat={beat} cameraRef={cameraRef} volume={ui0.storySfx !== false ? erosVolume : 0} />}
         {beat && !title && beat.cutin && <CutIn key={beat.key} beat={beat} view={view} />}
         {beat && !title && beat.hit && <HitImpact key={beat.key} beat={beat} sound={sfxOn} fx={hit} />}
         {beat && !title && beat.moment && <MomentLayer key={beat.key} beat={beat} view={view} sound={sfxOn} />}

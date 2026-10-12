@@ -210,6 +210,7 @@ export function buildBeats(view) {
         ...(hushed ? { hush: hushed } : {}), // 配乐留白：start 是停下的那一句，on 是还没回来
         amb: at.amb,
         sfx: line.sfx || '',
+        ...(line.peak ? { peak: line.peak } : {}), // 高潮那一下：climax / cum / both（lib/eros.js）
         ...(line.pause ? { pause: line.pause } : {}), // 「間」：这句的字出来之前先停一下
         sceneEnter: enter,
         set,
@@ -236,7 +237,8 @@ export function buildBeats(view) {
     })
     // 一轮结束：现实里的场景、配乐接着往下一轮带；还在段落里的先记着，下一轮第一句接着演同一种段落才留着。
     const last = scenes[scenes.length - 1]
-    if (last) { scene = { ...last.real.scene, transition: 'dissolve' }; bgm = last.real.bgm; amb = last.real.amb; layer = last.layer }
+    // 亲密场面的节奏底、触手只管这一轮（导演下一轮还在继续会再写），还没整理的下一轮先不带着
+    if (last) { scene = { ...last.real.scene, eros: 'none', tentacle: 'none', transition: 'dissolve' }; bgm = last.real.bgm; amb = last.real.amb; layer = last.layer }
     else layer = null
   })
   return { beats, byKey: new Map(beats.map((b, i) => [b.key, i])) }
@@ -333,6 +335,8 @@ export const PHONE_LEAD_MS = { call: 1000, dial: 800 }
  */
 export const HUSH_BEATS = 5
 export const HUSH_LEAD_MS = 700
+/** 高潮那一下（lib/eros.js 的 PEAKS）：白光先起来、射精的第一下脉动过去，字再出。 */
+export const PEAK_LEAD_MS = { climax: 650, cum: 420, both: 650 }
 /** 换了地方：转场演完再停这么久才出字。 */
 const SCENE_BEAT_MS = 300
 /**
@@ -351,9 +355,9 @@ const WAKE_FROM = new Set(['haze', 'dissolve', 'fade'])
  * - 导演写了 pause：beat 顿一拍，silence 让开对话框沉默一会儿；
  * - 从回忆里醒过来（导演没挑别的出法时）：对话框让开，等回忆褪白、现在的画面清晰过来（WAKE_MS），这时多一个 wake: true。
  * 几样同时有取最长的。有过场字卡的那一句字卡本身就是停顿，插画、换场和醒过来都不再另停。
- * cg：这一拍画面上的插画（还没画好为空）；was：上一拍画面上的 { cg, place, mode }（刚打开剧场时为空）。
+ * cg：这一拍画面上的插画（还没画好为空）；was：上一拍画面上的 { cg, place, mode }（刚打开剧场时为空）；eros：亲密场面的演出开着（关了高潮那一下不等）。
  */
-export function beatHold(beat, { cg = '', was = {} } = {}) {
+export function beatHold(beat, { cg = '', was = {}, eros = true } = {}) {
   let ms = 0, away = false
   if (cg && cg !== was.cg && !beat.cut) { ms = Math.max(ms, cgHoldMs(beat.cg, beat.scene.mood)); away = true }
   const sameLayer = (beat.mode || '') === (was.mode || '')
@@ -365,6 +369,7 @@ export function beatHold(beat, { cg = '', was = {} } = {}) {
   if (beat.moment) ms = Math.max(ms, MOMENT_LEAD_MS[beat.moment.kind] || 0)
   if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0)
   if (beat.hush === 'start') ms = Math.max(ms, HUSH_LEAD_MS)
+  if (eros && beat.peak) ms = Math.max(ms, PEAK_LEAD_MS[beat.peak] || 0)
   const wake = was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
   if (wake) { ms = Math.max(ms, WAKE_MS); away = true }
   return { ms, away, ...(wake ? { wake } : {}) }
