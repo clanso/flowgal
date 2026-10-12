@@ -4,6 +4,7 @@
 import { assetUrl } from '../api.js'
 import { voiceById, soundFor, slotById, DEFAULT_SOUNDS } from '../../../lib/sounds.js'
 import { FOLEY } from '../../../lib/foley.js'
+import { EROS_FOLEY, EROS_LOOPS, TENTACLE_LOOPS, TENTACLE_SWAP, PEAK_FOLEY } from '../../../lib/eros.js'
 
 let preview = null   // { el, id, onEnd }
 let ctx = null
@@ -46,8 +47,10 @@ const HUSH_BACK_MS = 2600
 function loopPlayer() {
   let cur = null // { el, id, volume }
   let hushed = false
+  let ducked = 1 // 高潮那一下压低到几成（见 duck）
+  let duckTurn = 0
   const halt = el => { el._fgStopped = true; el.pause(); el.src = '' }
-  const audible = volume => (preview || hushed ? 0 : volume)
+  const audible = volume => (preview || hushed ? 0 : volume * ducked)
   return {
     get current() { return cur },
     /** 现在该有的音量：试听、留白时是 0。 */
@@ -82,6 +85,17 @@ function loopPlayer() {
       if (on) fade(now.el, 0, HUSH_OUT_MS, () => { if (hushed && cur === now) now.el.pause() })
       else { now.el.play().catch(() => {}); fade(now.el, audible(now.volume), HUSH_BACK_MS) }
     },
+    /** 压低一会儿：很快压到 level 成，ms 毫秒后慢慢回来（又压了一次就按后一次算）。 */
+    duck(level, ms) {
+      const turn = (duckTurn += 1)
+      ducked = level
+      if (cur) fade(cur.el, audible(cur.volume), 350)
+      setTimeout(() => {
+        if (turn !== duckTurn) return
+        ducked = 1
+        if (cur) fade(cur.el, audible(cur.volume), 1800)
+      }, ms)
+    },
   }
 }
 const music = loopPlayer()
@@ -105,6 +119,7 @@ export function stopAll() {
   stopPreview()
   for (const src of [...oneShots]) { try { src.stop() } catch {} }
   oneShots.clear()
+  stopEros()
 }
 
 /** 试听一首（设置里的配乐页）：剧场配乐先淡出，试听停了再淡回来。onEnd 在停下时调用（播完、换一首或手动停）。 */
@@ -185,7 +200,9 @@ function playParts(ac, parts, { rate = 1, volume = 1, at = ac.currentTime, out =
     if (part.to && part.to !== part.f) freq.exponentialRampToValueAtTime(part.to * rate, end)
     if (part.lp) { const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = part.lp; head.connect(lp); head = lp }
     head.connect(g).connect(out)
-    src.start(t)
+    // 噪声从缓冲里随便一处开始：同一个配方连着响（节奏底一拍一拍）时每一下的颗粒不一样
+    if (part.wave === 'noise') src.start(t, Math.random() * 0.4)
+    else src.start(t)
     src.stop(end + 0.02)
   }
 }
@@ -445,4 +462,124 @@ export function previewSound(slot, choice, ui = sounds) {
   const file = choice === 'custom' && ui.customSounds && ui.customSounds[slot]
   const sound = file ? { assetId: file.assetId } : { parts: (def.presets.find(x => x.id === choice) || def.presets[0]).parts }
   playSound(sound, ui.sfxVolume ?? 1)
+}
+
+// ───────────── 亲密场面（lib/eros.js）─────────────
+// 一下一下的音效、节奏底（两条：eros 一条、触手一条）、高潮那一下。开关和音量跟剧情音效走（调用方给），画面上不出字。
+
+/** 随机抖一点（音高、拍子），同一个声音连着响也不机械。 */
+const wobble = (k = 0.06) => 1 - k + Math.random() * 2 * k
+
+/** 亲密场面的一下音效（插入、射精、触手爬过……，lib/eros.js 的 EROS_SFX）。 */
+export function erosFoley(id, volume = 1) {
+  const ac = EROS_FOLEY[id] && volume > 0 && audioCtx()
+  if (ac) playParts(ac, EROS_FOLEY[id], { rate: wobble(0.04), volume })
+}
+
+/** 节奏底的一条：定时器每 TICK_MS 往前排 AHEAD 秒的音（页面在后台时定时器变慢，会空几拍）。 */
+const AHEAD = 0.3
+const TICK_MS = 100
+function rhythm() {
+  let now = null // { key, plan, volume, t 下一下什么时候响, step 第几拍 }
+  let timer = 0
+  let quietUntil = 0
+  const tick = () => {
+    if (!now || !ctx) return
+    while (now.t < ctx.currentTime + AHEAD) {
+      const at = Math.max(now.t, ctx.currentTime + 0.01)
+      if (at >= quietUntil) now.plan.play(ctx, at, now.step, now.volume)
+      now.t = at + now.plan.gap()
+      now.step += 1
+    }
+  }
+  return {
+    set(key, plan, volume) {
+      if (!plan || !(volume > 0)) { this.stop(); return }
+      if (now && now.key === key) { now.volume = volume; return }
+      const ac = audioCtx()
+      if (!ac) return
+      // 换了节奏从下一拍接着走；刚开始时等 START 秒（进场景那一下先让画面换过去）
+      now = { key, plan, volume, t: now ? Math.max(now.t, ac.currentTime + 0.05) : ac.currentTime + EROS_START, step: 0 }
+      if (!timer) timer = setInterval(tick, TICK_MS)
+      tick()
+    },
+    stop() { now = null; if (timer) { clearInterval(timer); timer = 0 } },
+    /** 停 seconds 秒（高潮那一下只剩心跳和长鸣），之后接着响。 */
+    quiet(seconds) { if (ctx) quietUntil = ctx.currentTime + seconds },
+  }
+}
+/** 节奏底开始前等多久（秒）。 */
+const EROS_START = 0.25
+
+/** 画面的律动（Eros.jsx 的 useErosPulse）听节奏底：每排下一拍就告诉它还有几毫秒响、这一拍多长、什么节奏。返回取消的函数。 */
+const beatListeners = new Set()
+export function onErosBeat(fn) { beatListeners.add(fn); return () => beatListeners.delete(fn) }
+
+/** 抽插的节奏（scene.eros）：一拍里按 EROS_LOOPS 排的几下；有触手时换成触手的（TENTACLE_SWAP）。cue：告诉画面（试听时不告诉）。 */
+function paceLoop(pace, tentacle, cue = true) {
+  const def = EROS_LOOPS[pace]
+  if (!def) return null
+  return {
+    gap: () => def.beat * wobble(0.02),
+    play(ac, at, step, volume) {
+      for (const [id, phase, gain, every] of def.hits) {
+        if (every && step % every) continue
+        const parts = EROS_FOLEY[tentacle ? TENTACLE_SWAP[id] || id : id]
+        if (!parts) continue
+        const t = at + phase * def.beat + (Math.random() - 0.5) * (def.swing || 0) * def.beat
+        playParts(ac, parts, { rate: wobble(0.06), volume: volume * gain, at: Math.max(at, t) })
+      }
+      if (!cue || !beatListeners.size) return
+      // 声音真正出来还要再晚一点（outputLatency）
+      const ms = (at - ac.currentTime + (ac.outputLatency || ac.baseLatency || 0)) * 1000
+      for (const fn of beatListeners) fn({ in: Math.max(0, ms), beat: def.beat * 1000, pace })
+    },
+  }
+}
+/** 触手的蠕动（scene.tentacle）：隔一会儿从一组里随便挑一下。 */
+function tentacleLoop(kind) {
+  const def = TENTACLE_LOOPS[kind]
+  if (!def) return null
+  const [lo, hi] = def.every
+  return {
+    gap: () => lo + Math.random() * (hi - lo),
+    play(ac, at, step, volume) {
+      const [id, gain] = def.pool[Math.floor(Math.random() * def.pool.length)]
+      playParts(ac, EROS_FOLEY[id], { rate: wobble(0.1), volume: volume * gain, at })
+    },
+  }
+}
+const erosBed = rhythm()
+const tentacleBed = rhythm()
+
+/** 节奏底：pace 是 scene.eros，tentacle 是 scene.tentacle；是 none（或 volume 为 0）的那一条停下。 */
+export function playEros(pace, tentacle, volume = 1) {
+  const writhing = Boolean(TENTACLE_LOOPS[tentacle])
+  erosBed.set(pace + (writhing ? '|tentacle' : ''), paceLoop(pace, writhing), volume)
+  tentacleBed.set(tentacle, tentacleLoop(tentacle), volume * 0.8)
+}
+export function stopEros() { erosBed.stop(); tentacleBed.stop() }
+
+/** 高潮那一下（climax / cum / both）：节奏底停一会儿、配乐压低一会儿，只剩心跳、长鸣和脉动。 */
+const PEAK_QUIET = { climax: 2.6, cum: 1.8, both: 2.6 }
+export function erosPeak(kind, volume = 1) {
+  const ac = PEAK_FOLEY[kind] && volume > 0 && audioCtx()
+  if (!ac) return
+  for (const id of PEAK_FOLEY[kind]) playParts(ac, EROS_FOLEY[id], { volume })
+  erosBed.quiet(PEAK_QUIET[kind])
+  tentacleBed.quiet(PEAK_QUIET[kind])
+  music.duck(0.35, PEAK_QUIET[kind] * 1000)
+}
+
+/** 设置里试听节奏底：另起两条响 seconds 秒，剧场里正在响的先停这么久。 */
+let trial = null
+export function previewEros(pace, tentacle, volume = 1, seconds = 5) {
+  if (trial) { trial.beds.forEach(b => b.stop()); clearTimeout(trial.timer) }
+  const beds = [rhythm(), rhythm()]
+  const writhing = Boolean(TENTACLE_LOOPS[tentacle])
+  beds[0].set('trial', paceLoop(pace, writhing, false), volume)
+  beds[1].set('trial', tentacleLoop(tentacle), volume * 0.8)
+  erosBed.quiet(seconds + 0.5)
+  tentacleBed.quiet(seconds + 0.5)
+  trial = { beds, timer: setTimeout(() => { beds.forEach(b => b.stop()); trial = null }, seconds * 1000) }
 }

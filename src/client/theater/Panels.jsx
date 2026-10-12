@@ -12,7 +12,8 @@ import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn, LOOK_FIELDS, LOOK
 import { Silhouette } from './Stage.jsx'
 import { stateSpans } from '../../../lib/cast.js'
 import { SKINS } from './skins.js'
-import { previewTrack, stopPreview, previewVoice, previewSound } from './audio.js'
+import { previewTrack, stopPreview, previewVoice, previewSound, erosFoley, previewEros, erosPeak } from './audio.js'
+import { EROS_SFX, EROS_PACES, EROS_LABEL, TENTACLE, TENTACLE_LABEL, PEAKS, PEAK_LABEL } from '../../../lib/eros.js'
 import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, voiceById, castVoices } from '../../../lib/sounds.js'
 import { cleanPack, packFiles } from '../../../lib/aa-sprite.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
@@ -1722,6 +1723,30 @@ function LibSoundCard({ sound, playing, onPlay }) {
 }
 
 /** 音效库页：开关音量、导入整个文件夹（带上里面的描述文件）、按种类和分类分组浏览、搜索、试听、逐个改、整类删、导出描述。 */
+/** 亲密场面（lib/eros.js）：开关，和一排试听（节奏底、触手、高潮、一下一下的音效）。音量跟剧情音效走。 */
+function ErosField({ cfg, p }) {
+  const [open, setOpen] = React.useState(false)
+  const volume = (cfg.ui.storySfxVolume ?? 0.8) / 0.8
+  const row = { gap: '.5cqw', marginTop: '.6cqw' }
+  return (
+    <Field label="亲密场面" hint="成年人之间的亲密戏。导演按正文给一段一段配节奏：爱抚、缓慢、加快、激烈、余韵，节奏底一直响，镜头跟着一下一下轻轻地送，画面边上泛起潮红；有触手时画面边上有暗影在动，配湿黏的蠕动声。插入、顶到最深、射精这些读到那句时响；高潮时画面柔和地白一下，射精时跟着声音一下一下地亮。正文里的 [SE：…] 提示和日文拟声（ぬぷ、こつん、どくどく……）也认得。音量跟剧情音效走，画面上不出字。">
+      <div className="fg-row"><Toggle value={cfg.ui.eros} onChange={v => p({ eros: v })} /><button type="button" className="fg-btn" onClick={() => setOpen(v => !v)}>{open ? '收起试听' : '试听'}</button></div>
+      {open && (
+        <>
+          <div className="fg-row" style={row}>
+            {EROS_PACES.filter(k => k !== 'none').map(k => <button key={k} type="button" className="fg-btn" onClick={() => previewEros(k, '', volume)}>{EROS_LABEL[k]}</button>)}
+            {TENTACLE.filter(k => k !== 'none').map(k => <button key={k} type="button" className="fg-btn" onClick={() => previewEros('', k, volume)}>{TENTACLE_LABEL[k]}</button>)}
+            {PEAKS.map(k => <button key={k} type="button" className="fg-btn" onClick={() => erosPeak(k, volume)}>{PEAK_LABEL[k]}</button>)}
+          </div>
+          <div className="fg-row" style={row}>
+            {Object.keys(EROS_SFX).map(name => <button key={name} type="button" className="fg-btn" onClick={() => erosFoley(EROS_SFX[name].id, volume)}>{name}</button>)}
+          </div>
+        </>
+      )}
+    </Field>
+  )
+}
+
 function SoundLibSection({ data }) {
   const cfg = data.config
   const sounds = useSoundlib()
@@ -1796,6 +1821,7 @@ function SoundLibSection({ data }) {
       <div className="fg-section">播放</div>
       <Field label="环境音" hint="雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。"><div className="fg-row"><Toggle value={cfg.ui.amb} onChange={v => p({ amb: v })} /><input type="range" min="0" max="1" step="0.05" value={cfg.ui.ambVolume} onChange={e => p({ ambVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
       <Field label="剧情音效" hint="推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。"><div className="fg-row"><Toggle value={cfg.ui.storySfx} onChange={v => p({ storySfx: v })} /><input type="range" min="0" max="2" step="0.05" value={cfg.ui.storySfxVolume} onChange={e => p({ storySfxVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
+      <ErosField cfg={cfg} p={p} />
       <div className="fg-section">我的音效库{sounds ? ` · ${sounds.length} 个` : ''}</div>
       <div className="fg-note">库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪一幕放什么环境音、哪句配什么音效。所以标签要写正文里会出现的词。</div>
       <div className="fg-row" style={{ margin: '1cqw 0' }}>
