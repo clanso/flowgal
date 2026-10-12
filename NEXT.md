@@ -77,6 +77,10 @@ updated: 2026-10-12
   - 实现：style.js 的 softenSprite（吓人的词去掉：empty / dull / hollow eyes、constricted pupils、shaded face、clenched teeth……；太用力的换轻一档：glaring → narrowed eyes、streaming tears → tears、full-face blush → blush、sweat → sweatdrop；dark circles、bags under eyes 压到 0.6），立绘、换脸、工作台都过一遍，玩家自己改过词的那张（writer user）照写的画；动作与表情设计师写的表情存之前就收；内置表情（EMOTION_TAGS、EMOTION_FACE、EMOTION_ACTS）调轻；ACTING、SPRITE 提示词加「表情收着画」一条。负面：去掉插件自己加的立绘负面（整张的背景构图负面、角色块的全身侧身大动作、背景图的人物负面、换脸按表情加的负面），立绘设计师不再写 negative（写了也不收），旧记录里设计师写的负面不再带上；只用画风的负面 + 档案「不要出现」+ 玩家给这张写的 + 插画的「额外负面」；换脸和工作台的负面按现在的画风重算。工作台眨眼口型的状态负面（open eyes 之类）是机械的反面，留着。前倾：动作 tag 不再滤掉 leaning forward / bending，提示词改成「一般不前倾，演出需要的一两个可以」。
   - 自动化：npm test 181/181（acting、face、stature、workbench、sprite-recipe、aa-patch、core 的断言跟着新规则改）；npm run build 通过。用驾驶员存档里柯萝伊的设计过了一遍：10 种表情的词收轻了（如生气 angry, glaring, furrowed brow, clenched teeth → angry, narrowed eyes, furrowed brow）。
   - 没验：真实 NovelAI 照新词画出来的效果；老立绘要在人物志「动作与表情」点「按这套设计重画」（或单张重画）才会换。
+- 只换脸也通读一遍再写词（2026-10-12，驾驶员：只换脸不准只从「动作与表情设计」里拿，要和画立绘一个流程，通读后按性格和境况写）：
+  - 实现：engine 的 requestSprites 去掉「设计里有这张脸就直接用」的捷径，只换脸的跟整张画的一起交给立绘设计师（同一批请求，读人物卡、世界书、全部剧情、档案和已画好的立绘），设计好的脸写在差分清单里当底；没开设计师或没写出来时才按设计拼（fallback）。SPRITE 提示词：设计好的脸是底，按性格和此刻处境写，只换脸的不要照抄；ACTING 提示词改成「之后每张都以你的设计为底，再按当时的处境写」。
+  - 自动化：npm test 181/181（acting 的假立绘设计师对只换脸的回「设计的脸 + 一笔」，断言换脸用的是它写的；加了关掉设计师时用设计的保底）；npm run build 通过。
+  - 代价：每次要只换脸的表情多一次立绘设计师请求（同一个人一批最多 12 张，和底图同一批时不额外加）。
 
 ## 开放风险
 
