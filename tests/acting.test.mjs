@@ -26,10 +26,17 @@ function fakeLlm(answer) {
   return { calls, stream(request) { calls.push(request); const text = answer(request); return (async function* () { yield { type: 'text-delta', text }; yield { type: 'finish', reason: { kind: 'stop' } } })() } }
 }
 const isActingWriter = request => request.system.includes('你是视觉小说的角色表演设计师')
-/** 假的立绘设计师：按「要画的差分」里的编号逐条回 tag。 */
+/**
+ * 假的立绘设计师：按「要画的差分」里的编号逐条回 tag。
+ * 只换脸的：以设计好的脸为底，再按「此刻的处境」添一笔（这里固定添 half-closed eyes，看得出是它写的）。
+ */
 function spriteReply(request) {
-  const ids = [...request.messages[0].content[0].text.matchAll(/^- (s\d+)：/gm)].map(m => m[1])
-  return JSON.stringify({ sprites: ids.map(id => ({ key: id, tags: `1girl, long black hair, written-${id}` })) })
+  const lines = [...request.messages[0].content[0].text.matchAll(/^- (s\d+)：(.*)$/gm)]
+  return JSON.stringify({
+    sprites: lines.map(([, id, line]) => (line.startsWith('只换脸——')
+      ? { key: id, tags: `${line.match(/（脸 ([^）]*)）/)?.[1] || 'light frown'}, half-closed eyes` }
+      : { key: id, tags: `1girl, long black hair, written-${id}` })),
+  })
 }
 
 // 嘴硬心软的学生会长：平时背着手，嘴硬时抱着胳膊别过脸（侧身），担心时按着胸口。
@@ -191,7 +198,7 @@ async function settle(engine, gameId, done, what = '') {
 
 const charOf = r => r.parameters?.v4_prompt?.caption?.char_captions?.[0]?.char_caption || ''
 
-test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整套 → 画这个人「抱着胳膊别过脸」的侧身底图 → 生气用设计好的脸换 → 新情绪补设计 → 玩家改设计 → 重写表情时重新设计那张脸', async () => {
+test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整套 → 画这个人「抱着胳膊别过脸」的侧身底图 → 生气的脸由立绘设计师以设计好的为底写、再换 → 新情绪补设计 → 玩家改设计 → 重写表情时重新设计那张脸', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-acting-'))
   try {
     const store = createStore(dir)
@@ -218,23 +225,25 @@ test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整�
     assert.deepEqual(lin.acting.poses.map(p => [p.id, p.label, p.emotions[0]]), [['p1', '背手站着', 'neutral'], ['p2', '抱着胳膊别过脸', 'pout'], ['p3', '按着胸口', 'worried']])
     assert.equal(lin.acting.by, 'ai')
     assert.ok(lin.acting.poses.flatMap(p => p.emotions).includes('cry'), '没分到的内置情绪也有归处')
-    // 立绘设计师只写底图（赌气），生气直接用设计好的脸
+    // 立绘设计师一次写底图（赌气）和只换脸的生气：只换脸的也读完资料和剧情写，设计好的脸是底
     const writer = llm.calls.filter(c => c.system.includes('立绘设计师'))
     assert.equal(writer.length, 1)
     const writerUser = writer[0].messages[0].content[0].text
-    assert.match(writerUser, /- s1：.*情绪「赌气」；这个人的动作「抱着胳膊别过脸」（侧身）：嘴硬的时候（身体 arms crossed, head turned away）；这个人的表情：鼓着脸不看人.*同一个动作的生气、害羞会在这张上只换脸/)
-    assert.doesNotMatch(writerUser, /- s2/)
+    assert.match(writerUser, /- s1：只换脸——在「赌气」那张「抱着胳膊别过脸」动作底图上只重画脸.*情绪「生气」.*这个人的表情：生气时反而不说话，眼神冷下来（脸 expressionless, narrowed eyes, cold eyes, closed mouth）/)
+    assert.match(writerUser, /- s2：.*情绪「赌气」；这个人的动作「抱着胳膊别过脸」（侧身）：嘴硬的时候（身体 arms crossed, head turned away）；这个人的表情：鼓着脸不看人.*同一个动作的生气、害羞会在这张上只换脸/)
+    assert.match(writerUser, /【剧情（到第/)
+    assert.match(writer[0].system, /标着「只换脸」的.*跟整张画的一样读完资料和剧情再写，不要照抄设计好的表情/)
     assert.equal(requests.length, 1)
     assert.match(charOf(requests[0]), /from side, profile, looking to the side/, '侧身动作整张按侧身构图画')
     assert.deepEqual([lin.sprites[pout].pose, lin.sprites[pout].side, lin.sprites[pout].poseLabel], ['p2', true, '抱着胳膊别过脸'])
     assert.deepEqual(lin.sprites[angry].face, { from: pout, pose: 'p2' })
-    assert.deepEqual([lin.sprites[angry].tags, lin.sprites[angry].writer], ['expressionless, narrowed eyes, cold eyes, closed mouth', 'acting'])
+    assert.deepEqual([lin.sprites[angry].tags, lin.sprites[angry].writer], ['expressionless, narrowed eyes, cold eyes, closed mouth, half-closed eyes', 'ai'])
 
-    // 认出脸：生气换上设计好的脸
+    // 认出脸：生气换上设计师写的脸
     await engine.castAction('g', 'face-box', { name: '林岚', key: pout, rects: EYES })
     lin = await settle(engine, 'g', p => p.sprites[angry]?.assetId && !p.spriteStatus[angry], '换好脸')
     assert.equal(requests[1].action, 'infill')
-    assert.match(charOf(requests[1]), /expressionless, narrowed eyes, cold eyes, closed mouth/)
+    assert.match(charOf(requests[1]), /expressionless, narrowed eyes, cold eyes, closed mouth, half-closed eyes/)
     assert.doesNotMatch(charOf(requests[1]), /puffed cheeks/)
 
     // 导演新造的情绪：先补进设计（不重新设计整套），再在默认站姿（平静）的底图上换脸
@@ -246,7 +255,7 @@ test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整�
     assert.match(added, /【已有的动作与表情设计】[\s\S]*- 强忍泪水微笑（新情绪）/)
     assert.equal(llm.calls.filter(isActingWriter).length, 3)
     assert.ok(lin.acting.poses[0].emotions.includes('强忍泪水微笑'))
-    assert.deepEqual([lin.sprites[tearful].face.from, lin.sprites[tearful].tags], [neutral, 'smile, tearing up, trembling lips'])
+    assert.deepEqual([lin.sprites[tearful].face.from, lin.sprites[tearful].tags], [neutral, 'smile, tearing up, trembling lips, half-closed eyes'])
     assert.equal(lin.sprites[neutral].side, false)
     assert.doesNotMatch(charOf(requests.at(-1)), /from side/)
 
@@ -268,7 +277,7 @@ test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整�
     const before = requests.length
     await engine.castAction('g', 'sprite', { name: '林岚', emotion: 'angry' })
     // 设计师写的 glaring 收成 narrowed eyes（立绘表情收着画）；上面玩家自己写的 clenched teeth 照存
-    lin = await settle(engine, 'g', p => requests.length > before && p.sprites[angry]?.tags === 'biting lip, narrowed eyes' && !p.spriteStatus[angry], '重新设计这张脸')
+    lin = await settle(engine, 'g', p => requests.length > before && p.sprites[angry]?.tags === 'biting lip, narrowed eyes, half-closed eyes' && !p.spriteStatus[angry], '重新设计这张脸')
     assert.match(llm.calls.filter(isActingWriter).at(-1).messages[0].content[0].text, /- angry（生气）：已在动作 p2「抱着胳膊别过脸」里，只重新设计表情/)
     assert.equal(requests.at(-1).action, 'infill')
     assert.match(charOf(requests.at(-1)), /biting lip, narrowed eyes/)
@@ -315,14 +324,14 @@ test('gate: 设计不出来时按通用动作组画；关掉立绘设计师不�
     lin = await settle(engine, 'g', p => p.acting && !p.actingBusy, '重新设计')
     assert.equal(lin.acting.poses[1].label, '抱着胳膊别过脸')
 
-    // 按这套设计重画（keepFaces）：生气改到「抱着胳膊别过脸」上换脸、表情直接用设计好的，不再设计
+    // 按这套设计重画（keepFaces）：生气改到「抱着胳膊别过脸」上换脸、表情由立绘设计师以设计好的为底再写，不再设计
     const designs = llm.calls.filter(isActingWriter).length
     const pout = variantKey(look, 'pout')
     await engine.castAction('g', 'sprite', { name: '林岚', emotions: ['cold', 'angry'], keepFaces: true })
     const neutral = variantKey(look, 'neutral')
     lin = await settle(engine, 'g', p => p.sprites[pout]?.assetId && p.sprites[neutral]?.assetId && p.sprites[angry]?.face?.from === pout && p.sprites[cold]?.face?.from === neutral, '按新设计重画')
     assert.equal(llm.calls.filter(isActingWriter).length, designs, '不重新设计')
-    assert.equal(lin.sprites[angry].tags, 'expressionless, narrowed eyes, cold eyes, closed mouth')
+    assert.equal(lin.sprites[angry].tags, 'expressionless, narrowed eyes, cold eyes, closed mouth, half-closed eyes')
     assert.deepEqual([lin.sprites[cold].side, lin.sprites[cold].poseLabel], [false, '背手站着'], '冷淡在设计里没分到：进默认站姿，在平静的底图上换脸')
     assert.ok(requests.some(r => /from side/.test(charOf(r))), '侧身底图')
 
@@ -333,6 +342,11 @@ test('gate: 设计不出来时按通用动作组画；关掉立绘设计师不�
     lin = await settle(engine, 'g', p => p.sprites[variantKey(look, '委屈')]?.face, '关掉设计师')
     assert.equal(llm.calls.length, calls)
     assert.equal(lin.sprites[variantKey(look, '委屈')].face.pose, 'p1', '没设计到的情绪进默认站姿')
+    // 关掉设计师时只换脸的直接用设计好的脸（按档案拼的保底）
+    await engine.castAction('g', 'sprite', { name: '林岚', emotion: 'smile', rewrite: true })
+    lin = await settle(engine, 'g', p => p.sprites[variantKey(look, 'smile')]?.writer === 'fallback', '关掉设计师的保底')
+    assert.equal(lin.sprites[variantKey(look, 'smile')].tags, 'slight smile, closed mouth, looking away')
+    assert.equal(llm.calls.length, calls)
     engine.dispose()
   } finally {
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
