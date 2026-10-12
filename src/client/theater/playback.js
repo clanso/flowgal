@@ -7,6 +7,7 @@ import { placeKey, speakersOf, MODE_NAMES, cgIn, cgOut, cgMotion } from '../../.
 import { stageWalk, playedUnits } from '../../../lib/staging.js'
 import { walkScenes, recallRuns, markRecalls, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
+import { shiftsAhead } from '../../../lib/look.js'
 
 export { placeKey }
 export { emotionLabel } from '../../../lib/emotions.js'
@@ -67,6 +68,7 @@ export function buildBeats(view) {
     inside = walk.inside
     const scenes = walkScenes({ scene, bgm, amb, layer: keep }, lines)
     const recalls = recallRuns(script, units)
+    const ahead = shiftsAhead(lines) // 一轮中途变的样子：每一句还没发生的变化
     const unitIndex = new Map(units.map((u, i) => [u.id, i]))
     // 挂在不演的单元上的插画（导演整理前就有的、手动配的）：算到它前面最近一个要演的单元。
     const indexOf = id => {
@@ -137,6 +139,7 @@ export function buildBeats(view) {
         scene: at.scene,
         mode: at.mode,
         ...(at.layer && at.layer.then ? { then: at.layer.then } : {}), // 段落里的人当时的样子（回忆里还没受伤、穿着当时的衣服……）
+        ...(ahead[ui] ? { ahead: ahead[ui] } : {}), // 这一轮后面才变的样子（之后才缠上发带、才换衣服）：这一拍按变化之前的
         ...(at.cut ? { cut: at.cut } : {}),
         ...(recall ? { recall } : {}), // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
         ...(recallEdge ? { recallEdge } : {}),

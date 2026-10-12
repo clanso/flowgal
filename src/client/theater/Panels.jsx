@@ -356,7 +356,7 @@ async function readAaFolder(files) {
   return { manifest, files: images }
 }
 
-/** 一个人的各套样子：当前这套在最前，其余是已经有立绘的；回忆、梦境里当时的那套标上段落（era）。 */
+/** 一个人的各套样子：当前这套在最前，其余是已经有立绘的；回忆、梦境里当时的那套标上段落（era），一轮中途变样子之前的那套标 earlier。 */
 function lookGroups(person) {
   const now = lookAt(person.timeline, Infinity)
   const groups = new Map([[lookKey(now), { key: lookKey(now), look: now, current: true }]])
@@ -835,7 +835,7 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
         <div className="fg-looks">
           {groups.map(g => (
             <button key={g.key} type="button" className={`fg-look${g.key === group.key ? ' is-on' : ''}`} onClick={() => { setGroupKey(g.key); setEmotion(''); setPicked(new Set()) }}>
-              {g.era ? <i>{MODE_LABEL[g.era] || '回忆'}里</i> : null}{lookLabel(g.look)}{g.current ? <i>现在</i> : null}
+              {g.era === 'earlier' ? <i>变化之前</i> : g.era ? <i>{MODE_LABEL[g.era] || '回忆'}里</i> : null}{lookLabel(g.look)}{g.current ? <i>现在</i> : null}
             </button>
           ))}
           <span className="fg-note">已画 {drawn} 种情绪</span>

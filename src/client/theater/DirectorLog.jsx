@@ -20,6 +20,8 @@ const USAGE_LABEL = { inputTokens: '输入', outputTokens: '输出', reasoningTo
 const SHAPE_LABEL = { landscape: '横版', portrait: '竖版', square: '方形' }
 /** 段落里一个人当时的样子：「柯萝伊 魔导师长袍 · 无状态 · 外貌另写」。 */
 const thenText = t => [t.name, t.outfit, t.states ? (t.states.length ? t.states.map(s => s.name).join('、') : '无状态') : '', t.change ? '外貌另写' : ''].filter(Boolean).join(' ')
+// 一轮中途变的样子：「柯萝伊 换上睡衣 +手腕发带 −项链」
+const shiftText = s => [s.name, s.outfit ? `换上${s.outfit}` : '', ...(s.on || []).map(x => '+' + x.name), ...(s.off || []).map(x => '−' + x.name)].filter(Boolean).join(' ')
 /** 一条记录的标题：导演按轮次，立绘和动作与表情设计按人，插画按轮次。 */
 const entryTitle = e => (e.kind === 'sprite' ? `立绘 · ${e.name}` : e.kind === 'acting' ? `动作与表情 · ${e.name}` : e.kind === 'cg' ? `插画 · 第 ${e.turn} 轮` : `第 ${e.turn} 轮`)
 
@@ -147,6 +149,7 @@ function ScriptView({ script, units }) {
               l.mode && <Chip key="mode" k="段落">{MODE_LABEL[l.mode] || l.mode}</Chip>,
               l.recall && <Chip key="recall" k="段落">短闪回</Chip>,
               l.then && <Chip key="then" k="当时的样子">{l.then.map(thenText).join('；')}</Chip>,
+              l.look && <Chip key="look" k="从这句起">{l.look.map(shiftText).join('；')}</Chip>,
               l.scene && <Chip key="scene" k="场景">{sceneChange(l.scene)}</Chip>,
               l.bgm && <Chip key="bgm" k="换歌">{l.bgm === 'none' ? '停' : l.bgm}</Chip>,
               l.amb && <Chip key="amb" k="环境音">{l.amb === 'none' ? '停' : l.amb}</Chip>,

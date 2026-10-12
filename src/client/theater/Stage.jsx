@@ -5,7 +5,7 @@ import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
 import { SKY, placeKey, actorX, onStage, stageLayout, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
-import { lookAt, pickSprite, thenLook } from '../../../lib/look.js'
+import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
 import { heightOf, placeSprite } from '../../../lib/stature.js'
 import { AaSprite } from './AaSprite.jsx'
@@ -192,12 +192,14 @@ export function MangaSymbol({ kind, life = 2.6 }) {
 /**
  * 这一拍该用的立绘：按这一轮的样子（外貌、服装、长期状态）找对应情绪的差分，新情绪没画好时先用它的基础情绪。
  * 段落里导演写了这个人当时的样子（then）就按当时的找；还没画好时先显示剪影，不借现在那套。
+ * 这一轮中途才变的样子（pending：后面才缠上发带、才换衣服）还没发生时，按变化之前的样子找。
  */
-function spriteFor(person, turn, emo, emotions, then = null) {
+function spriteFor(person, turn, emo, emotions, then = null, pending = null) {
   if (!person || !person.timeline) return ''
   const custom = (emotions || []).find(e => e.id === emo)
   const now = lookAt(person.timeline, turn)
-  const look = then ? thenLook(now, then, person.timeline.outfits) : now
+  const over = then || (pending ? undoShifts(now, pending) : null)
+  const look = over ? thenLook(now, over, person.timeline.outfits) : now
   return pickSprite(person.sprites, look, emo, custom ? custom.base : '', { strict: Boolean(then) })
 }
 
@@ -215,7 +217,7 @@ function faceBoxOf(record, size) {
 
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name)
-  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name])
+  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name])
   const src = sprite ? assetUrl(sprite) : ''
   const color = (person && person.color) || '#9b7bff'
   const [shown, setShown] = React.useState(src)
