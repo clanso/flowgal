@@ -2,7 +2,7 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS } from './playback.js'
-import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, CutIn, BattleCard, HitBanner, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, SfxWord, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, CutIn, HitImpact, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -200,9 +200,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
   React.useEffect(() => { if (panel && !done) finish() }, [panel, done])
   const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])
-  // 灵光一闪（漫画符号是灯泡）：逆转裁判那一声「叮」
-  React.useEffect(() => { if (beat && beat.sym === 'bulb' && sfxOn) stinger('ding') }, [beat && beat.key])
-  // 甩镜：「唰」一下（跟漫画切入同一个音效）
+  // 甩镜：「唰」一下
   React.useEffect(() => { if (beat && beat.cam === 'whip' && !title && sfxOn) stinger('whoosh') }, [beat && beat.key])
   const cameraRef = React.useRef(null)
   const cam = useCamera(title ? null : beat, cameraRef)
@@ -402,16 +400,14 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} />
         {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
-        {beat && !title && beat.cutin && <CutIn key={beat.key} beat={beat} view={view} sound={sfxOn} />}
-        {beat && !title && beat.hit && <HitBanner key={beat.key} beat={beat} sound={sfxOn} fx={hit} />}
+        {beat && !title && beat.cutin && <CutIn key={beat.key} beat={beat} view={view} />}
+        {beat && !title && beat.hit && <HitImpact key={beat.key} beat={beat} sound={sfxOn} fx={hit} />}
         {beat && !title && beat.moment && <MomentLayer key={beat.key} beat={beat} view={view} sound={sfxOn} />}
-        {sfxKey && !title && !skip && ui0.sfxWords !== false && !soundById.has(beat.sfx) && ONOMATOPOEIA[beat.sfx] && <SfxWord key={sfxKey} beat={beat} />}
         {/* 手机：响着的来电 / 拨出、视频通话的小窗、挂断的小卡、通知横幅（「通话中」在右上角） */}
         {beat && !title && beat.call && beat.call.state === 'ringing' && <PhoneRing key={beat.call.id} beat={beat} view={view} sound={sfxOn} />}
         {beat && !title && beat.call && beat.call.state === 'live' && beat.call.video && !(beat.split && beat.split.who.includes(beat.call.who)) && <VideoPip key={beat.call.id} beat={beat} view={view} />}
         {beat && !title && beat.phone && beat.phone.kind === 'end' && <PhoneEnd key={beat.key} beat={beat} view={view} sound={sfxOn} />}
         {beat && !title && beat.phone && (beat.phone.kind === 'notify' || beat.phone.kind === 'voicemail') && <PhoneBanner key={beat.key} beat={beat} view={view} sound={sfxOn} />}
-        {beat && !title && beat.battleEdge && speed > 0 && <BattleCard key={beat.key} beat={beat} sound={sfxOn} />}
         {!panel && <RestartNotice floating />}
         {beat && !title && <TitleCard beat={beat} delay={speed > 0 ? (beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0) : 0} />}
         {beat && !title && beat.cut && speed > 0 && <CutCard beat={beat} out={!cutting} />}
@@ -423,7 +419,6 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
               <div className="fg-hud-place">{hud.scene.location || `第 ${hud.turn} 轮`}</div>
               <div className="fg-hud-meta">
                 {hud.mode && <span className="fg-hud-mode">{MODE_LABEL[hud.mode]}</span>}
-                {hud.battle && <span className="fg-hud-battle" title={hud.battle.title || ''}>交战 · {hud.battle.foe}</span>}
                 <span>{TIME_LABEL[hud.scene.time] || ''}</span>
                 {hud.scene.weather && hud.scene.weather !== 'clear' && <span>{WEATHER_LABEL[hud.scene.weather]}</span>}
                 {LIGHT_LABEL[hud.scene.light] && <span>{LIGHT_LABEL[hud.scene.light]}</span>}

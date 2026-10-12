@@ -1,12 +1,12 @@
-// 漫画式切入：决定性的一句，这个人的脸部特写从侧面冲进来。
+// 眼睛的特写：决定性的一句，画面中间拉开一道窄窄的宽银幕，里面是这个人的眼睛。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normalizeScript } from '../lib/director.js'
-import { bandCrop, CUTIN_FILL, CUTIN_AT } from '../lib/stature.js'
+import { bandCrop, CUTIN_FILL, CUTIN_AT, CUTIN_EYES } from '../lib/stature.js'
 import { MAX_CUTINS_PER_TURN } from '../lib/vocab.js'
 import { buildBeats, beatHold, CUTIN_LEAD_MS } from '../src/client/theater/playback.js'
 
-test('gate: 导演写的切入：true 是说话的人，写名字切那个人，写的就是说话人时记成 true；一轮有上限', () => {
+test('gate: 导演写的特写：true 是说话的人，写名字切那个人，写的就是说话人时记成 true；一轮有上限', () => {
   const units = ['U1', 'U2', 'U3', 'U4'].map(id => ({ id, type: 'dialogue', text: id }))
   const script = normalizeScript({
     scene: {}, cast: [],
@@ -24,7 +24,7 @@ test('gate: 导演写的切入：true 是说话的人，写名字切那个人，
   assert.equal(Object.values(crowded.lines).filter(l => l.cutin).length, MAX_CUTINS_PER_TURN)
 })
 
-test('gate: 切入切谁记在这一拍上；旁白没说话的人、短闪回里不切；字等带子冲进来再出', () => {
+test('gate: 特写切谁记在这一拍上；旁白没说话的人、短闪回里不切；字等宽银幕拉开再出', () => {
   const units = [
     { id: 'U1', type: 'dialogue', text: '我决定了' },
     { id: 'U2', type: 'dialogue', text: '我喜欢你' },
@@ -42,17 +42,20 @@ test('gate: 切入切谁记在这一拍上；旁白没说话的人、短闪回�
   assert.equal(beatHold(beats[2], { was }).ms, 0)
 })
 
-test('gate: 带子里的脸：脸框撑满带子高度的九成，中心落在带子左边三成、偏下一点', () => {
+test('gate: 宽银幕里的眼睛：脸框是画框高度的 CUTIN_FILL 倍（只看得见眉毛到鼻尖），两眼的中点落在画框正中', () => {
   const size = [1000, 2000]
   const box = [400, 300, 600, 460]
   const aspect = 4
   const c = bandCrop(box, size, aspect)
-  // 换回带子里的坐标量一下：图宽 c.width% × 带宽，左上角在 c.left%、c.top%
-  const scale = (c.width / 100) * aspect / size[0] // 每个像素是带子高度的多少
+  // 换回画框里的坐标量一下：图宽 c.width% × 框宽，左上角在 c.left%、c.top%
+  const scale = (c.width / 100) * aspect / size[0] // 每个像素是画框高度的多少
   assert.ok(Math.abs((box[3] - box[1]) * scale - CUTIN_FILL) < 0.01)
+  assert.ok(CUTIN_FILL > 1, '比整张脸还近')
   const cx = (c.left / 100) * aspect + ((box[0] + box[2]) / 2) * scale
-  const cy = c.top / 100 + ((box[1] + box[3]) / 2) * scale
+  const cy = c.top / 100 + (box[1] + (box[3] - box[1]) * CUTIN_EYES) * scale
   assert.ok(Math.abs(cx / aspect - CUTIN_AT[0]) < 0.01 && Math.abs(cy - CUTIN_AT[1]) < 0.01)
+  const mouth = c.top / 100 + box[3] * scale
+  assert.ok(mouth > 1, '嘴在画框外面')
   // 认不出脸时按参照立绘估，照样给位置；尺寸不对时不出
   assert.ok(bandCrop(null, size, aspect).width > 0)
   assert.equal(bandCrop(box, null, aspect), null)
