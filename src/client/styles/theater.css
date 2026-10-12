@@ -478,6 +478,17 @@
 @keyframes fg-fw-rise { 0% { opacity: 1; top: 100%; } 85% { opacity: 1; } 100% { opacity: 0; top: var(--y); } }
 @keyframes fg-fw-burst { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.1); } 60% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -40%) scale(1); } }
 @keyframes fg-fw-glow { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+/* 拟声字：内置拟声音效响起时蹦出来的字（描边用八个方向的影子，旧内核也一样粗） */
+.fg-sfxword { position: absolute; z-index: 17; pointer-events: none; transform: translate(-50%, -50%) rotate(var(--tilt, 0deg)); }
+.fg-sfxword span { --k: #6b4a7a; --o: .3cqw; display: block; font-family: var(--font-display); font-size: 4.4cqw; font-weight: 900; line-height: 1; white-space: nowrap; color: #fff;
+  text-shadow: var(--o) 0 0 var(--k), calc(-1 * var(--o)) 0 0 var(--k), 0 var(--o) 0 var(--k), 0 calc(-1 * var(--o)) 0 var(--k), var(--o) var(--o) 0 var(--k), calc(-1 * var(--o)) var(--o) 0 var(--k), var(--o) calc(-1 * var(--o)) 0 var(--k), calc(-1 * var(--o)) calc(-1 * var(--o)) 0 var(--k), .55cqw .7cqw 0 rgba(0, 0, 0, .35);
+  animation: fg-sfxword var(--ms, 1.1s) cubic-bezier(.2, .9, .3, 1.2) both; }
+.fg-sfxword[data-tone="hit"] span { --k: #b3121f; --o: .38cqw; color: #ffdf4a; font-size: 6.4cqw; animation-name: fg-sfxword-hit; }
+.fg-sfxword[data-tone="ring"] span { --k: #d26a00; color: #fff6b0; font-size: 4.8cqw; }
+.fg-sfxword[data-tone="air"] span { --k: #1b6f96; color: #e6fbff; font-style: italic; font-size: 5cqw; animation-name: fg-sfxword-air; }
+@keyframes fg-sfxword { 0% { opacity: 0; transform: scale(.4); } 18% { opacity: 1; transform: scale(1.15); } 30% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(1.04) translateY(-.8cqw); } }
+@keyframes fg-sfxword-hit { 0% { opacity: 0; transform: scale(2.2); } 12% { opacity: 1; transform: scale(.92); } 18% { transform: scale(1.06) translate(.3cqw, -.2cqw); } 24% { transform: scale(1) translate(-.3cqw, .2cqw); } 30% { transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(1.08); } }
+@keyframes fg-sfxword-air { 0% { opacity: 0; transform: translateX(-6cqw) skewX(-14deg); } 25% { opacity: 1; transform: skewX(-6deg); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateX(5cqw) skewX(-10deg); } }
 /* 手机：来电 / 拨出时右边滑进来一部响着的手机，接通后收成右上角的「通话中」；挂断的小卡；视频通话的小窗；通知横幅 */
 .fg-phone { position: absolute; right: 4.5%; top: 13%; z-index: 18; pointer-events: none; animation: fg-phone-in .5s cubic-bezier(.2, .9, .3, 1.1) both; }
 .fg-phone-card { width: 17cqw; box-sizing: border-box; padding: 1.5cqw 1.4cqw 1.6cqw; border-radius: 2cqw; text-align: center; color: #fff;
@@ -1414,6 +1425,7 @@
   .fg-recall::after, .fg-recall-face { animation: none !important; } /* 闪回里的光斑漂移、心跳脉动、小头像错位 */
   .fg-romance::before, .fg-romance::after, .fg-sense::after, .fg-world-in[data-sense] .fg-cast { animation: none !important; } /* 光斑漂移、心跳暗角、耳边的呼吸、触碰的涟漪、失神的晃 */
   .fg-sense[data-v="heat"]::before, .fg-sense[data-v="touch"]::before, .fg-sense[data-v="scent"]::before { animation: none !important; }
+  .fg-sfxword span, .fg-phone-card, .fg-phone-ripple, .fg-phone-key.is-accept, .fg-notify-wave i { animation: none !important; } /* 拟声字蹦出来、手机一震一震、声波跳 */
   .fg-dialog[data-recall] .fg-box, .fg-dialog[data-recall] .fg-box::after, .fg-dialog[data-recall] .fg-line, .fg-dialog[data-recall] .fg-name-plate { animation: none !important; } /* 闪回对话框里的光斑、脉动、抖动、名牌忽隐忽现 */
   .fg-dialog[data-recall] .fg-char { animation-name: fg-char-in !important; }
   .fg-flash.is-dread { animation: fg-bloom .6s ease-out both !important; } /* 撕裂闪烁换成淡入淡出 */
@@ -1439,6 +1451,7 @@
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
   .fg-recall-face { width: 17cqw; }
+  .fg-sfxword span { font-size: 9cqw; --o: .55cqw; } .fg-sfxword[data-tone="hit"] span { font-size: 12cqw; --o: .7cqw; }
   .fg-phone { top: 16%; } .fg-phone-card { width: 34cqw; padding: 3cqw 2.6cqw; border-radius: 4cqw; }
   .fg-phone-label { font-size: 2.4cqw; } .fg-phone-label svg { width: 2.6cqw; height: 2.6cqw; }
   .fg-phone-avatar { width: 15cqw; height: 15cqw; margin: 2.4cqw auto 1.6cqw; } .fg-phone-face { font-size: 6.4cqw; }

@@ -402,6 +402,12 @@ export function foley(id, delay = 0) {
   if (ac) playParts(ac, FOLEY[id], { volume: sounds.sfxVolume ?? 1, at: ac.currentTime + delay / 1000 })
 }
 
+/** 剧情音效里的内置拟声（砰、咚、叮……，lib/foley.js 的 ONOMATOPOEIA）：开关和音量跟剧情音效走（调用方给），不看界面音效的开关。 */
+export function storyFoley(id, volume = 1) {
+  const ac = FOLEY[id] && volume > 0 && audioCtx()
+  if (ac) playParts(ac, FOLEY[id], { volume })
+}
+
 /** 界面音：hover / select / page / open（back 当 select）。跟落字音效同一个开关和音量。 */
 export function sfx(kind = 'select') {
   stinger(kind === 'back' ? 'select' : kind)

@@ -13,6 +13,7 @@
 // 第 3 轮的原文像很多角色卡那样夹着状态栏、变量更新和章节尾巴（raw），导演把它们标成不演。
 // 场景逐句变：第 3 轮闪电那句路灯闪烁、苏晴跑走后暗下来；第 4 轮先出「翌日 放学后」字卡，中途进入三年前的回忆，
 // 回到现实时灯一盏盏熄灭（换成诡异、停掉音乐），林岚在黑暗里出现时打上一束光。
+// 内置拟声音效：第 1 轮推开琴房的门「吱呀」，第 3 轮闪电「轰」。
 // 特效：第 3 轮苏晴说出「掉下去了」时慢动作；手机：林岚打来电话（手机响起、接通后分屏、她的声音隔着电话、她先挂断），最后苏晴发来一条消息；
 // 短闪回：第 3 轮苏晴凑过来时，我想起林岚塞信封时的一句话。
 // 插画的出现和消失：第 1 轮从局部拉开，第 2 轮柔光渐显、轻轻起伏、溶回场景，第 4 轮的回忆像照片一样落下，回到现实时碎裂。
@@ -100,6 +101,7 @@ export function directorReply(turn, units) {
     scene: { location: '琴房', time: 'afternoon', weather: 'dust', mood: 'sweet', transition: 'cinematic', bg: 'music room, grand piano, afternoon sunlight, dust particles, scenery, no humans' },
     cast: [{ name: '林岚', pos: 'center' }],
     lines: [
+      L('放学铃响过很久', { sfx: '吱呀' }),
       L('林岚坐在琴凳上', { sp: '林岚', emo: 'thinking' }),
       L('你终于来了', { sp: '林岚', emo: 'smile', sym: 'sparkle', cam: 'zoom' }),
       L('抱歉，社团活动', { sp: '我', emo: 'neutral', sym: 'sweat', say: 'hesitant' }),
@@ -151,7 +153,7 @@ export function directorReply(turn, units) {
       L('那、那间教室里', { sp: '苏晴', emo: 'scared', sym: 'sweat', textfx: [{ text: '那、那间教室里', style: 'shake' }] }),
       L('她的声音一下子乱了', { sp: '苏晴', emo: 'scared' }),
       L('有人从窗口', { sp: '苏晴', emo: 'cry', say: 'breakdown', stress: '掉下去了', scene: { fx: 'slowmo' } }),
-      L('一道闪电', { cam: 'flash', scene: { light: 'flicker', fx: 'none' } }),
+      L('一道闪电', { cam: 'flash', sfx: '轰', scene: { light: 'flicker', fx: 'none' } }),
       L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: [{ name: '苏晴', how: 'run' }], scene: { light: 'dim', mood: 'sad', bars: 'none' } }),
       L('口袋里的手机震了起来', { phone: { kind: 'call', who: '林岚' } }),
       L('信，看到了吗', { sp: '林岚', emo: 'smile', split: { who: ['林岚'], location: '琴房', bg: 'music room, grand piano, night, moonlight through window, scenery, no humans' } }),

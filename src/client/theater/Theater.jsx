@@ -2,12 +2,13 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS } from './playback.js'
-import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, CutIn, BattleCard, HitBanner, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, CutIn, BattleCard, HitBanner, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, SfxWord, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
 import { useFaceFramer } from './faceFramer.js'
-import { playBgm, playAmbience, stopAll, playLibSound, sfx, stinger, configureSounds } from './audio.js'
+import { playBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds } from './audio.js'
+import { ONOMATOPOEIA } from '../../../lib/foley.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
 import { castVoices, lineVoice } from '../../../lib/sounds.js'
 import { ROMANCE_LABEL, SENSE_LABEL } from '../../../lib/vocab.js'
@@ -238,10 +239,15 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if (closingRef.current) return
     playAmbience(ambSound ? { id: ambSound.id, url: assetUrl(ambSound.assetId) } : null, (ui0.ambVolume ?? 0.35) * (ambSound ? ambSound.volume ?? 1 : 1))
   }, [ambSound && ambSound.id, ambSound && ambSound.volume, ui0.ambVolume])
+  // 音效库里没有的是内置的拟声（砰、咚、叮……）：现场合成，默认音量（0.8）时按配方原本的响度。
+  // 跟着这句的字一起响：转场、插画、「間」让字等着的时候，音效也等到字出来那一刻（拟声字同样）。
+  const sfxKey = beat && beat.sfx && !holdText ? beat.key : ''
   React.useEffect(() => {
-    const sound = beat && beat.sfx && !title && !skip && ui0.storySfx !== false ? soundById.get(beat.sfx) : null
+    if (!sfxKey || title || skip || ui0.storySfx === false) return
+    const sound = soundById.get(beat.sfx)
     if (sound) playLibSound(sound.assetId, (ui0.storySfxVolume ?? 0.8) * (sound.volume ?? 1))
-  }, [beat && beat.key])
+    else if (ONOMATOPOEIA[beat.sfx]) storyFoley(ONOMATOPOEIA[beat.sfx].id, (ui0.storySfxVolume ?? 0.8) / 0.8)
+  }, [sfxKey])
 
   const go = React.useCallback(i => {
     if (!beats.length) return
@@ -396,6 +402,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {beat && !title && beat.cutin && <CutIn key={beat.key} beat={beat} view={view} sound={sfxOn} />}
         {beat && !title && beat.hit && <HitBanner key={beat.key} beat={beat} sound={sfxOn} fx={hit} />}
         {beat && !title && beat.moment && <MomentLayer key={beat.key} beat={beat} view={view} sound={sfxOn} />}
+        {sfxKey && !title && !skip && ui0.sfxWords !== false && !soundById.has(beat.sfx) && ONOMATOPOEIA[beat.sfx] && <SfxWord key={sfxKey} beat={beat} />}
         {/* 手机：响着的来电 / 拨出、视频通话的小窗、挂断的小卡、通知横幅（「通话中」在右上角） */}
         {beat && !title && beat.call && beat.call.state === 'ringing' && <PhoneRing key={beat.call.id} beat={beat} view={view} sound={sfxOn} />}
         {beat && !title && beat.call && beat.call.state === 'live' && beat.call.video && !(beat.split && beat.split.who.includes(beat.call.who)) && <VideoPip key={beat.call.id} beat={beat} view={view} />}

@@ -11,7 +11,7 @@ import { heightOf, placeSprite, faceCrop, bandCrop, FACE_RATIO } from '../../../
 import { aimCamera } from '../../../lib/camera.js'
 import { reactKind } from '../../../lib/blocking.js'
 import { BATTLE_END_LABEL } from '../../../lib/vocab.js'
-import { MOMENT_FOLEY, PHONE_FOLEY } from '../../../lib/foley.js'
+import { MOMENT_FOLEY, PHONE_FOLEY, ONOMATOPOEIA } from '../../../lib/foley.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger, foley } from './audio.js'
 
@@ -771,6 +771,27 @@ export function Fireworks({ sound = true }) {
           <i className="fg-fw-glow" /><i className="fg-fw-trail" /><i className="fg-fw-burst" /><i className="fg-fw-burst is-inner" />
         </div>
       ))}
+    </div>
+  )
+}
+
+/**
+ * 拟声字：内置拟声音效（砰、咚、叮……，lib/foley.js 的 ONOMATOPOEIA）响起时画面上蹦出这个字，像漫画的拟声。
+ * 位置按这一拍散列在画面左右两侧偏上（不挡中间的脸），样子按 tone：撞击的黄字红边、带感叹号、一震；清脆的亮黄；掠过的青字横着飞过；轻的白字。
+ */
+export const SFX_WORD_MS = 1100
+export function SfxWord({ beat }) {
+  const info = ONOMATOPOEIA[beat.sfx]
+  const [gone, setGone] = React.useState(false)
+  React.useEffect(() => { const t = setTimeout(() => setGone(true), SFX_WORD_MS); return () => clearTimeout(t) }, [])
+  if (!info || gone) return null
+  const h = hashOf(beat.key)
+  const x = (h & 1 ? 66 : 12) + ((h >>> 1) % 18)
+  const y = 16 + ((h >>> 6) % 22)
+  const tilt = ((h >>> 11) % 25) - 12
+  return (
+    <div className="fg-sfxword" data-tone={info.tone} style={{ left: x + '%', top: y + '%', '--tilt': tilt + 'deg', '--ms': SFX_WORD_MS + 'ms' }} aria-hidden="true">
+      <span>{info.tone === 'hit' ? beat.sfx + '！' : beat.sfx}</span>
     </div>
   )
 }
