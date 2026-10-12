@@ -822,6 +822,17 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-fw-rise { 0% { opacity: 1; top: 100%; } 85% { opacity: 1; } 100% { opacity: 0; top: var(--y); } }
 @keyframes fg-fw-burst { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.1); } 60% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -40%) scale(1); } }
 @keyframes fg-fw-glow { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+/* 拟声字：内置拟声音效响起时蹦出来的字（描边用八个方向的影子，旧内核也一样粗） */
+.fg-sfxword { position: absolute; z-index: 17; pointer-events: none; transform: translate(-50%, -50%) rotate(var(--tilt, 0deg)); }
+.fg-sfxword span { --k: #6b4a7a; --o: .3cqw; display: block; font-family: var(--font-display); font-size: 4.4cqw; font-weight: 900; line-height: 1; white-space: nowrap; color: #fff;
+  text-shadow: var(--o) 0 0 var(--k), calc(-1 * var(--o)) 0 0 var(--k), 0 var(--o) 0 var(--k), 0 calc(-1 * var(--o)) 0 var(--k), var(--o) var(--o) 0 var(--k), calc(-1 * var(--o)) var(--o) 0 var(--k), var(--o) calc(-1 * var(--o)) 0 var(--k), calc(-1 * var(--o)) calc(-1 * var(--o)) 0 var(--k), .55cqw .7cqw 0 rgba(0, 0, 0, .35);
+  animation: fg-sfxword var(--ms, 1.1s) cubic-bezier(.2, .9, .3, 1.2) both; }
+.fg-sfxword[data-tone="hit"] span { --k: #b3121f; --o: .38cqw; color: #ffdf4a; font-size: 6.4cqw; animation-name: fg-sfxword-hit; }
+.fg-sfxword[data-tone="ring"] span { --k: #d26a00; color: #fff6b0; font-size: 4.8cqw; }
+.fg-sfxword[data-tone="air"] span { --k: #1b6f96; color: #e6fbff; font-style: italic; font-size: 5cqw; animation-name: fg-sfxword-air; }
+@keyframes fg-sfxword { 0% { opacity: 0; transform: scale(.4); } 18% { opacity: 1; transform: scale(1.15); } 30% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(1.04) translateY(-.8cqw); } }
+@keyframes fg-sfxword-hit { 0% { opacity: 0; transform: scale(2.2); } 12% { opacity: 1; transform: scale(.92); } 18% { transform: scale(1.06) translate(.3cqw, -.2cqw); } 24% { transform: scale(1) translate(-.3cqw, .2cqw); } 30% { transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(1.08); } }
+@keyframes fg-sfxword-air { 0% { opacity: 0; transform: translateX(-6cqw) skewX(-14deg); } 25% { opacity: 1; transform: skewX(-6deg); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateX(5cqw) skewX(-10deg); } }
 /* 手机：来电 / 拨出时右边滑进来一部响着的手机，接通后收成右上角的「通话中」；挂断的小卡；视频通话的小窗；通知横幅 */
 .fg-phone { position: absolute; right: 4.5%; top: 13%; z-index: 18; pointer-events: none; animation: fg-phone-in .5s cubic-bezier(.2, .9, .3, 1.1) both; }
 .fg-phone-card { width: 17cqw; box-sizing: border-box; padding: 1.5cqw 1.4cqw 1.6cqw; border-radius: 2cqw; text-align: center; color: #fff;
@@ -1758,6 +1769,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-recall::after, .fg-recall-face { animation: none !important; } /* 闪回里的光斑漂移、心跳脉动、小头像错位 */
   .fg-romance::before, .fg-romance::after, .fg-sense::after, .fg-world-in[data-sense] .fg-cast { animation: none !important; } /* 光斑漂移、心跳暗角、耳边的呼吸、触碰的涟漪、失神的晃 */
   .fg-sense[data-v="heat"]::before, .fg-sense[data-v="touch"]::before, .fg-sense[data-v="scent"]::before { animation: none !important; }
+  .fg-sfxword span, .fg-phone-card, .fg-phone-ripple, .fg-phone-key.is-accept, .fg-notify-wave i { animation: none !important; } /* 拟声字蹦出来、手机一震一震、声波跳 */
   .fg-dialog[data-recall] .fg-box, .fg-dialog[data-recall] .fg-box::after, .fg-dialog[data-recall] .fg-line, .fg-dialog[data-recall] .fg-name-plate { animation: none !important; } /* 闪回对话框里的光斑、脉动、抖动、名牌忽隐忽现 */
   .fg-dialog[data-recall] .fg-char { animation-name: fg-char-in !important; }
   .fg-flash.is-dread { animation: fg-bloom .6s ease-out both !important; } /* 撕裂闪烁换成淡入淡出 */
@@ -1783,6 +1795,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
   .fg-recall-face { width: 17cqw; }
+  .fg-sfxword span { font-size: 9cqw; --o: .55cqw; } .fg-sfxword[data-tone="hit"] span { font-size: 12cqw; --o: .7cqw; }
   .fg-phone { top: 16%; } .fg-phone-card { width: 34cqw; padding: 3cqw 2.6cqw; border-radius: 4cqw; }
   .fg-phone-label { font-size: 2.4cqw; } .fg-phone-label svg { width: 2.6cqw; height: 2.6cqw; }
   .fg-phone-avatar { width: 15cqw; height: 15cqw; margin: 2.4cqw auto 1.6cqw; } .fg-phone-face { font-size: 6.4cqw; }
@@ -3787,10 +3800,80 @@ var FOLEY = Object.freeze({
   // 通知：叮咚
   notify: [p2("sine", 1760, 0.18, 0.06, { attack: 2e-3 }), p2("sine", 2349, 0.4, 0.05, { attack: 2e-3, at: 0.1 }), p2("sine", 4699, 0.12, 8e-3, { attack: 2e-3, at: 0.1 })],
   // 语音留言：录音机的「嘀——」
-  voicemail: [p2("sine", 1e3, 0.55, 0.05, { attack: 0.01, hold: 0.45 })]
+  voicemail: [p2("sine", 1e3, 0.55, 0.05, { attack: 0.01, hold: 0.45 })],
+  // ── 拟声：导演在 sfx 里写的砰、咚、叮……（ONOMATOPOEIA），没有音效库也能响 ──
+  // 砰：撞击、摔门、枪响——一下脆的炸开，底下一记闷的
+  bang: [p2("noise", 1800, 0.12, 0.3, { q: 0.7 }), p2("sine", 90, 0.35, 0.35, { to: 45, attack: 2e-3 }), p2("noise", 500, 0.25, 0.14, { q: 0.5 })],
+  // 咚：重物落地、撞到
+  thud: [p2("sine", 110, 0.3, 0.36, { to: 55, attack: 2e-3 }), p2("noise", 300, 0.08, 0.12, { q: 0.8 })],
+  // 咚咚：敲门，三下
+  knock: [0, 0.17, 0.34].flatMap((at2) => [p2("sine", 220, 0.08, 0.2, { to: 160, attack: 1e-3, at: at2 }), p2("noise", 900, 0.04, 0.12, { q: 2, at: at2 })]),
+  // 啪：一巴掌、拍桌子、打响指
+  slap: [p2("noise", 2600, 0.06, 0.32, { q: 0.9 }), p2("noise", 1200, 0.1, 0.12, { q: 0.6 })],
+  // 叮：清脆的一声（铃、杯沿、灵光一现）
+  ding: [p2("sine", 1568, 1.2, 0.08, { attack: 2e-3 }), p2("sine", 3136, 0.5, 0.02, { attack: 2e-3 }), p2("sine", 4699, 0.3, 0.01, { attack: 2e-3 })],
+  // 叮咚：门铃
+  doorbell: [p2("sine", 659, 0.9, 0.09, { attack: 3e-3 }), p2("sine", 1318, 0.4, 0.015, { attack: 3e-3 }), p2("sine", 523, 1.3, 0.09, { attack: 3e-3, at: 0.45 }), p2("sine", 1046, 0.5, 0.015, { attack: 3e-3, at: 0.45 })],
+  // 叮铃：风铃、店门上的铃、车铃
+  jingle: [2637, 3136, 2793, 3520, 2960, 3322].map((f, i) => p2("sine", f, 0.45, 0.035, { attack: 2e-3, at: i * 0.055 })),
+  // 哗：一盆水泼下来、人群哗然、浪拍上来
+  splash: [p2("noise", 1500, 0.9, 0.15, { q: 0.5, attack: 0.04 }), p2("noise", 4e3, 0.6, 0.07, { q: 1, attack: 0.02, at: 0.05 }), p2("noise", 700, 0.5, 0.08, { q: 0.6 })],
+  // 哗啦：东西碎了一地、塌下来
+  shatter: [p2("noise", 5e3, 0.4, 0.22, { q: 1.2 }), p2("noise", 2500, 0.25, 0.12, { q: 1, at: 0.03 }), ...[3400, 5200, 4300, 6100, 3800].map((f, i) => p2("sine", f, 0.18, 0.02, { attack: 1e-3, at: 0.02 + i * 0.045 }))],
+  // 咔嚓：折断、按下快门、上锁
+  snap: [p2("noise", 3500, 0.03, 0.26, { q: 2 }), p2("square", 1200, 0.02, 0.02, { attack: 1e-3, lp: 3e3 }), p2("noise", 2e3, 0.05, 0.18, { q: 1.5, at: 0.07 })],
+  // 嗖：一下掠过去
+  whoosh: [p2("noise", 600, 0.38, 0.16, { to: 2800, q: 1.5, attack: 0.14 })],
+  // 呼：吹过去的风、长长地呼一口气
+  breeze: [p2("noise", 500, 0.9, 0.13, { to: 380, q: 0.4, attack: 0.3 })],
+  // 轰：爆炸、雷、塌方——很低很长
+  boom: [p2("sine", 60, 1.4, 0.38, { to: 28, attack: 4e-3 }), p2("noise", 200, 1.2, 0.24, { q: 0.4, attack: 0.02 }), p2("noise", 900, 0.5, 0.09, { q: 0.5 })],
+  // 哐当：铁的东西砸下来、铁门撞上
+  clang: [p2("sine", 520, 0.9, 0.09), p2("sine", 1240, 0.7, 0.05), p2("sine", 1873, 0.5, 0.04), p2("noise", 3e3, 0.03, 0.15, { q: 2 }), p2("sine", 470, 0.6, 0.05, { at: 0.22 }), p2("noise", 2600, 0.03, 0.08, { q: 2, at: 0.22 })],
+  // 吱呀：老旧的门慢慢推开
+  creak: [p2("sawtooth", 380, 0.55, 0.025, { to: 520, lp: 1500, attack: 0.05 }), p2("sawtooth", 520, 0.45, 0.02, { to: 340, lp: 1400, attack: 0.03, at: 0.45 })],
+  // 噗：没忍住笑出来、泄了气
+  puff: [p2("noise", 600, 0.12, 0.2, { q: 0.6, attack: 5e-3 }), p2("sine", 180, 0.12, 0.1, { to: 90 })],
+  // 咕噜：肚子叫、咕噜噜冒泡
+  growl: [[95, 0], [80, 0.12], [104, 0.24], [76, 0.36]].map(([f, at2]) => p2("sine", f, 0.16, 0.13, { to: f * 0.8, at: at2 })).concat(p2("noise", 250, 0.5, 0.05, { q: 1 })),
+  // 滴答：水一滴一滴落下来、钟走着
+  drip: [p2("sine", 900, 0.07, 0.11, { to: 1800, attack: 2e-3 }), p2("sine", 1100, 0.07, 0.1, { to: 2100, attack: 2e-3, at: 0.38 })],
+  // 啾：亲一下、小鸟叫
+  chu: [p2("sine", 1200, 0.1, 0.09, { to: 2400, attack: 3e-3 }), p2("noise", 3e3, 0.03, 0.05, { q: 3 })],
+  // 噼啪：柴火、电火花
+  crackle: crackle(9, 0, 0.08),
+  // 扑通：掉进水里
+  plop: [p2("sine", 420, 0.15, 0.22, { to: 120, attack: 2e-3 }), p2("noise", 500, 0.22, 0.08, { q: 1, at: 0.05 })],
+  // 嘀：电子的一声提示、刷卡
+  beep: [p2("sine", 1400, 0.16, 0.06, { attack: 5e-3, hold: 0.1 })]
 });
 var FOLEY_IDS = new Set(Object.keys(FOLEY));
 var MOMENT_FOLEY = Object.freeze({ photo: "shutter", touch: "heartbeat", pat: "pat", poke: "poke", cook: "cook", nickname: "nickname", promise: "promise", contact: "contact" });
+var ONOMATOPOEIA = Object.freeze({
+  砰: { id: "bang", tone: "hit" },
+  咚: { id: "thud", tone: "hit" },
+  咚咚: { id: "knock", tone: "soft" },
+  啪: { id: "slap", tone: "hit" },
+  叮: { id: "ding", tone: "ring" },
+  叮咚: { id: "doorbell", tone: "ring" },
+  叮铃: { id: "jingle", tone: "ring" },
+  嘀: { id: "beep", tone: "ring" },
+  哗: { id: "splash", tone: "air" },
+  哗啦: { id: "shatter", tone: "hit" },
+  咔嚓: { id: "snap", tone: "hit" },
+  嗖: { id: "whoosh", tone: "air" },
+  呼: { id: "breeze", tone: "air" },
+  轰: { id: "boom", tone: "hit" },
+  哐当: { id: "clang", tone: "hit" },
+  吱呀: { id: "creak", tone: "soft" },
+  噗: { id: "puff", tone: "soft" },
+  咕噜: { id: "growl", tone: "soft" },
+  滴答: { id: "drip", tone: "soft" },
+  啾: { id: "chu", tone: "ring" },
+  噼啪: { id: "crackle", tone: "soft" },
+  扑通: { id: "plop", tone: "soft" },
+  怦怦: { id: "heartbeat", tone: "soft" }
+});
 var PHONE_FOLEY = Object.freeze({ call: "ring", dial: "ringback", pickup: "pickup", end: "hangup", busy: "busy", notify: "notify", voicemail: "voicemail" });
 
 // src/client/theater/AaSprite.jsx
@@ -5097,6 +5180,10 @@ function foley(id, delay = 0) {
   const ac = audioCtx();
   if (ac) playParts(ac, FOLEY[id], { volume: sounds.sfxVolume ?? 1, at: ac.currentTime + delay / 1e3 });
 }
+function storyFoley(id, volume = 1) {
+  const ac = FOLEY[id] && volume > 0 && audioCtx();
+  if (ac) playParts(ac, FOLEY[id], { volume });
+}
 function sfx(kind = "select") {
   stinger(kind === "back" ? "select" : kind);
 }
@@ -5633,6 +5720,21 @@ function Fireworks({ sound = true }) {
   }, []);
   if (gone) return null;
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-fireworks", "aria-hidden": "true", style: { "--rise": FIREWORK_RISE_MS + "ms" } }, BURSTS.map((b, i) => /* @__PURE__ */ import_react4.default.createElement("div", { key: i, className: "fg-firework", style: { "--x": b.x + "%", "--y": b.y + "%", "--hue": b.hue, "--at": b.at + "ms" } }, /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-fw-glow" }), /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-fw-trail" }), /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-fw-burst" }), /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-fw-burst is-inner" }))));
+}
+var SFX_WORD_MS = 1100;
+function SfxWord({ beat }) {
+  const info = ONOMATOPOEIA[beat.sfx];
+  const [gone, setGone] = import_react4.default.useState(false);
+  import_react4.default.useEffect(() => {
+    const t = setTimeout(() => setGone(true), SFX_WORD_MS);
+    return () => clearTimeout(t);
+  }, []);
+  if (!info || gone) return null;
+  const h = hashOf(beat.key);
+  const x = (h & 1 ? 66 : 12) + (h >>> 1) % 18;
+  const y = 16 + (h >>> 6) % 22;
+  const tilt = (h >>> 11) % 25 - 12;
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-sfxword", "data-tone": info.tone, style: { left: x + "%", top: y + "%", "--tilt": tilt + "deg", "--ms": SFX_WORD_MS + "ms" }, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("span", null, info.tone === "hit" ? beat.sfx + "！" : beat.sfx));
 }
 var PHONE_END_MS = 2600;
 var PHONE_BANNER_MS = { notify: 3800, voicemail: 4800 };
@@ -8370,7 +8472,7 @@ function SoundLibSection({ data }) {
       await loadSoundlib();
     }, "已删除");
   };
-  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "播放"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "环境音", hint: "雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.amb, onChange: (v) => p3({ amb: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.ambVolume, onChange: (e) => p3({ ambVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "剧情音效", hint: "推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.storySfx, onChange: (v) => p3({ storySfx: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.05", value: cfg.ui.storySfxVolume, onChange: (e) => p3({ storySfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "我的音效库", sounds2 ? ` · ${sounds2.length} 个` : ""), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪一幕放什么环境音、哪句配什么音效。所以标签要写正文里会出现的词。"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !sounds2 || !sounds2.some((s) => s.file), onClick: () => saveText(writeSoundSidecar(sounds2 || []), SOUND_SIDECAR) }, "导出描述"), progress && /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react9.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "播放"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "环境音", hint: "雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.amb, onChange: (v) => p3({ amb: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.ambVolume, onChange: (e) => p3({ ambVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "剧情音效", hint: "推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.storySfx, onChange: (v) => p3({ storySfx: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.05", value: cfg.ui.storySfxVolume, onChange: (e) => p3({ storySfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "拟声字", hint: "内置拟声音效响起时，画面上蹦出这个字（砰！咚！），像漫画那样。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.sfxWords, onChange: (v) => p3({ sfxWords: v }) })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "我的音效库", sounds2 ? ` · ${sounds2.length} 个` : ""), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪一幕放什么环境音、哪句配什么音效。所以标签要写正文里会出现的词。"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !sounds2 || !sounds2.some((s) => s.file), onClick: () => saveText(writeSoundSidecar(sounds2 || []), SOUND_SIDECAR) }, "导出描述"), progress && /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react9.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
     importFiles(e.target.files);
     e.target.value = "";
   } })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "文件夹最上面放一份 ", /* @__PURE__ */ import_react9.default.createElement("code", null, SOUND_SIDECAR), "（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签；没有描述文件时名字取文件名、分类取所在的文件夹。同一个文件再导入不会重复存，但描述会以描述文件为准。"), !sounds2 && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "读取中…"), sounds2 && !sounds2.length && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "音效库还是空的。没有声音时剧场不放环境音和剧情音效。"), sounds2 && sounds2.length > 0 && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "100%", margin: "0.6cqw 0 1cqw" }, value: query, placeholder: "搜索名字、分类、标签、描述（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), found && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "找到 ", found.length, " 个", found.length > LIB_SHOWN ? `，先列出前 ${LIB_SHOWN} 个` : ""), found && cards(found), !found && groups.map((g) => /* @__PURE__ */ import_react9.default.createElement("div", { key: g.key, className: "fg-libgroup" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row fg-libgroup-head" }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpenGroup((k) => k === g.key ? "" : g.key) }, openGroup === g.key ? "▾" : "▸", " ", KIND_LABEL[g.kind], " · ", g.name), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, g.items.length, " 个"), /* @__PURE__ */ import_react9.default.createElement("span", { style: { flex: 1 } }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "g" + g.key, onClick: () => removeGroup(g) }, "删除这一类")), openGroup === g.key && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, g.items.length > LIB_SHOWN && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "这一类有 ", g.items.length, " 个，先列出前 ", LIB_SHOWN, " 个；用搜索找其余的。"), cards(g.items))))));
@@ -8511,6 +8613,7 @@ function ScriptView({ script, units }) {
       l.scene && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "scene", k: "场景" }, sceneChange(l.scene)),
       l.bgm && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "bgm", k: "换歌" }, l.bgm === "none" ? "停" : l.bgm),
       l.amb && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "amb", k: "环境音" }, l.amb === "none" ? "停" : l.amb),
+      l.sfx && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "sfx", k: "音效" }, l.sfx),
       l.react && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "react", k: "反应" }, l.react.map((r) => (r.name === "*" ? "全员" : r.name) + " " + [r.emo && emotionLabel(r.emo), r.sym && (SYMBOL_LABEL[r.sym] || r.sym)].filter(Boolean).join(" · ")).join("、")),
       l.move && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "move", k: "走位" }, l.move.map((m) => `${m.name === "*" ? "全员" : m.name} ${MOVE_LABEL[m.act] || m.act}${m.to ? " " + m.to : ""}`).join("、")),
       l.enter && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "in", k: "登场" }, l.enter.map((e) => e.name + (e.pos ? `（${POS_LABEL[e.pos] || e.pos}）` : "") + (e.how ? ` · ${ENTER_HOW_LABEL[e.how] || e.how}` : "")).join("、")),
@@ -8825,10 +8928,13 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if (closingRef.current) return;
     playAmbience(ambSound ? { id: ambSound.id, url: assetUrl(ambSound.assetId) } : null, (ui0.ambVolume ?? 0.35) * (ambSound ? ambSound.volume ?? 1 : 1));
   }, [ambSound && ambSound.id, ambSound && ambSound.volume, ui0.ambVolume]);
+  const sfxKey = beat && beat.sfx && !holdText ? beat.key : "";
   import_react11.default.useEffect(() => {
-    const sound = beat && beat.sfx && !title && !skip && ui0.storySfx !== false ? soundById.get(beat.sfx) : null;
+    if (!sfxKey || title || skip || ui0.storySfx === false) return;
+    const sound = soundById.get(beat.sfx);
     if (sound) playLibSound(sound.assetId, (ui0.storySfxVolume ?? 0.8) * (sound.volume ?? 1));
-  }, [beat && beat.key]);
+    else if (ONOMATOPOEIA[beat.sfx]) storyFoley(ONOMATOPOEIA[beat.sfx].id, (ui0.storySfxVolume ?? 0.8) / 0.8);
+  }, [sfxKey]);
   const go = import_react11.default.useCallback((i) => {
     if (!beats.length) return;
     const next = Math.max(0, Math.min(beats.length - 1, i));
@@ -9042,6 +9148,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     beat && !title && beat.cutin && /* @__PURE__ */ import_react11.default.createElement(CutIn, { key: beat.key, beat, view, sound: sfxOn }),
     beat && !title && beat.hit && /* @__PURE__ */ import_react11.default.createElement(HitBanner, { key: beat.key, beat, sound: sfxOn, fx: hit }),
     beat && !title && beat.moment && /* @__PURE__ */ import_react11.default.createElement(MomentLayer, { key: beat.key, beat, view, sound: sfxOn }),
+    sfxKey && !title && !skip && ui0.sfxWords !== false && !soundById.has(beat.sfx) && ONOMATOPOEIA[beat.sfx] && /* @__PURE__ */ import_react11.default.createElement(SfxWord, { key: sfxKey, beat }),
     beat && !title && beat.call && beat.call.state === "ringing" && /* @__PURE__ */ import_react11.default.createElement(PhoneRing, { key: beat.call.id, beat, view, sound: sfxOn }),
     beat && !title && beat.call && beat.call.state === "live" && beat.call.video && !(beat.split && beat.split.who.includes(beat.call.who)) && /* @__PURE__ */ import_react11.default.createElement(VideoPip, { key: beat.call.id, beat, view }),
     beat && !title && beat.phone && beat.phone.kind === "end" && /* @__PURE__ */ import_react11.default.createElement(PhoneEnd, { key: beat.key, beat, view, sound: sfxOn }),

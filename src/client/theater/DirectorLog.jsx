@@ -165,6 +165,7 @@ function ScriptView({ script, units }) {
               l.scene && <Chip key="scene" k="场景">{sceneChange(l.scene)}</Chip>,
               l.bgm && <Chip key="bgm" k="换歌">{l.bgm === 'none' ? '停' : l.bgm}</Chip>,
               l.amb && <Chip key="amb" k="环境音">{l.amb === 'none' ? '停' : l.amb}</Chip>,
+              l.sfx && <Chip key="sfx" k="音效">{l.sfx}</Chip>,
               l.react && <Chip key="react" k="反应">{l.react.map(r => (r.name === '*' ? '全员' : r.name) + ' ' + [r.emo && emotionLabel(r.emo), r.sym && (SYMBOL_LABEL[r.sym] || r.sym)].filter(Boolean).join(' · ')).join('、')}</Chip>,
               l.move && <Chip key="move" k="走位">{l.move.map(m => `${m.name === '*' ? '全员' : m.name} ${MOVE_LABEL[m.act] || m.act}${m.to ? ' ' + m.to : ''}`).join('、')}</Chip>,
               l.enter && <Chip key="in" k="登场">{l.enter.map(e => e.name + (e.pos ? `（${POS_LABEL[e.pos] || e.pos}）` : '') + (e.how ? ` · ${ENTER_HOW_LABEL[e.how] || e.how}` : '')).join('、')}</Chip>,
