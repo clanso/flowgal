@@ -1980,6 +1980,7 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null, ca
   const walkOns = /* @__PURE__ */ new Map();
   const ownExit = /* @__PURE__ */ new Map();
   let layer = false, layerSeen = false, layerStart = -1, split = null, caller = calling || "";
+  let place = script.scene?.location || "", reset = false;
   units.forEach((u, i) => {
     const line = lines[u.id] || {};
     const returning = line.mode === "real" && layer;
@@ -1987,6 +1988,11 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null, ca
     else if (line.mode) {
       if (!layer) layerStart = i;
       layer = layerSeen = true;
+    }
+    if (!layer) {
+      const moved = Boolean(line.scene?.location) && line.scene.location !== place;
+      if (i > 0 && !returning && (moved || (line.exit || []).some((n) => ALL.has(n)))) reset = true;
+      if (line.scene?.location) place = line.scene.location;
     }
     if (line.split === "off") split = null;
     else if (line.split) split = line.split;
@@ -2014,7 +2020,7 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null, ca
       } else {
         realVoices.add(name2);
         if (!layerSeen) early.add(name2);
-        if (!spokeAt.has(name2)) spokeAt.set(name2, i);
+        if (!reset && !spokeAt.has(name2)) spokeAt.set(name2, i);
         if (walkOn && walkOn.has(name2) && !listed.has(name2) && !line.as) walkOns.set(i, [...walkOns.get(i) || [], name2]);
       }
     }

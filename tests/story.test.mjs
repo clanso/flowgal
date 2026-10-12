@@ -436,6 +436,35 @@ test('gate: 导演漏写了主角开场就在、只在后面换场时「全部�
   assert.equal(who(stageWalk(described, units).steps)[0], '-', '只被描写、隔着电话说话的：开场不在，到 U4 才进回忆')
 })
 
+test('gate: 清场、换地方之后才在登场前开口的人不算开场就在：醒过来先听见背后应了一声，两句后才看见她', () => {
+  // 照玩家存档：营地、柱厅里只有柯萝伊和同伴；换到巢穴那一句清场再让柯萝伊 enter，阿黛尔先在背后说话（第二句导演没写画外音），两句后才登场
+  const units = ['dialogue', 'dialogue', 'narration', 'dialogue', 'dialogue', 'dialogue', 'narration'].map((type, i) => ({ id: 'U' + (i + 1), type }))
+  const script = {
+    scene: { location: '营地' },
+    cast: [{ name: '柯萝伊', pos: 'center' }, { name: '米尔特', pos: 'right' }, { name: '阿黛尔', pos: 'right' }],
+    lines: {
+      U1: { sp: '柯萝伊' },
+      U2: { sp: '米尔特' },
+      U3: { scene: { location: '巢穴' }, exit: ['*'], enter: [{ name: '柯萝伊', pos: 'center' }] },
+      U4: { sp: '阿黛尔', as: '？？？', voice: 'offscreen' },
+      U5: { sp: '柯萝伊' },
+      U6: { sp: '阿黛尔' },
+      U7: { enter: [{ name: '阿黛尔', pos: 'right', how: 'slow' }] },
+    },
+  }
+  const who = steps => steps.map(s => s.cast.map(c => c.name).join('+') || '-')
+  assert.deepEqual(who(stageWalk(script, units).steps), ['柯萝伊+米尔特', '柯萝伊+米尔特', '柯萝伊', '柯萝伊', '柯萝伊', '柯萝伊', '柯萝伊+阿黛尔'])
+  // 导演换地方时没写清场也一样：在新地方才开口的，说明不了开场时他在旧地方
+  const moved = { ...script, lines: { ...script.lines, U3: { scene: { location: '巢穴' }, exit: ['米尔特'] } } }
+  assert.deepEqual(who(stageWalk(moved, units).steps), ['柯萝伊+米尔特', '柯萝伊+米尔特', '柯萝伊', '柯萝伊', '柯萝伊', '柯萝伊', '柯萝伊+阿黛尔'])
+  // 清场之前就当面说过话的照旧开场就在
+  const spoke = { ...script, lines: { ...script.lines, U2: { sp: '阿黛尔' } } }
+  assert.deepEqual(who(stageWalk(spoke, units).steps).slice(0, 2), ['柯萝伊+米尔特+阿黛尔', '柯萝伊+米尔特+阿黛尔'])
+  // 第一句就写了地点（跟开场一样或不一样）不算换过地方
+  const opening = { ...script, lines: { ...script.lines, U1: { sp: '柯萝伊', scene: { location: '柱厅' } }, U2: { sp: '阿黛尔' } } }
+  assert.equal(who(stageWalk(opening, units).steps)[0], '柯萝伊+米尔特+阿黛尔')
+})
+
 test('gate: 导演把告别那句的说话人写进了同一句的 exit：说完这句再走，不在开口那一拍就消失；清场、换地方的那句照旧当场生效', () => {
   // 照玩家存档：「……抱歉。我去透透气」这一句同时写了阿黛尔 exit
   const units = ['dialogue', 'dialogue', 'narration', 'dialogue'].map((type, i) => ({ id: 'U' + (i + 1), type }))
