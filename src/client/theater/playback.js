@@ -96,6 +96,7 @@ export function buildBeats(view) {
       })
       .sort((a, b) => a.at - b.at)
     let lastSpeaker = ''
+    let hush = 0 // 配乐留白还剩几拍：写了换歌（写回原来的曲子也算）、换了地方、进出段落、过场字卡就提前回来；不跨轮
     let split = null // 分屏：电话另一头的人在画面一侧，写 off 或这一轮结束时收起
     const blocking = poseTracker() // 走位：每一轮、每换一堂布景从原位开始
     const exitWay = {} // 写了怎么走、还没走的人（告别那句说完下一拍才走）
@@ -178,6 +179,10 @@ export function buildBeats(view) {
       const voice = recall && type !== 'narration' && (!line.voice || line.voice === 'echo') ? 'memory' : line.voice || (onPhone ? 'phone' : '')
       const recallEdge = recall === recalled ? '' : recall ? 'in' : 'out'
       recalled = recall
+      if (hush && (line.bgm || at.moved || at.cut)) hush = 0
+      if (line.bgm === 'hush') hush = HUSH_BEATS
+      const hushed = hush ? (hush === HUSH_BEATS ? 'start' : 'on') : ''
+      if (hush) hush--
       beats.push({
         key: `${t.turn}:${unit.id}`,
         turn: t.turn,
@@ -214,6 +219,7 @@ export function buildBeats(view) {
         ...(recall ? { recall } : {}), // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
         ...(recallEdge ? { recallEdge } : {}),
         bgm: at.bgm,
+        ...(hushed ? { hush: hushed } : {}), // 配乐留白：start 是停下的那一句，on 是还没回来
         amb: at.amb,
         sfx: line.sfx || '',
         ...(line.pause ? { pause: line.pause } : {}), // 「間」：这句的字出来之前先停一下
@@ -334,6 +340,12 @@ export const HIT_LEAD_MS = 700
 export const MOMENT_LEAD_MS = { photo: 650, fireworks: 900, cook: 450, nickname: 600, promise: 600, contact: 450 }
 /** 手机：来电、拨出时手机先响一下（滑进来、响第一声）字再出；挂断、通知、留言不打断。 */
 export const PHONE_LEAD_MS = { call: 1000, dial: 800 }
+/**
+ * 配乐留白（导演写 bgm: hush 的那一句）：配乐先淡出、静一下（HUSH_LEAD_MS）字再出，
+ * 连这一句在内 HUSH_BEATS 拍里不放配乐，之后从停下的地方淡回来（淡出淡入的快慢在 audio.js）。
+ */
+export const HUSH_BEATS = 5
+export const HUSH_LEAD_MS = 700
 /** 换了地方：转场演完再停这么久才出字。 */
 const SCENE_BEAT_MS = 300
 /**
@@ -366,6 +378,7 @@ export function beatHold(beat, { cg = '', was = {} } = {}) {
   if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS)
   if (beat.moment) ms = Math.max(ms, MOMENT_LEAD_MS[beat.moment.kind] || 0)
   if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0)
+  if (beat.hush === 'start') ms = Math.max(ms, HUSH_LEAD_MS)
   const wake = was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
   if (wake) { ms = Math.max(ms, WAKE_MS); away = true }
   return { ms, away, ...(wake ? { wake } : {}) }

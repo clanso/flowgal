@@ -163,7 +163,7 @@ function ScriptView({ script, units }) {
               l.then && <Chip key="then" k="当时的样子">{l.then.map(thenText).join('；')}</Chip>,
               l.look && <Chip key="look" k="从这句起">{l.look.map(shiftText).join('；')}</Chip>,
               l.scene && <Chip key="scene" k="场景">{sceneChange(l.scene)}</Chip>,
-              l.bgm && <Chip key="bgm" k="换歌">{l.bgm === 'none' ? '停' : l.bgm}</Chip>,
+              l.bgm && (l.bgm === 'hush' ? <Chip key="bgm" k="配乐">留白</Chip> : <Chip key="bgm" k="换歌">{l.bgm === 'none' ? '停' : l.bgm}</Chip>),
               l.amb && <Chip key="amb" k="环境音">{l.amb === 'none' ? '停' : l.amb}</Chip>,
               l.sfx && <Chip key="sfx" k="音效">{l.sfx}</Chip>,
               l.react && <Chip key="react" k="反应">{l.react.map(r => (r.name === '*' ? '全员' : r.name) + ' ' + [r.emo && emotionLabel(r.emo), r.sym && (SYMBOL_LABEL[r.sym] || r.sym)].filter(Boolean).join(' · ')).join('、')}</Chip>,

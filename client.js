@@ -1265,7 +1265,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-hud-place { font-family: var(--font-display); font-size: 1.55cqw; font-weight: 700; letter-spacing: .14em; text-shadow: 0 1px 6px rgba(0, 0, 0, .7); }
 .fg-hud-meta { margin-top: .25cqw; font-size: .95cqw; letter-spacing: .14em; color: var(--ink-dim); text-shadow: 0 1px 4px rgba(0, 0, 0, .7); display: flex; gap: .8cqw; }
 .fg-topright { position: absolute; right: 2%; top: 3%; z-index: 22; display: flex; gap: .6cqw; align-items: center; }
-.fg-pill { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1cqw; border-radius: 99px; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: .95cqw; letter-spacing: .08em; color: var(--ink); }
+.fg-pill { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1cqw; border-radius: 99px; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: .95cqw; letter-spacing: .08em; color: var(--ink); transition: opacity 1.2s; }
 .fg-pill.is-busy::before { content: ""; width: .7cqw; height: .7cqw; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: fg-spin .8s linear infinite; }
 .fg-iconbtn { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; display: grid; place-items: center; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: 1.2cqw; transition: transform .2s, background .2s; }
 .fg-iconbtn:hover { transform: rotate(90deg); background: rgba(255, 255, 255, .14); }
@@ -1559,7 +1559,9 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-dlog-k { display: inline-block; margin-right: .6cqw; padding: 0 .5cqw; border-radius: .3cqw; font-style: normal; font-family: var(--font-body); font-size: .8cqw; letter-spacing: .08em; color: var(--ink-dim); border: 1px solid var(--box-border); }
 .fg-dlog-cgchar { margin-top: .4cqw; padding-left: .8cqw; border-left: 2px solid var(--box-border); }
 .fg-dlog-list-plain { margin: 0; padding-left: 2cqw; font-size: 1.05cqw; line-height: 1.8; }
-.fg-pill.is-link { cursor: pointer; transition: border-color .2s; }
+.fg-pill.is-link { cursor: pointer; transition: border-color .2s, opacity 1.2s; }
+/* 配乐留白：曲名暗下去，回来时再亮 */
+.fg-pill.is-hushed { opacity: .35; transition-duration: .5s; }
 .fg-pill.is-link:hover { border-color: var(--accent); }
 
 .fg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20cqw, 1fr)); gap: 1.4cqw; }
@@ -2233,8 +2235,9 @@ function walkScenes(start, lines) {
       layer = layer ? { ...layer, mode: line.mode, scene: applyDelta(layer.scene, delta, known), then: addThen(layer.mode === line.mode ? layer.then : null, line.then) } : { mode: line.mode, scene: applyDelta(real.scene, delta, known), bgm: real.bgm, amb: real.amb, then: addThen(null, line.then) };
     } else if (layer) layer = { ...layer, scene: applyDelta(layer.scene, delta, known), then: addThen(layer.then, line.then) };
     else real = { ...real, scene: applyDelta(real.scene, delta, known) };
-    if (line.bgm || line.amb) {
-      const patch = { ...line.bgm ? { bgm: line.bgm } : {}, ...line.amb ? { amb: line.amb } : {} };
+    const bgm = line.bgm === "hush" ? "" : line.bgm;
+    if (bgm || line.amb) {
+      const patch = { ...bgm ? { bgm } : {}, ...line.amb ? { amb: line.amb } : {} };
       if (layer) layer = { ...layer, ...patch };
       else real = { ...real, ...patch };
     }
@@ -3069,6 +3072,7 @@ function buildBeats(view) {
       return { img, at: at2, end };
     }).sort((a, b) => a.at - b.at);
     let lastSpeaker = "";
+    let hush = 0;
     let split = null;
     const blocking = poseTracker();
     const exitWay = {};
@@ -3147,6 +3151,10 @@ function buildBeats(view) {
       const voice = recall && type !== "narration" && (!line.voice || line.voice === "echo") ? "memory" : line.voice || (onPhone ? "phone" : "");
       const recallEdge = recall === recalled ? "" : recall ? "in" : "out";
       recalled = recall;
+      if (hush && (line.bgm || at2.moved || at2.cut)) hush = 0;
+      if (line.bgm === "hush") hush = HUSH_BEATS;
+      const hushed = hush ? hush === HUSH_BEATS ? "start" : "on" : "";
+      if (hush) hush--;
       beats.push({
         key: `${t.turn}:${unit.id}`,
         turn: t.turn,
@@ -3198,6 +3206,8 @@ function buildBeats(view) {
         // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
         ...recallEdge ? { recallEdge } : {},
         bgm: at2.bgm,
+        ...hushed ? { hush: hushed } : {},
+        // 配乐留白：start 是停下的那一句，on 是还没回来
         amb: at2.amb,
         sfx: line.sfx || "",
         ...line.pause ? { pause: line.pause } : {},
@@ -3296,6 +3306,8 @@ var HIT_IMPACT_MS = 420;
 var HIT_LEAD_MS = 700;
 var MOMENT_LEAD_MS = { photo: 650, fireworks: 900, cook: 450, nickname: 600, promise: 600, contact: 450 };
 var PHONE_LEAD_MS = { call: 1e3, dial: 800 };
+var HUSH_BEATS = 5;
+var HUSH_LEAD_MS = 700;
 var SCENE_BEAT_MS = 300;
 var WAKE_SWAP_MS = 1700;
 var WAKE_MS = 3600;
@@ -3321,6 +3333,7 @@ function beatHold(beat, { cg = "", was = {} } = {}) {
   if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS);
   if (beat.moment) ms = Math.max(ms, MOMENT_LEAD_MS[beat.moment.kind] || 0);
   if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0);
+  if (beat.hush === "start") ms = Math.max(ms, HUSH_LEAD_MS);
   const wake = was.mode === "memory" && (beat.mode || "") !== "memory" && !beat.cut && WAKE_FROM.has(beat.transition);
   if (wake) {
     ms = Math.max(ms, WAKE_MS);
@@ -4775,15 +4788,21 @@ function audioCtx() {
 function fade(el, to, ms, done) {
   const from = el.volume;
   const start = performance.now();
+  const turn = el._fgFadeTurn = (el._fgFadeTurn || 0) + 1;
   let over = false;
   const end = () => {
     if (over) return;
     over = true;
+    if (el._fgFadeTurn !== turn) return;
     el.volume = Math.max(0, Math.min(1, to));
     if (done) done();
   };
   const tick = (now) => {
     if (over) return;
+    if (el._fgFadeTurn !== turn) {
+      over = true;
+      return;
+    }
     const k = Math.min(1, (now - start) / ms);
     el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
     if (k < 1) requestAnimationFrame(tick);
@@ -4792,16 +4811,24 @@ function fade(el, to, ms, done) {
   requestAnimationFrame(tick);
   setTimeout(end, ms + 150);
 }
+var HUSH_OUT_MS = 600;
+var HUSH_BACK_MS = 2600;
 function loopPlayer() {
   let cur = null;
+  let hushed = false;
   const halt = (el) => {
     el._fgStopped = true;
     el.pause();
     el.src = "";
   };
+  const audible = (volume) => preview || hushed ? 0 : volume;
   return {
     get current() {
       return cur;
+    },
+    /** 现在该有的音量：试听、留白时是 0。 */
+    get level() {
+      return cur ? audible(cur.volume) : 0;
     },
     play(item, volume) {
       if (!item) {
@@ -4809,13 +4836,13 @@ function loopPlayer() {
         return;
       }
       volume = Math.max(0, Math.min(1, volume));
-      const audible = preview ? 0 : volume;
       if (cur && cur.id === item.id) {
         cur.volume = volume;
-        cur.el.volume = Math.min(cur.el.volume, audible);
-        fade(cur.el, audible, 400);
+        cur.el.volume = Math.min(cur.el.volume, audible(volume));
+        fade(cur.el, audible(volume), 400);
         return;
       }
+      hushed = false;
       const old = cur;
       const el = new Audio();
       el.src = item.url;
@@ -4823,7 +4850,7 @@ function loopPlayer() {
       el.volume = 0;
       el.play().then(() => {
         if (el._fgStopped) halt(el);
-        else if (!el._fgFading) fade(el, preview ? 0 : volume, 1800);
+        else if (!el._fgFading) fade(el, audible(volume), 1800);
       }).catch(() => {
       });
       cur = { el, id: item.id, volume };
@@ -4839,20 +4866,41 @@ function loopPlayer() {
         old.el._fgFading = true;
         fade(old.el, 0, 900, () => halt(old.el));
       }
+    },
+    /** 留白：on 淡出、停在原处；off 从停下的地方接着放、慢慢淡回来。 */
+    hush(on) {
+      on = Boolean(on);
+      if (on === hushed) return;
+      hushed = on;
+      const now = cur;
+      if (!now) return;
+      if (on) fade(now.el, 0, HUSH_OUT_MS, () => {
+        if (hushed && cur === now) now.el.pause();
+      });
+      else {
+        now.el.play().catch(() => {
+        });
+        fade(now.el, audible(now.volume), HUSH_BACK_MS);
+      }
     }
   };
 }
 var music = loopPlayer();
 var ambience = loopPlayer();
+var players = [music, ambience];
 var loops = () => [music.current, ambience.current].filter(Boolean);
 function playBgm(track, volume = 0.45) {
   music.play(track, volume);
+}
+function hushBgm(on) {
+  music.hush(on);
 }
 function playAmbience(sound, volume = 0.35) {
   ambience.play(sound, volume);
 }
 function stopAll() {
   music.stop();
+  music.hush(false);
   ambience.stop();
   stopPreview();
   for (const src of [...oneShots]) {
@@ -4883,7 +4931,7 @@ function stopPreview() {
   preview = null;
   p3.el.pause();
   p3.el.src = "";
-  for (const loop of loops()) fade(loop.el, loop.volume, 800);
+  for (const player of players) if (player.current) fade(player.current.el, player.level, 800);
   if (p3.onEnd) p3.onEnd();
 }
 var sounds = { blipVolume: 1, sfx: true, sfxVolume: 1, sounds: DEFAULT_SOUNDS, customSounds: {} };
@@ -8611,7 +8659,7 @@ function ScriptView({ script, units }) {
       l.then && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "then", k: "当时的样子" }, l.then.map(thenText).join("；")),
       l.look && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "look", k: "从这句起" }, l.look.map(shiftText).join("；")),
       l.scene && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "scene", k: "场景" }, sceneChange(l.scene)),
-      l.bgm && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "bgm", k: "换歌" }, l.bgm === "none" ? "停" : l.bgm),
+      l.bgm && (l.bgm === "hush" ? /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "bgm", k: "配乐" }, "留白") : /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "bgm", k: "换歌" }, l.bgm === "none" ? "停" : l.bgm)),
       l.amb && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "amb", k: "环境音" }, l.amb === "none" ? "停" : l.amb),
       l.sfx && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "sfx", k: "音效" }, l.sfx),
       l.react && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "react", k: "反应" }, l.react.map((r) => (r.name === "*" ? "全员" : r.name) + " " + [r.emo && emotionLabel(r.emo), r.sym && (SYMBOL_LABEL[r.sym] || r.sym)].filter(Boolean).join(" · ")).join("、")),
@@ -8920,6 +8968,10 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   import_react11.default.useEffect(() => {
     if (!closingRef.current && (track || !ui0.bgm || waking)) playBgm(track, ui0.bgmVolume);
   }, [track && track.id, ui0.bgm, ui0.bgmVolume]);
+  const hushed = Boolean(musicBeat && musicBeat.hush);
+  import_react11.default.useEffect(() => {
+    if (!closingRef.current) hushBgm(hushed);
+  }, [hushed]);
   const soundlib = useSoundlib();
   const soundById = import_react11.default.useMemo(() => new Map((soundlib || []).map((s) => [s.id, s])), [soundlib]);
   const ambId = ui0.amb !== false && musicBeat && musicBeat.amb !== "none" ? musicBeat.amb : "";
@@ -9158,7 +9210,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(TitleCard, { beat, delay: speed > 0 ? beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0 : 0 }),
     beat && !title && beat.cut && speed > 0 && /* @__PURE__ */ import_react11.default.createElement(CutCard, { beat, out: !cutting }),
     !title && beat && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react11.default.createElement("div", null, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-place" }, hud.scene.location || `第 ${hud.turn} 轮`), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-meta" }, hud.mode && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-mode" }, MODE_LABEL[hud.mode]), hud.battle && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-battle", title: hud.battle.title || "" }, "交战 · ", hud.battle.foe), /* @__PURE__ */ import_react11.default.createElement("span", null, TIME_LABEL[hud.scene.time] || ""), hud.scene.weather && hud.scene.weather !== "clear" && /* @__PURE__ */ import_react11.default.createElement("span", null, WEATHER_LABEL[hud.scene.weather]), LIGHT_LABEL[hud.scene.light] && /* @__PURE__ */ import_react11.default.createElement("span", null, LIGHT_LABEL[hud.scene.light]), FX_LABEL[hud.scene.fx] && /* @__PURE__ */ import_react11.default.createElement("span", null, FX_LABEL[hud.scene.fx]), ROMANCE_LABEL[hud.scene.romance] && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-romance" }, "♡ ", ROMANCE_LABEL[hud.scene.romance]), SENSE_LABEL[hud.scene.sense] && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-sense" }, SENSE_LABEL[hud.scene.sense]), hud.scene.mood && /* @__PURE__ */ import_react11.default.createElement("span", null, "♪ ", MOOD_LABEL[hud.scene.mood])))),
-    !title && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, directing && /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), drawing > 0 && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), beat && beat.call && beat.call.state === "live" && /* @__PURE__ */ import_react11.default.createElement(CallChip, { key: beat.call.id, call: beat.call, sound: sfxOn }), track && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill", title: track.name }, "♪ ", track.name), viewError && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
+    !title && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, directing && /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), drawing > 0 && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), beat && beat.call && beat.call.state === "live" && /* @__PURE__ */ import_react11.default.createElement(CallChip, { key: beat.call.id, call: beat.call, sound: sfxOn }), track && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill" + (hushed ? " is-hushed" : ""), title: hushed ? `${track.name}（留白，一会儿回来）` : track.name }, "♪ ", track.name), viewError && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
     beat && !title && beat.card && /* @__PURE__ */ import_react11.default.createElement(SceneCard, { beat }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(
       DialogBox,

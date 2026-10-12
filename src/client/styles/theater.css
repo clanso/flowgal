@@ -921,7 +921,7 @@
 .fg-hud-place { font-family: var(--font-display); font-size: 1.55cqw; font-weight: 700; letter-spacing: .14em; text-shadow: 0 1px 6px rgba(0, 0, 0, .7); }
 .fg-hud-meta { margin-top: .25cqw; font-size: .95cqw; letter-spacing: .14em; color: var(--ink-dim); text-shadow: 0 1px 4px rgba(0, 0, 0, .7); display: flex; gap: .8cqw; }
 .fg-topright { position: absolute; right: 2%; top: 3%; z-index: 22; display: flex; gap: .6cqw; align-items: center; }
-.fg-pill { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1cqw; border-radius: 99px; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: .95cqw; letter-spacing: .08em; color: var(--ink); }
+.fg-pill { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1cqw; border-radius: 99px; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: .95cqw; letter-spacing: .08em; color: var(--ink); transition: opacity 1.2s; }
 .fg-pill.is-busy::before { content: ""; width: .7cqw; height: .7cqw; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: fg-spin .8s linear infinite; }
 .fg-iconbtn { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; display: grid; place-items: center; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: 1.2cqw; transition: transform .2s, background .2s; }
 .fg-iconbtn:hover { transform: rotate(90deg); background: rgba(255, 255, 255, .14); }
@@ -1215,7 +1215,9 @@
 .fg-dlog-k { display: inline-block; margin-right: .6cqw; padding: 0 .5cqw; border-radius: .3cqw; font-style: normal; font-family: var(--font-body); font-size: .8cqw; letter-spacing: .08em; color: var(--ink-dim); border: 1px solid var(--box-border); }
 .fg-dlog-cgchar { margin-top: .4cqw; padding-left: .8cqw; border-left: 2px solid var(--box-border); }
 .fg-dlog-list-plain { margin: 0; padding-left: 2cqw; font-size: 1.05cqw; line-height: 1.8; }
-.fg-pill.is-link { cursor: pointer; transition: border-color .2s; }
+.fg-pill.is-link { cursor: pointer; transition: border-color .2s, opacity 1.2s; }
+/* 配乐留白：曲名暗下去，回来时再亮 */
+.fg-pill.is-hushed { opacity: .35; transition-duration: .5s; }
 .fg-pill.is-link:hover { border-color: var(--accent); }
 
 .fg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20cqw, 1fr)); gap: 1.4cqw; }

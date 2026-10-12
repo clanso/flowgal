@@ -62,7 +62,8 @@ const tavern = {
 }
 
 // ───────── 假模型：按单元编号回放写好的导演输出，像真模型一样先「思考」再分段流式吐字；
-// 第 4 轮故意慢，演示「先文本后整理」和导演日志里的实时输出。配乐按轮次从示例曲里选，第 3 轮在闪电那句换歌，第 4 轮回忆里换成琴房那首、灯灭时停下 ─────────
+// 第 4 轮故意慢，演示「先文本后整理」和导演日志里的实时输出。配乐按轮次从示例曲里选，第 3 轮苏晴说到「那间教室」时配乐留白、闪电那句换成雨夜那首，
+// 第 4 轮回忆里换成琴房那首、灯灭时停下 ─────────
 const trackIds = {}
 function withMusic(turn, units, reply) {
   if (!trackIds.room) return reply
@@ -73,6 +74,8 @@ function withMusic(turn, units, reply) {
     const line = reply.lines.find(l => l.u === flash.id)
     if (line) line.bgm = trackIds.rain
     else reply.lines.push({ u: flash.id, bgm: trackIds.rain })
+    const room = reply.lines.find(l => l.u === units.find(u => u.text.includes('那、那间教室里'))?.id)
+    if (room) room.bgm = 'hush'
   }
   // 第 4 轮：回忆里放琴房那首，回到现实灯灭时音乐停下
   if (turn === 4) {
