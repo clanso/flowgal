@@ -6,6 +6,8 @@ import { Particles } from './particles.js'
 import { SKY, placeKey, actorX, onStage, stageLayout, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite, thenLook } from '../../../lib/look.js'
+import { faceBoxFrom } from '../../../lib/face.js'
+import { heightOf, placeSprite } from '../../../lib/stature.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger } from './audio.js'
 
@@ -202,6 +204,15 @@ function spriteFor(person, turn, emo, emotions, then = null) {
 /** 登场从靠近的那一侧滑进来，退场往同一侧淡出。 */
 const SIDE = { farleft: '-40%', left: '-28%', center: '0%', right: '28%', farright: '40%' }
 
+/** 立绘里的脸框（像素）：认过脸的底图、换脸的差分（用它底图的框）、逆转式素材包框好的眼睛和嘴。 */
+function faceBoxOf(record, size) {
+  if (!record) return null
+  if (record.faceBox) return record.faceBox
+  if (record.face && record.face.box) return record.face.box
+  const rects = record.aa && record.aa.rects
+  return rects && size ? faceBoxFrom(rects, size[0], size[1]) : null
+}
+
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name)
   const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name])
@@ -209,6 +220,15 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const color = (person && person.color) || '#9b7bff'
   const [shown, setShown] = React.useState(src)
   const [swap, setSwap] = React.useState(false)
+  const [size, setSize] = React.useState(null) // 显示中那张图的原始宽高（按脸框缩放要用）
+  React.useEffect(() => {
+    if (!shown) return undefined
+    let live = true
+    const img = new Image()
+    img.onload = () => { if (live && img.naturalHeight) setSize([img.naturalWidth, img.naturalHeight]) }
+    img.src = shown
+    return () => { live = false }
+  }, [shown])
   React.useEffect(() => {
     if (src === shown) return undefined
     if (!src) { setShown(''); return undefined }
@@ -219,12 +239,16 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     const t = setTimeout(() => setSwap(false), 300)
     return () => clearTimeout(t)
   }, [src])
-  const uploaded = Boolean(person && Object.values(person.sprites || {}).some(r => r && r.assetId === sprite && r.uploaded))
+  const records = Object.values((person && person.sprites) || {})
+  const uploaded = records.some(r => r && r.assetId === sprite && r.uploaded)
   // 立绘记录带逆转式素材包时，用分层画布（眨眼 + 口型），原图作读包前的后备
-  const aa = (person && Object.values(person.sprites || {}).find(r => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null
+  const aa = (records.find(r => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null
+  // 头一样大、按身高站：按显示中那张图的脸框缩放，按这个人的身高抬高或压低（lib/stature.js）
+  const record = shown ? records.find(r => r && shown === assetUrl(r.assetId)) : null
+  const place = placeSprite({ box: faceBoxOf(record, size), size, cm: heightOf(person).cm })
   const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
   return (
-    <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}${aa ? ' is-aa' : ''}`} style={{ '--x': (entry.x ?? actorX(entry.pos)) + '%', '--s': entry.scale ?? 1, '--side': SIDE[entry.pos] || '0%' }} data-name={entry.name}>
+    <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}${aa ? ' is-aa' : ''}`} style={{ '--x': (entry.x ?? actorX(entry.pos)) + '%', '--s': entry.scale ?? 1, '--side': SIDE[entry.pos] || '0%', '--k': place.k, '--lift': place.lift, '--head': place.head * 100 + '%' }} data-name={entry.name}>
       <div className="fg-actor-body">
         {aa ? <AaSprite aa={aa} talk={speaking && talk && talk.key === beat.key ? talk : null} fallback={still} className="fg-aa" label={entry.name} /> : still}
       </div>

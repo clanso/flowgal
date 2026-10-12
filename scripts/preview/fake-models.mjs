@@ -42,10 +42,11 @@ function spriteWriterReply(prompt) {
 // 情绪清单里每个都分进一个动作：写好的按写好的放，其余放进第一个动作；补设计时只回要补的那几条。
 const ACTING = {
   林岚: {
+    height: 166,
     read: '安静、爱捉弄人的学姐：情绪很少写在脸上，开心时只是嘴角压不住，被说中心事时会别过脸去，越在意越装得若无其事。',
     poses: [
       { label: '指尖搭在琴凳边', desc: '弹琴的人的习惯：一只手垂着，指尖轻轻搭着，站得很稳', tags: 'one hand at side, fingers slightly curled, relaxed shoulders, weight on one leg', emotions: ['neutral', 'smile', 'happy', 'laugh', 'thinking', 'serious', 'tired', 'sad', 'cry'] },
-      { label: '手背在身后歪头', desc: '捉弄人、等你上钩的时候', tags: 'hands behind back, leaning forward, head tilt', emotions: ['teasing', 'smug', 'love', 'confused', 'surprised'] },
+      { label: '手背在身后歪头', desc: '捉弄人、等你上钩的时候', tags: 'hands behind back, head tilt, weight on one leg', emotions: ['teasing', 'smug', 'love', 'confused', 'surprised'] },
       { label: '别过脸按着胸口', desc: '被说中心事、强装镇定的时候', tags: 'hand on own chest, head turned away, shoulders drawn in', side: true, emotions: ['shy', 'blush', 'pout', '害羞地强装镇定', 'worried', 'scared'] },
       { label: '抱着胳膊', desc: '冷下来、拒绝再说下去的时候', tags: 'arms crossed, straight posture', emotions: ['cold', 'angry', 'determined'] },
     ],
@@ -59,9 +60,10 @@ const ACTING = {
     },
   },
   苏晴: {
+    height: 154,
     read: '元气的同学：什么都写在脸上，笑起来眯成一条缝，难过和生气也来得快去得快。',
     poses: [
-      { label: '双手叉腰', desc: '风风火火跑过来、精神十足的时候', tags: 'hands on hips, leaning forward, energetic', emotions: ['neutral', 'smile', 'happy', 'laugh', 'smug', 'determined', 'angry', 'teasing'] },
+      { label: '双手叉腰', desc: '风风火火跑过来、精神十足的时候', tags: 'hands on hips, wide stance, energetic', emotions: ['neutral', 'smile', 'happy', 'laugh', 'smug', 'determined', 'angry', 'teasing'] },
       { label: '攥着衣角', desc: '心里没底、不知道该不该说的时候', tags: 'hands clasped in front, gripping own skirt, shoulders drawn in', emotions: ['sad', 'cry', 'worried', 'scared', 'shy', 'surprised', 'serious'] },
     ],
     faces: {
@@ -79,7 +81,7 @@ function actingWriterReply(prompt) {
   if (adding) return JSON.stringify({ poses: [{ id: 'p1', emotions: list }], faces }, null, 1)
   const placed = new Set(plan.poses.flatMap(p => p.emotions))
   const poses = plan.poses.map((p, i) => ({ id: 'p' + (i + 1), ...p, emotions: [...p.emotions, ...(i ? [] : list.filter(e => !placed.has(e)))] }))
-  return JSON.stringify({ read: plan.read, poses, faces }, null, 1)
+  return JSON.stringify({ read: plan.read, height: plan.height, poses, faces }, null, 1)
 }
 
 // 假插画分镜师：按「要画的插画」里的标题回 story.mjs 写好的 Base + 角色块。

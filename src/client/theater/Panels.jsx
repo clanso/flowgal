@@ -21,6 +21,7 @@ import { modelKey, qualityFor, negativeFor, sizeFor, MAX_STYLES } from '../../..
 import { naiModelInfo } from '../../../lib/image/nai-models.js'
 import { CG_MAX_CHARACTERS, EMOTIONS, EMOTION_POSE, POSES } from '../../../lib/vocab.js'
 import { POSE_IDS, poseMembers, anchorOf, faceBoxFrom, cleanFaceBox } from '../../../lib/face.js'
+import { heightOf } from '../../../lib/stature.js'
 import { defaultRects } from '../../../lib/aa-sprite.js'
 
 const STATUS_LABEL = { writing: '分镜中', queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消', ready: '' }
@@ -386,29 +387,30 @@ const LOOK_HINTS = {
   other: '分不进上面各格的 tag。旧档案的一整串在这里，照常出图；想整理就挪进上面各格，tag 没变的话已经画好的立绘不用重画',
 }
 
-/** 档案：固定外貌（按字段）、性别、种子、声音、给立绘设计师的备注和负面词。全局角色改的是全局库。cast 是这一局的全部人物（自动分声音时避开别人）。 */
+/** 档案：固定外貌（按字段）、性别、种子、身高、声音、给立绘设计师的备注和负面词。全局角色改的是全局库。cast 是这一局的全部人物（自动分声音时避开别人）。 */
 function ProfileEditor({ gameId, person, cast }) {
   const pick = p => ({
     look: Object.fromEntries(LOOK_FIELDS.map(f => [f, (p.appearanceFields || {})[f] || ''])),
-    gender: p.gender || '', note: p.note || '', negative: p.negative || '', seed: p.seedCustom ? String(p.seed) : '', voice: p.voice || '', voicePitch: String(p.voicePitch || 0),
+    gender: p.gender || '', note: p.note || '', negative: p.negative || '', seed: p.seedCustom ? String(p.seed) : '', height: p.height ? String(p.height) : '', voice: p.voice || '', voicePitch: String(p.voicePitch || 0),
   })
   const [form, setForm] = React.useState(() => pick(person))
   const [busy, run] = useBusy()
   const cfg = useConfig()
   const ui = cfg ? cfg.config.ui : null
-  React.useEffect(() => { setForm(pick(person)) }, [person.appearance, JSON.stringify(person.appearanceFields || {}), person.gender, person.note, person.negative, person.seed, person.seedCustom, person.voice, person.voicePitch])
+  React.useEffect(() => { setForm(pick(person)) }, [person.appearance, JSON.stringify(person.appearanceFields || {}), person.gender, person.note, person.negative, person.seed, person.seedCustom, person.height, person.voice, person.voicePitch])
   const dirty = JSON.stringify(form) !== JSON.stringify(pick(person))
   const set = k => e => setForm({ ...form, [k]: e.target.value })
   const setLook = f => e => setForm({ ...form, look: { ...form.look, [f]: e.target.value } })
   const save = () => {
     const { look, ...rest } = form
     // 一整串（appearance）也带上：后台按分格存；碰上还没重启、不认分格的旧后台时，至少这一串能存下，不会悄悄丢
-    return run('save', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { ...rest, appearanceFields: look, appearance: lookTags(look, person.appearance), seed: form.seed === '' ? null : Number(form.seed), voicePitch: Number(form.voicePitch) } }), '档案已保存')
+    return run('save', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { ...rest, appearanceFields: look, appearance: lookTags(look, person.appearance), seed: form.seed === '' ? null : Number(form.seed), height: form.height === '' ? null : Number(form.height), voicePitch: Number(form.voicePitch) } }), '档案已保存')
   }
   // 按表单里还没保存的选择试听；「自动」显示实际会分到哪个音色（跟着表单里的性别变）。
   const others = (cast || []).filter(p => p.name !== person.name)
   const draft = { ...person, gender: form.gender, voice: form.voice, voicePitch: Number(form.voicePitch) }
   const voiceNow = castVoices([...others, draft], ui).get(person.name)
+  const guess = heightOf({ ...person, gender: form.gender, height: null })
   const autoVoice = castVoices([...others, { ...draft, voice: '' }], ui).get(person.name)
   return (
     <div className="fg-person-form">
@@ -433,6 +435,12 @@ function ProfileEditor({ gameId, person, cast }) {
           <input className="fg-input" style={{ width: '12cqw' }} inputMode="numeric" value={form.seed} placeholder={`默认 ${person.seed}`} onChange={e => setForm({ ...form, seed: e.target.value.replace(/\D/g, '') })} onKeyDown={e => e.stopPropagation()} />
           <button type="button" className="fg-btn" title="换一个随机种子" onClick={() => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) })}>🎲</button>
           <span className="fg-note">所有立绘差分共用这个种子</span>
+        </div>
+      </div>
+      <div className="fg-field"><label>身高</label>
+        <div className="fg-row">
+          <input className="fg-input" style={{ width: '12cqw' }} inputMode="numeric" value={form.height} placeholder={`约 ${guess.cm}`} onChange={e => setForm({ ...form, height: e.target.value.replace(/\D/g, '').slice(0, 3) })} onKeyDown={e => e.stopPropagation()} />
+          <span className="fg-note">厘米。剧场里大家的头缩放到一样大，高的人站得高、矮的站得低。留空用{guess.from === 'acting' ? '设计师读资料估的' : '按性别和外貌估的'}（{guess.cm}）。</span>
         </div>
       </div>
       <div className="fg-field"><label>声音</label>
@@ -698,7 +706,7 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
 function ActingEditor({ gameId, person, emotions, group, turn }) {
   const [busy, run] = useBusy()
   const acting = person.acting
-  const copy = a => (a ? JSON.parse(JSON.stringify({ read: a.read || '', poses: a.poses || [], faces: a.faces || {} })) : null)
+  const copy = a => (a ? JSON.parse(JSON.stringify({ read: a.read || '', ...(a.height ? { height: a.height } : {}), poses: a.poses || [], faces: a.faces || {} })) : null)
   const [draft, setDraft] = React.useState(() => copy(acting))
   React.useEffect(() => { setDraft(copy(acting)) }, [acting && acting.at])
   const dirty = Boolean(draft) && JSON.stringify(draft) !== JSON.stringify(copy(acting))
@@ -734,7 +742,7 @@ function ActingEditor({ gameId, person, emotions, group, turn }) {
   return (
     <div className="fg-person-form fg-acting">
       <div className="fg-row">
-        <span className="fg-note">{acting.by === 'user' ? '你改过的设计' : `立绘设计师读到第 ${acting.turn != null ? acting.turn : '?'} 轮设计的`} · {draft.poses.length} 个动作</span>
+        <span className="fg-note">{acting.by === 'user' ? '你改过的设计' : `立绘设计师读到第 ${acting.turn != null ? acting.turn : '?'} 轮设计的`} · {draft.poses.length} 个动作{acting.height ? ` · 估的身高 ${acting.height} 厘米${person.height ? `（档案里写的 ${person.height} 优先）` : '（档案里能改）'}` : ''}</span>
         <span className="fg-spacer" />
         <button type="button" className="fg-btn is-mini" disabled={designing} onClick={design}>{designing ? '设计中…' : '重新设计'}</button>
         <button type="button" className="fg-btn is-mini" disabled={!reachable || dirty || !drawn.length || busy === 'redraw'} title={dirty ? '先保存修改' : ''} onClick={redraw}>按这套设计重画「{lookLabel(group.look)}」{drawn.length ? `（${drawn.length} 张）` : ''}</button>
