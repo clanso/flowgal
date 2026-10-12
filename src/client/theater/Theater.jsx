@@ -387,6 +387,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {/* 感官那一层也在镜头外面：特写时蒙眼的黑、耳边的光不跟着放大出画 */}
         <FadeLayer name="sense" value={atmosphere ? senseLayer(stageBeat, stageScene) : ''} ms={sense === 'blind' ? 1400 : 900} />
         {/* 特殊段落的滤镜放在镜头外面：推镜头时录像框、REC 这些不跟着放大，对话框和标题卡也不被滤到 */}
+        {/* 电影黑边：严肃的一段一直挂着，也在镜头外面 */}
+        <div className="fg-bars" data-on={atmosphere && stageScene.bars === 'on' ? '' : undefined} aria-hidden="true" />
         <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} />
         {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />

@@ -8,6 +8,7 @@
 // 漫画式切入：第 3 轮苏晴喊「不行！」那一句、第 4 轮林岚「你来了」。
 // 镜头：第 1 轮「你终于来了」推近对准林岚、「不许走神」背景虚化，第 2 轮「只给你一个人」特写，第 3 轮「旧校舍」推近对准右边的苏晴、最后一句空镜，第 4 轮「你来了」仰拍。
 // 亲密氛围：第 1 轮林岚回过头起暧昧；感官：第 2 轮「只给你一个人」贴在耳边。
+// 电影黑边：第 3 轮苏晴说起旧校舍到她冒雨跑走那一段。
 // 句中文字效果：第 1 轮心声「好像有点不一样」越说越小，第 2 轮苏晴「好巧啊」波浪，第 3 轮「旧校舍……那里」「那、那间教室里」发抖、「不行！」吼出来。
 // 第 3 轮的原文像很多角色卡那样夹着状态栏、变量更新和章节尾巴（raw），导演把它们标成不演。
 // 场景逐句变：第 3 轮闪电那句路灯闪烁、苏晴跑走后暗下来；第 4 轮先出「翌日 放学后」字卡，中途进入三年前的回忆，
@@ -144,14 +145,14 @@ export function directorReply(turn, units) {
       L('明天放学后', { sp: '林岚', card: 'note' }),
       L('不知什么时候凑了过来', { sp: '苏晴', emo: 'surprised', enter: [{ name: '苏晴', how: 'peek' }] }),
       L('别让苏晴看到', { sp: '林岚', emo: 'blush', say: 'whisper', recall: true }),
-      L('旧校舍……那里', { sp: '苏晴', emo: 'scared', sym: 'surprise', cam: 'zoom', say: 'hesitant', stress: '三年前', textfx: [{ text: '旧校舍……那里', style: 'shake' }] }),
+      L('旧校舍……那里', { sp: '苏晴', emo: 'scared', sym: 'surprise', cam: 'zoom', scene: { bars: 'on' }, say: 'hesitant', stress: '三年前', textfx: [{ text: '旧校舍……那里', style: 'shake' }] }),
       L('你绝对不能去那里', { sp: '苏晴', emo: 'angry', sym: 'anger', say: 'shout', textfx: [{ text: '不行！', style: 'roar' }], cutin: true, move: [{ name: '苏晴', act: 'forward' }] }),
       L('……为什么', { sp: '我', emo: 'confused' }),
       L('那、那间教室里', { sp: '苏晴', emo: 'scared', sym: 'sweat', textfx: [{ text: '那、那间教室里', style: 'shake' }] }),
       L('她的声音一下子乱了', { sp: '苏晴', emo: 'scared' }),
       L('有人从窗口', { sp: '苏晴', emo: 'cry', say: 'breakdown', stress: '掉下去了', scene: { fx: 'slowmo' } }),
       L('一道闪电', { cam: 'flash', scene: { light: 'flicker', fx: 'none' } }),
-      L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: [{ name: '苏晴', how: 'run' }], scene: { light: 'dim', mood: 'sad' } }),
+      L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: [{ name: '苏晴', how: 'run' }], scene: { light: 'dim', mood: 'sad', bars: 'none' } }),
       L('口袋里的手机震了起来', { split: { who: ['林岚'], location: '琴房', bg: 'music room, grand piano, night, moonlight through window, scenery, no humans' } }),
       L('信，看到了吗', { sp: '林岚', emo: 'smile', voice: 'phone' }),
       L('学姐，旧校舍到底', { sp: '我', emo: 'worried', say: 'hesitant' }),

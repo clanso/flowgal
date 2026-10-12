@@ -959,6 +959,13 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-breath-close { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes fg-daze-sway { 0%, 100% { translate: -.8% 0; rotate: -.5deg; } 50% { translate: .8% .4%; rotate: .5deg; } }
 
+/* 电影黑边：严肃的一段一直挂着上下黑边（在镜头外面，推镜头时不动），收起时慢慢退出去。左上角的地点、右上角的按钮压在黑边上。 */
+.fg-bars { position: absolute; inset: 0; z-index: 12; pointer-events: none; }
+.fg-bars::before, .fg-bars::after { content: ""; position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height 1.2s cubic-bezier(.6, 0, .2, 1); }
+.fg-bars::before { top: 0; }
+.fg-bars::after { bottom: 0; }
+.fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 10.5%; }
+
 /* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。 */
 .fg-world[data-fx="sway"] { animation: fg-fx-sway 7s ease-in-out infinite; }
 .fg-world[data-fx="ride"] { animation: fg-fx-ride 1.7s ease-in-out infinite; }
@@ -1625,6 +1632,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
 @container stage (max-aspect-ratio: 4/5) {
+  .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }
   .fg-cutin { top: 24%; height: 20%; }
   .fg-cutin-name { font-size: 6cqw; }
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
@@ -2010,7 +2018,7 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null } =
 }
 
 // lib/scenes.js
-var SCENE_DEFAULTS = { location: "", time: "afternoon", weather: "clear", mood: "daily", light: "normal", fx: "none", romance: "none", sense: "none", bg: "" };
+var SCENE_DEFAULTS = { location: "", time: "afternoon", weather: "clear", mood: "daily", light: "normal", fx: "none", romance: "none", sense: "none", bars: "none", bg: "" };
 var MODE_TRANSITION = { memory: "haze", dream: "swirl", illusion: "glitch", imagine: "iris", pov: "blink", inner: "black", screen: "glitch", tale: "dissolve", vision: "flash", digital: "glitch" };
 function applyDelta(scene, delta, known) {
   if (!delta) return scene;
@@ -2022,6 +2030,7 @@ function applyDelta(scene, delta, known) {
     if (!change.fx) next.fx = "none";
     if (!change.romance) next.romance = "none";
     if (!change.sense) next.sense = "none";
+    if (!change.bars) next.bars = "none";
   }
   if (next.bg && next.location) known.set(next.location, next.bg);
   return next;
@@ -8067,7 +8076,7 @@ function LogRow({ e, on, onClick }) {
 }
 var TYPE_LABEL = { dialogue: "台词", narration: "旁白", thought: "心声" };
 function sceneChange(c) {
-  return [c.location, TIME_LABEL[c.time], WEATHER_LABEL[c.weather], c.light && (LIGHT_LABEL[c.light] || "正常光线"), c.fx && (FX_LABEL[c.fx] || "停止效果"), c.romance && (ROMANCE_LABEL[c.romance] ? "♡ " + ROMANCE_LABEL[c.romance] : "收起亲密氛围"), c.sense && (SENSE_LABEL[c.sense] ? "感官：" + SENSE_LABEL[c.sense] : "感官恢复"), c.mood && "♪ " + (MOOD_LABEL[c.mood] || c.mood), c.transition && (TRANSITION_LABEL[c.transition] || c.transition)].filter(Boolean).join(" · ");
+  return [c.location, TIME_LABEL[c.time], WEATHER_LABEL[c.weather], c.light && (LIGHT_LABEL[c.light] || "正常光线"), c.fx && (FX_LABEL[c.fx] || "停止效果"), c.romance && (ROMANCE_LABEL[c.romance] ? "♡ " + ROMANCE_LABEL[c.romance] : "收起亲密氛围"), c.sense && (SENSE_LABEL[c.sense] ? "感官：" + SENSE_LABEL[c.sense] : "感官恢复"), c.bars && (c.bars === "on" ? "电影黑边" : "收起黑边"), c.mood && "♪ " + (MOOD_LABEL[c.mood] || c.mood), c.transition && (TRANSITION_LABEL[c.transition] || c.transition)].filter(Boolean).join(" · ");
 }
 function Chip({ k, children }) {
   return /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-dlog-chip" }, k && /* @__PURE__ */ import_react10.default.createElement("i", null, k), children);
@@ -8077,7 +8086,7 @@ function ScriptView({ script, units }) {
   const s = script.scene;
   const tagged = units.filter((u) => script.lines[u.id] && Object.keys(script.lines[u.id]).length).length;
   const skipped = new Set(script.skip || []);
-  return /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(Block, { label: "场景" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "地点" }, s.location || "—"), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "时段" }, TIME_LABEL[s.time] || s.time), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "天气" }, WEATHER_LABEL[s.weather] || s.weather), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "基调" }, MOOD_LABEL[s.mood] || s.mood), LIGHT_LABEL[s.light] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "光线" }, LIGHT_LABEL[s.light]), FX_LABEL[s.fx] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "效果" }, FX_LABEL[s.fx]), ROMANCE_LABEL[s.romance] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "氛围" }, ROMANCE_LABEL[s.romance]), SENSE_LABEL[s.sense] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "感官" }, SENSE_LABEL[s.sense]), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "转场" }, TRANSITION_LABEL[s.transition] || s.transition)), s.bg && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "背景提示词：", s.bg)), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `出场 · ${script.cast.length}` }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, script.cast.map((c) => /* @__PURE__ */ import_react10.default.createElement(Chip, { key: c.name, k: POS_LABEL[c.pos] || c.pos }, c.name)), !script.cast.length && /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "没有人物上场"))), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `逐句标注 · ${tagged} / ${units.length - skipped.size} 句${skipped.size ? ` · 不演 ${skipped.size} 句` : ""}` }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-lines" }, units.map((u) => {
+  return /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(Block, { label: "场景" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "地点" }, s.location || "—"), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "时段" }, TIME_LABEL[s.time] || s.time), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "天气" }, WEATHER_LABEL[s.weather] || s.weather), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "基调" }, MOOD_LABEL[s.mood] || s.mood), LIGHT_LABEL[s.light] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "光线" }, LIGHT_LABEL[s.light]), FX_LABEL[s.fx] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "效果" }, FX_LABEL[s.fx]), ROMANCE_LABEL[s.romance] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "氛围" }, ROMANCE_LABEL[s.romance]), SENSE_LABEL[s.sense] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "感官" }, SENSE_LABEL[s.sense]), s.bars === "on" && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "画幅" }, "电影黑边"), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "转场" }, TRANSITION_LABEL[s.transition] || s.transition)), s.bg && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "背景提示词：", s.bg)), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `出场 · ${script.cast.length}` }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, script.cast.map((c) => /* @__PURE__ */ import_react10.default.createElement(Chip, { key: c.name, k: POS_LABEL[c.pos] || c.pos }, c.name)), !script.cast.length && /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "没有人物上场"))), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `逐句标注 · ${tagged} / ${units.length - skipped.size} 句${skipped.size ? ` · 不演 ${skipped.size} 句` : ""}` }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-lines" }, units.map((u) => {
     const l = script.lines[u.id] || {};
     if (skipped.has(u.id)) return /* @__PURE__ */ import_react10.default.createElement("div", { key: u.id, className: "fg-dlog-line is-skipped" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-dlog-uid" }, u.id), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-utext" }, u.text), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "不是故事 · 不演")));
     const marks = [
@@ -8626,6 +8635,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-vignette" })
     ))),
     /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "sense", value: atmosphere ? senseLayer(stageBeat, stageScene) : "", ms: sense === "blind" ? 1400 : 900 }),
+    /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-bars", "data-on": atmosphere && stageScene.bars === "on" ? "" : void 0, "aria-hidden": "true" }),
     /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "mode", value: atmosphere ? stageMode : "", ms: stageTr === "wake" ? 200 : stageTr === "haze" ? 2400 : 1200 }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking }),
     /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),
