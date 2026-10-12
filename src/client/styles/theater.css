@@ -297,6 +297,14 @@
 .fg-recall .fg-actor { animation: fg-ghost-in 1.1s .45s ease-out both; }
 @keyframes fg-ghost-in { from { opacity: 0; transform: translateX(-50%) translateY(1.5%); } }
 .fg-recall .fg-actor.is-speaking { filter: sepia(.32) brightness(1.04) drop-shadow(0 0 2cqw rgba(255, 238, 210, .55)); opacity: .95; }
+/* 短闪回（轻的演法）：画面不动，只是四角泛黄、起一点颗粒 */
+.fg-recall.is-light { backdrop-filter: none; -webkit-backdrop-filter: none; background: radial-gradient(120% 95% at 50% 45%, transparent 50%, rgba(130, 88, 36, .4)); }
+/* 短闪回的小头像：对话框右上角，泛黄，换人时重新浮出来 */
+.fg-recall-face { position: absolute; right: 3.2%; bottom: calc(100% - 1.4cqw); z-index: 2; width: 11cqw; aspect-ratio: 1; border-radius: 1.2cqw; overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, rgba(120, 86, 46, .5), rgba(30, 20, 10, .75)); border: 1px solid rgba(240, 210, 160, .55);
+  box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .45), 0 0 2cqw rgba(255, 226, 180, .22), inset 0 0 0 2px color-mix(in oklab, var(--speaker, #f0d2a0) 35%, transparent); animation: fg-face-in .45s ease-out both; }
+.fg-recall-face img { position: absolute; max-width: none; height: auto; filter: sepia(.45) saturate(.85) brightness(1.03); }
+@keyframes fg-face-in { from { opacity: 0; transform: translateY(.8cqw); } }
 @keyframes fg-flash { from { opacity: .95; } to { opacity: 0; } }
 /* 落字特效的闪光层：平时透明，由演出计划在某个字上点亮（Stage.jsx 的 useHits） */
 .fg-hitflash { position: absolute; inset: 0; z-index: 41; pointer-events: none; opacity: 0; background: #fff; }
@@ -938,6 +946,7 @@
 @container stage (max-aspect-ratio: 4/5) {
   .fg-actor { width: calc(60% * var(--s, 1)); height: calc(60% * var(--s, 1)); bottom: 23%; }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
+  .fg-recall-face { width: 17cqw; }
   .fg-text { font-size: 4.6cqw; top: 18%; bottom: 26%; }
   .fg-progress { bottom: 12%; right: 4.2%; }
   .fg-quick { bottom: 5%; left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }

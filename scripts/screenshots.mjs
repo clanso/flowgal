@@ -103,6 +103,10 @@ try {
   await jumpTo('明天放学后')
   await sleep(2600)
   await shot('07-note-card')
+  // 短闪回：画面不动，回忆里说话的林岚在对话框右上角出小头像
+  await jumpTo('别让苏晴看到')
+  await sleep(1600)
+  await shot('46-recall-face')
   await jumpTo('到底想告诉我什么')
   await sleep(1400)
   await settle(900)

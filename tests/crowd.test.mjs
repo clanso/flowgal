@@ -39,3 +39,10 @@ test('gate: 设置里的同屏人数：2~8 或 0（不限），填坏了用 5', 
   assert.equal(resolveConfig({ ui: { maxOnStage: 12 } }).ui.maxOnStage, 5)
   assert.equal(resolveConfig({ ui: { maxOnStage: '4' } }).ui.maxOnStage, 5)
 })
+
+test('gate: 设置里的短闪回演法：小头像（默认）、只换对话框、压暗画面三选一，填坏了用小头像', () => {
+  assert.equal(resolveConfig({}).ui.recall, 'face')
+  assert.equal(resolveConfig({ ui: { recall: 'text' } }).ui.recall, 'text')
+  assert.equal(resolveConfig({ ui: { recall: 'ghost' } }).ui.recall, 'ghost')
+  assert.equal(resolveConfig({ ui: { recall: 'fog' } }).ui.recall, 'face')
+})

@@ -2,7 +2,7 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold } from './playback.js'
-import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -138,7 +138,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     shownRef.current = { key: beat.key, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was }) }
   } else if (shownRef.current.cg !== cgOn) shownRef.current = { ...shownRef.current, cg: cgOn }
   const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false }
-  const edgeMs = !beat || title ? 0 : beat.cut ? CUT_MS : beat.transition === 'haze' ? HAZE_MS : RECALL_HOLD_MS[beat.recallEdge] || 0
+  // 短闪回的演法（设置）：只有「压暗画面」进出时起雾、等画面变过去；另外两种画面不动，直接出字
+  const recallStyle = ui0.recall || 'face'
+  const edgeMs = !beat || title ? 0 : beat.cut ? CUT_MS : beat.transition === 'haze' ? HAZE_MS : recallStyle === 'ghost' ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0
   const pauseMs = speed > 0 ? Math.max(edgeMs, hold.ms) : 0
   const [pauseSeen, setPauseSeen] = React.useState('')
   const pausing = pauseMs > 0 && pauseSeen !== beat.key
@@ -342,7 +344,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
               {stageBeat && !title && <CgLayer beat={stageBeat} sound={sfxOn} />}
               <Particles weather={stageScene.weather} enabled={ui0.particles !== false} speed={atmosphere ? TIME_FLOW[stageScene.fx] ?? 1 : 1} />
               {stageBeat && !title && <SplitPanel beat={stageBeat} view={view} talk={talk} />}
-              {stageBeat && !title && <RecallLayer beat={stageBeat} view={view} talk={talk} />}
+              {stageBeat && !title && <RecallLayer beat={stageBeat} view={view} talk={talk} light={recallStyle !== 'ghost'} />}
               <FadeLayer name="fxlayer" value={atmosphere && stageScene.fx !== 'none' ? stageScene.fx : ''} ms={900} />
               <div className="fg-vignette" />
             </div>
@@ -350,7 +352,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         </div>
         {/* 特殊段落的滤镜放在镜头外面：推镜头时录像框、REC 这些不跟着放大，对话框和标题卡也不被滤到 */}
         <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageBeat && stageBeat.transition === 'haze' ? 2400 : 1200} />
-        {beat && !title && <Flash beat={beat} />}
+        {beat && !title && <Flash beat={beat} mist={recallStyle === 'ghost'} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
         {!panel && <RestartNotice floating />}
         {beat && !title && <TitleCard beat={beat} delay={beat.cut && speed > 0 ? CUT_MS : 0} />}
@@ -384,7 +386,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
         {beat && !title && beat.card && <SceneCard beat={beat} />}
         {beat && !title && (
-          <DialogBox beat={beat} chars={chars} plan={typed} done={done} waiting={holdText} away={pausing && hold.away} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)} />
+          <DialogBox beat={beat} chars={chars} plan={typed} done={done} waiting={holdText} away={pausing && hold.away} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)}
+            face={recallStyle === 'face' && beat.recall ? <RecallFace beat={beat} view={view} /> : null} />
         )}
         {!beat && !title && (
           <div className="fg-choices"><div className="fg-choices-title">{view ? '这一局还没有可以演的内容' : '读取中'}</div></div>

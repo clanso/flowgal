@@ -1451,6 +1451,13 @@ export function LookSection({ data }) {
         </select>
       </Field>
       <div className="fg-section">演出</div>
+      <Field label="短闪回" hint="正文里一两句的回忆（「她说过：……」）怎么演。要换到当时的地方慢慢演的长回忆，导演会换成整段回忆场景，不受这里影响。">
+        <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.recall || 'face'} onChange={e => p({ recall: e.target.value })}>
+          <option value="face">画面不动，说话的人在对话框旁出小头像</option>
+          <option value="text">画面不动，只换对话框</option>
+          <option value="ghost">画面压暗，回忆里的人浮到台前</option>
+        </select>
+      </Field>
       <Field label="文字速度" hint="每字毫秒，0 为瞬间显示。"><input type="range" min="0" max="80" value={cfg.ui.textSpeed} onChange={e => p({ textSpeed: Number(e.target.value) })} style={{ width: '100%' }} /></Field>
       <Field label="自动播放间隔"><input type="range" min="400" max="4000" step="100" value={cfg.ui.autoDelay} onChange={e => p({ autoDelay: Number(e.target.value) })} style={{ width: '100%' }} /></Field>
       <Field label="天气粒子"><Toggle value={cfg.ui.particles} onChange={v => p({ particles: v })} /></Field>

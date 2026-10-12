@@ -69,7 +69,8 @@ function origChars(orig, times, count, speed) {
 }
 
 /** away：插画正在出现这类时候对话框先让开（淡出），过后再回来。 */
-export function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quick, progress, status, hiddenText }) {
+/** face：短闪回时回忆里说话的人的小头像（Stage.jsx 的 RecallFace），挂在对话框右上角。 */
+export function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quick, progress, status, hiddenText, face = null }) {
   const speaker = beat.alias || beat.speaker
   const showName = speaker && beat.type !== 'narration'
   const speed = quick.speed
@@ -80,6 +81,7 @@ export function DialogBox({ beat, chars, plan, done, waiting, away = false, colo
   return (
     <div className={`fg-dialog${away ? ' is-away' : ''}`} data-voice={beat.voice || undefined} style={{ '--speaker': color || undefined }}>
       <div className="fg-box" />
+      {face}
       {(showName || voiceChip) && (
         <div className="fg-name" key={beat.speaker + beat.alias + (beat.voice || '')}>
           {showName && <div className="fg-name-plate">{speaker}</div>}

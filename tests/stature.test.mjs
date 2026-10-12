@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { guessHeight, heightOf, cleanHeight, placeSprite, genderOf, FACE_RATIO } from '../lib/stature.js'
+import { guessHeight, heightOf, cleanHeight, placeSprite, genderOf, faceCrop, FACE_RATIO } from '../lib/stature.js'
 import { cleanActing, mergeActing, poseTags } from '../lib/acting.js'
 import { composePrompt } from '../lib/image/style.js'
 import { resolveConfig } from '../lib/config.js'
@@ -114,4 +114,17 @@ test('gate: 剧场量脸框（measure）：整张画的立绘记下脸框；换�
     assert.equal(g.looks['马科斯'].sprites['a||smile'].face.body, 'old-body')
     engine.dispose?.()
   } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test('gate: 短闪回的小头像从立绘里裁脸：认过脸按脸框裁，脸在格子正中；没认脸按参照立绘的脸框位置估；图还没读到尺寸不裁', () => {
+  // 照玩家存档里阿黛尔那张立绘（832×1216，认过脸）
+  const crop = faceCrop([304, 184, 488, 328], [832, 1216])
+  const side = 100 / crop.width * 832 // 格子边长（像素）
+  const center = [(304 + 488) / 2, (184 + 328) / 2]
+  assert.ok(Math.abs(-crop.left / 100 * side + side / 2 - center[0]) < 1, '脸在格子水平正中')
+  assert.ok(Math.abs((328 - 184) / side - 0.48) < 0.01, '脸占格子高度的一半不到')
+  const guess = faceCrop(null, [832, 1216])
+  assert.ok(Math.abs(guess.width / 100 - 832 / ((FACE_RATIO * 1216) / 0.48)) < 0.01)
+  assert.equal(faceCrop([0, 0, 10, 10], null), null)
+  assert.ok(faceCrop([0, 0, 830, 1210], [832, 1216]).width >= 100, '脸框大得离谱时格子不超过整张图')
 })
