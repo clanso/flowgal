@@ -41,7 +41,7 @@
   /* 竖屏手机：舞台铺满，立绘居中放大，对话框加高。 */
   .fg-stage { width: 100vw; height: 100vh; }
 }
-.fg-camera { position: absolute; inset: 0; transform-origin: 50% 45%; }
+.fg-camera { position: absolute; inset: 0; transform-origin: 50% 50%; }
 
 /* ── 背景层 ── */
 .fg-bg { position: absolute; inset: -3%; background-size: cover; background-position: center 42%; will-change: transform, opacity; }
@@ -103,7 +103,7 @@
 .fg-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }
 
 /* ── 立绘 ── */
-.fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; transition: right .65s cubic-bezier(.4, .1, .2, 1); }
+.fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
 .fg-cast[data-split] { right: 34%; }
 /* 分屏：右边斜切的一格，另一头的地点和人；白色斜边，滑进滑出；有插画时让开 */
 .fg-split { position: absolute; top: 0; bottom: 0; right: 0; width: 42%; z-index: 8; pointer-events: none; animation: fg-split-in .7s cubic-bezier(.2, .8, .2, 1) both; transition: opacity .6s ease; }
@@ -292,18 +292,36 @@
 .fg-cg-wait { position: absolute; right: 2.4%; top: 12%; z-index: 20; display: flex; align-items: center; gap: .6cqw; font-size: 1cqw; padding: .5cqw 1cqw; border-radius: 99px; background: var(--chip-bg); backdrop-filter: blur(8px); color: var(--ink-dim); }
 .fg-cg-wait i { width: .7cqw; height: .7cqw; border-radius: 50%; background: var(--accent); animation: fg-pulse 1.2s ease-in-out infinite; }
 
-/* ── 镜头 ── */
+/* ── 镜头 ──
+   推近、特写、仰拍、缓推、背景虚化、倾斜、下沉、升起、空镜、希区柯克变焦：过渡到那个样子停住，下一拍（data-cam 没了）缓回来。
+   对准人的那几种由 Stage.jsx 的 aimCamera 给 --zs 放大倍数、--tx / --ty 平移（脸停在画面中上，不推出框）。震动、甩镜、拉远、平移、虚焦演一下就完。 */
+.fg-camera { transition: transform 1s cubic-bezier(.4, 0, .2, 1); }
+.fg-camera[data-cam="zoom"], .fg-camera[data-cam="closeup"], .fg-camera[data-cam="slowpush"], .fg-camera[data-cam="focus"] { transform: scale(var(--zs, 1.12)) translate(var(--tx, 0%), var(--ty, 0%)); }
+.fg-camera[data-cam="zoom"] { transition: transform 1.6s cubic-bezier(.2, .7, .2, 1); }
+.fg-camera[data-cam="closeup"] { transition: transform .9s cubic-bezier(.2, .8, .2, 1); }
+.fg-camera[data-cam="slowpush"] { transition: transform 7s cubic-bezier(.3, 0, .4, 1); }
+.fg-camera[data-cam="focus"] { transition: transform 1.4s ease; }
+.fg-camera[data-cam="lowangle"] { transform: perspective(80cqw) rotateX(4deg) scale(var(--zs, 1.24)) translate(var(--tx, 0%), var(--ty, 0%)); transition: transform 1.3s cubic-bezier(.2, .7, .2, 1); }
+.fg-camera[data-cam="tilt"] { transform: rotate(-1.6deg) scale(1.05); transition: transform 1.2s ease; }
+.fg-camera[data-cam="sink"] { transform: translateY(-5%) scale(1.07); transition: transform 1.6s cubic-bezier(.4, 0, .2, 1); }
+.fg-camera[data-cam="rise"] { transform: translateY(5%) scale(1.07); transition: transform 1.6s cubic-bezier(.4, 0, .2, 1); }
+.fg-camera[data-cam="empty"] { transform: scale(1.04); transition: transform 3s ease; }
+/* 背景虚化只糊背景、人清楚；特写时背景也轻轻糊一点；空镜时人淡出、只剩背景；希区柯克变焦背景往前涌、人不动 */
+.fg-bg { transition: filter 1s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
+.fg-camera[data-cam="focus"] .fg-bg { filter: blur(6px) brightness(.86); }
+.fg-camera[data-cam="closeup"] .fg-bg { filter: blur(2.5px); }
+.fg-camera[data-cam="empty"] .fg-cast { opacity: 0; }
+.fg-camera[data-cam="dolly"] .fg-bg { scale: 1.28; }
+.fg-camera[data-cam="dolly"] .fg-cast { scale: .96; }
 .fg-camera[data-cam="shake"] { animation: fg-shake .5s linear; }
-.fg-camera[data-cam="zoom"] { animation: fg-zoom 1.6s cubic-bezier(.2, .7, .2, 1) both; }
+.fg-camera[data-cam="whip"] { animation: fg-whip .55s cubic-bezier(.6, 0, .3, 1); }
 .fg-camera[data-cam="zoomout"] { animation: fg-zoomout 1.6s cubic-bezier(.2, .7, .2, 1) both; }
 .fg-camera[data-cam="pan"] { animation: fg-pan 3s ease-in-out both; }
-.fg-camera[data-cam="tilt"] { animation: fg-tilt 1.2s ease both; }
 .fg-camera[data-cam="blur"] { animation: fg-blur 2.2s ease both; }
 @keyframes fg-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-1.2%, .6%); } 30% { transform: translate(1%, -.8%); } 45% { transform: translate(-.8%, .4%); } 60% { transform: translate(.6%, .6%); } 80% { transform: translate(-.3%, -.2%); } }
-@keyframes fg-zoom { from { transform: scale(1); } to { transform: scale(1.12); } }
+@keyframes fg-whip { 0% { transform: none; filter: none; } 35% { transform: translateX(-9%) scale(1.04); filter: blur(10px); } 60% { transform: translateX(2.5%) scale(1.02); filter: blur(3px); } 100% { transform: none; filter: none; } }
 @keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }
 @keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }
-@keyframes fg-tilt { 0% { transform: rotate(0); } 40% { transform: rotate(-2.4deg) scale(1.05); } 100% { transform: rotate(-1.4deg) scale(1.04); } }
 @keyframes fg-blur { 0% { filter: blur(0); } 30% { filter: blur(6px); } 100% { filter: blur(0); } }
 .fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }
 .fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }
@@ -1108,6 +1126,7 @@
   .fg-cg:not(.is-leaving) { animation: fg-cg-fade-in .6s ease both !important; }
   .fg-cg.is-leaving { animation: fg-cg-fade-out .6s ease both !important; }
   .fg-cg::before { display: none; }
+  .fg-camera[data-cam="whip"] { animation: none !important; }
   .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */
   .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }
   .fg-text.is-wait .fg-char { animation: none !important; }

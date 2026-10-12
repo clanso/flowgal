@@ -5,6 +5,7 @@
 // 同屏的人：第 2 轮我说「很可疑」时苏晴赌气、林岚偷笑，林岚塞信封时上前一步；第 3 轮苏晴喊「不能去」时上前一步。
 // 台词演法与重音：威压（不许走神）、迟疑（抱歉……）、激动（苏晴喊人）、重音（很可疑）、低语（信封那两句），
 // 第 3 轮苏晴的怒吼、说说停停和崩溃（旧校舍的事）。
+// 镜头：第 1 轮「你终于来了」推近对准林岚、「不许走神」背景虚化，第 2 轮「只给你一个人」特写，第 3 轮「旧校舍」推近对准右边的苏晴、最后一句空镜，第 4 轮「你来了」仰拍。
 // 句中文字效果：第 1 轮心声「好像有点不一样」越说越小，第 2 轮苏晴「好巧啊」波浪，第 3 轮「旧校舍……那里」「那、那间教室里」发抖、「不行！」吼出来。
 // 第 3 轮的原文像很多角色卡那样夹着状态栏、变量更新和章节尾巴（raw），导演把它们标成不演。
 // 场景逐句变：第 3 轮闪电那句路灯闪烁、苏晴跑走后暗下来；第 4 轮先出「翌日 放学后」字卡，中途进入三年前的回忆，
@@ -103,7 +104,7 @@ export function directorReply(turn, units) {
       L('林岚回过头', { sp: '林岚', emo: 'smile' }),
       L('那就罚你', { sp: '林岚', emo: 'teasing', sym: 'heart' }),
       L('她把一缕头发', { sp: '林岚', emo: 'shy' }),
-      L('不许走神', { sp: '林岚', emo: 'pout', sym: 'anger', say: 'menace' }),
+      L('不许走神', { sp: '林岚', emo: 'pout', sym: 'anger', say: 'menace', cam: 'focus' }),
     ],
     choices: [],
     images: [{ after: find(units, '那就罚你'), title: '午后的琴房', moment: '林岚坐在琴凳上回过头，带着捉弄人的笑，要罚我听她弹完这一首', who: ['林岚'] }],
@@ -123,7 +124,7 @@ export function directorReply(turn, units) {
       L('不过我可不是跟踪', { sp: '苏晴', emo: 'smug' }),
       L('悄悄把一个小信封', { sp: '林岚', emo: '害羞地强装镇定', move: [{ name: '林岚', act: 'forward' }] }),
       L('回家以后再看', { sp: '林岚', emo: 'blush', sym: 'blush', say: 'whisper' }),
-      L('只给你一个人', { sp: '林岚', emo: 'love', sym: 'heart', say: 'whisper', stress: '只给你' }),
+      L('只给你一个人', { sp: '林岚', emo: 'love', sym: 'heart', say: 'whisper', stress: '只给你', cam: 'closeup' }),
     ],
     choices: [],
     emotions: [{ name: '害羞地强装镇定', desc: '脸颊泛红却板着脸，目光移开，嘴唇抿紧，手指捏着衣角', base: 'shy' }],
@@ -154,7 +155,7 @@ export function directorReply(turn, units) {
       L('学姐，旧校舍到底', { sp: '我', emo: 'worried', say: 'hesitant' }),
       L('明天你就知道了', { sp: '林岚', emo: 'serious', voice: 'phone', say: 'whisper' }),
       L('电话挂断了', { split: 'off' }),
-      L('到底想告诉我什么', { sp: '我', sym: 'gloom' }),
+      L('到底想告诉我什么', { sp: '我', sym: 'gloom', cam: 'empty' }),
     ],
     skip: [find(units, '状态栏'), find(units, '19:40'), find(units, '林岚 52'), find(units, '第三章 · 完')],
     choices: ['答应赴约，一个人去旧校舍', '拉上苏晴一起去', '先打电话问林岚本人'],
@@ -171,7 +172,7 @@ export function directorReply(turn, units) {
       L('学姐，这是什么曲子', { sp: '我' }),
       L('一首还没写完的曲子', { sp: '林岚', emo: 'smile' }),
       L('琴声戛然而止', { mode: 'real', scene: { light: 'dark', mood: 'eerie', transition: 'none' } }),
-      L('你来了', { sp: '林岚', emo: 'serious', cam: 'zoom', enter: [{ name: '林岚' }], scene: { light: 'spot', fx: 'drift' } }),
+      L('你来了', { sp: '林岚', emo: 'serious', cam: 'lowangle', enter: [{ name: '林岚' }], scene: { light: 'spot', fx: 'drift' } }),
     ],
     choices: ['走进音乐教室', '先在门口叫她的名字'],
     images: [{ after: find(units, '学姐，这是什么曲子'), until: find(units, '一首还没写完的曲子'), title: '三年前的黄昏', moment: '三年前的音乐教室，夕阳和樱花，林岚坐在钢琴前回头微笑', who: ['林岚'] }],

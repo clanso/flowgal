@@ -189,7 +189,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])
   // 灵光一闪（漫画符号是灯泡）：逆转裁判那一声「叮」
   React.useEffect(() => { if (beat && beat.sym === 'bulb' && sfxOn) stinger('ding') }, [beat && beat.key])
-  const cam = useCamera(title ? null : beat)
+  const cameraRef = React.useRef(null)
+  const cam = useCamera(title ? null : beat, cameraRef)
   const atEnd = beat && index === beats.length - 1
 
   React.useEffect(() => { loadSkinFonts(ui0.skin, ui0.fontBase) }, [ui0.skin, ui0.fontBase])
@@ -345,7 +346,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     <div ref={rootRef} className={`fg-theater${closing ? ' is-closing' : ''}${hidden ? ' fg-ui-hidden' : ''}`} data-skin={ui0.skin} style={{ '--stage-ar': stageRatio(cfg) }} role="dialog" aria-label="FlowGal 剧场">
       <div className="fg-stage" ref={stageRef} onClick={() => { if (hidden) { setHidden(false); return } if (!title && !panel && !choosing) advance() }}
         onWheel={e => { if (!title && !panel && e.deltaY < -30) setPanel('log') }}>
-        <div className="fg-camera" data-cam={cam}>
+        <div className="fg-camera" ref={cameraRef} data-cam={cam.kind || undefined} style={cam.style || undefined}>
           {/* 画面效果（船上摇晃、车里颠簸、心跳……）和特殊段落（梦里飘、幻觉里扭曲）各动一层，叠在一起不互相顶掉 */}
           <div className="fg-world" data-fx={atmosphere ? stageScene.fx : ''}>
             <div className="fg-world-in" data-mode={atmosphere ? stageMode : ''} data-tr={stageTr === 'haze' || stageTr === 'wake' ? stageTr : undefined}>
