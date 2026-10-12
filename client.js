@@ -1090,6 +1090,28 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-char-pop { from { opacity: 0; transform: scale(1.9); } 55% { opacity: 1; transform: scale(.92); } to { opacity: 1; transform: none; } }
 @keyframes fg-char-hop { from { opacity: 0; transform: translateY(.3em); } to { opacity: 1; transform: none; } }
 @keyframes fg-char-quake { 0%, 100% { opacity: 1; transform: translate(0, 0); } 25% { opacity: 1; transform: translate(.05em, -.04em); } 50% { opacity: 1; transform: translate(-.04em, .05em); } 75% { opacity: 1; transform: translate(.04em, .03em); } }
+/* ── 句中文字效果（导演 textfx，节奏和打字音在 lib/typing.js 的 TEXT_STYLES）：某几个字的样子。
+   比台词演法（.fg-text.say-*）更具体，同一句里两者都有时以这几个字为准；字号变大的把行高收紧，免得一行被撑高、对话框装不下；越说越大 / 越小按 --k（这段走到几成）变，波浪按 --i（第几个字）错开 ── */
+.fg-text .fg-char[class*="tx-"] { display: inline-block; white-space: pre; }
+.fg-text .fg-char.tx-shake { animation: fg-char-in .22s ease forwards var(--d), fg-tx-shake .16s steps(2) infinite var(--d); }
+.fg-text .fg-char.tx-wave { animation: fg-char-in .3s ease forwards var(--d), fg-tx-wave 1.3s ease-in-out infinite calc(var(--i) * -.13s); }
+.fg-text .fg-char.tx-big { font-size: 1.32em; font-weight: 700; line-height: 1.1; animation-name: fg-char-pop; animation-duration: .26s; }
+.fg-text .fg-char.tx-roar { font-size: 1.62em; font-weight: 900; line-height: 1; letter-spacing: -.02em; color: color-mix(in oklab, currentColor 80%, #ff5a4a); text-shadow: .06em .06em 0 rgba(0, 0, 0, .55), 0 0 .5em rgba(255, 70, 50, .45); animation-name: fg-tx-slam; animation-duration: .3s; }
+.fg-text .fg-char.tx-grow { font-size: calc(1em + var(--k) * .6em); font-weight: calc(500 + var(--k) * 400); line-height: 1; animation-name: fg-char-pop; animation-duration: .22s; }
+.fg-text .fg-char.tx-dwindle { font-size: calc(1em - var(--k) * .34em); color: color-mix(in oklab, currentColor calc(100% - var(--k) * 62%), transparent); animation-duration: .45s; }
+.fg-text .fg-char.tx-small { font-size: .8em; color: color-mix(in oklab, currentColor 72%, transparent); }
+.fg-text .fg-char.tx-faint { color: color-mix(in oklab, currentColor 50%, transparent); letter-spacing: .08em; text-shadow: 0 0 .35em rgba(255, 255, 255, .35); animation-duration: .7s; }
+.fg-text .fg-char.tx-glow { color: color-mix(in oklab, var(--accent) 40%, #fff6d8); font-weight: 700; text-shadow: 0 0 .45em color-mix(in oklab, var(--accent) 70%, transparent), 0 0 1em color-mix(in oklab, var(--accent) 40%, transparent); animation: fg-char-in .3s ease forwards var(--d), fg-tx-glow 2.4s ease-in-out infinite calc(var(--d) + var(--i) * .08s); }
+/* 打完之后：别的不再重放，发抖、波浪、发光接着动；等字体时先不动 */
+.fg-text.is-done .fg-char[class*="tx-"] { animation: none; opacity: 1; }
+.fg-text.is-done .fg-char.tx-shake { animation: fg-tx-shake .16s steps(2) infinite; }
+.fg-text.is-done .fg-char.tx-wave { animation: fg-tx-wave 1.3s ease-in-out infinite calc(var(--i) * -.13s); }
+.fg-text.is-done .fg-char.tx-glow { animation: fg-tx-glow 2.4s ease-in-out infinite calc(var(--i) * .08s); }
+.fg-text.is-wait .fg-char[class*="tx-"] { animation: none; }
+@keyframes fg-tx-shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(.045em, -.035em) rotate(-1deg); } 50% { transform: translate(-.04em, .04em) rotate(.8deg); } 75% { transform: translate(.035em, .03em); } }
+@keyframes fg-tx-wave { 0%, 100% { transform: translateY(.1em); } 50% { transform: translateY(-.16em); } }
+@keyframes fg-tx-slam { from { opacity: 0; transform: scale(2.6) rotate(-4deg); } 50% { opacity: 1; transform: scale(.88); } 75% { opacity: 1; transform: scale(1.06); } to { opacity: 1; transform: none; } }
+@keyframes fg-tx-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
 .fg-wait { position: absolute; right: 2.6%; bottom: 20%; font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }
 .fg-wait::before { content: var(--wait-glyph); }
 @keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }
@@ -1430,7 +1452,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-cg:not(.is-leaving) { animation: fg-cg-fade-in .6s ease both !important; }
   .fg-cg.is-leaving { animation: fg-cg-fade-out .6s ease both !important; }
   .fg-cg::before { display: none; }
-  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress { animation: fg-char-in .22s ease forwards var(--d) !important; }
+  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */
   .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
@@ -1668,6 +1690,8 @@ var EMOTION_POSE = {
 var MOVE_LABEL = { approach: "靠近", apart: "拉开", forward: "上前", back: "后退", turn: "背过身", face: "转身面对", lookback: "回眸", reset: "复位" };
 var ENTER_HOW_LABEL = { run: "跑进来", peek: "探头", slow: "慢慢走进来" };
 var EXIT_HOW_LABEL = { storm: "甩头离开", run: "跑开", slow: "慢慢走远" };
+var DELIVERY_LABEL = { menace: "威压", excited: "激动", shout: "怒吼", hesitant: "迟疑", whisper: "低语", breakdown: "崩溃" };
+var TEXT_FX_LABEL = { shake: "发抖", wave: "波浪", big: "放大", roar: "吼", grow: "越说越大", dwindle: "越说越小", small: "小声", faint: "轻淡", glow: "发光强调" };
 var CG_INS = ["dissolve", "slow", "black", "flash", "focus", "cut", "impact"];
 var CG_OUTS = ["dissolve", "slow", "black", "flash", "cut"];
 var CG_MOTIONS = ["still", "push", "pan"];
@@ -2719,6 +2743,8 @@ function buildBeats(view) {
         cam: line.cam || "",
         say: line.say || "",
         stress: line.stress || "",
+        ...line.textfx ? { textfx: line.textfx } : {},
+        // 句中文字效果：某几个字发抖、放大、越说越小……
         card: line.card || "",
         scene: at2.scene,
         mode: at2.mode,
@@ -3325,6 +3351,39 @@ var IMPACT = {
   whisper: [],
   breakdown: [["shake", 3], ["redflash", 2], ["sound", "stab"]]
 };
+var TEXT_STYLES = {
+  shake: { gap: 1.3, gain: 0.9, pitch: "jitter" },
+  wave: { gap: 1.25, pitch: "wave" },
+  big: { gap: 1.1, before: 2, gain: 1.25, pitch: 1.04, land: [["box", 1]], after: 2 },
+  roar: { gap: 1.2, before: 5, chunk: 2, gain: 1.45, pitch: 0.94, land: [["shake", 3], ["box", 3], ["flash", 1], ["sound", "slam"]], after: 4 },
+  grow: { gap: [1.35, 0.8], gain: [0.85, 1.5], pitch: [1, 1.12], land: [["box", 2], ["shake", 1]], after: 3 },
+  dwindle: { gap: [1.1, 2.6], gain: [1, 0.25], pitch: [1, 0.9] },
+  small: { gap: 1.15, gain: 0.55, pitch: 1.05 },
+  faint: { gap: 1.4, gain: 0.32, pitch: 0.96 },
+  glow: { gap: 1.45, before: 3, gain: 1.1, after: 2 }
+};
+var lerp = (v, k) => Array.isArray(v) ? v[0] + (v[1] - v[0]) * k : v;
+function textFxSpans(chars, textfx = []) {
+  const text = chars.join("");
+  const spans = [];
+  for (const f of textfx || []) {
+    if (!f || !f.text || !TEXT_STYLES[f.style]) continue;
+    const len = Array.from(f.text).length;
+    let from = 0;
+    for (; ; ) {
+      const at2 = text.indexOf(f.text, from);
+      if (at2 < 0) break;
+      const s0 = Array.from(text.slice(0, at2)).length;
+      const s1 = s0 + len - 1;
+      if (!spans.some((o) => s0 <= o.s1 && s1 >= o.s0)) {
+        spans.push({ s0, s1, style: f.style });
+        break;
+      }
+      from = at2 + f.text.length;
+    }
+  }
+  return spans.sort((a, b) => a.s0 - b.s0);
+}
 function seeded(seed) {
   let h = 2166136261;
   for (const ch of String(seed)) h = Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0;
@@ -3347,15 +3406,31 @@ function inferDelivery(text, emo = "", type = "dialogue") {
   if (stammer || dots >= 4 || dots >= 2 && HESITANT_EMO.has(emo)) return "hesitant";
   return "";
 }
-function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialogue", seed = "" } = {}) {
+function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialogue", seed = "", textfx = null } = {}) {
   const n = chars.length;
   const text = chars.join("");
   const spoken = type === "dialogue" || type === "thought";
   const style = !spoken ? "" : say && STYLES[say] ? say : inferDelivery(text, emo, type);
   const S = STYLES[style];
   const base = Math.max(speed * S.gap, S.min || 0);
-  const plan = { times: [], marks: new Array(n).fill(""), say: style, gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: S.blip, fx: [] };
+  const plan = { times: [], marks: new Array(n).fill(""), say: style, gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: S.blip, fx: [], tx: new Array(n).fill(""), txk: new Array(n).fill(0), txi: new Array(n).fill(0), blips: null };
   if (!n) return plan;
+  const spans = textFxSpans(chars, textfx);
+  const spanAt = new Array(n).fill(null);
+  if (spans.length) plan.blips = new Array(n).fill(null);
+  for (const sp of spans) {
+    const T = TEXT_STYLES[sp.style];
+    const len = sp.s1 - sp.s0;
+    for (let i = sp.s0; i <= sp.s1; i += 1) {
+      const k = len ? (i - sp.s0) / len : 1;
+      plan.tx[i] = sp.style;
+      plan.txk[i] = Math.round(k * 100) / 100;
+      plan.txi[i] = i - sp.s0;
+      spanAt[i] = sp;
+      const pitch = T.pitch === "wave" ? 1 + 0.09 * Math.sin((i - sp.s0) * 1.3) : T.pitch === "jitter" ? (i - sp.s0) % 2 ? 0.95 : 1.06 : lerp(T.pitch ?? 1, k);
+      plan.blips[i] = { gain: lerp(T.gain ?? 1, k), pitch };
+    }
+  }
   if (!(speed > 0)) {
     plan.times = new Array(n).fill(0);
     return plan;
@@ -3380,6 +3455,15 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
       if (S.jitter) gap = base * (0.4 + rand2() * 1.4) + (rand2() < 0.12 ? speed * 5 : 0);
       gap += pauses[i - 1] * S.pause * (spoken ? 1 : NARRATION_PAUSE);
       if (S.stall && !SILENT.test(prev) && !SILENT.test(chars[i]) && rand2() < 0.2) gap += Math.max(speed * 4, 90);
+      const sp = spanAt[i];
+      if (sp) {
+        const T = TEXT_STYLES[sp.style];
+        if (T.chunk && i > sp.s0) gap = (i - sp.s0) % T.chunk === 0 || SILENT.test(prev) ? gap * T.chunk * lerp(T.gap, plan.txk[i]) : 0;
+        else gap *= lerp(T.gap, plan.txk[i]);
+        if (i === sp.s0) gap += speed * (T.before || 0);
+      }
+      const was = spanAt[i - 1];
+      if (was && was !== sp && i - 1 === was.s1) gap += speed * (TEXT_STYLES[was.style].after || 0);
       if (i === s0) gap += speed * 8;
       if (i > s0 && i <= s1) gap = Math.max(gap, base, speed * 3.5, 100);
       if (s0 >= 0 && i === s1 + 1) gap += speed * 4;
@@ -3392,7 +3476,11 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
     for (const [kind, v] of list2) fx.push(kind === "sound" ? { at: time, kind, sound: v } : { at: time, kind, power: v });
   };
   if (s0 >= 0) push(plan.times[s1], IMPACT[style]);
-  else if (style === "shout") push(0, IMPACT.shout);
+  else if (style === "shout" && !spans.some((sp) => (TEXT_STYLES[sp.style].land || []).some(([k]) => k === "shake"))) push(0, IMPACT.shout);
+  for (const sp of spans) {
+    const land = TEXT_STYLES[sp.style].land;
+    if (land && !(s1 >= sp.s0 && s1 <= sp.s1)) push(plan.times[sp.s1], land);
+  }
   if (style === "breakdown") {
     if (s0 !== 0) push(0, IMPACT.breakdown);
   }
@@ -5038,7 +5126,8 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
   const say = beat ? beat.say : "";
   const stress = beat ? beat.stress : "";
   const type = beat ? beat.type : "narration";
-  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key }), [chars, speed, say, stress, emo, type, key]);
+  const textfx = beat ? beat.textfx : null;
+  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx }), [chars, speed, say, stress, emo, type, key, textfx]);
   const [shown, setShown] = import_react5.default.useState({ key, done: false });
   const [start, setStart] = import_react5.default.useState({ key: "", at: NaN });
   if (shown.key !== key) setShown({ key, done: false });
@@ -5064,12 +5153,13 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
     pending.current = fx.map((f) => setTimeout(() => {
       if (fxRef.current) fxRef.current(f);
     }, f.at));
+    const sounded = (i) => plan.blips && plan.blips[i] ? { ...delivery, gain: delivery.gain * plan.blips[i].gain, pitch: delivery.pitch * plan.blips[i].pitch } : delivery;
     let next = 0;
     const tick = sound ? setInterval(() => {
       const now = performance.now() - t0;
       for (; next < chars.length && times[next] <= now; next += 1) {
         const sameBurst = next > 0 && times[next] === times[next - 1];
-        if (next % delivery.every === 0 && !sameBurst && !SILENT.test(chars[next])) blip(voiceRef.current, delivery);
+        if (next % delivery.every === 0 && !sameBurst && !SILENT.test(chars[next])) blip(voiceRef.current, sounded(next));
       }
       if (next >= chars.length) clearInterval(tick);
     }, Math.max(8, Math.min(speed, plan.gap))) : null;
@@ -5096,8 +5186,11 @@ function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quic
   const speed = quick.speed;
   const times = plan ? plan.times : null;
   const marks = plan ? plan.marks : [];
+  const tx = plan ? plan.tx : [];
+  const charClass = (i) => "fg-char" + (marks[i] ? " is-" + marks[i] : "") + (tx[i] ? " tx-" + tx[i] : "");
+  const charStyle = (i) => ({ "--d": (times ? times[i] : i * speed) + "ms", ...tx[i] ? { "--k": plan.txk[i], "--i": plan.txi[i] } : {} });
   const voiceChip = !recall && beat.voice && VOICE_LABEL[beat.voice] ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-voice-chip", "data-voice": beat.voice }, /* @__PURE__ */ import_react5.default.createElement("i", null), /* @__PURE__ */ import_react5.default.createElement("i", null), /* @__PURE__ */ import_react5.default.createElement("i", null), /* @__PURE__ */ import_react5.default.createElement("span", null, VOICE_LABEL[beat.voice])) : null;
-  return /* @__PURE__ */ import_react5.default.createElement("div", { className: `fg-dialog${away ? " is-away" : ""}`, "data-voice": beat.voice || void 0, "data-recall": recall ? recall.tone || "warm" : void 0, "data-recall-name": recall ? recall.name : void 0, style: { "--speaker": color || void 0 } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-box" }), face, (showName || voiceChip) && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name", key: beat.speaker + beat.alias + (beat.voice || "") }, showName && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-plate" }, speaker), voiceChip, showName && !recall && beat.emo && quick.emoLabel && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-sub" }, quick.emoLabel)), hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-text is-cardhint" }, "〔 ", CARD_LABEL[beat.card] || "卡片", " 〕"), !hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: `fg-text is-${beat.type}${plan && plan.say ? " say-" + plan.say : ""}${done ? " is-done" : waiting ? " is-wait" : ""}`, key: beat.key, "aria-live": "polite" }, beat.orig && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-orig", lang: "und" }, origChars(beat.orig, times, chars.length, speed).map(([ch, d], i) => /* @__PURE__ */ import_react5.default.createElement("span", { key: i, className: "fg-char", style: { "--d": d + "ms" } }, ch))), /* @__PURE__ */ import_react5.default.createElement("span", { className: "fg-line" }, chars.map((ch, i) => /* @__PURE__ */ import_react5.default.createElement("span", { key: i, className: marks[i] ? "fg-char is-" + marks[i] : "fg-char", style: { "--d": (times ? times[i] : i * speed) + "ms" } }, ch)))), done && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-wait", "aria-hidden": "true" }), status && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-status" }, status), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-progress" }, /* @__PURE__ */ import_react5.default.createElement("i", { style: { width: Math.round(progress * 100) + "%" } })), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-quick", onClick: (e) => e.stopPropagation() }, quick.items.map((item) => /* @__PURE__ */ import_react5.default.createElement("button", { key: item.id, type: "button", className: item.on ? "is-on" : "", title: item.title, onClick: () => {
+  return /* @__PURE__ */ import_react5.default.createElement("div", { className: `fg-dialog${away ? " is-away" : ""}`, "data-voice": beat.voice || void 0, "data-recall": recall ? recall.tone || "warm" : void 0, "data-recall-name": recall ? recall.name : void 0, style: { "--speaker": color || void 0 } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-box" }), face, (showName || voiceChip) && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name", key: beat.speaker + beat.alias + (beat.voice || "") }, showName && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-plate" }, speaker), voiceChip, showName && !recall && beat.emo && quick.emoLabel && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-sub" }, quick.emoLabel)), hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-text is-cardhint" }, "〔 ", CARD_LABEL[beat.card] || "卡片", " 〕"), !hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: `fg-text is-${beat.type}${plan && plan.say ? " say-" + plan.say : ""}${done ? " is-done" : waiting ? " is-wait" : ""}`, key: beat.key, "aria-live": "polite" }, beat.orig && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-orig", lang: "und" }, origChars(beat.orig, times, chars.length, speed).map(([ch, d], i) => /* @__PURE__ */ import_react5.default.createElement("span", { key: i, className: "fg-char", style: { "--d": d + "ms" } }, ch))), /* @__PURE__ */ import_react5.default.createElement("span", { className: "fg-line" }, chars.map((ch, i) => /* @__PURE__ */ import_react5.default.createElement("span", { key: i, className: charClass(i), style: charStyle(i) }, ch)))), done && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-wait", "aria-hidden": "true" }), status && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-status" }, status), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-progress" }, /* @__PURE__ */ import_react5.default.createElement("i", { style: { width: Math.round(progress * 100) + "%" } })), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-quick", onClick: (e) => e.stopPropagation() }, quick.items.map((item) => /* @__PURE__ */ import_react5.default.createElement("button", { key: item.id, type: "button", className: item.on ? "is-on" : "", title: item.title, onClick: () => {
     sfx("select");
     item.run();
   }, onMouseEnter: () => sfx("hover") }, item.label))));
@@ -7620,6 +7713,9 @@ function ScriptView({ script, units }) {
       l.type && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "type", k: "改判" }, TYPE_LABEL[l.type] || l.type),
       l.sp && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "sp", k: "说话" }, l.sp, l.as ? `（显示为 ${l.as}）` : ""),
       l.emo && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "emo", k: "情绪" }, emotionLabel(l.emo)),
+      l.say && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "say", k: "演法" }, DELIVERY_LABEL[l.say] || l.say),
+      l.stress && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "stress", k: "重音" }, "「", l.stress, "」"),
+      l.textfx && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "textfx", k: "文字" }, l.textfx.map((f) => `「${f.text}」${TEXT_FX_LABEL[f.style] || f.style}`).join("、")),
       l.voice && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "voice", k: "声音" }, VOICE_LABEL[l.voice] || l.voice),
       l.split && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "split", k: "分屏" }, l.split === "off" ? "收起" : l.split.who.join("、") + (l.split.location ? ` @ ${l.split.location}` : "")),
       l.sym && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "sym", k: "符号" }, SYMBOL_LABEL[l.sym] || l.sym),

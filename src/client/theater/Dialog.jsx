@@ -20,7 +20,8 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
   const say = beat ? beat.say : ''
   const stress = beat ? beat.stress : ''
   const type = beat ? beat.type : 'narration'
-  const plan = React.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key }), [chars, speed, say, stress, emo, type, key])
+  const textfx = beat ? beat.textfx : null
+  const plan = React.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx }), [chars, speed, say, stress, emo, type, key, textfx])
   const [shown, setShown] = React.useState({ key, done: false })
   const [start, setStart] = React.useState({ key: '', at: NaN })
   if (shown.key !== key) setShown({ key, done: false })
@@ -40,13 +41,15 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
     const { times, blip: delivery, fx } = plan
     const finish = setTimeout(() => setShown({ key, done: true }), times[times.length - 1] + speed + 220)
     pending.current = fx.map(f => setTimeout(() => { if (fxRef.current) fxRef.current(f) }, f.at))
-    // 打字音跟着演出计划：每 delivery.every 个字响一下，标点、空白不响，成块蹦出来的字只响一下
+    // 打字音跟着演出计划：每 delivery.every 个字响一下，标点、空白不响，成块蹦出来的字只响一下；
+    // 文字效果那几个字按它的音量、音高念（越说越小的越来越轻，波浪的一高一低）
+    const sounded = i => (plan.blips && plan.blips[i] ? { ...delivery, gain: delivery.gain * plan.blips[i].gain, pitch: delivery.pitch * plan.blips[i].pitch } : delivery)
     let next = 0
     const tick = sound ? setInterval(() => {
       const now = performance.now() - t0
       for (; next < chars.length && times[next] <= now; next += 1) {
         const sameBurst = next > 0 && times[next] === times[next - 1]
-        if (next % delivery.every === 0 && !sameBurst && !SILENT.test(chars[next])) blip(voiceRef.current, delivery)
+        if (next % delivery.every === 0 && !sameBurst && !SILENT.test(chars[next])) blip(voiceRef.current, sounded(next))
       }
       if (next >= chars.length) clearInterval(tick)
     }, Math.max(8, Math.min(speed, plan.gap))) : null
@@ -80,6 +83,10 @@ export function DialogBox({ beat, chars, plan, done, waiting, away = false, colo
   const speed = quick.speed
   const times = plan ? plan.times : null
   const marks = plan ? plan.marks : []
+  const tx = plan ? plan.tx : []
+  // 一个字的样子：重音、文字效果（tx-*，越说越大 / 越小按 --k 变，波浪按 --i 错开）
+  const charClass = i => 'fg-char' + (marks[i] ? ' is-' + marks[i] : '') + (tx[i] ? ' tx-' + tx[i] : '')
+  const charStyle = i => ({ '--d': (times ? times[i] : i * speed) + 'ms', ...(tx[i] ? { '--k': plan.txk[i], '--i': plan.txi[i] } : {}) })
   // 声音的样子：名牌旁边一个小标（带跳动的音量条），对话框和字也换个样子（样式在 theater.css 的 data-voice）
   const voiceChip = !recall && beat.voice && VOICE_LABEL[beat.voice] ? <div className="fg-voice-chip" data-voice={beat.voice}><i /><i /><i /><span>{VOICE_LABEL[beat.voice]}</span></div> : null
   return (
@@ -97,7 +104,7 @@ export function DialogBox({ beat, chars, plan, done, waiting, away = false, colo
       {!hiddenText && (
         <div className={`fg-text is-${beat.type}${plan && plan.say ? ' say-' + plan.say : ''}${done ? ' is-done' : waiting ? ' is-wait' : ''}`} key={beat.key} aria-live="polite">
           {beat.orig && <div className="fg-orig" lang="und">{origChars(beat.orig, times, chars.length, speed).map(([ch, d], i) => <span key={i} className="fg-char" style={{ '--d': d + 'ms' }}>{ch}</span>)}</div>}
-          <span className="fg-line">{chars.map((ch, i) => <span key={i} className={marks[i] ? 'fg-char is-' + marks[i] : 'fg-char'} style={{ '--d': (times ? times[i] : i * speed) + 'ms' }}>{ch}</span>)}</span>
+          <span className="fg-line">{chars.map((ch, i) => <span key={i} className={charClass(i)} style={charStyle(i)}>{ch}</span>)}</span>
         </div>
       )}
       {done && <div className="fg-wait" aria-hidden="true" />}

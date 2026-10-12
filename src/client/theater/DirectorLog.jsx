@@ -5,7 +5,7 @@ import React from 'react'
 import { api, toast, useDirectorLog, hostName } from '../api.js'
 import { Panel } from './Panels.jsx'
 import { formatLook } from '../../../lib/look.js'
-import { MOVE_LABEL, ENTER_HOW_LABEL, EXIT_HOW_LABEL } from '../../../lib/vocab.js'
+import { MOVE_LABEL, ENTER_HOW_LABEL, EXIT_HOW_LABEL, DELIVERY_LABEL, TEXT_FX_LABEL } from '../../../lib/vocab.js'
 import { emotionEntry } from '../../../lib/emotions.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, RECALL_TONE_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL, VOICE_LABEL, CG_IN_LABEL, CG_OUT_LABEL, CG_MOTION_LABEL } from './playback.js'
 
@@ -141,6 +141,9 @@ function ScriptView({ script, units }) {
               l.type && <Chip key="type" k="改判">{TYPE_LABEL[l.type] || l.type}</Chip>,
               l.sp && <Chip key="sp" k="说话">{l.sp}{l.as ? `（显示为 ${l.as}）` : ''}</Chip>,
               l.emo && <Chip key="emo" k="情绪">{emotionLabel(l.emo)}</Chip>,
+              l.say && <Chip key="say" k="演法">{DELIVERY_LABEL[l.say] || l.say}</Chip>,
+              l.stress && <Chip key="stress" k="重音">「{l.stress}」</Chip>,
+              l.textfx && <Chip key="textfx" k="文字">{l.textfx.map(f => `「${f.text}」${TEXT_FX_LABEL[f.style] || f.style}`).join('、')}</Chip>,
               l.voice && <Chip key="voice" k="声音">{VOICE_LABEL[l.voice] || l.voice}</Chip>,
               l.split && <Chip key="split" k="分屏">{l.split === 'off' ? '收起' : l.split.who.join('、') + (l.split.location ? ` @ ${l.split.location}` : '')}</Chip>,
               l.sym && <Chip key="sym" k="符号">{SYMBOL_LABEL[l.sym] || l.sym}</Chip>,
