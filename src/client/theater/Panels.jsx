@@ -788,6 +788,8 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
   const [fold, setFold] = React.useState('')
   const [manage, setManage] = React.useState(false) // 管理立绘：格子变成多选，批量删除
   const [picked, setPicked] = React.useState(() => new Set())
+  const [clearing, setClearing] = React.useState(false) // 清空立绘：确认那一行开着
+  const [dropActing, setDropActing] = React.useState(true)
   const group = groups.find(g => g.key === groupKey) || groups[0]
   const turn = group.current ? null : findLookTurn(person.timeline, group.key)
   const now = lookAt(person.timeline, Infinity)
@@ -804,6 +806,14 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
     const keys = [...picked]
     if (!keys.length || !window.confirm(`删除 ${person.name} 的 ${keys.length} 张立绘？${person.global ? '这是全局角色，所有对局里都会少这几张。' : ''}删掉后可以再画。`)) return
     run('del', () => api.cast(gameId, 'sprite-delete', { name: person.name, keys }).then(endManage), `已删除 ${keys.length} 张`)
+  }
+  // 清空立绘：这个人每一身、每种情绪的立绘全删，测试时反复重画用；默认连动作与表情设计一起清（你改过的设计默认留着）
+  const records = Object.values(person.sprites || {}).filter(Boolean)
+  const painted = records.filter(r => r.assetId).length
+  const openClear = () => { endManage(); setEmotion(''); setDropActing(!(person.acting && person.acting.by === 'user')); setClearing(true) }
+  const clearAll = () => {
+    const acting = Boolean(person.acting) && dropActing
+    run('clear', () => api.cast(gameId, 'sprite-clear', { name: person.name, acting }).then(() => setClearing(false)), acting ? '已清空立绘和动作与表情设计' : '已清空立绘')
   }
   const mainRecord = main ? Object.values(person.sprites || {}).find(r => r && r.assetId === main) : null
   const [viewing, setViewing] = React.useState(false)
@@ -840,8 +850,18 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
           ))}
           <span className="fg-note">已画 {drawn} 种情绪</span>
           <span className="fg-spacer" />
-          {!manage && <button type="button" className="fg-btn is-mini" disabled={!deletable.length} onClick={() => { setManage(true); setEmotion('') }}>管理立绘</button>}
+          {!manage && !clearing && <button type="button" className="fg-btn is-mini" disabled={!deletable.length} onClick={() => { setManage(true); setEmotion('') }}>管理立绘</button>}
+          {!manage && !clearing && <button type="button" className="fg-btn is-mini fg-danger" disabled={!records.length && !person.acting} title="删掉这个人每一身、每种情绪的立绘，从头再画" onClick={openClear}>清空立绘</button>}
         </div>
+        {clearing && (
+          <div className="fg-row fg-manage">
+            <span className="fg-note">清空 {person.name} 每一身、每种情绪的立绘（已画好 {painted} 张），连提示词、眨眼口型一起删{person.global ? '；这是全局角色，所有对局里都会清掉' : ''}；正在画的会停下。</span>
+            {person.acting && <label className="fg-row fg-note" style={{ gap: '.3em' }}><input type="checkbox" checked={dropActing} onChange={e => setDropActing(e.target.checked)} />动作与表情设计也清掉，下次画先重新设计{person.acting.by === 'user' ? '（这份你改过）' : ''}</label>}
+            <span className="fg-spacer" />
+            <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'clear'} onClick={clearAll}>确认清空</button>
+            <button type="button" className="fg-btn is-mini" onClick={() => setClearing(false)}>取消</button>
+          </div>
+        )}
         {manage && (
           <div className="fg-row fg-manage">
             <span className="fg-note">点格子选中要删的（只能选画过或记过提示词的），已选 {picked.size}</span>

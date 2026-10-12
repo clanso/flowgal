@@ -167,6 +167,10 @@ updated: 2026-10-12
   - 实现：导演在那一句写 bgm: "hush"（也认留白、无声、屏息、静默；只收在句子上，开场 scene.bgm 不收；没接曲库、当时没在放的不收）。不算换歌、不占一轮那一次，一轮最多 MAX_HUSH_PER_TURN = 2 次；留白之后写回原来的编号是让它早点回来（照收），之后的第一处换歌也算转折点。scenes.js 的 walkScenes 不把 hush 当换歌，所以 playingAfter、下一轮接着放的都是原来的曲子。剧场 playback：连那一句在内 HUSH_BEATS = 5 拍带 hush（start / on），写了换歌（包括写回原来的）、换了地方、进出段落、过场字卡就提前回来，不跨轮；那一句先静 HUSH_LEAD_MS = 700 ms 再出字。audio.js 的配乐多了 hush：淡出 0.6 s 后暂停在原处，回来时从停下的地方接着放、2.6 s 淡回来；换了一首时留白自然结束；试听结束、调音量不会把留白中的配乐弄响。fade() 改成同一条声音后开始的淡入淡出接管前一个（留白停下又马上回来时两边不再抢着改音量）。右上角曲名在留白时暗下去。导演日志显示「配乐 留白」。
   - 自动化：npm test 231/231（新增 tests/hush.test.mjs 4 条）；npm run build 通过。预览：第 3 轮苏晴说到「那、那间教室里」配乐停下，闪电那句换成雨夜那首；在浏览器里逐句点过去记了配乐的状态（停下时淡出、暂停在 8.2 s，换歌时雨夜淡入）；把闪电换歌临时拿掉又跑了一遍，第 5 拍后萤火小径从 8.2 s 接着放、慢慢淡回 0.30，测完还原。
   - 没验：DSH 真机的听感；真实导演会不会把 hush 用在不该静的地方。
+- 清空单角色立绘（2026-10-12，驾驶员测试时要频繁清空重画）：
+  - 实现：castAction sprite-clear（engine 的 clearSprites）：这个人 looks 里的 sprites、spriteStatus 全清，文件按 releaseAssets 删；acting 为真时连 looks[名].acting 一起删。全局角色同 sprite-delete：全局库的 sprites（和 acting）一起清，文件留着。清空时撤下这个人在出图队列里的立绘（排队的、在画的），停掉他正在跑的立绘设计师（连设计清时也停动作与表情设计师）。engine 里按人记清空次数（cleared.sprites / cleared.acting，sinceClear 取一个 stale()）：requestSprites、drawSprite、paintFace、ensureActing 开头记下，排队等写词时、写完词落记录时、图回来落记录时、设计写回时都在 store 锁里再看一次，清空过就不写（晚到的图删文件），markSprites 带 stale 时状态也不写，所以清完不留「已取消 / 失败」的格子，也不会把 writing 集合占着（清完马上能重新画）。人物志「管理立绘」旁边加「清空立绘」，点开一行确认：已画好几张、全局角色提示所有对局都清，勾「动作与表情设计也清掉」（默认勾，by: user 的默认不勾）。
+  - 自动化：npm test 235/235（新增 tests/clear.test.mjs 4 条：本局角色、全局角色、在画的时候清空（假 NovelAI 不理会取消、图晚到）、写词的时候清空（排队的那批不再写）；把出图落记录、排队等写词、写状态这三处 stale 检查分别拿掉都有测试会挂）；npm run build 通过。预览：人物志里清空林岚（确认行、勾设计），林岚的格子全空、动作与表情变「还没设计」，苏晴不动。
+  - 没验：DSH 真机、酒馆真机。
 
 ## 开放风险
 
