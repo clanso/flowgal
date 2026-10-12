@@ -214,13 +214,14 @@ test('gate: 短闪回：导演给闪回的几句写 recall（不换场景）；�
     cast: [{ name: '柯萝伊', pos: 'left' }, { name: '布琳希尔德', pos: 'right' }],
     lines: [
       { u: 'U3', sp: '柯萝伊', voice: 'echo', recall: true, then: [ROBE] },
-      { u: 'U4', sp: '阿黛尔', voice: 'echo', emo: 'happy', recall: true },
+      { u: 'U4', sp: '阿黛尔', voice: 'echo', emo: 'happy', recall: 'true' },
       { u: 'U5', sp: '布琳希尔德' },
       { u: 'U1', recall: 'yes' },
       { u: 'U2', mode: 'memory', recall: true },
     ],
   }, units)
   assert.equal(s.lines.U3.recall, true)
+  assert.equal(s.lines.U4.recall, true, '照着格式说明写成字符串 "true" 的也收')
   assert.equal(s.lines.U1?.recall, undefined, '只收 true')
   assert.equal(s.lines.U2.recall, undefined, '写了 mode 的就是段落，不算短闪回')
   const plain = { ...s, lines: { ...s.lines, U2: {} } }
