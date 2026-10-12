@@ -157,6 +157,7 @@ export function buildBeats(view) {
         cam: line.cam || '',
         say: line.say || '',
         stress: line.stress || '',
+        ...(line.textfx ? { textfx: line.textfx } : {}), // 句中文字效果：某几个字发抖、放大、越说越小……
         card: line.card || '',
         scene: at.scene,
         mode: at.mode,
