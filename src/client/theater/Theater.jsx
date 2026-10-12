@@ -10,6 +10,7 @@ import { useFaceFramer } from './faceFramer.js'
 import { playBgm, playAmbience, stopAll, playLibSound, sfx, stinger, configureSounds } from './audio.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
 import { castVoices, lineVoice } from '../../../lib/sounds.js'
+import { ROMANCE_LABEL, SENSE_LABEL } from '../../../lib/vocab.js'
 
 // 读到哪一句：每局记在浏览器里。
 const POS_KEY = gameId => 'flowgal:pos:' + gameId
@@ -18,6 +19,17 @@ const writePos = (gameId, key) => { try { localStorage.setItem(POS_KEY(gameId), 
 
 /** 慢动作、时间停止时雨雪这些粒子的流速。 */
 const TIME_FLOW = { slowmo: 0.12, timestop: 0 }
+/** 屏住呼吸时雨雪也几乎停住。 */
+const SENSE_FLOW = { breath: 0.25 }
+/**
+ * 感官那一层：耳边要知道贴在哪一边（说话的人站在哪边就是哪边，看不到人时在右边），写成 ear-left / ear-right。
+ */
+function senseLayer(beat, scene) {
+  const sense = scene.sense && scene.sense !== 'none' ? scene.sense : ''
+  if (sense !== 'ear') return sense
+  const who = beat && (beat.cast || []).find(c => c.name === beat.speaker)
+  return who && ['left', 'farleft'].includes(who.pos) ? 'ear-left' : 'ear-right'
+}
 
 /** 提前下载后面几拍要用的字形分片。 */
 const GLYPH_AHEAD = 12
@@ -324,6 +336,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? 'wake' : stageBeat && stageBeat.transition
   const stageScene = stageBeat ? stageBeat.scene : { location: '', time: 'night', weather: 'stars', mood: 'calm', light: 'normal', fx: 'none' }
   const stageMode = (stageBeat && stageBeat.mode) || ''
+  // 亲密氛围、感官主导的一段（lib/vocab.js 的 ROMANCE、SENSES）
+  const romance = stageScene.romance && stageScene.romance !== 'none' ? stageScene.romance : ''
+  const sense = stageScene.sense && stageScene.sense !== 'none' ? stageScene.sense : ''
   // 标题画面上不加光线、滤镜、晃动这些气氛层，只留背景、天色和天气
   const atmosphere = Boolean(stageBeat) && !title
   const latest = beats.length ? beats[beats.length - 1] : null
@@ -351,15 +366,17 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         <div className="fg-camera" ref={cameraRef} data-cam={cam.kind || undefined} style={cam.style || undefined}>
           {/* 画面效果（船上摇晃、车里颠簸、心跳……）和特殊段落（梦里飘、幻觉里扭曲）各动一层，叠在一起不互相顶掉 */}
           <div className="fg-world" data-fx={atmosphere ? stageScene.fx : ''}>
-            <div className="fg-world-in" data-mode={atmosphere ? stageMode : ''} data-tr={stageTr === 'haze' || stageTr === 'wake' ? stageTr : undefined}>
+            <div className="fg-world-in" data-mode={atmosphere ? stageMode : ''} data-tr={stageTr === 'haze' || stageTr === 'wake' ? stageTr : undefined}
+              data-romance={atmosphere && romance ? romance : undefined} data-sense={atmosphere && sense ? sense : undefined}>
               <Backdrop scene={stageScene} view={view} transition={stageTr || 'dissolve'} />
               <div className={`fg-grade${backgroundFor(stageScene, view).src ? ' is-drawn' : ''}`} data-time={stageScene.time} />
               {/* 短闪回时说话的是闪回里的人：现在台上的人不高亮、不对口型 */}
               {stageBeat && <Cast beat={title || stageBeat.recall || waking ? { ...stageBeat, speaker: '', speakers: null, sym: '' } : stageBeat} view={view} talk={title || stageBeat.recall || waking ? null : talk} max={ui0.maxOnStage ?? 5} />}
               <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} />
               <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} />
+              <FadeLayer name="romance" value={atmosphere ? romance : ''} ms={1600} />
               {stageBeat && !title && <CgLayer beat={stageBeat} sound={sfxOn} />}
-              <Particles weather={stageScene.weather} enabled={ui0.particles !== false} speed={atmosphere ? TIME_FLOW[stageScene.fx] ?? 1 : 1} />
+              <Particles weather={stageScene.weather} enabled={ui0.particles !== false} speed={atmosphere ? (TIME_FLOW[stageScene.fx] ?? 1) * (SENSE_FLOW[sense] ?? 1) : 1} />
               {stageBeat && !title && <SplitPanel beat={stageBeat} view={view} talk={talk} />}
               {stageBeat && !title && <RecallLayer beat={stageBeat} view={view} talk={talk} light={recallStyle !== 'ghost'} tone={recallTone} />}
               <FadeLayer name="fxlayer" value={atmosphere && stageScene.fx !== 'none' ? stageScene.fx : ''} ms={900} />
@@ -367,6 +384,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
             </div>
           </div>
         </div>
+        {/* 感官那一层也在镜头外面：特写时蒙眼的黑、耳边的光不跟着放大出画 */}
+        <FadeLayer name="sense" value={atmosphere ? senseLayer(stageBeat, stageScene) : ''} ms={sense === 'blind' ? 1400 : 900} />
         {/* 特殊段落的滤镜放在镜头外面：推镜头时录像框、REC 这些不跟着放大，对话框和标题卡也不被滤到 */}
         <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} />
         {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} />}
@@ -390,6 +409,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
                 {hud.scene.weather && hud.scene.weather !== 'clear' && <span>{WEATHER_LABEL[hud.scene.weather]}</span>}
                 {LIGHT_LABEL[hud.scene.light] && <span>{LIGHT_LABEL[hud.scene.light]}</span>}
                 {FX_LABEL[hud.scene.fx] && <span>{FX_LABEL[hud.scene.fx]}</span>}
+                {ROMANCE_LABEL[hud.scene.romance] && <span className="fg-hud-romance">♡ {ROMANCE_LABEL[hud.scene.romance]}</span>}
+                {SENSE_LABEL[hud.scene.sense] && <span className="fg-hud-sense">{SENSE_LABEL[hud.scene.sense]}</span>}
                 {hud.scene.mood && <span>♪ {MOOD_LABEL[hud.scene.mood]}</span>}
               </div>
             </div>
