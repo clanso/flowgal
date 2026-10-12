@@ -6,7 +6,7 @@ import { api, toast, useDirectorLog, hostName } from '../api.js'
 import { Panel } from './Panels.jsx'
 import { formatLook } from '../../../lib/look.js'
 import { emotionEntry } from '../../../lib/emotions.js'
-import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL, VOICE_LABEL, CG_IN_LABEL, CG_OUT_LABEL, CG_MOTION_LABEL } from './playback.js'
+import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, RECALL_TONE_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL, VOICE_LABEL, CG_IN_LABEL, CG_OUT_LABEL, CG_MOTION_LABEL } from './playback.js'
 
 /** 导演写的外貌：新版是字段，老日志里是一整串。 */
 const lookText = v => (typeof v === 'string' ? v : v ? formatLook(v) : '')
@@ -147,7 +147,7 @@ function ScriptView({ script, units }) {
               l.card && <Chip key="card" k="卡片">{CARD_LABEL[l.card] || l.card}</Chip>,
               l.cut && <Chip key="cut" k="字卡">{l.cut.text}</Chip>,
               l.mode && <Chip key="mode" k="段落">{MODE_LABEL[l.mode] || l.mode}</Chip>,
-              l.recall && <Chip key="recall" k="段落">短闪回</Chip>,
+              l.recall && <Chip key="recall" k="段落">短闪回{RECALL_TONE_LABEL[l.recall] ? ` · ${RECALL_TONE_LABEL[l.recall]}` : ''}</Chip>,
               l.then && <Chip key="then" k="当时的样子">{l.then.map(thenText).join('；')}</Chip>,
               l.look && <Chip key="look" k="从这句起">{l.look.map(shiftText).join('；')}</Chip>,
               l.scene && <Chip key="scene" k="场景">{sceneChange(l.scene)}</Chip>,

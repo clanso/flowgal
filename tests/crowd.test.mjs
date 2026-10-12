@@ -46,3 +46,9 @@ test('gate: 设置里的短闪回演法：小头像（默认）、只换对话�
   assert.equal(resolveConfig({ ui: { recall: 'ghost' } }).ui.recall, 'ghost')
   assert.equal(resolveConfig({ ui: { recall: 'fog' } }).ui.recall, 'face')
 })
+
+test('gate: 设置里的短闪回基调：自动（默认）或固定一种，填坏了用自动', () => {
+  assert.equal(resolveConfig({}).ui.recallTone, 'auto')
+  assert.equal(resolveConfig({ ui: { recallTone: 'haze' } }).ui.recallTone, 'haze')
+  assert.equal(resolveConfig({ ui: { recallTone: 'rainbow' } }).ui.recallTone, 'auto')
+})

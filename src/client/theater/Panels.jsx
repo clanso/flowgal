@@ -1,7 +1,7 @@
 // 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含声音、「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
 import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, hostName } from '../api.js'
-import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, cgSrc } from './playback.js'
+import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, RECALL_TONES, RECALL_TONE_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions } from '../../../lib/emotions.js'
 import { AaWorkbench, RectEditor } from './AaWorkbench.jsx'
@@ -1456,6 +1456,12 @@ export function LookSection({ data }) {
           <option value="face">画面不动，说话的人在对话框旁出小头像</option>
           <option value="text">画面不动，只换对话框</option>
           <option value="ghost">画面压暗，回忆里的人浮到台前</option>
+        </select>
+      </Field>
+      <Field label="短闪回的基调" hint="切进闪回的方式和色调：温暖怀念慢慢泛黄，甜蜜泛起粉光，伤感褪成冷灰，不安画面撕裂泛红、像心跳一样一暗一暗，猛然想起白闪一下，朦胧如梦起雾。自动时导演按剧情选，没选的按闪回里的情绪和当时的氛围挑。">
+        <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.recallTone || 'auto'} onChange={e => p({ recallTone: e.target.value })}>
+          <option value="auto">自动（按剧情和氛围）</option>
+          {RECALL_TONES.map(t => <option key={t} value={t}>都用「{RECALL_TONE_LABEL[t]}」</option>)}
         </select>
       </Field>
       <Field label="文字速度" hint="每字毫秒，0 为瞬间显示。"><input type="range" min="0" max="80" value={cfg.ui.textSpeed} onChange={e => p({ textSpeed: Number(e.target.value) })} style={{ width: '100%' }} /></Field>

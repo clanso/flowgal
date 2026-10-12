@@ -140,6 +140,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false }
   // 短闪回的演法（设置）：只有「压暗画面」进出时起雾、等画面变过去；另外两种画面不动，直接出字
   const recallStyle = ui0.recall || 'face'
+  const recallTone = ui0.recallTone && ui0.recallTone !== 'auto' ? ui0.recallTone : '' // 设置里固定了一种基调
   const edgeMs = !beat || title ? 0 : beat.cut ? CUT_MS : beat.transition === 'haze' ? HAZE_MS : recallStyle === 'ghost' ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0
   const pauseMs = speed > 0 ? Math.max(edgeMs, hold.ms) : 0
   const [pauseSeen, setPauseSeen] = React.useState('')
@@ -344,7 +345,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
               {stageBeat && !title && <CgLayer beat={stageBeat} sound={sfxOn} />}
               <Particles weather={stageScene.weather} enabled={ui0.particles !== false} speed={atmosphere ? TIME_FLOW[stageScene.fx] ?? 1 : 1} />
               {stageBeat && !title && <SplitPanel beat={stageBeat} view={view} talk={talk} />}
-              {stageBeat && !title && <RecallLayer beat={stageBeat} view={view} talk={talk} light={recallStyle !== 'ghost'} />}
+              {stageBeat && !title && <RecallLayer beat={stageBeat} view={view} talk={talk} light={recallStyle !== 'ghost'} tone={recallTone} />}
               <FadeLayer name="fxlayer" value={atmosphere && stageScene.fx !== 'none' ? stageScene.fx : ''} ms={900} />
               <div className="fg-vignette" />
             </div>
@@ -352,7 +353,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         </div>
         {/* 特殊段落的滤镜放在镜头外面：推镜头时录像框、REC 这些不跟着放大，对话框和标题卡也不被滤到 */}
         <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageBeat && stageBeat.transition === 'haze' ? 2400 : 1200} />
-        {beat && !title && <Flash beat={beat} mist={recallStyle === 'ghost'} />}
+        {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
         {!panel && <RestartNotice floating />}
         {beat && !title && <TitleCard beat={beat} delay={beat.cut && speed > 0 ? CUT_MS : 0} />}
@@ -387,7 +388,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {beat && !title && beat.card && <SceneCard beat={beat} />}
         {beat && !title && (
           <DialogBox beat={beat} chars={chars} plan={typed} done={done} waiting={holdText} away={pausing && hold.away} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)}
-            face={recallStyle === 'face' && beat.recall ? <RecallFace beat={beat} view={view} /> : null} />
+            face={recallStyle === 'face' && beat.recall ? <RecallFace beat={beat} view={view} tone={recallTone} /> : null} />
         )}
         {!beat && !title && (
           <div className="fg-choices"><div className="fg-choices-title">{view ? '这一局还没有可以演的内容' : '读取中'}</div></div>

@@ -3,9 +3,9 @@
 // 立绘按导演标的登场 / 退场逐句增减；插画从 after 那一句显示到 until 那一句（没写就到这一轮结束）。
 // 场景逐句变：导演在某一句写的地点、时段、天气、光线、基调、画面效果从那一句起生效，特殊段落（回忆、梦境……）进出见 lib/scenes.js。
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
-import { placeKey, speakersOf, MODE_NAMES, cgIn, cgOut, cgMotion } from '../../../lib/vocab.js'
+import { placeKey, speakersOf, MODE_NAMES, RECALL_TONES, RECALL_TONE_NAMES, cgIn, cgOut, cgMotion } from '../../../lib/vocab.js'
 import { stageWalk, playedUnits } from '../../../lib/staging.js'
-import { walkScenes, recallRuns, markRecalls, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
+import { walkScenes, recallRuns, markRecalls, autoRecallTone, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
 import { shiftsAhead } from '../../../lib/look.js'
 
@@ -18,6 +18,7 @@ export const MOOD_LABEL = { daily: '日常', cheerful: '轻快', comic: '滑稽'
 export const LIGHT_LABEL = { normal: '', dim: '昏暗', dark: '熄灯', black: '漆黑', candle: '烛光', spot: '聚光', neon: '霓虹', screen: '屏幕光', alarm: '警报红光', moon: '月光', warm: '暖光', cold: '冷光', glare: '强光', flicker: '灯光闪烁' }
 export const FX_LABEL = { none: '', sway: '摇晃', ride: '颠簸', handheld: '手持', drift: '推近', woozy: '晕眩', heat: '热浪', underwater: '水下', rumble: '震动', speed: '疾驰', heartbeat: '心跳', slowmo: '慢动作', timestop: '时间停止' }
 export const MODE_LABEL = { ...MODE_NAMES, real: '回到现实' }
+export { RECALL_TONES, RECALL_TONE_NAMES as RECALL_TONE_LABEL }
 export const CUT_LABEL = { time: 'Time Skip', date: 'Date', chapter: 'Chapter', meanwhile: 'Meanwhile' }
 export const VOICE_LABEL = { phone: '电话', radio: '广播', telepathy: '心灵感应', chorus: '齐声', offscreen: '画外音', echo: '回声', memory: '回忆', machine: '机械音' }
 export const CG_IN_LABEL = { dissolve: '溶入', slow: '慢慢溶入', black: '暗场后浮现', flash: '白闪', focus: '由虚到实', cut: '直接切入', impact: '冲击' }
@@ -117,6 +118,8 @@ export function buildBeats(view) {
       shown = at
       for (const name of [...speakers, ...steps[ui].entered]) active.set(name, beats.length)
       const recall = recalls[ui]
+      // 导演没写基调的闪回：进闪回那一句按闪回里的情绪（自定义情绪看它的基础情绪）和这一刻的场景基调挑
+      if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map(e => ((view.emotions || []).find(x => x.id === e) || {}).base || e), at.scene.mood)
       // 短闪回里开口的人用回忆里的声音（老脚本写的是回声，一并换掉）
       const voice = recall && type !== 'narration' && (!line.voice || line.voice === 'echo') ? 'memory' : line.voice
       const recallEdge = recall === recalled ? '' : recall ? 'in' : 'out'

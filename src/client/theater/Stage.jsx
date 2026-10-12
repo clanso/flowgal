@@ -364,15 +364,16 @@ export function SplitPanel({ beat, view, talk }) {
 // 短闪回慢慢沉进去、慢慢浮出来：现在的画面先暗下去、失焦，闪回里的人再浮出来（样式在 theater.css 的 .fg-recall）
 const RECALL_IN_MS = 1200
 const RECALL_LEAVE_MS = 1000
-// 轻的演法（设置里的 face / text）：画面不动，只是四角泛黄，进出很快
-const RECALL_LIGHT_MS = 400
+// 轻的演法（设置里的 face / text）：画面不动，只是四角换个色调；进出快慢按基调（伤感、朦胧慢慢浮上来，不安、猛然想起一下就到）
+const RECALL_LIGHT_MS = { warm: 400, sweet: 500, sad: 900, dread: 200, flash: 150, haze: 900 }
 
 /**
  * 短闪回。设置里选「压暗画面」（ghost）时：现在的画面（背景、在场的人、插画、分屏）压暗、褪色、模糊，这一段开口的人以当时的样子半透明浮在前面，
  * 说话的亮一点；进出时起一层薄雾（Flash 按 recallEdge），离开时淡出。没有档案的人（路人、「我」）不浮出来。
- * 其他演法（light）：画面不动，四角泛黄、起一点颗粒，谁也不浮出来（小头像在对话框那边，见 RecallFace）。
+ * 其他演法（light）：画面不动，四角按基调换个色调、起一点颗粒，谁也不浮出来（小头像在对话框那边，见 RecallFace）。
+ * 基调（data-tone）：导演写的或剧场挑的（beat.recall.tone），设置里固定了一种时用 tone。色调、颗粒、心跳一样的脉动在 theater.css。
  */
-export function RecallLayer({ beat, view, talk, light = false }) {
+export function RecallLayer({ beat, view, talk, light = false, tone = '' }) {
   const recall = beat.recall || null
   const last = React.useRef(null)
   const [, refresh] = React.useReducer(n => n + 1, 0)
@@ -385,12 +386,13 @@ export function RecallLayer({ beat, view, talk, light = false }) {
   }, [recall])
   const shown = recall ? { recall, beat } : last.current
   if (!shown) return null
-  if (light) return <div className={`fg-recall is-light${leaving ? ' is-leave' : ''}`} style={{ '--fade': RECALL_LIGHT_MS + 'ms' }} aria-hidden="true"><div className="fg-recall-veil" /></div>
+  const mood = tone || shown.recall.tone || 'warm'
+  if (light) return <div className={`fg-recall is-light${leaving ? ' is-leave' : ''}`} data-tone={mood} style={{ '--fade': (RECALL_LIGHT_MS[mood] || 400) + 'ms' }} aria-hidden="true"><div className="fg-recall-veil" /></div>
   const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
   const ghosts = stageLayout(shown.recall.who.filter(name => people.has(name)).map(name => ({ name, pos: 'center' })))
   const ghostBeat = { ...shown.beat, then: shown.recall.then, ...(leaving ? { speaker: '', speakers: null, sym: '' } : {}) }
   return (
-    <div className={`fg-recall${leaving ? ' is-leave' : ''}`} style={{ '--fade': (leaving ? RECALL_LEAVE_MS : RECALL_IN_MS) + 'ms' }} aria-hidden="true">
+    <div className={`fg-recall${leaving ? ' is-leave' : ''}`} data-tone={mood} style={{ '--fade': (leaving ? RECALL_LEAVE_MS : RECALL_IN_MS) + 'ms' }} aria-hidden="true">
       <div className="fg-recall-veil" />
       {ghosts.map(entry => (
         <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={ghostBeat} emo={shown.beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={leaving ? null : talk} />
@@ -400,10 +402,10 @@ export function RecallLayer({ beat, view, talk, light = false }) {
 }
 
 /**
- * 短闪回的小头像：回忆里正在开口的人，按当时的样子（导演写的 then）取这句情绪的立绘，裁出脸，泛黄放在对话框右上角。
+ * 短闪回的小头像：回忆里正在开口的人，按当时的样子（导演写的 then）取这句情绪的立绘，裁出脸，放在对话框右上角，色调和出现的样子跟着基调变。
  * 只在台词、心声上出；旁白、没有档案的人、还没画立绘的人不出。
  */
-export function RecallFace({ beat, view }) {
+export function RecallFace({ beat, view, tone = '' }) {
   const recall = beat && beat.recall
   const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
   const name = recall && beat.type !== 'narration' ? (beat.speakers || [beat.speaker]).find(n => recall.who.includes(n) && people.has(n)) : ''
@@ -424,7 +426,7 @@ export function RecallFace({ beat, view }) {
   const record = Object.values(person.sprites || {}).find(r => r && r.assetId === sprite)
   const crop = faceCrop(faceBoxOf(record, size), size)
   return (
-    <div className="fg-recall-face" key={name} style={{ '--speaker': person.color || undefined }} aria-hidden="true">
+    <div className="fg-recall-face" key={name} data-tone={tone || recall.tone || 'warm'} style={{ '--speaker': person.color || undefined }} aria-hidden="true">
       {crop && <img src={src} alt="" draggable="false" style={{ width: crop.width + '%', left: crop.left + '%', top: crop.top + '%' }} />}
     </div>
   )
@@ -626,12 +628,16 @@ export function useCamera(beat) {
 
 const TRANSITION_OVERLAY = { flash: '', black: 'is-black', blink: 'is-blink', glitch: 'is-glitch', haze: 'is-haze' }
 
-/** mist：短闪回进出时起一层薄雾（只有「压暗画面」的演法起）。 */
-export function Flash({ beat, mist = true }) {
+// 进短闪回时按基调起一下：甜蜜泛起一层粉光、不安画面撕裂泛红、猛然想起白闪一下、朦胧起雾；温暖、伤感的直接慢慢浮上来
+const RECALL_ENTRY = { sweet: 'is-bloom', dread: 'is-dread', flash: 'is-snap', haze: 'is-mist' }
+
+/** recallStyle 是设置里短闪回的演法（「压暗画面」进出都起薄雾），tone 是设置里固定的基调（不固定时用导演写的 / 剧场挑的）。 */
+export function Flash({ beat, recallStyle = 'face', tone = '' }) {
   if (!beat) return null
   const kind = beat.cam === 'flash' ? '' : beat.cam === 'redflash' ? 'is-red' : beat.cam === 'fadeblack' ? 'is-black' : null
   const tr = TRANSITION_OVERLAY[beat.transition] ?? null
-  const cls = kind ?? tr ?? (beat.recallEdge && mist ? 'is-mist' : null)
+  const entry = beat.recallEdge === 'in' ? RECALL_ENTRY[tone || (beat.recall && beat.recall.tone)] : null
+  const cls = kind ?? tr ?? entry ?? (beat.recallEdge && recallStyle === 'ghost' ? 'is-mist' : null)
   if (cls === null) return null
   return <div key={beat.key} className={`fg-flash ${cls}`} />
 }

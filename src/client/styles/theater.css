@@ -305,6 +305,56 @@
   box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .45), 0 0 2cqw rgba(255, 226, 180, .22), inset 0 0 0 2px color-mix(in oklab, var(--speaker, #f0d2a0) 35%, transparent); animation: fg-face-in .45s ease-out both; }
 .fg-recall-face img { position: absolute; max-width: none; height: auto; filter: sepia(.45) saturate(.85) brightness(1.03); }
 @keyframes fg-face-in { from { opacity: 0; transform: translateY(.8cqw); } }
+/* 短闪回的基调（data-tone）：上面的泛黄是 warm（温暖怀念）。轻的演法换四角的色调，压暗画面的演法换整个画面的滤镜，小头像换色调和出现的样子 */
+/* 甜蜜：四角泛粉，几点光斑慢慢飘 */
+.fg-recall.is-light[data-tone="sweet"] { background: radial-gradient(120% 95% at 50% 45%, transparent 48%, rgba(255, 150, 190, .36)); }
+.fg-recall[data-tone="sweet"]::after { content: ""; position: absolute; inset: -4%; pointer-events: none; filter: blur(.5cqw); opacity: .8; animation: fg-bokeh 9s ease-in-out infinite alternate;
+  background: radial-gradient(circle at 16% 26%, rgba(255, 224, 236, .5) 0 1.1cqw, transparent 1.5cqw), radial-gradient(circle at 84% 20%, rgba(255, 214, 232, .42) 0 .8cqw, transparent 1.1cqw),
+    radial-gradient(circle at 78% 66%, rgba(255, 232, 242, .36) 0 1.5cqw, transparent 1.9cqw), radial-gradient(circle at 24% 72%, rgba(255, 204, 226, .4) 0 .6cqw, transparent .9cqw),
+    radial-gradient(circle at 92% 46%, rgba(255, 236, 244, .3) 0 1cqw, transparent 1.3cqw); }
+@keyframes fg-bokeh { to { transform: translate(1.5%, -2%); } }
+/* 伤感：四周褪成冷灰、泛一点蓝，正中照旧 */
+.fg-recall.is-light[data-tone="sad"] { background: rgba(40, 62, 98, .34); backdrop-filter: grayscale(.85) brightness(.85); -webkit-backdrop-filter: grayscale(.85) brightness(.85);
+  -webkit-mask-image: radial-gradient(85% 75% at 50% 45%, transparent 28%, #000 85%); mask-image: radial-gradient(85% 75% at 50% 45%, transparent 28%, #000 85%); }
+/* 不安：四角暗红，像心跳一样一暗一暗，颗粒重一点 */
+.fg-recall.is-light[data-tone="dread"] { background: none; }
+.fg-recall[data-tone="dread"]::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(110% 90% at 50% 45%, transparent 36%, rgba(96, 0, 14, .66)); animation: fg-dread-pulse 1.2s ease-in-out infinite; }
+.fg-recall[data-tone="dread"] .fg-recall-veil { opacity: .3; }
+@keyframes fg-dread-pulse { 0%, 100% { opacity: .75; } 10% { opacity: 1; } 22% { opacity: .55; } 34% { opacity: .95; } }
+/* 猛然想起：四周一圈白、对比强一点 */
+.fg-recall.is-light[data-tone="flash"] { background: radial-gradient(120% 95% at 50% 45%, transparent 55%, rgba(255, 255, 255, .26)); backdrop-filter: contrast(1.12) saturate(.88); -webkit-backdrop-filter: contrast(1.12) saturate(.88); }
+/* 朦胧如梦：四周起白雾、失焦 */
+.fg-recall.is-light[data-tone="haze"] { background: rgba(255, 250, 240, .26); backdrop-filter: blur(3px) brightness(1.06); -webkit-backdrop-filter: blur(3px) brightness(1.06);
+  -webkit-mask-image: radial-gradient(90% 80% at 50% 45%, transparent 18%, #000 100%); mask-image: radial-gradient(90% 80% at 50% 45%, transparent 18%, #000 100%); }
+/* 压暗画面的演法：整个画面的滤镜和浮出来的人跟着基调换 */
+.fg-recall:not(.is-light)[data-tone="sweet"] { backdrop-filter: sepia(.3) saturate(.75) brightness(.58) blur(4px); -webkit-backdrop-filter: sepia(.3) saturate(.75) brightness(.58) blur(4px); background: radial-gradient(110% 85% at 50% 42%, rgba(255, 200, 225, .16), rgba(60, 10, 30, .45)); }
+.fg-recall:not(.is-light)[data-tone="sad"] { backdrop-filter: grayscale(.9) brightness(.45) blur(4px); -webkit-backdrop-filter: grayscale(.9) brightness(.45) blur(4px); background: radial-gradient(110% 85% at 50% 42%, rgba(150, 175, 215, .1), rgba(8, 14, 28, .55)); }
+.fg-recall:not(.is-light)[data-tone="sad"] .fg-actor { filter: grayscale(.75) brightness(.85); }
+.fg-recall:not(.is-light)[data-tone="dread"] { backdrop-filter: grayscale(.5) contrast(1.2) brightness(.35) blur(3px); -webkit-backdrop-filter: grayscale(.5) contrast(1.2) brightness(.35) blur(3px); background: none; }
+.fg-recall:not(.is-light)[data-tone="dread"] .fg-actor { filter: grayscale(.6) contrast(1.2) brightness(.8); }
+.fg-recall:not(.is-light)[data-tone="flash"] { backdrop-filter: brightness(.7) contrast(1.3) blur(2px); -webkit-backdrop-filter: brightness(.7) contrast(1.3) blur(2px); background: radial-gradient(110% 85% at 50% 42%, rgba(255, 255, 255, .12), rgba(0, 0, 0, .35)); }
+.fg-recall:not(.is-light)[data-tone="haze"] { backdrop-filter: brightness(.9) saturate(.7) blur(9px); -webkit-backdrop-filter: brightness(.9) saturate(.7) blur(9px); background: rgba(255, 248, 236, .28); }
+/* 小头像：甜蜜粉边柔光；伤感冷灰；不安暗红边、带噪点，时不时错位一下；猛然想起白边、弹出来；朦胧如梦边缘化开、慢慢浮现 */
+.fg-recall-face[data-tone="sweet"] { border-color: rgba(255, 182, 212, .75); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .4), 0 0 2.6cqw rgba(255, 170, 210, .45); background: radial-gradient(circle at 50% 40%, rgba(255, 190, 215, .45), rgba(60, 20, 36, .7)); }
+.fg-recall-face[data-tone="sweet"] img { filter: sepia(.12) saturate(1.05) brightness(1.06); }
+.fg-recall-face[data-tone="sad"] { border-color: rgba(172, 192, 222, .55); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .5); background: radial-gradient(circle at 50% 40%, rgba(70, 90, 122, .5), rgba(12, 18, 30, .8)); animation-duration: .9s; }
+.fg-recall-face[data-tone="sad"] img { filter: grayscale(.85) brightness(.92) contrast(.95); }
+.fg-recall-face[data-tone="sad"]::after { content: ""; position: absolute; inset: 0; background: rgba(80, 110, 160, .22); mix-blend-mode: soft-light; }
+.fg-recall-face[data-tone="dread"] { border-color: rgba(205, 42, 54, .75); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .55), 0 0 2cqw rgba(200, 20, 32, .42); background: #12060a; animation: fg-face-in .2s ease-out both, fg-face-jitter 2.6s steps(1) .4s infinite; }
+.fg-recall-face[data-tone="dread"] img { filter: grayscale(.55) contrast(1.25) brightness(.9); }
+.fg-recall-face[data-tone="dread"]::after { content: ""; position: absolute; inset: 0; background-image: var(--fg-noise); opacity: .35; mix-blend-mode: overlay; }
+@keyframes fg-face-jitter { 0%, 86%, 100% { transform: none; } 88% { transform: translate(.35cqw, -.15cqw); } 91% { transform: translate(-.3cqw, .12cqw); } 94% { transform: translate(.15cqw, 0); } }
+.fg-recall-face[data-tone="flash"] { border-color: rgba(255, 255, 255, .85); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .45), 0 0 2.4cqw rgba(255, 255, 255, .4); animation: fg-face-snap .35s cubic-bezier(.2, 1.6, .4, 1) both; }
+.fg-recall-face[data-tone="flash"] img { filter: contrast(1.15) saturate(.9); }
+@keyframes fg-face-snap { from { opacity: 0; transform: scale(.7); } }
+.fg-recall-face[data-tone="haze"] { border-color: rgba(255, 250, 240, .35); background: rgba(250, 244, 232, .35); box-shadow: 0 0 3cqw rgba(255, 250, 240, .35); animation-duration: 1.1s; }
+.fg-recall-face[data-tone="haze"] img { filter: blur(.6px) brightness(1.1) saturate(.8); -webkit-mask-image: radial-gradient(circle at 50% 48%, #000 45%, transparent 78%); mask-image: radial-gradient(circle at 50% 48%, #000 45%, transparent 78%); }
+/* 进短闪回的那一下：甜蜜泛起粉光、不安画面撕裂泛红闪两下、猛然想起白闪一下（都在对话框下面） */
+.fg-flash.is-bloom { z-index: 15; background: radial-gradient(90% 80% at 50% 45%, rgba(255, 222, 236, .72), rgba(255, 160, 200, .34)); animation: fg-bloom .9s ease-out both; }
+@keyframes fg-bloom { 0% { opacity: 0; } 30% { opacity: .85; } 100% { opacity: 0; } }
+.fg-flash.is-dread { z-index: 15; background: linear-gradient(transparent 0 18%, rgba(255, 30, 60, .45) 18% 21%, transparent 21% 57%, rgba(255, 255, 255, .35) 57% 58.5%, transparent 58.5%), radial-gradient(circle, rgba(120, 0, 15, .25), rgba(60, 0, 8, .88)); animation: fg-dread-in .6s steps(5) both; }
+@keyframes fg-dread-in { 0% { opacity: 0; } 20% { opacity: 1; } 40% { opacity: .2; } 60% { opacity: .9; transform: translateX(-.6%); } 80% { opacity: .3; transform: translateX(.5%); } 100% { opacity: 0; } }
+.fg-flash.is-snap { z-index: 15; animation: fg-flash .35s ease-out both; }
 @keyframes fg-flash { from { opacity: .95; } to { opacity: 0; } }
 /* 落字特效的闪光层：平时透明，由演出计划在某个字上点亮（Stage.jsx 的 useHits） */
 .fg-hitflash { position: absolute; inset: 0; z-index: 41; pointer-events: none; opacity: 0; background: #fff; }
@@ -935,6 +985,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .fg-bg, .fg-cg-img, .fg-cg-art, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-symbol-art, .fg-symbol-art svg { animation: none !important; }
+  .fg-recall::after, .fg-recall-face { animation: none !important; } /* 闪回里的光斑漂移、心跳脉动、小头像错位 */
+  .fg-flash.is-dread { animation: fg-bloom .6s ease-out both !important; } /* 撕裂闪烁换成淡入淡出 */
   .fg-cg-pan { animation: none !important; transform: scale(var(--r)); }
   .fg-cg:not(.is-leaving) { animation: fg-cg-fade-in .6s ease both !important; }
   .fg-cg.is-leaving { animation: fg-cg-fade-out .6s ease both !important; }

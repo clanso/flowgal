@@ -252,6 +252,37 @@ test('gate: 短闪回：导演给闪回的几句写 recall（不换场景）；�
   assert.equal(stageWalk(listed, units).steps[0].cast.length, 3)
 })
 
+test('gate: 短闪回的基调：导演写在 recall 上的照收；没写时按闪回里的情绪（不安 > 伤感 > 甜蜜）、再按当时的场景基调挑，都不像就是温暖怀念', async () => {
+  const { recallRuns, autoRecallTone } = await import('../lib/scenes.js')
+  const units = segmentTurn(['雨还在下。', '“别回头。”', '“快跑。”', '她握紧了拳头。', '“生日快乐。”'].join('\n'))
+  const s = normalizeScript({
+    scene: { location: '街道', mood: 'calm' },
+    lines: [
+      { u: 'U2', sp: '阿黛尔', recall: 'DREAD' },
+      { u: 'U3', sp: '阿黛尔', recall: 'warm' },
+      { u: 'U5', sp: '阿黛尔', emo: 'blush', recall: 'fog' },
+    ],
+  }, units)
+  assert.equal(s.lines.U2.recall, 'dread', '大小写不论')
+  assert.equal(s.lines.U5.recall, undefined, '不认识的基调不收')
+  const runs = recallRuns(s, units)
+  assert.equal(runs[1].tone, 'dread', '一段的基调看第一句写的')
+  assert.equal(runs[2], runs[1])
+  assert.equal(autoRecallTone(['smile', 'cry', 'blush'], 'sweet'), 'sad', '情绪先于场景基调，伤感先于甜蜜')
+  assert.equal(autoRecallTone(['love'], 'calm'), 'sweet')
+  assert.equal(autoRecallTone(['scared', 'sad'], 'sweet'), 'dread')
+  assert.equal(autoRecallTone([], 'eerie'), 'dread')
+  assert.equal(autoRecallTone(['neutral'], 'despair'), 'sad')
+  assert.equal(autoRecallTone(['smile'], 'daily'), 'warm')
+  // 剧场：导演写了的照用；没写的按情绪挑（自定义情绪看它的基础情绪），再按那一刻的场景基调
+  const tone = script => buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script }], images: [], emotions: [{ id: '压抑的思念', base: 'sad' }] }).beats[1].recall.tone
+  assert.equal(tone(s), 'dread')
+  const plain = { ...s, lines: { U2: { sp: '阿黛尔', recall: true, emo: '压抑的思念' } } }
+  assert.equal(tone(plain), 'sad')
+  assert.equal(tone({ ...plain, lines: { U2: { sp: '阿黛尔', recall: true } } }), 'warm', '平静的场景')
+  assert.equal(tone({ ...plain, scene: { location: '街道', mood: 'tense' }, lines: { U2: { sp: '阿黛尔', recall: true } } }), 'dread', '紧张的场景')
+})
+
 test('gate: 正文用【闪回】…【闪回结束】框起来的一段、回忆里的声音：导演没写 recall 也按短闪回演；导演写成回忆段落的不动', async () => {
   const { markRecalls } = await import('../lib/scenes.js')
   const units = segmentTurn(['是柯萝伊亲手绣的。', '【闪回演出：一瞬】', '“那个，阿黛尔。生日快乐。”', '“哎呀……是铃兰呢。”', '【闪回结束】', '“是那家伙的吗？”', '理由很简单：', '“在迷宫里，要好好吃饭哦。”'].join('\n'))
