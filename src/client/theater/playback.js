@@ -27,7 +27,7 @@ export const CG_OUT_LABEL = { dissolve: '溶回场景', slow: '慢慢淡去', bl
 export const CG_MOTION_LABEL = { still: '静止', push: '极慢推近', pan: '横移一遍' }
 export const CARD_LABEL = { sms: '短信', letter: '信', note: '便条', news: '报纸', terminal: '终端', notice: '告示', diary: '日记', scroll: '卷轴' }
 export const POS_LABEL = { farleft: '最左', left: '左', center: '中', right: '右', farright: '最右' }
-export const CAMERA_LABEL = { shake: '震动', zoom: '推近', zoomout: '拉远', flash: '闪白', pan: '平移', blur: '虚焦', fadeblack: '黑场', redflash: '红闪', tilt: '倾斜' }
+export const CAMERA_LABEL = { shake: '震动', zoom: '推近', zoomout: '拉远', flash: '闪白', pan: '平移', blur: '虚焦', fadeblack: '黑场', redflash: '红闪', tilt: '倾斜', closeup: '特写', focus: '背景虚化', whip: '甩镜', sink: '下沉', rise: '升起', lowangle: '仰拍', dolly: '希区柯克变焦', empty: '空镜', slowpush: '缓推' }
 export const SYMBOL_LABEL = { heart: '爱心', anger: '怒筋', sweat: '汗滴', sparkle: '闪光', surprise: '惊叹', gloom: '阴云', note: '音符', zzz: '睡着', bulb: '灵光', heartbreak: '心碎', sigh: '叹气', dizzy: '眩晕', fire: '燃起', blush: '红晕', bloom: '开花', silence: '无语' }
 export const TRANSITION_LABEL = { dissolve: '溶解', fade: '慢慢变化', cinematic: '电影黑边', wipe: '横扫', iris: '圆形收缩', strips: '百叶', black: '黑场', flash: '白闪', blink: '闭眼睁眼', glitch: '画面撕裂', swirl: '旋转入梦', haze: '起雾', none: '直接切' }
 const POS_X = { farleft: 14, left: 28, center: 50, right: 72, farright: 86 }
@@ -155,6 +155,7 @@ export function buildBeats(view) {
         emo: line.emo || '',
         sym: line.sym || '',
         cam: line.cam || '',
+        ...(line.camOn ? { camOn: line.camOn } : {}), // 镜头对准谁（不写是说话的人）
         say: line.say || '',
         stress: line.stress || '',
         ...(line.textfx ? { textfx: line.textfx } : {}), // 句中文字效果：某几个字发抖、放大、越说越小……

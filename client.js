@@ -385,7 +385,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   /* 竖屏手机：舞台铺满，立绘居中放大，对话框加高。 */
   .fg-stage { width: 100vw; height: 100vh; }
 }
-.fg-camera { position: absolute; inset: 0; transform-origin: 50% 45%; }
+.fg-camera { position: absolute; inset: 0; transform-origin: 50% 50%; }
 
 /* ── 背景层 ── */
 .fg-bg { position: absolute; inset: -3%; background-size: cover; background-position: center 42%; will-change: transform, opacity; }
@@ -447,7 +447,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }
 
 /* ── 立绘 ── */
-.fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; transition: right .65s cubic-bezier(.4, .1, .2, 1); }
+.fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
 .fg-cast[data-split] { right: 34%; }
 /* 分屏：右边斜切的一格，另一头的地点和人；白色斜边，滑进滑出；有插画时让开 */
 .fg-split { position: absolute; top: 0; bottom: 0; right: 0; width: 42%; z-index: 8; pointer-events: none; animation: fg-split-in .7s cubic-bezier(.2, .8, .2, 1) both; transition: opacity .6s ease; }
@@ -636,18 +636,36 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-cg-wait { position: absolute; right: 2.4%; top: 12%; z-index: 20; display: flex; align-items: center; gap: .6cqw; font-size: 1cqw; padding: .5cqw 1cqw; border-radius: 99px; background: var(--chip-bg); backdrop-filter: blur(8px); color: var(--ink-dim); }
 .fg-cg-wait i { width: .7cqw; height: .7cqw; border-radius: 50%; background: var(--accent); animation: fg-pulse 1.2s ease-in-out infinite; }
 
-/* ── 镜头 ── */
+/* ── 镜头 ──
+   推近、特写、仰拍、缓推、背景虚化、倾斜、下沉、升起、空镜、希区柯克变焦：过渡到那个样子停住，下一拍（data-cam 没了）缓回来。
+   对准人的那几种由 Stage.jsx 的 aimCamera 给 --zs 放大倍数、--tx / --ty 平移（脸停在画面中上，不推出框）。震动、甩镜、拉远、平移、虚焦演一下就完。 */
+.fg-camera { transition: transform 1s cubic-bezier(.4, 0, .2, 1); }
+.fg-camera[data-cam="zoom"], .fg-camera[data-cam="closeup"], .fg-camera[data-cam="slowpush"], .fg-camera[data-cam="focus"] { transform: scale(var(--zs, 1.12)) translate(var(--tx, 0%), var(--ty, 0%)); }
+.fg-camera[data-cam="zoom"] { transition: transform 1.6s cubic-bezier(.2, .7, .2, 1); }
+.fg-camera[data-cam="closeup"] { transition: transform .9s cubic-bezier(.2, .8, .2, 1); }
+.fg-camera[data-cam="slowpush"] { transition: transform 7s cubic-bezier(.3, 0, .4, 1); }
+.fg-camera[data-cam="focus"] { transition: transform 1.4s ease; }
+.fg-camera[data-cam="lowangle"] { transform: perspective(80cqw) rotateX(4deg) scale(var(--zs, 1.24)) translate(var(--tx, 0%), var(--ty, 0%)); transition: transform 1.3s cubic-bezier(.2, .7, .2, 1); }
+.fg-camera[data-cam="tilt"] { transform: rotate(-1.6deg) scale(1.05); transition: transform 1.2s ease; }
+.fg-camera[data-cam="sink"] { transform: translateY(-5%) scale(1.07); transition: transform 1.6s cubic-bezier(.4, 0, .2, 1); }
+.fg-camera[data-cam="rise"] { transform: translateY(5%) scale(1.07); transition: transform 1.6s cubic-bezier(.4, 0, .2, 1); }
+.fg-camera[data-cam="empty"] { transform: scale(1.04); transition: transform 3s ease; }
+/* 背景虚化只糊背景、人清楚；特写时背景也轻轻糊一点；空镜时人淡出、只剩背景；希区柯克变焦背景往前涌、人不动 */
+.fg-bg { transition: filter 1s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
+.fg-camera[data-cam="focus"] .fg-bg { filter: blur(6px) brightness(.86); }
+.fg-camera[data-cam="closeup"] .fg-bg { filter: blur(2.5px); }
+.fg-camera[data-cam="empty"] .fg-cast { opacity: 0; }
+.fg-camera[data-cam="dolly"] .fg-bg { scale: 1.28; }
+.fg-camera[data-cam="dolly"] .fg-cast { scale: .96; }
 .fg-camera[data-cam="shake"] { animation: fg-shake .5s linear; }
-.fg-camera[data-cam="zoom"] { animation: fg-zoom 1.6s cubic-bezier(.2, .7, .2, 1) both; }
+.fg-camera[data-cam="whip"] { animation: fg-whip .55s cubic-bezier(.6, 0, .3, 1); }
 .fg-camera[data-cam="zoomout"] { animation: fg-zoomout 1.6s cubic-bezier(.2, .7, .2, 1) both; }
 .fg-camera[data-cam="pan"] { animation: fg-pan 3s ease-in-out both; }
-.fg-camera[data-cam="tilt"] { animation: fg-tilt 1.2s ease both; }
 .fg-camera[data-cam="blur"] { animation: fg-blur 2.2s ease both; }
 @keyframes fg-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-1.2%, .6%); } 30% { transform: translate(1%, -.8%); } 45% { transform: translate(-.8%, .4%); } 60% { transform: translate(.6%, .6%); } 80% { transform: translate(-.3%, -.2%); } }
-@keyframes fg-zoom { from { transform: scale(1); } to { transform: scale(1.12); } }
+@keyframes fg-whip { 0% { transform: none; filter: none; } 35% { transform: translateX(-9%) scale(1.04); filter: blur(10px); } 60% { transform: translateX(2.5%) scale(1.02); filter: blur(3px); } 100% { transform: none; filter: none; } }
 @keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }
 @keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }
-@keyframes fg-tilt { 0% { transform: rotate(0); } 40% { transform: rotate(-2.4deg) scale(1.05); } 100% { transform: rotate(-1.4deg) scale(1.04); } }
 @keyframes fg-blur { 0% { filter: blur(0); } 30% { filter: blur(6px); } 100% { filter: blur(0); } }
 .fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }
 .fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }
@@ -1452,6 +1470,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-cg:not(.is-leaving) { animation: fg-cg-fade-in .6s ease both !important; }
   .fg-cg.is-leaving { animation: fg-cg-fade-out .6s ease both !important; }
   .fg-cg::before { display: none; }
+  .fg-camera[data-cam="whip"] { animation: none !important; }
   .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */
   .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }
   .fg-text.is-wait .fg-char { animation: none !important; }
@@ -2341,8 +2360,8 @@ function faceCrop(box, size) {
   const ok = Array.isArray(box) && box.length === 4 && box.every(Number.isFinite) && box[2] > box[0] && box[3] > box[1];
   const [x0, y0, x1, y1] = ok ? box : [w / 2 - FACE_RATIO * h / 2, (FACE_CENTER - FACE_RATIO / 2) * h, w / 2 + FACE_RATIO * h / 2, (FACE_CENTER + FACE_RATIO / 2) * h];
   const side = Math.min((y1 - y0) / 0.48, w, h);
-  const pct = (v) => round(v / side * 100);
-  return { width: pct(w), left: pct(-((x0 + x1) / 2 - side / 2)), top: pct(-((y0 + y1) / 2 - side * 0.52)) };
+  const pct2 = (v) => round(v / side * 100);
+  return { width: pct2(w), left: pct2(-((x0 + x1) / 2 - side / 2)), top: pct2(-((y0 + y1) / 2 - side * 0.52)) };
 }
 
 // lib/cast.js
@@ -2619,7 +2638,7 @@ var CG_OUT_LABEL = { dissolve: "溶回场景", slow: "慢慢淡去", black: "暗
 var CG_MOTION_LABEL = { still: "静止", push: "极慢推近", pan: "横移一遍" };
 var CARD_LABEL = { sms: "短信", letter: "信", note: "便条", news: "报纸", terminal: "终端", notice: "告示", diary: "日记", scroll: "卷轴" };
 var POS_LABEL = { farleft: "最左", left: "左", center: "中", right: "右", farright: "最右" };
-var CAMERA_LABEL = { shake: "震动", zoom: "推近", zoomout: "拉远", flash: "闪白", pan: "平移", blur: "虚焦", fadeblack: "黑场", redflash: "红闪", tilt: "倾斜" };
+var CAMERA_LABEL = { shake: "震动", zoom: "推近", zoomout: "拉远", flash: "闪白", pan: "平移", blur: "虚焦", fadeblack: "黑场", redflash: "红闪", tilt: "倾斜", closeup: "特写", focus: "背景虚化", whip: "甩镜", sink: "下沉", rise: "升起", lowangle: "仰拍", dolly: "希区柯克变焦", empty: "空镜", slowpush: "缓推" };
 var SYMBOL_LABEL = { heart: "爱心", anger: "怒筋", sweat: "汗滴", sparkle: "闪光", surprise: "惊叹", gloom: "阴云", note: "音符", zzz: "睡着", bulb: "灵光", heartbreak: "心碎", sigh: "叹气", dizzy: "眩晕", fire: "燃起", blush: "红晕", bloom: "开花", silence: "无语" };
 var TRANSITION_LABEL = { dissolve: "溶解", fade: "慢慢变化", cinematic: "电影黑边", wipe: "横扫", iris: "圆形收缩", strips: "百叶", black: "黑场", flash: "白闪", blink: "闭眼睁眼", glitch: "画面撕裂", swirl: "旋转入梦", haze: "起雾", none: "直接切" };
 var POS_X = { farleft: 14, left: 28, center: 50, right: 72, farright: 86 };
@@ -2741,6 +2760,8 @@ function buildBeats(view) {
         emo: line.emo || "",
         sym: line.sym || "",
         cam: line.cam || "",
+        ...line.camOn ? { camOn: line.camOn } : {},
+        // 镜头对准谁（不写是说话的人）
         say: line.say || "",
         stress: line.stress || "",
         ...line.textfx ? { textfx: line.textfx } : {},
@@ -3284,6 +3305,24 @@ function faceBoxFrom(rects, width, height) {
   const eyeBottom = Math.max(...eyes.map((r) => r[3]));
   const bottom = mouth ? Math.max(mouth[3], eyeBottom) : eyeBottom + 0.75 * d;
   return cleanFaceBox([Math.min(...eyes.map((r) => r[0])) - 0.15 * d, Math.min(...eyes.map((r) => r[1])) - 0.22 * d, Math.max(...eyes.map((r) => r[2])) + 0.15 * d, bottom + 0.22 * d], width, height);
+}
+
+// lib/camera.js
+var CAM_AIM = { zoom: [1.12, 0.4], closeup: [1.6, 1], lowangle: [1.24, 0.6], slowpush: [1.08, 0.5], focus: [1.04, 0.3] };
+var CAM_CENTER = [50, 36];
+var pct = (v) => Math.round(v * 100) / 100 + "%";
+function aimCamera(cam, face) {
+  const spec = CAM_AIM[cam];
+  if (!spec) return null;
+  const [zs, pull] = spec;
+  if (!face) return { "--zs": zs, "--tx": "0%", "--ty": "0%" };
+  const half = 50 / zs;
+  const [tx, ty] = [0, 1].map((i) => {
+    const want = face[i] + (CAM_CENTER[i] - face[i]) * pull;
+    const center2 = Math.min(100 - half, Math.max(half, face[i] - (want - 50) / zs));
+    return pct(50 - center2);
+  });
+  return { "--zs": zs, "--tx": tx, "--ty": ty };
 }
 
 // src/client/theater/AaSprite.jsx
@@ -5093,12 +5132,29 @@ function useHits(stageRef, flashRef, soundOn) {
     }
   }, [stageRef, flashRef]);
 }
-function useCamera(beat) {
-  const [cam, setCam] = import_react4.default.useState("");
+function faceAt(camera, name2) {
+  if (!camera || !name2) return null;
+  const actor = [...camera.querySelectorAll(".fg-actor:not(.is-leaving)")].find((el) => el.dataset.name === name2);
+  if (!actor || !camera.offsetWidth || !camera.offsetHeight) return null;
+  let x = actor.offsetLeft;
+  const head = parseFloat(actor.style.getPropertyValue("--head"));
+  const k = parseFloat(actor.style.getPropertyValue("--k")) || 1;
+  let y = actor.offsetTop + actor.offsetHeight * ((Number.isFinite(head) ? head / 100 : 0.1) + (0.08 + FACE_RATIO / 2) * k);
+  for (let el = actor.offsetParent; el && el !== camera && camera.contains(el); el = el.offsetParent) {
+    x += el.offsetLeft;
+    y += el.offsetTop;
+  }
+  return [x / camera.offsetWidth * 100, y / camera.offsetHeight * 100];
+}
+function useCamera(beat, cameraRef) {
+  const [cam, setCam] = import_react4.default.useState({ kind: "", style: null });
   import_react4.default.useEffect(() => {
-    setCam("");
+    setCam((c) => c.kind ? { kind: "", style: null } : c);
     if (!beat || !beat.cam) return void 0;
-    const raf = requestAnimationFrame(() => setCam(beat.cam));
+    const raf = requestAnimationFrame(() => {
+      const who = beat.camOn || (beat.speakers ? beat.speakers[0] : beat.speaker);
+      setCam({ kind: beat.cam, style: aimCamera(beat.cam, faceAt(cameraRef && cameraRef.current, who)) });
+    });
     return () => cancelAnimationFrame(raf);
   }, [beat && beat.key]);
   return cam;
@@ -5549,13 +5605,13 @@ async function autoFrame(img, run, { ground = null, fine = false } = {}) {
   const notes = [];
   const W = img.width, H = img.height;
   const whole = [0, 0, W, H];
-  const pct = (s) => Math.round(s * 100) + "%";
+  const pct2 = (s) => Math.round(s * 100) + "%";
   let face = null, faceScore = 0, view = null, big = false;
   const f = mainFace(await run("face", whole, fitSize(W, H)), W, H);
   if (f && f.score >= 0.5) {
     face = f.box;
     faceScore = f.score;
-    notes.push(`认到脸（把握 ${pct(f.score)}）`);
+    notes.push(`认到脸（把握 ${pct2(f.score)}）`);
   } else {
     const h = mainFace(await run("head", whole, fitSize(W, H)), W, H);
     if (ground) {
@@ -5572,12 +5628,12 @@ async function autoFrame(img, run, { ground = null, fine = false } = {}) {
     if (!face && h) {
       face = faceFromHead(h.box);
       faceScore = h.score * 0.7;
-      notes.push(`没认准脸，按头的位置估（把握 ${pct(h.score)}）`);
+      notes.push(`没认准脸，按头的位置估（把握 ${pct2(h.score)}）`);
     }
     if (!face && f) {
       face = f.box;
       faceScore = f.score;
-      notes.push(`认到脸，但把握不大（${pct(f.score)}）`);
+      notes.push(`认到脸，但把握不大（${pct2(f.score)}）`);
     }
     if (!face) return null;
   }
@@ -7719,7 +7775,7 @@ function ScriptView({ script, units }) {
       l.voice && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "voice", k: "声音" }, VOICE_LABEL[l.voice] || l.voice),
       l.split && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "split", k: "分屏" }, l.split === "off" ? "收起" : l.split.who.join("、") + (l.split.location ? ` @ ${l.split.location}` : "")),
       l.sym && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "sym", k: "符号" }, SYMBOL_LABEL[l.sym] || l.sym),
-      l.cam && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cam", k: "镜头" }, CAMERA_LABEL[l.cam] || l.cam),
+      l.cam && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cam", k: "镜头" }, CAMERA_LABEL[l.cam] || l.cam, l.camOn ? ` · ${l.camOn}` : ""),
       l.card && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "card", k: "卡片" }, CARD_LABEL[l.card] || l.card),
       l.cut && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cut", k: "字卡" }, l.cut.text),
       l.mode && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "mode", k: "段落" }, MODE_LABEL[l.mode] || l.mode),
@@ -7998,7 +8054,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   import_react11.default.useEffect(() => {
     if (beat && beat.sym === "bulb" && sfxOn) stinger("ding");
   }, [beat && beat.key]);
-  const cam = useCamera(title ? null : beat);
+  const cameraRef = import_react11.default.useRef(null);
+  const cam = useCamera(title ? null : beat, cameraRef);
   const atEnd = beat && index === beats.length - 1;
   import_react11.default.useEffect(() => {
     loadSkinFonts(ui0.skin, ui0.fontBase);
@@ -8216,7 +8273,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         if (!title && !panel && e.deltaY < -30) setPanel("log");
       }
     },
-    /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-camera", "data-cam": cam }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-world", "data-fx": atmosphere ? stageScene.fx : "" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-world-in", "data-mode": atmosphere ? stageMode : "", "data-tr": stageTr === "haze" || stageTr === "wake" ? stageTr : void 0 }, /* @__PURE__ */ import_react11.default.createElement(Backdrop, { scene: stageScene, view, transition: stageTr || "dissolve" }), /* @__PURE__ */ import_react11.default.createElement("div", { className: `fg-grade${backgroundFor(stageScene, view).src ? " is-drawn" : ""}`, "data-time": stageScene.time }), stageBeat && /* @__PURE__ */ import_react11.default.createElement(Cast, { beat: title || stageBeat.recall || waking ? { ...stageBeat, speaker: "", speakers: null, sym: "" } : stageBeat, view, talk: title || stageBeat.recall || waking ? null : talk, max: ui0.maxOnStage ?? 5 }), /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "tone", value: atmosphere && stageScene.mood !== "daily" ? stageScene.mood : "", ms: 1600 }), /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "light", value: atmosphere && stageScene.light !== "normal" ? stageScene.light : "", ms: 700 }), stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(CgLayer, { beat: stageBeat, sound: sfxOn }), /* @__PURE__ */ import_react11.default.createElement(Particles, { weather: stageScene.weather, enabled: ui0.particles !== false, speed: atmosphere ? TIME_FLOW[stageScene.fx] ?? 1 : 1 }), stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(SplitPanel, { beat: stageBeat, view, talk }), stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(RecallLayer, { beat: stageBeat, view, talk, light: recallStyle !== "ghost", tone: recallTone }), /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "fxlayer", value: atmosphere && stageScene.fx !== "none" ? stageScene.fx : "", ms: 900 }), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-vignette" })))),
+    /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-camera", ref: cameraRef, "data-cam": cam.kind || void 0, style: cam.style || void 0 }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-world", "data-fx": atmosphere ? stageScene.fx : "" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-world-in", "data-mode": atmosphere ? stageMode : "", "data-tr": stageTr === "haze" || stageTr === "wake" ? stageTr : void 0 }, /* @__PURE__ */ import_react11.default.createElement(Backdrop, { scene: stageScene, view, transition: stageTr || "dissolve" }), /* @__PURE__ */ import_react11.default.createElement("div", { className: `fg-grade${backgroundFor(stageScene, view).src ? " is-drawn" : ""}`, "data-time": stageScene.time }), stageBeat && /* @__PURE__ */ import_react11.default.createElement(Cast, { beat: title || stageBeat.recall || waking ? { ...stageBeat, speaker: "", speakers: null, sym: "" } : stageBeat, view, talk: title || stageBeat.recall || waking ? null : talk, max: ui0.maxOnStage ?? 5 }), /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "tone", value: atmosphere && stageScene.mood !== "daily" ? stageScene.mood : "", ms: 1600 }), /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "light", value: atmosphere && stageScene.light !== "normal" ? stageScene.light : "", ms: 700 }), stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(CgLayer, { beat: stageBeat, sound: sfxOn }), /* @__PURE__ */ import_react11.default.createElement(Particles, { weather: stageScene.weather, enabled: ui0.particles !== false, speed: atmosphere ? TIME_FLOW[stageScene.fx] ?? 1 : 1 }), stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(SplitPanel, { beat: stageBeat, view, talk }), stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(RecallLayer, { beat: stageBeat, view, talk, light: recallStyle !== "ghost", tone: recallTone }), /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "fxlayer", value: atmosphere && stageScene.fx !== "none" ? stageScene.fx : "", ms: 900 }), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-vignette" })))),
     /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "mode", value: atmosphere ? stageMode : "", ms: stageTr === "wake" ? 200 : stageTr === "haze" ? 2400 : 1200 }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking }),
     /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),

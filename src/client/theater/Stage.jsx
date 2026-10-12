@@ -7,7 +7,8 @@ import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, cgSrc, cgEntr
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
-import { heightOf, placeSprite, faceCrop } from '../../../lib/stature.js'
+import { heightOf, placeSprite, faceCrop, FACE_RATIO } from '../../../lib/stature.js'
+import { aimCamera } from '../../../lib/camera.js'
 import { reactKind } from '../../../lib/blocking.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger } from './audio.js'
@@ -669,13 +670,36 @@ export function useHits(stageRef, flashRef, soundOn) {
   }, [stageRef, flashRef])
 }
 
-/** 镜头：每一拍重新触发一次动画。 */
-export function useCamera(beat) {
-  const [cam, setCam] = React.useState('')
+/**
+ * 台上某人脸的位置（占镜头框的 %）。按布局算（offsetLeft / offsetTop 不受正在演的反应、转身、镜头本身的缩放影响）：
+ * 立绘用 left 定位、translateX(-50%) 居中，所以 offsetLeft 就是中线；脸的中心在额头（--head，lib/stature.js 的 placeSprite）往下
+ * 「额头到脸框上沿 + 半个脸框」那么多（按这张图的缩放 --k）。人不在台上返回 null。
+ */
+export function faceAt(camera, name) {
+  if (!camera || !name) return null
+  const actor = [...camera.querySelectorAll('.fg-actor:not(.is-leaving)')].find(el => el.dataset.name === name)
+  if (!actor || !camera.offsetWidth || !camera.offsetHeight) return null
+  let x = actor.offsetLeft
+  const head = parseFloat(actor.style.getPropertyValue('--head'))
+  const k = parseFloat(actor.style.getPropertyValue('--k')) || 1
+  let y = actor.offsetTop + actor.offsetHeight * ((Number.isFinite(head) ? head / 100 : 0.1) + (0.08 + FACE_RATIO / 2) * k)
+  for (let el = actor.offsetParent; el && el !== camera && camera.contains(el); el = el.offsetParent) { x += el.offsetLeft; y += el.offsetTop }
+  return [x / camera.offsetWidth * 100, y / camera.offsetHeight * 100]
+}
+
+/**
+ * 镜头：每一拍重新来一次。推近、特写、仰拍这类停在推到的地方，下一拍缓回来（theater.css 的过渡）；
+ * 震动、甩镜、闪白这类演一下就完。对准谁看 camOn，不写是说话的人；按这一拍台上的站位算（所以等这一拍的立绘排好、下一帧再动）。
+ */
+export function useCamera(beat, cameraRef) {
+  const [cam, setCam] = React.useState({ kind: '', style: null })
   React.useEffect(() => {
-    setCam('')
+    setCam(c => (c.kind ? { kind: '', style: null } : c))
     if (!beat || !beat.cam) return undefined
-    const raf = requestAnimationFrame(() => setCam(beat.cam))
+    const raf = requestAnimationFrame(() => {
+      const who = beat.camOn || (beat.speakers ? beat.speakers[0] : beat.speaker)
+      setCam({ kind: beat.cam, style: aimCamera(beat.cam, faceAt(cameraRef && cameraRef.current, who)) })
+    })
     return () => cancelAnimationFrame(raf)
   }, [beat && beat.key])
   return cam
