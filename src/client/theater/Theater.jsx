@@ -2,7 +2,7 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS } from './playback.js'
-import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, CutIn, BattleCard, HitBanner, MomentLayer, Fireworks, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, CutIn, BattleCard, HitBanner, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -396,6 +396,11 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {beat && !title && beat.cutin && <CutIn key={beat.key} beat={beat} view={view} sound={sfxOn} />}
         {beat && !title && beat.hit && <HitBanner key={beat.key} beat={beat} sound={sfxOn} fx={hit} />}
         {beat && !title && beat.moment && <MomentLayer key={beat.key} beat={beat} view={view} sound={sfxOn} />}
+        {/* 手机：响着的来电 / 拨出、视频通话的小窗、挂断的小卡、通知横幅（「通话中」在右上角） */}
+        {beat && !title && beat.call && beat.call.state === 'ringing' && <PhoneRing key={beat.call.id} beat={beat} view={view} sound={sfxOn} />}
+        {beat && !title && beat.call && beat.call.state === 'live' && beat.call.video && !(beat.split && beat.split.who.includes(beat.call.who)) && <VideoPip key={beat.call.id} beat={beat} view={view} />}
+        {beat && !title && beat.phone && beat.phone.kind === 'end' && <PhoneEnd key={beat.key} beat={beat} view={view} sound={sfxOn} />}
+        {beat && !title && beat.phone && (beat.phone.kind === 'notify' || beat.phone.kind === 'voicemail') && <PhoneBanner key={beat.key} beat={beat} view={view} sound={sfxOn} />}
         {beat && !title && beat.battleEdge && speed > 0 && <BattleCard key={beat.key} beat={beat} sound={sfxOn} />}
         {!panel && <RestartNotice floating />}
         {beat && !title && <TitleCard beat={beat} delay={speed > 0 ? (beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0) : 0} />}
@@ -424,6 +429,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
           <div className="fg-topright" onClick={e => e.stopPropagation()}>
             {directing && <button type="button" className="fg-pill is-busy is-link" title="看导演正在写什么" onClick={() => setPanel('director')}>导演整理中 ›</button>}
             {drawing > 0 && <span className="fg-pill is-busy">出图 {drawing}</span>}
+            {beat && beat.call && beat.call.state === 'live' && <CallChip key={beat.call.id} call={beat.call} sound={sfxOn} />}
             {track && <span className="fg-pill" title={track.name}>♪ {track.name}</span>}
             {viewError && <span className="fg-pill fg-err" title={viewError}>连接中断，重连中</span>}
             <button type="button" className="fg-iconbtn" title="回到聊天（Esc）" onClick={close}>✕</button>

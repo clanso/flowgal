@@ -13,7 +13,7 @@
 // 第 3 轮的原文像很多角色卡那样夹着状态栏、变量更新和章节尾巴（raw），导演把它们标成不演。
 // 场景逐句变：第 3 轮闪电那句路灯闪烁、苏晴跑走后暗下来；第 4 轮先出「翌日 放学后」字卡，中途进入三年前的回忆，
 // 回到现实时灯一盏盏熄灭（换成诡异、停掉音乐），林岚在黑暗里出现时打上一束光。
-// 特效：第 3 轮苏晴说出「掉下去了」时慢动作，林岚打来电话时分屏、她的声音隔着电话；
+// 特效：第 3 轮苏晴说出「掉下去了」时慢动作；手机：林岚打来电话（手机响起、接通后分屏、她的声音隔着电话、她先挂断），最后苏晴发来一条消息；
 // 短闪回：第 3 轮苏晴凑过来时，我想起林岚塞信封时的一句话。
 // 插画的出现和消失：第 1 轮从局部拉开，第 2 轮柔光渐显、轻轻起伏、溶回场景，第 4 轮的回忆像照片一样落下，回到现实时碎裂。
 export const CARD = { id: 'preview-card', name: '放学后的约定' }
@@ -153,12 +153,12 @@ export function directorReply(turn, units) {
       L('有人从窗口', { sp: '苏晴', emo: 'cry', say: 'breakdown', stress: '掉下去了', scene: { fx: 'slowmo' } }),
       L('一道闪电', { cam: 'flash', scene: { light: 'flicker', fx: 'none' } }),
       L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: [{ name: '苏晴', how: 'run' }], scene: { light: 'dim', mood: 'sad', bars: 'none' } }),
-      L('口袋里的手机震了起来', { split: { who: ['林岚'], location: '琴房', bg: 'music room, grand piano, night, moonlight through window, scenery, no humans' } }),
-      L('信，看到了吗', { sp: '林岚', emo: 'smile', voice: 'phone' }),
+      L('口袋里的手机震了起来', { phone: { kind: 'call', who: '林岚' } }),
+      L('信，看到了吗', { sp: '林岚', emo: 'smile', split: { who: ['林岚'], location: '琴房', bg: 'music room, grand piano, night, moonlight through window, scenery, no humans' } }),
       L('学姐，旧校舍到底', { sp: '我', emo: 'worried', say: 'hesitant' }),
-      L('明天你就知道了', { sp: '林岚', emo: 'serious', voice: 'phone', say: 'whisper' }),
-      L('电话挂断了', { split: 'off' }),
-      L('到底想告诉我什么', { sp: '我', sym: 'gloom', cam: 'empty' }),
+      L('明天你就知道了', { sp: '林岚', emo: 'serious', say: 'whisper' }),
+      L('电话挂断了', { split: 'off', phone: { kind: 'end', result: 'hungup' } }),
+      L('到底想告诉我什么', { sp: '我', sym: 'gloom', cam: 'empty', phone: { kind: 'notify', who: '苏晴', text: '明天……千万别一个人去。' } }),
     ],
     skip: [find(units, '状态栏'), find(units, '19:40'), find(units, '林岚 52'), find(units, '第三章 · 完')],
     choices: ['答应赴约，一个人去旧校舍', '拉上苏晴一起去', '先打电话问林岚本人'],

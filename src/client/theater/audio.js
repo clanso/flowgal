@@ -139,6 +139,7 @@ function playParts(ac, parts, { rate = 1, volume = 1, at = ac.currentTime, out =
     const peak = Math.max(0.0002, part.gain * volume)
     const attack = part.attack ?? (part.wave === 'noise' ? 0 : 0.006)
     if (attack > 0) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + attack) } else g.gain.setValueAtTime(peak, t)
+    if (part.hold) g.gain.setValueAtTime(peak, t + attack + part.hold) // 拉长的音（电话的嘟——）：先稳住再收
     g.gain.exponentialRampToValueAtTime(0.0001, end)
     let src, head
     if (part.wave === 'noise') {

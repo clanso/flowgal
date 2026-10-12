@@ -478,6 +478,68 @@
 @keyframes fg-fw-rise { 0% { opacity: 1; top: 100%; } 85% { opacity: 1; } 100% { opacity: 0; top: var(--y); } }
 @keyframes fg-fw-burst { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.1); } 60% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -40%) scale(1); } }
 @keyframes fg-fw-glow { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+/* 手机：来电 / 拨出时右边滑进来一部响着的手机，接通后收成右上角的「通话中」；挂断的小卡；视频通话的小窗；通知横幅 */
+.fg-phone { position: absolute; right: 4.5%; top: 13%; z-index: 18; pointer-events: none; animation: fg-phone-in .5s cubic-bezier(.2, .9, .3, 1.1) both; }
+.fg-phone-card { width: 17cqw; box-sizing: border-box; padding: 1.5cqw 1.4cqw 1.6cqw; border-radius: 2cqw; text-align: center; color: #fff;
+  background: linear-gradient(180deg, rgba(40, 44, 58, .86), rgba(18, 20, 28, .9)); border: 1px solid rgba(255, 255, 255, .16); box-shadow: 0 1.4cqw 3.4cqw rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.fg-phone[data-side="left"] { right: auto; left: 4.5%; } /* 分屏在右边开着时 */
+.fg-phone[data-dir="in"] .fg-phone-card { animation: fg-phone-buzz .78s ease-in-out .1s 2; }
+.fg-phone-label { display: flex; align-items: center; justify-content: center; gap: .4cqw; font-size: 1.05cqw; letter-spacing: .24em; color: rgba(255, 255, 255, .72); }
+.fg-phone-label svg { width: 1.2cqw; height: 1.2cqw; }
+.fg-phone-avatar { position: relative; width: 7.4cqw; height: 7.4cqw; margin: 1.2cqw auto .8cqw; }
+.fg-phone-face, .fg-pip-face, .fg-notify-icon { position: relative; overflow: hidden; display: grid; place-items: center; color: #fff; font-weight: 700; background: radial-gradient(circle at 50% 35%, color-mix(in oklab, var(--who, #8aa4ff) 70%, #fff), var(--who, #8aa4ff)); }
+.fg-phone-face img, .fg-pip-face img, .fg-notify-icon img { position: absolute; max-width: none; height: auto; }
+.fg-phone-face { width: 100%; height: 100%; border-radius: 50%; font-size: 3.2cqw; box-shadow: 0 0 0 .25cqw rgba(255, 255, 255, .85), 0 .5cqw 1.4cqw rgba(0, 0, 0, .4); }
+.fg-phone-ripple { position: absolute; inset: 0; border-radius: 50%; border: .2cqw solid rgba(140, 255, 190, .8); opacity: 0; animation: fg-phone-ripple 1.2s ease-out infinite; }
+.fg-phone-name { font-family: var(--font-display); font-size: 2cqw; font-weight: 700; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fg-phone-keys { display: flex; justify-content: center; gap: 3.4cqw; margin-top: 1.4cqw; }
+.fg-phone-key { display: grid; place-items: center; width: 3.6cqw; height: 3.6cqw; border-radius: 50%; color: #fff; background: #f2484f; box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35); }
+.fg-phone-key svg { width: 55%; height: 55%; }
+.fg-phone-key.is-decline svg { transform: rotate(135deg); }
+.fg-phone-key.is-accept { background: #34c759; animation: fg-phone-accept 1.1s ease-in-out infinite; }
+.fg-phone[data-dir="out"] .fg-phone-label::after { content: ""; display: inline-block; width: 1.6cqw; height: .3cqw; margin-left: .3cqw; background: radial-gradient(circle, currentColor 40%, transparent 45%) 0 50% / .55cqw .3cqw repeat-x; animation: fg-phone-dots 1.2s steps(4) infinite; }
+.fg-phone.is-end { animation: fg-phone-in .4s cubic-bezier(.2, .9, .3, 1.1) both, fg-fade-out .45s ease var(--hold, 2s) forwards; }
+.fg-phone.is-end .fg-phone-face { filter: grayscale(.6) brightness(.85); }
+.fg-phone-result { display: flex; align-items: center; justify-content: center; gap: .5cqw; margin-top: .6cqw; font-size: 1.3cqw; letter-spacing: .12em; color: rgba(255, 255, 255, .8); font-variant-numeric: tabular-nums; }
+.fg-phone-result i { display: grid; place-items: center; width: 1.9cqw; height: 1.9cqw; border-radius: 50%; background: #f2484f; }
+.fg-phone-result svg { width: 60%; height: 60%; transform: rotate(135deg); color: #fff; }
+.fg-phone.is-end[data-result="missed"] .fg-phone-result, .fg-phone.is-end[data-result="declined"] .fg-phone-result, .fg-phone.is-end[data-result="hungup"] .fg-phone-result { color: #ff8a8f; }
+@keyframes fg-phone-in { from { opacity: 0; transform: translateX(6cqw) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes fg-phone-buzz { 0%, 46%, 100% { transform: none; } 6%, 18%, 30% { transform: translateX(-.3cqw) rotate(-1.5deg); } 12%, 24%, 36% { transform: translateX(.3cqw) rotate(1.5deg); } }
+@keyframes fg-phone-ripple { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.55); } }
+@keyframes fg-phone-accept { 0%, 100% { transform: none; box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35), 0 0 0 0 rgba(52, 199, 89, .6); } 50% { transform: translateY(-.25cqw); box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35), 0 0 0 .8cqw rgba(52, 199, 89, 0); } }
+@keyframes fg-phone-dots { from { width: 0; } to { width: 1.65cqw; } }
+.fg-call-chip { color: #b8ffd0; border-color: rgba(52, 199, 89, .55); background: rgba(10, 40, 22, .62); animation: fg-call-chip .45s cubic-bezier(.2, .9, .3, 1.2) both; }
+.fg-call-chip svg { width: 1.05cqw; height: 1.05cqw; }
+.fg-call-chip b { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .06em; color: #fff; }
+.fg-call-dot { width: .6cqw; height: .6cqw; border-radius: 50%; background: #34c759; box-shadow: 0 0 .6cqw #34c759; animation: fg-call-dot 1.4s ease-in-out infinite; }
+@keyframes fg-call-chip { from { opacity: 0; transform: translateX(3cqw) scale(.8); } to { opacity: 1; transform: none; } }
+@keyframes fg-call-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.fg-pip { position: absolute; right: 2.2%; top: 10%; z-index: 17; width: 12cqw; aspect-ratio: 3 / 4; border-radius: 1.2cqw; overflow: hidden; pointer-events: none;
+  border: .2cqw solid rgba(255, 255, 255, .75); box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .5); background: #111; animation: fg-phone-in .5s cubic-bezier(.2, .9, .3, 1.1) both; transition: border-color .3s, box-shadow .3s; }
+.fg-pip.is-talking { border-color: #34c759; box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .5), 0 0 1.4cqw rgba(52, 199, 89, .6); }
+.fg-pip-face { position: absolute; inset: 0; font-size: 4cqw; }
+.fg-pip-face img { filter: saturate(1.05) contrast(1.03); }
+.fg-pip-face::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .03) 0 1px, transparent 1px 3px), linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, .55)); }
+.fg-pip-name { position: absolute; left: .8cqw; right: .8cqw; bottom: .7cqw; display: flex; align-items: center; gap: .4cqw; font-size: 1.05cqw; letter-spacing: .1em; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fg-pip-name i { flex: none; width: .55cqw; height: .55cqw; border-radius: 50%; background: #ff453a; animation: fg-call-dot 1.4s ease-in-out infinite; }
+.fg-notify { position: absolute; left: 50%; top: 3%; z-index: 23; display: flex; gap: 1cqw; align-items: flex-start; width: 36cqw; box-sizing: border-box; padding: 1cqw 1.3cqw; border-radius: 1.6cqw; pointer-events: none; color: #fff;
+  background: rgba(30, 32, 40, .78); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .45); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  transform: translateX(-50%); animation: fg-notify-in .5s cubic-bezier(.2, .9, .3, 1.15) both, fg-notify-out .4s cubic-bezier(.6, 0, .8, .4) var(--hold, 3s) forwards; }
+.fg-notify-icon { flex: none; width: 3.4cqw; height: 3.4cqw; border-radius: .9cqw; font-size: 1.7cqw; }
+.fg-notify-body { flex: 1; min-width: 0; }
+.fg-notify-head { display: flex; justify-content: space-between; gap: 1cqw; font-size: 1.15cqw; }
+.fg-notify-head b { font-weight: 700; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fg-notify-head span { flex: none; color: rgba(255, 255, 255, .55); font-size: 1cqw; }
+.fg-notify-text { margin-top: .2cqw; font-size: 1.3cqw; line-height: 1.45; color: rgba(255, 255, 255, .9); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fg-notify-wave { display: flex; align-items: center; gap: .22cqw; height: 2cqw; margin-top: .4cqw; }
+.fg-notify-wave i { width: .22cqw; height: var(--h, 50%); border-radius: 1px; background: rgba(255, 255, 255, .75); transform-origin: 50% 50%; animation: fg-notify-wave .9s ease-in-out infinite alternate; }
+.fg-notify-wave .fg-notify-play { width: 0; height: 0; margin-right: .6cqw; border-radius: 0; background: none; border-left: .9cqw solid #34c759; border-top: .55cqw solid transparent; border-bottom: .55cqw solid transparent; animation: none; }
+.fg-notify[data-kind="voicemail"] .fg-notify-head b { color: #b8ffd0; }
+@keyframes fg-notify-in { from { opacity: 0; transform: translateX(-50%) translateY(-120%); } to { opacity: 1; transform: translateX(-50%); } }
+@keyframes fg-notify-out { to { opacity: 0; transform: translateX(-50%) translateY(-120%); } }
+@keyframes fg-notify-wave { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
 /* 被打的不在台上（主角、画外的人）：整个画面替他挨这一下 */
 .fg-hurt { position: absolute; inset: 0; z-index: 17; pointer-events: none; animation: fg-hurt .7s ease-out both; background: radial-gradient(ellipse at center, transparent 45%, rgba(220, 20, 40, .55)); }
 .fg-hurt[data-effect="crit"] { background: radial-gradient(ellipse at center, rgba(255, 40, 40, .12) 30%, rgba(230, 10, 30, .75)); animation-duration: 1s; }
@@ -1377,6 +1439,17 @@
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
   .fg-recall-face { width: 17cqw; }
+  .fg-phone { top: 16%; } .fg-phone-card { width: 34cqw; padding: 3cqw 2.6cqw; border-radius: 4cqw; }
+  .fg-phone-label { font-size: 2.4cqw; } .fg-phone-label svg { width: 2.6cqw; height: 2.6cqw; }
+  .fg-phone-avatar { width: 15cqw; height: 15cqw; margin: 2.4cqw auto 1.6cqw; } .fg-phone-face { font-size: 6.4cqw; }
+  .fg-phone-name { font-size: 4.2cqw; } .fg-phone-keys { gap: 7cqw; margin-top: 2.6cqw; } .fg-phone-key { width: 8cqw; height: 8cqw; }
+  .fg-phone-result { font-size: 2.8cqw; } .fg-phone-result i { width: 4cqw; height: 4cqw; }
+  .fg-call-chip svg { width: 2.6cqw; height: 2.6cqw; } .fg-call-dot { width: 1.4cqw; height: 1.4cqw; }
+  .fg-pip { width: 24cqw; top: 9%; border-radius: 2.4cqw; } .fg-pip-name { font-size: 2.4cqw; left: 1.6cqw; bottom: 1.4cqw; } .fg-pip-name i { width: 1.2cqw; height: 1.2cqw; }
+  .fg-notify { width: 88cqw; top: 2.4%; padding: 2.2cqw 2.8cqw; gap: 2.2cqw; border-radius: 3.4cqw; }
+  .fg-notify-icon { width: 8cqw; height: 8cqw; border-radius: 2cqw; font-size: 4cqw; }
+  .fg-notify-head { font-size: 2.8cqw; } .fg-notify-head span { font-size: 2.4cqw; } .fg-notify-text { font-size: 3.2cqw; }
+  .fg-notify-wave { height: 4.4cqw; gap: .5cqw; } .fg-notify-wave i { width: .5cqw; }
   .fg-text { font-size: 4.6cqw; top: 18%; bottom: 26%; }
   .fg-progress { bottom: 12%; right: 4.2%; }
   .fg-quick { bottom: 5%; left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }

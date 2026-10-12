@@ -11,7 +11,7 @@ import { heightOf, placeSprite, faceCrop, bandCrop, FACE_RATIO } from '../../../
 import { aimCamera } from '../../../lib/camera.js'
 import { reactKind } from '../../../lib/blocking.js'
 import { BATTLE_END_LABEL } from '../../../lib/vocab.js'
-import { MOMENT_FOLEY } from '../../../lib/foley.js'
+import { MOMENT_FOLEY, PHONE_FOLEY } from '../../../lib/foley.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger, foley } from './audio.js'
 
@@ -509,12 +509,10 @@ export function RecallLayer({ beat, view, talk, light = false, tone = '' }) {
  * 短闪回的小头像：回忆里正在开口的人，按当时的样子（导演写的 then）取这句情绪的立绘，裁出脸，放在对话框右上角，色调和出现的样子跟着基调变。
  * 只在台词、心声上出；旁白、没有档案的人、还没画立绘的人不出。
  */
-export function RecallFace({ beat, view, tone = '' }) {
-  const recall = beat && beat.recall
-  const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
-  const name = recall && beat.type !== 'narration' ? (beat.speakers || [beat.speaker]).find(n => recall.who.includes(n) && people.has(n)) : ''
-  const person = name ? people.get(name) : null
-  const sprite = person ? spriteFor(person, beat.turn, beat.emotions[name] || 'neutral', view && view.emotions, recall.then && recall.then[name]) : ''
+/** 这个人这一拍的脸（小头像用）：立绘的地址和裁成正方形小格的位置（faceCrop）；没有立绘时 src 为空。 */
+function useFace(person, beat, view, then = null) {
+  const name = person ? person.name : ''
+  const sprite = person ? spriteFor(person, beat.turn, beat.emotions[name] || 'neutral', view && view.emotions, then) : ''
   const src = sprite ? assetUrl(sprite) : ''
   const [size, setSize] = React.useState(null)
   React.useEffect(() => {
@@ -526,9 +524,18 @@ export function RecallFace({ beat, view, tone = '' }) {
     img.src = src
     return () => { live = false }
   }, [src])
-  if (!src) return null
+  if (!src) return { src: '', crop: null }
   const record = Object.values(person.sprites || {}).find(r => r && r.assetId === sprite)
-  const crop = faceCrop(faceBoxOf(record, size), size)
+  return { src, crop: faceCrop(faceBoxOf(record, size), size) }
+}
+
+export function RecallFace({ beat, view, tone = '' }) {
+  const recall = beat && beat.recall
+  const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
+  const name = recall && beat.type !== 'narration' ? (beat.speakers || [beat.speaker]).find(n => recall.who.includes(n) && people.has(n)) : ''
+  const person = name ? people.get(name) : null
+  const { src, crop } = useFace(person, beat, view, recall && recall.then && recall.then[name])
+  if (!src) return null
   return (
     <div className="fg-recall-face" key={name} data-tone={tone || recall.tone || 'warm'} style={{ '--speaker': person.color || undefined }} aria-hidden="true">
       {crop && <img src={src} alt="" draggable="false" style={{ width: crop.width + '%', left: crop.left + '%', top: crop.top + '%' }} />}
@@ -764,6 +771,136 @@ export function Fireworks({ sound = true }) {
           <i className="fg-fw-glow" /><i className="fg-fw-trail" /><i className="fg-fw-burst" /><i className="fg-fw-burst is-inner" />
         </div>
       ))}
+    </div>
+  )
+}
+
+// ───────────── 手机 ─────────────
+/**
+ * 手机（playback.js 的 call / phone）：来电、拨出时手机从右边滑进来响着（对方的头像、名字，接听 / 拒接），接通后收成右上角的「通话中」和计时，
+ * 视频通话再挂一个小窗看着对方的脸（分屏里已经看得到他时不挂）；挂断时出一张小卡（通话结束 / 未接来电 / 拒接 / 对方挂断）；
+ * 通知、语音留言从上面滑下来一条横幅，不打断。声音都是 lib/foley.js 合成的。
+ */
+export const PHONE_END_MS = 2600
+export const PHONE_BANNER_MS = { notify: 3800, voicemail: 4800 }
+const callClock = new Map() // 每通电话接通的时刻（挂断时那张卡上写通了多久）
+const clock = ms => { const s = Math.max(0, Math.round(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` }
+const firstChar = name => Array.from(String(name || ''))[0] || '?'
+/** 联系人头像：有立绘的裁出脸，没有的写名字的第一个字。 */
+function PhoneFace({ person, beat, view, name, className = 'fg-phone-face' }) {
+  const { src, crop } = useFace(person, beat, view)
+  return (
+    <div className={className} style={person && person.color ? { '--who': person.color } : undefined}>
+      {src && crop ? <img src={src} alt="" draggable="false" style={{ width: crop.width + '%', left: crop.left + '%', top: crop.top + '%' }} /> : <span>{firstChar(name)}</span>}
+    </div>
+  )
+}
+const personOf = (view, name) => (name ? ((view && view.cast) || []).find(p => p.name === name) : null) || null
+const HANDSET = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z" fill="currentColor" /></svg>
+const CAMERA = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h11a2 2 0 0 1 2 2v1.5l4-2.5v10l-4-2.5V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" fill="currentColor" /></svg>
+
+/** 响着的手机：打来的有接听、拒接两个键、跟着铃声一震一震；拨出去的写「正在呼叫…」，只有挂断键。每一拍还在响就再响一遍。 */
+export function PhoneRing({ beat, view, sound = true }) {
+  const call = beat.call
+  React.useEffect(() => { if (sound) foley(PHONE_FOLEY[call.dir === 'in' ? 'call' : 'dial']) }, [beat.key])
+  const person = personOf(view, call.who)
+  const incoming = call.dir === 'in'
+  const label = incoming ? (call.video ? '视频通话邀请' : '来电') : call.video ? '正在发起视频通话…' : '正在呼叫…'
+  return (
+    <div className="fg-phone" data-dir={call.dir} data-video={call.video ? '' : undefined} data-side={beat.split ? 'left' : undefined} aria-hidden="true">
+      <div className="fg-phone-card">
+        <div className="fg-phone-label">{call.video && CAMERA}{label}</div>
+        <div className="fg-phone-avatar">{incoming && <><i className="fg-phone-ripple" /><i className="fg-phone-ripple" style={{ animationDelay: '.6s' }} /></>}<PhoneFace person={person} beat={beat} view={view} name={call.who} /></div>
+        <div className="fg-phone-name">{call.who || '未知号码'}</div>
+        <div className="fg-phone-keys">
+          <i className="fg-phone-key is-decline">{HANDSET}</i>
+          {incoming && <i className="fg-phone-key is-accept">{call.video ? CAMERA : HANDSET}</i>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 接通后右上角的「通话中」：对方的名字和走着的计时，视频通话是摄像机的小标。 */
+export function CallChip({ call, sound = true }) {
+  const [now, setNow] = React.useState(() => Date.now())
+  React.useEffect(() => {
+    if (!callClock.has(call.id)) callClock.set(call.id, Date.now())
+    if (sound) foley(PHONE_FOLEY.pickup)
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  return (
+    <span className="fg-pill fg-call-chip" data-video={call.video ? '' : undefined} title={call.video ? '视频通话中' : '通话中'}>
+      <i className="fg-call-dot" />{call.video ? CAMERA : HANDSET}{call.who || '通话中'}<b>{clock(now - (callClock.get(call.id) || now))}</b>
+    </span>
+  )
+}
+
+/** 视频通话的小窗：对方的脸，他说话时边框亮起来。 */
+export function VideoPip({ beat, view }) {
+  const call = beat.call
+  const person = personOf(view, call.who)
+  const talking = (beat.speakers || [beat.speaker]).includes(call.who)
+  return (
+    <div className={`fg-pip${talking ? ' is-talking' : ''}`} aria-hidden="true">
+      <PhoneFace person={person} beat={beat} view={view} name={call.who} className="fg-pip-face" />
+      <div className="fg-pip-name"><i />{call.who || '视频通话'}</div>
+    </div>
+  )
+}
+
+/** 挂断那一句：一张小卡写怎么结束的（通了多久、没接通、拒接、对方挂断），对方挂断、对方拒接是忙音。 */
+const END_TEXT = {
+  missed: { in: '未接来电', out: '无人接听' },
+  declined: { in: '已拒接', out: '对方已拒接' },
+  hungup: { in: '对方挂断了', out: '对方挂断了' },
+}
+export function PhoneEnd({ beat, view, sound = true }) {
+  const end = beat.phone
+  const dir = end.dir || 'in'
+  const [gone, setGone] = React.useState(false)
+  const started = end.live && end.id ? callClock.get(end.id) : 0
+  React.useEffect(() => {
+    if (sound) foley(end.result === 'hungup' || (end.result === 'declined' && dir === 'out') ? PHONE_FOLEY.busy : end.result === 'missed' && dir === 'in' ? '' : PHONE_FOLEY.end)
+    const t = setTimeout(() => setGone(true), PHONE_END_MS)
+    return () => clearTimeout(t)
+  }, [])
+  const [ended] = React.useState(() => Date.now())
+  if (gone) return null
+  const text = end.result ? END_TEXT[end.result][dir] : '通话结束'
+  return (
+    <div className="fg-phone is-end" data-result={end.result || 'ended'} style={{ '--hold': PHONE_END_MS - 450 + 'ms' }} aria-hidden="true">
+      <div className="fg-phone-card">
+        <div className="fg-phone-avatar"><PhoneFace person={personOf(view, end.who)} beat={beat} view={view} name={end.who} /></div>
+        <div className="fg-phone-name">{end.who || '通话'}</div>
+        <div className="fg-phone-result"><i>{HANDSET}</i>{text}{!end.result && started ? ` · ${clock(ended - started)}` : ''}</div>
+      </div>
+    </div>
+  )
+}
+
+/** 通知、语音留言：从上面滑下来一条横幅（发送的人、一句话），叮咚一声，过一会儿自己收回去。 */
+export function PhoneBanner({ beat, view, sound = true }) {
+  const m = beat.phone
+  const [gone, setGone] = React.useState(false)
+  const hold = PHONE_BANNER_MS[m.kind] || 3800
+  React.useEffect(() => {
+    if (sound) foley(PHONE_FOLEY[m.kind])
+    const t = setTimeout(() => setGone(true), hold)
+    return () => clearTimeout(t)
+  }, [])
+  if (gone) return null
+  const person = personOf(view, m.who)
+  const voicemail = m.kind === 'voicemail'
+  return (
+    <div className="fg-notify" data-kind={m.kind} style={{ '--hold': hold - 500 + 'ms' }} aria-hidden="true">
+      <PhoneFace person={person} beat={beat} view={view} name={m.who || (voicemail ? '留' : '通')} className="fg-notify-icon" />
+      <div className="fg-notify-body">
+        <div className="fg-notify-head"><b>{voicemail ? `语音留言 · ${m.who || '未知号码'}` : m.who || '通知'}</b><span>现在</span></div>
+        {voicemail && <div className="fg-notify-wave"><i className="fg-notify-play" />{Array.from({ length: 18 }, (_, i) => <i key={i} style={{ '--h': 30 + ((i * 37) % 70) + '%', animationDelay: -i * 0.09 + 's' }} />)}</div>}
+        <div className="fg-notify-text">{voicemail ? `「${m.text}」` : m.text}</div>
+      </div>
     </div>
   )
 }
