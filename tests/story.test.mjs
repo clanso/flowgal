@@ -412,6 +412,30 @@ test('gate: 回到现实那一句写「全部离开」再让现实里的人 ente
   assert.equal(who(stageWalk(stray, units).steps)[0], '-')
 })
 
+test('gate: 导演漏写了主角开场就在、只在后面换场时「全部离开」再让她 enter：她在那之前当面说过话，开场就在', () => {
+  // 照玩家存档里的一轮：柯萝伊整轮都在（开头就在说话），导演只在换到泉之间那一句清场再让她 enter；中间有一段回忆
+  const units = ['narration', 'dialogue', 'dialogue', 'narration', 'narration', 'dialogue', 'narration', 'dialogue'].map((type, i) => ({ id: 'U' + (i + 1), type }))
+  const script = {
+    cast: [{ name: '柯萝伊', pos: 'center' }, { name: '布琳希尔德', pos: 'left' }, { name: '阿黛尔', pos: 'center' }],
+    lines: {
+      U1: { sp: '柯萝伊' }, // 旁白描写她（不算开口）
+      U2: { sp: '柯萝伊', say: 'whisper' },
+      U3: { sp: '布琳希尔德', enter: [{ name: '布琳希尔德', pos: 'left' }] },
+      U4: { mode: 'memory', exit: ['*'], enter: [{ name: '阿黛尔' }, { name: '柯萝伊', pos: 'left' }] },
+      U5: { mode: 'real' },
+      U7: { exit: ['*'], enter: [{ name: '柯萝伊', pos: 'left' }] },
+    },
+  }
+  const who = steps => steps.map(s => s.cast.map(c => c.name).sort().join('+') || '-')
+  assert.deepEqual(who(stageWalk(script, units).steps), [
+    '柯萝伊', '柯萝伊', '布琳希尔德+柯萝伊', '柯萝伊+阿黛尔', '布琳希尔德+柯萝伊', '布琳希尔德+柯萝伊', '柯萝伊', '柯萝伊',
+  ])
+  // 在登场那一句才开口的照旧到那一句才上场；之前只被旁白描写到的也一样
+  assert.equal(who(stageWalk(script, units).steps)[1], '柯萝伊', '布琳希尔德到 U3 才上场')
+  const described = { ...script, lines: { ...script.lines, U2: { sp: '柯萝伊', voice: 'phone' } } }
+  assert.equal(who(stageWalk(described, units).steps)[0], '-', '只被描写、隔着电话说话的：开场不在，到 U4 才进回忆')
+})
+
 test('gate: 回忆演到下一轮：接着演的那几句台上还是回忆里的人，现在的人等回到现实再上来', () => {
   const first = segmentTurn('“走吧。”\n“嗯。”\n三年前。\n“这是中奖了吧？”')
   const second = segmentTurn('“嗯。”\n“你也来了？”\n她回过神来。\n“发什么呆？”')
