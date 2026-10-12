@@ -1808,6 +1808,33 @@ function thenLook(base, entry, outfits = {}) {
     states: Array.isArray(entry.states) ? entry.states : base.states
   };
 }
+function shiftsAhead(lines) {
+  const out = new Array(lines.length).fill(null);
+  let ahead = null;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    out[i] = ahead;
+    const list2 = lines[i]?.look;
+    if (!Array.isArray(list2) || !list2.length) continue;
+    ahead = { ...ahead || {} };
+    for (const s of list2) if (s?.name) ahead[s.name] = [s, ...ahead[s.name] || []];
+  }
+  return out;
+}
+function undoShifts(base, pending) {
+  if (!base || !pending?.length) return null;
+  let states = [...base.states || []];
+  for (const s of [...pending].reverse()) {
+    const on = new Set((s.on || []).map((x) => x.name));
+    states = states.filter((x) => !on.has(x.name));
+    for (const x of s.off || []) if (x?.name && !states.some((y) => y.name === x.name)) states.push({ name: x.name, tags: x.tags || "" });
+  }
+  const entry = { name: pending[0].name, shift: true };
+  const wear = pending.find((s) => s.outfit);
+  if (wear?.from && wear.from !== base.outfit) entry.outfit = wear.from;
+  const names = (list2) => list2.map((x) => x.name).sort().join("+");
+  if (names(states) !== names(base.states || [])) entry.states = states;
+  return entry.outfit || entry.states ? entry : null;
+}
 function pickSprite(sprites, look, emotion, base = "", { strict = false } = {}) {
   const all = sprites || {};
   const asset = (key) => all[key]?.assetId || "";
@@ -2268,6 +2295,7 @@ function buildBeats(view) {
     inside = walk.inside;
     const scenes = walkScenes({ scene, bgm, amb, layer: keep }, lines);
     const recalls = recallRuns(script, units);
+    const ahead = shiftsAhead(lines);
     const unitIndex = new Map(units.map((u, i) => [u.id, i]));
     const indexOf = (id) => {
       for (let i = all.findIndex((u) => u.id === id); i >= 0; i--) if (unitIndex.has(all[i].id)) return unitIndex.get(all[i].id);
@@ -2336,6 +2364,8 @@ function buildBeats(view) {
         mode: at2.mode,
         ...at2.layer && at2.layer.then ? { then: at2.layer.then } : {},
         // 段落里的人当时的样子（回忆里还没受伤、穿着当时的衣服……）
+        ...ahead[ui2] ? { ahead: ahead[ui2] } : {},
+        // 这一轮后面才变的样子（之后才缠上发带、才换衣服）：这一拍按变化之前的
         ...at2.cut ? { cut: at2.cut } : {},
         ...recall ? { recall } : {},
         // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
@@ -4186,11 +4216,12 @@ function MangaSymbol({ kind, life = 2.6 }) {
   if (!svg2) return null;
   return /* @__PURE__ */ import_react4.default.createElement("span", { className: "fg-symbol", "data-kind": kind, style: { "--life": life + "s" } }, /* @__PURE__ */ import_react4.default.createElement("span", { className: "fg-symbol-art", dangerouslySetInnerHTML: { __html: svg2 } }));
 }
-function spriteFor(person, turn, emo, emotions, then = null) {
+function spriteFor(person, turn, emo, emotions, then = null, pending = null) {
   if (!person || !person.timeline) return "";
   const custom = (emotions || []).find((e) => e.id === emo);
   const now = lookAt(person.timeline, turn);
-  const look = then ? thenLook(now, then, person.timeline.outfits) : now;
+  const over = then || (pending ? undoShifts(now, pending) : null);
+  const look = over ? thenLook(now, over, person.timeline.outfits) : now;
   return pickSprite(person.sprites, look, emo, custom ? custom.base : "", { strict: Boolean(then) });
 }
 var SIDE = { farleft: "-40%", left: "-28%", center: "0%", right: "28%", farright: "40%" };
@@ -4203,7 +4234,7 @@ function faceBoxOf(record, size) {
 }
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name);
-  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name]);
+  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name]);
   const src = sprite ? assetUrl(sprite) : "";
   const color = person && person.color || "#9b7bff";
   const [shown, setShown] = import_react4.default.useState(src);
@@ -6434,7 +6465,7 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
     setGroupKey(g.key);
     setEmotion("");
     setPicked(/* @__PURE__ */ new Set());
-  } }, g.era ? /* @__PURE__ */ import_react9.default.createElement("i", null, MODE_LABEL[g.era] || "回忆", "里") : null, lookLabel(g.look), g.current ? /* @__PURE__ */ import_react9.default.createElement("i", null, "现在") : null)), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "已画 ", drawn, " 种情绪"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-spacer" }), !manage && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !deletable.length, onClick: () => {
+  } }, g.era === "earlier" ? /* @__PURE__ */ import_react9.default.createElement("i", null, "变化之前") : g.era ? /* @__PURE__ */ import_react9.default.createElement("i", null, MODE_LABEL[g.era] || "回忆", "里") : null, lookLabel(g.look), g.current ? /* @__PURE__ */ import_react9.default.createElement("i", null, "现在") : null)), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "已画 ", drawn, " 种情绪"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-spacer" }), !manage && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !deletable.length, onClick: () => {
     setManage(true);
     setEmotion("");
   } }, "管理立绘")), manage && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row fg-manage" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "点格子选中要删的（只能选画过或记过提示词的），已选 ", picked.size), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(deletable.map((t) => t.key))) }, "全选"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(/* @__PURE__ */ new Set()) }, "全不选"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: !picked.size || busy === "del", onClick: removePicked }, "删除所选（", picked.size, "）"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: endManage }, "完成")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-emos" }, tiles.map((t) => /* @__PURE__ */ import_react9.default.createElement(
@@ -7018,6 +7049,7 @@ var sourceLabel = (source) => ({ tavern: hostName() === "st" ? "跟着酒馆当�
 var USAGE_LABEL = { inputTokens: "输入", outputTokens: "输出", reasoningTokens: "思考", cachedInputTokens: "缓存命中", cacheReadTokens: "缓存读", cacheWriteTokens: "缓存写", totalTokens: "合计" };
 var SHAPE_LABEL = { landscape: "横版", portrait: "竖版", square: "方形" };
 var thenText = (t) => [t.name, t.outfit, t.states ? t.states.length ? t.states.map((s) => s.name).join("、") : "无状态" : "", t.change ? "外貌另写" : ""].filter(Boolean).join(" ");
+var shiftText = (s) => [s.name, s.outfit ? `换上${s.outfit}` : "", ...(s.on || []).map((x) => "+" + x.name), ...(s.off || []).map((x) => "−" + x.name)].filter(Boolean).join(" ");
 var entryTitle = (e) => e.kind === "sprite" ? `立绘 · ${e.name}` : e.kind === "acting" ? `动作与表情 · ${e.name}` : e.kind === "cg" ? `插画 · 第 ${e.turn} 轮` : `第 ${e.turn} 轮`;
 var num = (n) => Number(n || 0).toLocaleString("en-US");
 var secs = (ms) => ms >= 6e4 ? `${Math.floor(ms / 6e4)} 分 ${Math.round(ms % 6e4 / 1e3)} 秒` : `${(ms / 1e3).toFixed(1)} 秒`;
@@ -7096,6 +7128,7 @@ function ScriptView({ script, units }) {
       l.mode && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "mode", k: "段落" }, MODE_LABEL[l.mode] || l.mode),
       l.recall && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "recall", k: "段落" }, "短闪回"),
       l.then && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "then", k: "当时的样子" }, l.then.map(thenText).join("；")),
+      l.look && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "look", k: "从这句起" }, l.look.map(shiftText).join("；")),
       l.scene && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "scene", k: "场景" }, sceneChange(l.scene)),
       l.bgm && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "bgm", k: "换歌" }, l.bgm === "none" ? "停" : l.bgm),
       l.amb && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "amb", k: "环境音" }, l.amb === "none" ? "停" : l.amb),
