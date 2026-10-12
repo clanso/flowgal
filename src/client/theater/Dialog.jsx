@@ -69,24 +69,28 @@ function origChars(orig, times, count, speed) {
 }
 
 /** away：插画正在出现这类时候对话框先让开（淡出），过后再回来。 */
-/** face：短闪回时回忆里说话的人的小头像（Stage.jsx 的 RecallFace），挂在对话框右上角。 */
-export function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quick, progress, status, hiddenText, face = null }) {
+/**
+ * recall：短闪回里的一句 { tone 基调, name 名牌 blur 模糊压暗 | hide 不显示 | show 照常 }。对话框换成回忆的样子（theater.css 的 data-recall），
+ * 「回忆」小标和情绪小字不出：回忆里的声音靠对话框和打字音认出来，不靠界面上的标签。
+ * face：短闪回时回忆里说话的人的小头像（Stage.jsx 的 RecallFace，设置里选了才有），挂在对话框右上角。
+ */
+export function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quick, progress, status, hiddenText, recall = null, face = null }) {
   const speaker = beat.alias || beat.speaker
-  const showName = speaker && beat.type !== 'narration'
+  const showName = speaker && beat.type !== 'narration' && !(recall && recall.name === 'hide')
   const speed = quick.speed
   const times = plan ? plan.times : null
   const marks = plan ? plan.marks : []
   // 声音的样子：名牌旁边一个小标（带跳动的音量条），对话框和字也换个样子（样式在 theater.css 的 data-voice）
-  const voiceChip = beat.voice && VOICE_LABEL[beat.voice] ? <div className="fg-voice-chip" data-voice={beat.voice}><i /><i /><i /><span>{VOICE_LABEL[beat.voice]}</span></div> : null
+  const voiceChip = !recall && beat.voice && VOICE_LABEL[beat.voice] ? <div className="fg-voice-chip" data-voice={beat.voice}><i /><i /><i /><span>{VOICE_LABEL[beat.voice]}</span></div> : null
   return (
-    <div className={`fg-dialog${away ? ' is-away' : ''}`} data-voice={beat.voice || undefined} style={{ '--speaker': color || undefined }}>
+    <div className={`fg-dialog${away ? ' is-away' : ''}`} data-voice={beat.voice || undefined} data-recall={recall ? recall.tone || 'warm' : undefined} data-recall-name={recall ? recall.name : undefined} style={{ '--speaker': color || undefined }}>
       <div className="fg-box" />
       {face}
       {(showName || voiceChip) && (
         <div className="fg-name" key={beat.speaker + beat.alias + (beat.voice || '')}>
           {showName && <div className="fg-name-plate">{speaker}</div>}
           {voiceChip}
-          {showName && beat.emo && quick.emoLabel && <div className="fg-name-sub">{quick.emoLabel}</div>}
+          {showName && !recall && beat.emo && quick.emoLabel && <div className="fg-name-sub">{quick.emoLabel}</div>}
         </div>
       )}
       {hiddenText && <div className="fg-text is-cardhint">〔 {CARD_LABEL[beat.card] || '卡片'} 〕</div>}

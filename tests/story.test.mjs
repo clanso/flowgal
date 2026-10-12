@@ -8,7 +8,7 @@ import { cleanTurnText } from '../lib/clean.js'
 import { segmentTurn, joinUnits, pairUnits } from '../lib/segment.js'
 import { normalizeScript, rawSection, scriptScenes, sceneAfter, playingAfter, previousBrief } from '../lib/director.js'
 import { playedUnits, castAtEnd, stageWalk } from '../lib/staging.js'
-import { buildBeats, onStage, hintedSpeaker, cgEntrance, cgExit, cgStay, cgHoldMs, CG_IN_MS, beatHold, PAUSE_MS, TRANSITION_MS } from '../src/client/theater/playback.js'
+import { buildBeats, onStage, hintedSpeaker, cgEntrance, cgExit, cgStay, cgHoldMs, CG_IN_MS, beatHold, PAUSE_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS } from '../src/client/theater/playback.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 
@@ -682,4 +682,36 @@ test('「間」：插画这一句才出现、换了地方时对话框先让开�
   assert.deepEqual(beatHold({ ...base, pause: 'beat' }, { was: { place: '教室' } }), { ms: PAUSE_MS.beat, away: false })
   // 几样同时有取最长的
   assert.equal(beatHold({ ...base, cg: img, pause: 'silence' }, { cg: 'cg1', was: { place: '教室' } }).ms, Math.max(PAUSE_MS.silence, cgHoldMs(img, 'daily')))
+})
+
+test('gate: 从回忆里醒过来：对话框让开，等回忆褪白、现在的画面清晰过来再出字；同一个人回忆里和现在都在，算两堂布景，跟着画面退场再登场，不从回忆的站位滑过去', () => {
+  const back = { key: 't:U4', scene: { location: '螺旋回廊', mood: 'mystery' }, mode: '', sceneEnter: true, transition: 'haze' }
+  assert.deepEqual(beatHold(back, { was: { place: '水晶洞窟（三年前）', mode: 'memory' } }), { ms: WAKE_MS, away: true, wake: true })
+  assert.ok(WAKE_SWAP_MS < WAKE_MS, '白透了才换画面，之后还要慢慢散开')
+  assert.equal(beatHold({ ...back, cut: { kind: 'time' } }, { was: { mode: 'memory' } }).wake, undefined, '有过场字卡的，字卡就是停顿')
+  assert.equal(beatHold({ ...back, mode: 'memory' }, { was: { mode: 'memory' } }).wake, undefined, '还在回忆里')
+  assert.equal(beatHold(back, { was: { place: '长楼梯', mode: '' } }).wake, undefined, '本来就在现在')
+  assert.equal(beatHold({ ...back, transition: 'dissolve' }, { was: { mode: 'memory' } }).wake, true)
+  assert.equal(beatHold({ ...back, transition: 'none' }, { was: { mode: 'memory' } }).wake, undefined, '导演要的是一下切断（琴声戛然而止）')
+  assert.equal(beatHold({ ...back, transition: 'glitch' }, { was: { mode: 'memory' } }).wake, undefined)
+  // 照玩家存档：长楼梯 → 回忆（水晶洞窟，布琳希尔德也在）→ 回到螺旋回廊
+  const units = ['U1', 'U2', 'U3', 'U4', 'U5'].map(id => ({ id, type: 'dialogue' }))
+  const script = {
+    scene: { location: '长楼梯' },
+    cast: [{ name: '柯萝伊', pos: 'center' }, { name: '布琳希尔德', pos: 'left' }],
+    lines: {
+      U1: { sp: '布琳希尔德' },
+      U2: { sp: '阿黛尔', mode: 'memory', scene: { location: '水晶洞窟（三年前）' }, exit: ['*'], enter: [{ name: '阿黛尔', pos: 'center' }, { name: '布琳希尔德', pos: 'right' }] },
+      U3: { sp: '布琳希尔德' },
+      U4: { mode: 'real', scene: { location: '螺旋回廊', transition: 'haze' }, sp: '柯萝伊' },
+      U5: { sp: '布琳希尔德' },
+    },
+  }
+  const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script }], images: [] })
+  const sets = beats.map(b => b.set)
+  assert.notEqual(sets[1], sets[0], '进回忆换一堂布景')
+  assert.equal(sets[2], sets[1], '回忆里接着说不换')
+  assert.notEqual(sets[3], sets[2], '回到现在换一堂布景')
+  assert.equal(sets[4], sets[3])
+  assert.ok(beats[2].cast.some(c => c.name === '布琳希尔德') && beats[3].cast.some(c => c.name === '布琳希尔德'), '布琳希尔德两边都在')
 })

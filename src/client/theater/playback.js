@@ -53,6 +53,7 @@ export function buildBeats(view) {
   let shown = null // 上一拍画面上的场景和段落：判断新一轮开场要不要转场
   const active = new Map() // 每个人最近一次说话、登场是第几拍：台上人太多时，最久没动静的先下场
   let recalled = null // 上一拍所在的短闪回：进出闪回时白闪一下
+  let set = 0 // 第几堂布景：换了地方、进出回忆这类段落时加一，台上的人跟着旧画面一起退、在新画面里重新登场，不从旧站位滑过去
   // 有立绘的人：导演漏列进 cast、却当面开口时让他上台（lib/staging.js 的 walkOn）
   const drawn = new Set((view.cast || []).filter(p => Object.values(p.sprites || {}).some(s => s && s.assetId)).map(p => p.name))
   const people = (view.cast || []).map(p => p.name)
@@ -116,6 +117,7 @@ export function buildBeats(view) {
         transition = !opened ? '' : at.transition || (at.mode && (!shown || at.mode !== shown.mode) ? MODE_TRANSITION[at.mode] : enter ? opening : 'fade')
       }
       shown = at
+      if (enter) set += 1
       for (const name of [...speakers, ...steps[ui].entered]) active.set(name, beats.length)
       const recall = recalls[ui]
       // 导演没写基调的闪回：进闪回那一句按闪回里的情绪（自定义情绪看它的基础情绪）和这一刻的场景基调挑
@@ -155,6 +157,7 @@ export function buildBeats(view) {
         sfx: line.sfx || '',
         ...(line.pause ? { pause: line.pause } : {}), // 「間」：这句的字出来之前先停一下
         sceneEnter: enter,
+        set,
         transition,
         cast: steps[ui].cast,
         recent: steps[ui].cast.map(c => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)), // 台上的人，最近有动静的在前
@@ -252,18 +255,27 @@ export function cgHoldMs(img, mood) {
 
 // ───────────── 「間」：字出来之前先停一下 ─────────────
 /** 转场演多久（毫秒），样式在 Stage.jsx 的 TRANSITION / theater.css，时长要对上。 */
-export const TRANSITION_MS = { dissolve: 1100, fade: 2600, cinematic: 1500, wipe: 1000, iris: 1200, strips: 800, black: 1800, flash: 1000, blink: 1500, glitch: 700, swirl: 1900, haze: 2600, none: 0 }
+export const TRANSITION_MS = { dissolve: 1100, fade: 2600, cinematic: 1500, wipe: 1000, iris: 1200, strips: 800, black: 1800, flash: 1000, blink: 1500, glitch: 700, swirl: 1900, haze: 2600, wake: 1900, none: 0 }
 /** 导演写的停顿：beat 顿一拍（对话框留着，先不出字），silence 沉默（对话框让开，只剩画面和环境声）。 */
 export const PAUSE_MS = { beat: 900, silence: 2400 }
 /** 换了地方：转场演完再停这么久才出字。 */
 const SCENE_BEAT_MS = 300
+/**
+ * 从回忆里醒过来（上一拍还在回忆里，这一拍回到了别处）：回忆的画面先慢慢褪白、配乐停下，
+ * 白到最浓时（WAKE_SWAP_MS）才换成现在的画面，再从白里慢慢清晰过来，WAKE_MS 时对话框回来出字。样式在 theater.css 的 .fg-flash.is-wake。
+ */
+export const WAKE_SWAP_MS = 1700
+export const WAKE_MS = 3600
+// 导演挑了别的出法（直接切断、白闪、画面撕裂、闭眼……）的照导演的，只有慢慢化开的这几种换成醒过来
+const WAKE_FROM = new Set(['haze', 'dissolve', 'fade'])
 
 /**
  * 这一拍的字出来之前停多久、对话框要不要先让开：{ ms, away }。
  * - 插画这一句才出现：对话框让开，出现的过程 + 一拍（cgHoldMs）；
  * - 换了地方（转场不是直接切）：对话框让开，转场 + 一拍。进出回忆这类特殊段落不在这里算；
- * - 导演写了 pause：beat 顿一拍，silence 让开对话框沉默一会儿。
- * 几样同时有取最长的。有过场字卡的那一句字卡本身就是停顿，插画和换场不再另停。
+ * - 导演写了 pause：beat 顿一拍，silence 让开对话框沉默一会儿；
+ * - 从回忆里醒过来（导演没挑别的出法时）：对话框让开，等回忆褪白、现在的画面清晰过来（WAKE_MS），这时多一个 wake: true。
+ * 几样同时有取最长的。有过场字卡的那一句字卡本身就是停顿，插画、换场和醒过来都不再另停。
  * cg：这一拍画面上的插画（还没画好为空）；was：上一拍画面上的 { cg, place, mode }（刚打开剧场时为空）。
  */
 export function beatHold(beat, { cg = '', was = {} } = {}) {
@@ -273,7 +285,9 @@ export function beatHold(beat, { cg = '', was = {} } = {}) {
   const moved = beat.sceneEnter && beat.scene.location !== was.place && sameLayer
   if (moved && !beat.cut && TRANSITION_MS[beat.transition]) { ms = Math.max(ms, TRANSITION_MS[beat.transition] + SCENE_BEAT_MS); away = true }
   if (PAUSE_MS[beat.pause]) { ms = Math.max(ms, PAUSE_MS[beat.pause]); if (beat.pause === 'silence') away = true }
-  return { ms, away }
+  const wake = was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
+  if (wake) { ms = Math.max(ms, WAKE_MS); away = true }
+  return { ms, away, ...(wake ? { wake } : {}) }
 }
 
 // ───────────── 我的配乐 ─────────────

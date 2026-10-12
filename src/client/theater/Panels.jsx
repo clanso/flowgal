@@ -1452,13 +1452,20 @@ export function LookSection({ data }) {
       </Field>
       <div className="fg-section">演出</div>
       <Field label="短闪回" hint="正文里一两句的回忆（「她说过：……」）怎么演。要换到当时的地方慢慢演的长回忆，导演会换成整段回忆场景，不受这里影响。">
-        <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.recall || 'face'} onChange={e => p({ recall: e.target.value })}>
-          <option value="face">画面不动，说话的人在对话框旁出小头像</option>
-          <option value="text">画面不动，只换对话框</option>
+        <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.recall || 'text'} onChange={e => p({ recall: e.target.value })}>
+          <option value="text">画面不动，对话框换成回忆的样子</option>
           <option value="ghost">画面压暗，回忆里的人浮到台前</option>
+          <option value="portrait">对话框换样子，旁边再出说话人的小头像</option>
         </select>
       </Field>
-      <Field label="短闪回的基调" hint="切进闪回的方式和色调：温暖怀念慢慢泛黄，甜蜜泛起粉光，伤感褪成冷灰，不安画面撕裂泛红、像心跳一样一暗一暗，猛然想起白闪一下，朦胧如梦起雾。自动时导演按剧情选，没选的按闪回里的情绪和当时的氛围挑。">
+      <Field label="短闪回的名牌" hint="回忆里说话的人的名字。模糊压暗时认得出是谁，又像隔着一层看不清。">
+        <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.recallName || 'blur'} onChange={e => p({ recallName: e.target.value })}>
+          <option value="blur">模糊、压暗</option>
+          <option value="hide">不显示</option>
+          <option value="show">照常显示</option>
+        </select>
+      </Field>
+      <Field label="短闪回的基调" hint="切进闪回的方式和色调，对话框和回忆里的声音也跟着变：温暖怀念慢慢泛黄，甜蜜泛起粉光，伤感褪成冷灰，不安画面撕裂泛红、像心跳一样一暗一暗，猛然想起白闪一下，朦胧如梦起雾。自动时导演按剧情选，没选的按闪回里的情绪和当时的氛围挑。">
         <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.recallTone || 'auto'} onChange={e => p({ recallTone: e.target.value })}>
           <option value="auto">自动（按剧情和氛围）</option>
           {RECALL_TONES.map(t => <option key={t} value={t}>都用「{RECALL_TONE_LABEL[t]}」</option>)}

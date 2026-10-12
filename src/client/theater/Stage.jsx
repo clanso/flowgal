@@ -3,7 +3,7 @@
 import React from 'react'
 import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
-import { SKY, placeKey, actorX, onStage, stageLayout, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
+import { SKY, placeKey, actorX, onStage, stageLayout, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
@@ -15,7 +15,7 @@ import { stinger } from './audio.js'
 const TRANSITION_ANIM = {
   dissolve: 'fg-dissolve', fade: 'fg-fade-slow', cinematic: 'fg-cinematic', wipe: 'fg-wipe', iris: 'fg-iris',
   strips: 'fg-wipe', black: 'fg-black-in', flash: 'fg-flash-in', blink: 'fg-blink-in', glitch: 'fg-glitch-in',
-  swirl: 'fg-swirl-in', haze: 'fg-haze-in', none: 'none',
+  swirl: 'fg-swirl-in', haze: 'fg-haze-in', wake: 'fg-haze-in', none: 'none', // wake：从回忆里醒过来，剧场按 beatHold 的 wake 换上，导演不写
 }
 const TRANSITION = Object.fromEntries(Object.entries(TRANSITION_ANIM).map(([k, anim]) => [k, [anim, TRANSITION_MS[k] / 1000 + 's']]))
 
@@ -270,8 +270,8 @@ function useLeaving(cast) {
   const leaving = React.useRef(new Map())
   const [, refresh] = React.useReducer(n => n + 1, 0)
   const now = Date.now()
-  for (const p of prev.current) if (!cast.some(c => c.name === p.name) && !leaving.current.has(p.name)) leaving.current.set(p.name, { entry: p, at: now })
-  for (const c of cast) leaving.current.delete(c.name)
+  for (const p of prev.current) if (!cast.some(c => c.id === p.id) && !leaving.current.has(p.id)) leaving.current.set(p.id, { entry: p, at: now })
+  for (const c of cast) leaving.current.delete(c.id)
   prev.current = cast
   const pending = leaving.current.size
   React.useEffect(() => {
@@ -294,17 +294,19 @@ export function Cast({ beat, view, talk, max = 5 }) {
   // 分屏时另一头的人只在分屏里出现，主舞台的人往左挪让出右边
   const split = beat.split || null
   if (split) cast = cast.filter(c => !split.who.includes(c.name))
-  // 人太多时最久没动静的先下场，剩下的按站位均匀排开
-  cast = stageLayout(onStage(cast, beat.recent, max))
+  // 人太多时最久没动静的先下场，剩下的按站位均匀排开。
+  // 换了一堂布景（换地方、进出回忆）时同一个人也算新登场：跟着旧画面一起退，在新画面里重新出来，不从旧站位滑到新站位
+  // 退场的人按最后在台上那一拍的样子退（从回忆里退下去的还穿着当时的衣服），不在退场途中换成现在的样子
+  cast = stageLayout(onStage(cast, beat.recent, max)).map(entry => ({ ...entry, id: entry.name + '@' + (beat.set || 0), seen: beat }))
   const leaving = useLeaving(cast)
   // 插画全屏盖住舞台：立绘照常在下面，插画收起时直接露出来。
   return (
     <div className="fg-cast" data-split={split ? 'on' : undefined}>
       {cast.map(entry => (
-        <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={talk} />
+        <Actor key={entry.id} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={talk} />
       ))}
       {leaving.map(entry => (
-        <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} leaving />
+        <Actor key={entry.id} entry={entry} person={people.get(entry.name)} beat={entry.seen} emo={entry.seen.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} leaving />
       ))}
     </div>
   )
@@ -631,9 +633,13 @@ const TRANSITION_OVERLAY = { flash: '', black: 'is-black', blink: 'is-blink', gl
 // 进短闪回时按基调起一下：甜蜜泛起一层粉光、不安画面撕裂泛红、猛然想起白闪一下、朦胧起雾；温暖、伤感的直接慢慢浮上来
 const RECALL_ENTRY = { sweet: 'is-bloom', dread: 'is-dread', flash: 'is-snap', haze: 'is-mist' }
 
-/** recallStyle 是设置里短闪回的演法（「压暗画面」进出都起薄雾），tone 是设置里固定的基调（不固定时用导演写的 / 剧场挑的）。 */
-export function Flash({ beat, recallStyle = 'face', tone = '' }) {
+/**
+ * recallStyle 是设置里短闪回的演法（「压暗画面」进出都起薄雾），tone 是设置里固定的基调（不固定时用导演写的 / 剧场挑的）。
+ * wake：从回忆里醒过来的那一句（playback.js 的 beatHold），rising 时回忆正在褪白，之后白慢慢散开、露出现在的画面。
+ */
+export function Flash({ beat, recallStyle = 'text', tone = '', wake = false, rising = false }) {
   if (!beat) return null
+  if (wake) return <div key={beat.key} className={`fg-flash is-wake${rising ? ' is-rising' : ''}`} style={{ '--rise': WAKE_SWAP_MS + 'ms', '--clear': WAKE_MS - WAKE_SWAP_MS + 'ms' }} />
   const kind = beat.cam === 'flash' ? '' : beat.cam === 'redflash' ? 'is-red' : beat.cam === 'fadeblack' ? 'is-black' : null
   const tr = TRANSITION_OVERLAY[beat.transition] ?? null
   const entry = beat.recallEdge === 'in' ? RECALL_ENTRY[tone || (beat.recall && beat.recall.tone)] : null

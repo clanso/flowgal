@@ -1,7 +1,7 @@
 // 剧场：全屏 galgame 播放器。读宿主整理好的场景脚本，逐拍演出；导演没整理完的部分先按原文演。
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
-import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold } from './playback.js'
+import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS } from './playback.js'
 import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
@@ -132,14 +132,14 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   // 插画出现、换了地方时对话框先让开，等画面出来再接着念；导演写的停顿（pause）按它写的停。后三样的规则在 playback.js 的 beatHold，
   // 跟上一拍画面上的比：往回翻到插画已经在画面上的那句、读到一半插画才画好，都不等。几样同时有取最长的。
   const cgOn = beat && !title && beat.cg && cgSrc(beat.cg, assetUrl) ? beat.cg.id : ''
-  const shownRef = React.useRef({ key: '', cg: '', place: '', mode: '', hold: { ms: 0, away: false } })
+  const shownRef = React.useRef({ key: '', beat: null, was: null, cg: '', place: '', mode: '', hold: { ms: 0, away: false } })
   if (beat && shownRef.current.key !== beat.key) {
     const was = shownRef.current
-    shownRef.current = { key: beat.key, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was }) }
+    shownRef.current = { key: beat.key, beat, was: was.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was }) }
   } else if (shownRef.current.cg !== cgOn) shownRef.current = { ...shownRef.current, cg: cgOn }
   const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false }
   // 短闪回的演法（设置）：只有「压暗画面」进出时起雾、等画面变过去；另外两种画面不动，直接出字
-  const recallStyle = ui0.recall || 'face'
+  const recallStyle = ui0.recall || 'text'
   const recallTone = ui0.recallTone && ui0.recallTone !== 'auto' ? ui0.recallTone : '' // 设置里固定了一种基调
   const edgeMs = !beat || title ? 0 : beat.cut ? CUT_MS : beat.transition === 'haze' ? HAZE_MS : recallStyle === 'ghost' ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0
   const pauseMs = speed > 0 ? Math.max(edgeMs, hold.ms) : 0
@@ -152,6 +152,14 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     return () => clearTimeout(t)
   }, [pausing, beat && beat.key])
   const holdText = (Boolean(beat) && glyphKey !== beat.key) || pausing
+  // 从回忆里醒过来：回忆褪白的这段时间舞台还演着回忆的最后一拍、配乐停下，白到最浓时（WAKE_SWAP_MS）才换成现在；点一下直接换
+  const [wokeKey, setWokeKey] = React.useState('')
+  const waking = pausing && Boolean(hold.wake) && Boolean(shownRef.current.was) && wokeKey !== beat.key
+  React.useEffect(() => {
+    if (!waking) return undefined
+    const t = setTimeout(() => setWokeKey(beat.key), WAKE_SWAP_MS)
+    return () => clearTimeout(t)
+  }, [waking, beat && beat.key])
   // 打开回想、设置这类面板时不把字速改成 0：改成 0 再改回来，关面板时这句会从头再打一遍（还带着打字音）。
   // 面板一打开就把这句直接打完（见下面的 effect），关掉后停在打完的样子。
   const typeSpeed = title ? 0 : speed
@@ -171,8 +179,10 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     const main = lineVoice(beat.type, names[0], voices, ui0)
     if (!main || !beat.voice) return main
     const also = beat.voice === 'chorus' ? names.slice(1).map(name => lineVoice(beat.type, name, voices, ui0)).filter(Boolean) : []
-    return { ...main, style: beat.voice, ...(also.length ? { also } : {}) }
-  }, [beat && beat.type, beat && beat.speaker, beat && beat.voice, voices, ui0])
+    // 短闪回里的回忆声按基调闷得深浅不一样（audio.js 的 MEMORY_DEPTH）
+    const tone = beat.recall ? recallTone || beat.recall.tone : ''
+    return { ...main, style: beat.voice, ...(also.length ? { also } : {}), ...(tone ? { tone } : {}) }
+  }, [beat && beat.type, beat && beat.speaker, beat && beat.voice, beat && beat.recall, recallTone, voices, ui0])
   const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : hit })
   // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
   React.useEffect(() => { if (panel && !done) finish() }, [panel, done])
@@ -201,9 +211,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const scene = beat ? beat.scene : (beats[beats.length - 1] || {}).scene
   const tracks = useMusic()
   // 定好从哪一拍开始演之前不放：不然先按最后一拍放一首，定位后又换一首，一进剧场声音就卡一下。
-  const musicBeat = beat
+  const musicBeat = waking ? null : beat
   const track = React.useMemo(() => (ui0.bgm ? pickTrack(musicBeat, tracks, assetUrl) : null), [ui0.bgm, tracks, musicBeat && musicBeat.bgm, scene && scene.mood, scene && scene.location])
-  React.useEffect(() => { if (!closingRef.current && (track || !ui0.bgm)) playBgm(track, ui0.bgmVolume) }, [track && track.id, ui0.bgm, ui0.bgmVolume])
+  React.useEffect(() => { if (!closingRef.current && (track || !ui0.bgm || waking)) playBgm(track, ui0.bgmVolume) }, [track && track.id, ui0.bgm, ui0.bgmVolume])
   // 环境音和剧情音效：导演从音效库里配的（音效库是空的就什么都不响）。剧情音效读到那句时响一次，快进时不响。
   const soundlib = useSoundlib()
   const soundById = React.useMemo(() => new Map((soundlib || []).map(s => [s.id, s])), [soundlib])
@@ -305,7 +315,10 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     ],
   }
 
-  const stageBeat = beat || (beats.length ? beats[beats.length - 1] : null)
+  const stageBeat = waking ? shownRef.current.was : beat || (beats.length ? beats[beats.length - 1] : null)
+  const hud = waking ? stageBeat : beat // 左上角的地点跟着画面走：回忆还没褪完时还是回忆里的地方
+  // 醒过来那一下换画面时已经白透了：回忆的背景、人和滤镜直接撤掉，不在白雾散开时又露出来（theater.css 的 data-tr="wake"）
+  const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? 'wake' : stageBeat && stageBeat.transition
   const stageScene = stageBeat ? stageBeat.scene : { location: '', time: 'night', weather: 'stars', mood: 'calm', light: 'normal', fx: 'none' }
   const stageMode = (stageBeat && stageBeat.mode) || ''
   // 标题画面上不加光线、滤镜、晃动这些气氛层，只留背景、天色和天气
@@ -335,11 +348,11 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         <div className="fg-camera" data-cam={cam}>
           {/* 画面效果（船上摇晃、车里颠簸、心跳……）和特殊段落（梦里飘、幻觉里扭曲）各动一层，叠在一起不互相顶掉 */}
           <div className="fg-world" data-fx={atmosphere ? stageScene.fx : ''}>
-            <div className="fg-world-in" data-mode={atmosphere ? stageMode : ''} data-tr={stageBeat && stageBeat.transition === 'haze' ? 'haze' : undefined}>
-              <Backdrop scene={stageScene} view={view} transition={(stageBeat && stageBeat.transition) || 'dissolve'} />
+            <div className="fg-world-in" data-mode={atmosphere ? stageMode : ''} data-tr={stageTr === 'haze' || stageTr === 'wake' ? stageTr : undefined}>
+              <Backdrop scene={stageScene} view={view} transition={stageTr || 'dissolve'} />
               <div className={`fg-grade${backgroundFor(stageScene, view).src ? ' is-drawn' : ''}`} data-time={stageScene.time} />
               {/* 短闪回时说话的是闪回里的人：现在台上的人不高亮、不对口型 */}
-              {stageBeat && <Cast beat={title || stageBeat.recall ? { ...stageBeat, speaker: '', speakers: null, sym: '' } : stageBeat} view={view} talk={title || stageBeat.recall ? null : talk} max={ui0.maxOnStage ?? 5} />}
+              {stageBeat && <Cast beat={title || stageBeat.recall || waking ? { ...stageBeat, speaker: '', speakers: null, sym: '' } : stageBeat} view={view} talk={title || stageBeat.recall || waking ? null : talk} max={ui0.maxOnStage ?? 5} />}
               <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} />
               <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} />
               {stageBeat && !title && <CgLayer beat={stageBeat} sound={sfxOn} />}
@@ -352,25 +365,25 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
           </div>
         </div>
         {/* 特殊段落的滤镜放在镜头外面：推镜头时录像框、REC 这些不跟着放大，对话框和标题卡也不被滤到 */}
-        <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageBeat && stageBeat.transition === 'haze' ? 2400 : 1200} />
-        {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} />}
+        <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} />
+        {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
         {!panel && <RestartNotice floating />}
-        {beat && !title && <TitleCard beat={beat} delay={beat.cut && speed > 0 ? CUT_MS : 0} />}
+        {beat && !title && <TitleCard beat={beat} delay={speed > 0 ? (beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0) : 0} />}
         {beat && !title && beat.cut && speed > 0 && <CutCard beat={beat} out={!cutting} />}
 
         {!title && beat && (
           <div className="fg-hud">
             <div className="fg-hud-bar" />
             <div>
-              <div className="fg-hud-place">{beat.scene.location || `第 ${beat.turn} 轮`}</div>
+              <div className="fg-hud-place">{hud.scene.location || `第 ${hud.turn} 轮`}</div>
               <div className="fg-hud-meta">
-                {beat.mode && <span className="fg-hud-mode">{MODE_LABEL[beat.mode]}</span>}
-                <span>{TIME_LABEL[beat.scene.time] || ''}</span>
-                {beat.scene.weather && beat.scene.weather !== 'clear' && <span>{WEATHER_LABEL[beat.scene.weather]}</span>}
-                {LIGHT_LABEL[beat.scene.light] && <span>{LIGHT_LABEL[beat.scene.light]}</span>}
-                {FX_LABEL[beat.scene.fx] && <span>{FX_LABEL[beat.scene.fx]}</span>}
-                {beat.scene.mood && <span>♪ {MOOD_LABEL[beat.scene.mood]}</span>}
+                {hud.mode && <span className="fg-hud-mode">{MODE_LABEL[hud.mode]}</span>}
+                <span>{TIME_LABEL[hud.scene.time] || ''}</span>
+                {hud.scene.weather && hud.scene.weather !== 'clear' && <span>{WEATHER_LABEL[hud.scene.weather]}</span>}
+                {LIGHT_LABEL[hud.scene.light] && <span>{LIGHT_LABEL[hud.scene.light]}</span>}
+                {FX_LABEL[hud.scene.fx] && <span>{FX_LABEL[hud.scene.fx]}</span>}
+                {hud.scene.mood && <span>♪ {MOOD_LABEL[hud.scene.mood]}</span>}
               </div>
             </div>
           </div>
@@ -388,7 +401,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {beat && !title && beat.card && <SceneCard beat={beat} />}
         {beat && !title && (
           <DialogBox beat={beat} chars={chars} plan={typed} done={done} waiting={holdText} away={pausing && hold.away} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)}
-            face={recallStyle === 'face' && beat.recall ? <RecallFace beat={beat} view={view} tone={recallTone} /> : null} />
+            recall={beat.recall ? { tone: recallTone || beat.recall.tone, name: ui0.recallName || 'blur' } : null}
+            face={recallStyle === 'portrait' && beat.recall ? <RecallFace beat={beat} view={view} tone={recallTone} /> : null} />
         )}
         {!beat && !title && (
           <div className="fg-choices"><div className="fg-choices-title">{view ? '这一局还没有可以演的内容' : '读取中'}</div></div>

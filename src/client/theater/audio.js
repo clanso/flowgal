@@ -255,6 +255,41 @@ function filter(ac, type, frequency, q = 0.7, gain = 0) {
 }
 function amp(ac, value) { const node = ac.createGain(); node.gain.value = value; return node }
 
+/**
+ * 回忆里的声音：像闷在水下。低通压到 cutoff 上下（两级，坡很陡）、低频鼓一点；
+ * 截止频率和音高都被很慢的振荡推着来回晃（水面在动），再带一点同样闷着的短混响。
+ * cutoff 截止频率，wet 混响多少，sway 音高晃多少（秒，延迟线的摆幅）。
+ */
+function underwater({ cutoff, wet, sway }) {
+  return (ac, input, out) => {
+    const wobble = ac.createDelay(0.05); wobble.delayTime.value = 0.015
+    const drift = ac.createOscillator(); drift.frequency.value = 1.1
+    drift.connect(amp(ac, sway)).connect(wobble.delayTime); drift.start()
+    const muffle = filter(ac, 'lowpass', cutoff, 1.2)
+    const tide = ac.createOscillator(); tide.frequency.value = 0.37
+    tide.connect(amp(ac, cutoff * 0.25)).connect(muffle.frequency); tide.start()
+    const body = input.connect(wobble).connect(filter(ac, 'highpass', 70)).connect(muffle).connect(filter(ac, 'lowpass', cutoff * 1.5)).connect(filter(ac, 'peaking', 240, 0.9, 5))
+    body.connect(amp(ac, 0.38)).connect(out)
+    const room = ac.createConvolver(); room.buffer = impulse(ac, 0.8, 2.6)
+    body.connect(room).connect(filter(ac, 'lowpass', cutoff * 0.8)).connect(amp(ac, wet)).connect(out)
+  }
+}
+// 短闪回各基调的回忆声：伤感、不安沉得更深，朦胧混响多，猛然想起的那一下浮得最近（还是闷的）
+const MEMORY_DEPTH = {
+  warm: { cutoff: 620, wet: 0.14, sway: 0.0025 },
+  sweet: { cutoff: 720, wet: 0.15, sway: 0.003 },
+  sad: { cutoff: 520, wet: 0.17, sway: 0.002 },
+  dread: { cutoff: 420, wet: 0.13, sway: 0.004 },
+  flash: { cutoff: 900, wet: 0.1, sway: 0.0015 },
+  haze: { cutoff: 560, wet: 0.24, sway: 0.0035 },
+}
+// 回忆的声音整体沉一点、慢一点
+const MEMORY_RATE = { warm: 0.92, sweet: 0.95, sad: 0.88, dread: 0.85, flash: 0.97, haze: 0.9 }
+// 隔着水，字的起音软下来、尾巴拖长一点
+const submerged = parts => parts.map(p => ({ ...p, attack: Math.max(p.attack ?? 0.006, 0.016), dur: p.dur * 1.3 }))
+// 偶尔冒一个小气泡（往上一挑的短音），跟字一起过同一条闷住的链
+const BUBBLE = [{ wave: 'sine', f: 280, to: 820, dur: 0.05, gain: 0.03, attack: 0.004 }]
+
 const VOICE_CHAINS = {
   // 电话：只剩中频，有点破
   phone: (ac, input, out) => { input.connect(filter(ac, 'highpass', 420)).connect(filter(ac, 'lowpass', 3000)).connect(filter(ac, 'peaking', 1700, 1, 6)).connect(shaper(ac, 6)).connect(amp(ac, 0.75)).connect(out) },
@@ -281,13 +316,6 @@ const VOICE_CHAINS = {
     input.connect(delay).connect(filter(ac, 'lowpass', 2200)).connect(feedback).connect(delay)
     delay.connect(amp(ac, 0.7)).connect(out)
   },
-  // 回忆：隔着一层时间。高频收掉一些（3 kHz 以上）、轻 2～3 dB，带一点短短的小房间混响，不拖尾、不弹回来（不是回声）
-  memory: (ac, input, out) => {
-    const soft = input.connect(filter(ac, 'highpass', 140)).connect(filter(ac, 'lowpass', 3000))
-    soft.connect(amp(ac, 0.75)).connect(out)
-    const room = ac.createConvolver(); room.buffer = impulse(ac, 0.7, 3.5)
-    soft.connect(room).connect(filter(ac, 'lowpass', 2200)).connect(amp(ac, 0.3)).connect(out)
-  },
   // 机械音：环形调制 + 削波，像机器人、AI、变声器
   machine: (ac, input, out) => {
     const ring = ac.createGain(); ring.gain.value = 0
@@ -297,6 +325,8 @@ const VOICE_CHAINS = {
     input.connect(amp(ac, 0.25)).connect(out)
   },
 }
+// 回忆：每种基调一条（memory-warm、memory-sad……），见上面的 underwater
+for (const [tone, depth] of Object.entries(MEMORY_DEPTH)) VOICE_CHAINS['memory-' + tone] = underwater(depth)
 const chains = new Map() // 样子 → 链的入口
 function chainFor(ac, style) {
   const build = VOICE_CHAINS[style]
@@ -330,8 +360,18 @@ export function blip(voice, { pitch = 1, gain = 1 } = {}) {
     group.forEach((who, i) => playParts(ac, voiceById(who.id).parts, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014 }))
     return
   }
-  const out = chainFor(ac, style)
-  const rate = rateOf(voice) * (style === 'telepathy' ? 1.08 : style === 'machine' ? 0.94 : 1)
+  // 短闪回里的回忆声按基调换一条链（voice.tone，见 Theater.jsx）
+  const memory = style === 'memory' ? (MEMORY_DEPTH[voice.tone] ? voice.tone : 'warm') : ''
+  const out = chainFor(ac, memory ? 'memory-' + memory : style)
+  const rate = rateOf(voice) * (style === 'telepathy' ? 1.08 : style === 'machine' ? 0.94 : memory ? MEMORY_RATE[memory] : 1)
+  if (memory) {
+    // 回忆：软起音的字 + 低八度的一层（声音变厚、发闷），偶尔冒个气泡
+    const parts = submerged(v.parts)
+    playParts(ac, parts, { rate, volume: volume * (voice.gain ?? 1), out })
+    playParts(ac, parts, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out })
+    if (Math.random() < 0.16) playParts(ac, BUBBLE, { rate: 0.8 + Math.random() * 0.6, volume, out, at: ac.currentTime + 0.03 + Math.random() * 0.04 })
+    return
+  }
   playParts(ac, v.parts, { rate, volume: volume * (voice.gain ?? 1), out })
   // 心灵感应：高八度的一层虚影；广播：一点电流声
   if (style === 'telepathy') playParts(ac, v.parts, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out })
