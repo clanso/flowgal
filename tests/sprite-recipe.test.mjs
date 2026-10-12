@@ -22,10 +22,9 @@ test('gate: 立绘 V5 透明底：Base 是画师串 → 质量词 → 透明底 
   assert.equal(p.positive, `${ARTIST}, ${QUALITY}, transparent background, cowboy shot, centered, standing, facing forward, eye-level, no props, solo, facing viewer, looking at viewer, straight-on`)
   assert.equal(p.characters.length, 1)
   assert.equal(p.characters[0], 'girl, long curly light brown hair, lake blue eyes, tareme, soft face, pale skin, edo-period daily kimono, muted grey-blue kimono, black haori, white obi sash, gentle neutral expression, light smile, looking at viewer, one hand lightly tucking a strand of hair behind ear, cowboy shot, standing, facing forward, eye-level, facing viewer, straight-on')
-  // 整张图的负面：画风那套 + 立绘专用（背景、景别、机位、多人、文字边框）+ 透明底时连纯色底也不要
-  for (const tag of ['worst quality', 'outdoors', 'floor', 'full body', 'from below', 'dutch angle', 'multiple people', 'upper body', 'head out of frame', 'props', 'drop shadow', 'border', 'solid background', 'white background']) assert.ok(p.negative.split(', ').includes(tag), tag)
-  // 这个人的负面：档案「不要出现」+ 这张额外的 + 不要全身侧身大动作
-  assert.equal(p.characterNegatives[0], 'glasses, wings, full body, feet, side view, off-center, tilted, dynamic pose, leaning forward, hands raised high, holding object, weapon, multiple people, dutch angle, from side, profile')
+  // 负面只用画风（画师串）里带的，插件不自己加；这个人的负面只有档案「不要出现」和玩家给这张写的
+  assert.equal(p.negative, STYLE_NEGATIVE)
+  assert.equal(p.characterNegatives[0], 'glasses, wings')
 })
 
 test('gate: 立绘请求参数跟柏宝绘 / IGS 一致：V5 用 params_version 4、角色块居中按坐标画、透明底带 straight_alpha、布朗噪声', () => {
@@ -67,7 +66,8 @@ test('gate: 立绘：别的视线时 Base 不再 looking at viewer；不是 V5 �
   assert.match(sd.positive, /^1girl, solo, /)
   assert.match(sd.positive, /long curly light brown hair, lake blue eyes.*edo-period daily kimono.*cowboy shot, centered, standing.*simple background, white background/)
   assert.doesNotMatch(sd.positive, /upper body|black hair/)
-  assert.match(sd.negative, /outdoors.*glasses|glasses.*outdoors/s)
+  assert.match(sd.negative, /, glasses$/)
+  assert.doesNotMatch(sd.negative, /outdoors/)
   const gpt = composePrompt({ kind: 'sprite', tags: written, person: lin, backend: 'openai', config: config() })
   assert.match(gpt.positive, /thighs up, standing upright/)
   assert.doesNotMatch(gpt.positive, /upper body/)

@@ -80,7 +80,7 @@ test('gate: 补设计：已经在动作里的不挪；新情绪按写的动作�
   })
   assert.deepEqual(next.poses.find(p => p.id === 'p2').emotions, ['pout', 'angry', 'shy', '赌气地道谢'], '生气本来就在，不重复')
   assert.deepEqual(next.poses.at(-1), { id: 'p4', label: '捂着脸', desc: '', tags: 'hands on own face', side: false, emotions: ['blush'] })
-  assert.equal(next.faces.angry.tags, 'angry, glaring', '重写了表情')
+  assert.equal(next.faces.angry.tags, 'angry, narrowed eyes', '重写了表情（太用力的词换轻一档）')
   assert.deepEqual([...touched].sort(), ['angry', '赌气地道谢'])
   assert.equal(sheet.poses.length, 4 - 1, '原设计不动')
   // 到顶了：新动作并进第一个
@@ -267,11 +267,13 @@ test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整�
     addReply = { faces: [{ emotion: 'angry', desc: '咬着嘴唇忍着', tags: 'biting lip, glaring' }] }
     const before = requests.length
     await engine.castAction('g', 'sprite', { name: '林岚', emotion: 'angry' })
-    lin = await settle(engine, 'g', p => requests.length > before && p.sprites[angry]?.tags === 'biting lip, glaring' && !p.spriteStatus[angry], '重新设计这张脸')
+    // 设计师写的 glaring 收成 narrowed eyes（立绘表情收着画）；上面玩家自己写的 clenched teeth 照存
+    lin = await settle(engine, 'g', p => requests.length > before && p.sprites[angry]?.tags === 'biting lip, narrowed eyes' && !p.spriteStatus[angry], '重新设计这张脸')
     assert.match(llm.calls.filter(isActingWriter).at(-1).messages[0].content[0].text, /- angry（生气）：已在动作 p2「抱着胳膊别过脸」里，只重新设计表情/)
     assert.equal(requests.at(-1).action, 'infill')
-    assert.match(charOf(requests.at(-1)), /biting lip, glaring/)
-    assert.equal(lin.acting.faces.angry.tags, 'biting lip, glaring')
+    assert.match(charOf(requests.at(-1)), /biting lip, narrowed eyes/)
+    assert.doesNotMatch(charOf(requests.at(-1)), /glaring/)
+    assert.equal(lin.acting.faces.angry.tags, 'biting lip, narrowed eyes')
 
     // 导演日志里有设计这一步
     const entries = (await engine.directorLog('g')).entries.filter(e => e.kind === 'acting').map(e => e.summary)

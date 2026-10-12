@@ -363,7 +363,7 @@ test('gate: 提示词组合：画师串在前、质量词在后、人数 tag 置
   assert.match(p.positive, /very aesthetic, masterpiece/)
   const bg = composePrompt({ kind: 'bg', tags: 'classroom', backend: 'novelai', config, scene: { time: 'dusk', weather: 'rain' } })
   assert.match(bg.positive, /no humans/)
-  assert.match(bg.negative, /1girl/)
+  assert.doesNotMatch(bg.negative, /1girl/, '负面只用画风里带的')
   const sprite = composePrompt({ kind: 'sprite', person: { gender: 'female', appearance: 'silver hair' }, emotion: 'shy', backend: 'openai', config })
   assert.match(sprite.positive, /character sprite/)
 })

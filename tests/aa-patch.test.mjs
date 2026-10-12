@@ -82,10 +82,9 @@ test('gate: 侧身动作组：底图整张按侧身构图画，同组表情在�
   assert.match(side.characters[0], /from side, profile, looking to the side/)
   assert.doesNotMatch(side.characters[0], /looking at viewer|facing forward/)
   assert.doesNotMatch(side.negative, /\bfrom side\b|\bprofile\b|side view/)
-  assert.match(side.characterNegatives[0], /looking at viewer, facing viewer/)
+  assert.equal(side.characterNegatives[0], '', '负面只用画风里带的，插件不自己加')
   const front = composePrompt({ kind: 'sprite', tags: 'smile', person, emotion: 'smile', backend: 'novelai', config })
   assert.match(front.positive, /facing viewer, looking at viewer, straight-on/)
-  assert.match(front.negative, /from side, profile/)
 })
 
 test('gate: 精简版（只有闭眼和一个张嘴）：眨眼是睁 → 闭 → 睁，连眨中间整个睁开；嘴在闭和开之间来回', () => {

@@ -96,12 +96,16 @@ test('gate: 表情 tag：情绪词、眉眼嘴、脸红、泪、视线算；瞳�
 })
 
 test('gate: 换脸的表情：设计师写的里挑脸上的，没有就用内置的；负面里跟这张表情打架的去掉', () => {
-  const written = faceFor('angry', '1girl, black hair, angry, glaring, clenched teeth, crossed arms', 'smile, glaring')
-  assert.deepEqual(written, { tags: 'angry, glaring, clenched teeth', negative: 'smile', preset: false })
+  // 设计师写的太用力的收一收：咬牙去掉、瞪眼换成眯眼；负面只用玩家给这张写的（跟表情打架的去掉）
+  const written = faceFor('angry', '1girl, black hair, angry, glaring, clenched teeth, crossed arms', 'smile, narrowed eyes')
+  assert.deepEqual(written, { tags: 'angry, narrowed eyes', negative: 'smile', preset: false })
+  // 玩家自己写的那张照写的画
+  assert.equal(faceFor('angry', 'angry, glaring, clenched teeth', '', [], { soften: false }).tags, 'angry, glaring, clenched teeth')
   const preset = faceFor('angry')
   assert.equal(preset.tags, EMOTION_FACE.angry.add)
   assert.equal(preset.preset, true)
-  assert.match(preset.negative, /smile/)
+  assert.equal(preset.negative, '', '插件不自己加负面')
+  assert.doesNotMatch(Object.values(EMOTION_FACE).map(f => f.add).join(', '), /glaring|clenched teeth|constricted pupils|streaming tears|full-face blush/, '内置表情也收着画')
   // 新情绪没写：用最接近的内置情绪的
   assert.equal(faceFor('带着烦躁思考', '', '', [{ id: '带着烦躁思考', base: 'thinking' }]).tags, EMOTION_FACE.thinking.add)
   // 自己写了 smile，负面就不能带 smile
@@ -116,9 +120,13 @@ test('gate: 底图的提示词换脸：角色块里原来的表情拿掉、新�
     characterNegatives: ['black hair'],
   }
   const angry = swapFace(drawn, faceFor('angry'))
-  assert.equal(angry.characters[0], 'girl, lake blue eyes, tareme, long curly light brown hair, soft face, pale skin, angry, v-shaped eyebrows, furrowed brow, glaring, clenched teeth, black haori, one hand lightly tucking a strand of hair behind ear, cowboy shot, standing')
+  assert.equal(angry.characters[0], 'girl, lake blue eyes, tareme, long curly light brown hair, soft face, pale skin, angry, v-shaped eyebrows, furrowed brow, frown, closed mouth, black haori, one hand lightly tucking a strand of hair behind ear, cowboy shot, standing')
   assert.equal(angry.prompt, drawn.positive, '看镜头的表情 Base 不动')
-  assert.match(angry.characterNegatives[0], /^black hair, smile, happy, blush/)
+  assert.equal(angry.characterNegatives[0], 'black hair', '负面不自己加')
+  // 以前画的底图带着太重的黑眼圈：换脸时压轻；底图是玩家自己写的就照原样
+  const heavy = { ...drawn, characters: ['girl, black hair, dark circles, neutral expression, school uniform'] }
+  assert.equal(swapFace(heavy, faceFor('smile')).characters[0], 'girl, black hair, 0.6::dark circles::, light smile, closed mouth, school uniform')
+  assert.match(swapFace(heavy, faceFor('smile'), { soften: false }).characters[0], /, dark circles, light smile/)
   const shy = swapFace(drawn, faceFor('shy'))
   assert.doesNotMatch(shy.prompt, /looking at viewer/)
   assert.match(shy.characters[0], /looking away/)

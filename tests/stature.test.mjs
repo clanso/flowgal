@@ -53,18 +53,18 @@ test('gate: 头一样大：脸框占图比例不同的立绘缩放后脸一样�
   assert.equal(placeSprite({ box: faceAt(0.4, 0.4), size: H, cm: 160 }).k, 0.6)
 })
 
-test('gate: 设计师估的身高跟着动作与表情设计存；前倾、弯腰这类会把镜头拉近的动作 tag 去掉', () => {
-  const sheet = cleanActing({ read: '矮人战士', height: '128', poses: [{ label: '握拳捶胸', tags: 'clenched fist on own chest, leaning forward slightly, shoulders squared', emotions: ['neutral'] }] })
+test('gate: 设计师估的身高跟着动作与表情设计存；演出型立绘可以前倾、弯腰（设计师决定，插件不拦）', () => {
+  const sheet = cleanActing({ read: '矮人战士', height: '128', poses: [{ label: '握拳捶胸', tags: 'clenched fist on own chest, leaning forward slightly, shoulders squared, cowboy shot', emotions: ['neutral'] }] })
   assert.equal(sheet.height, 128)
-  assert.equal(sheet.poses[0].tags, 'clenched fist on own chest, shoulders squared')
+  assert.equal(sheet.poses[0].tags, 'clenched fist on own chest, leaning forward slightly, shoulders squared', '构图还是归插件管')
   assert.equal(cleanActing({ height: 9000, poses: [{ label: 'A', emotions: ['neutral'] }] }).height, undefined)
   assert.equal(mergeActing(sheet, { height: 150, poses: [] }).sheet.height, 128, '补设计不改已经估好的身高')
   assert.equal(mergeActing({ ...sheet, height: undefined }, { height: 150 }).sheet.height, 150)
-  assert.equal(poseTags('bent over, hands on knees, bending forward'), 'hands on knees')
+  assert.equal(poseTags('bent over, hands on knees, bending forward'), 'bent over, hands on knees, bending forward')
   const cfg = resolveConfig({ images: { backend: 'novelai' } })
   const p = composePrompt({ kind: 'sprite', tags: 'girl, smile, leaning forward, hands behind back', person: { appearance: '1girl', gender: 'female' }, emotion: 'smile', backend: 'novelai', config: cfg })
-  assert.doesNotMatch(p.characters[0], /leaning forward/, '设计师写了前倾也不进提示词')
-  assert.match(p.characterNegatives[0], /leaning forward/)
+  assert.match(p.characters[0], /leaning forward, hands behind back/, '设计师写了前倾就照画')
+  assert.equal(p.characterNegatives[0], '', '负面不自己加')
 })
 
 test('gate: 档案里的身高：本局、全局都能写，清空回到估的；提升为全局、复制回本局时带着', async () => {

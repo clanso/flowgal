@@ -72,6 +72,11 @@ updated: 2026-10-12
   - 自动化：npm test 181/181（新增 tests/shifts.test.mjs 3 条）；npm run build 通过。
   - 预览（临时给第 2 轮林岚加了中途戴上的发夹，没提交）：戴上之前和之后的立绘不同；导演日志那一句显示「从这句起 林岚 +星星发夹」；人物志两套样子都在。
   - 没验：真实大模型会不会照规则在那一句写 look；驾驶员这一局要重新整理那一轮才有。
+- 立绘表情收着画、负面只用画师串的、演出型立绘可以前倾（2026-10-12，驾驶员反馈：柯萝伊的脸部差分好可怕、太用力；写词不要自己加负面；演出型立绘可以前倾）：
+  - 查驾驶员 DSH 存档：柯萝伊的设计里有 empty eyes（疲惫、压抑的思念、红肿着眼咧嘴笑）、constricted pupils、glaring + clenched teeth、streaming tears、full-face blush、sweat，档案和状态里带 dark circles；拼成一张看，黑眼圈重、眼睛空洞。
+  - 实现：style.js 的 softenSprite（吓人的词去掉：empty / dull / hollow eyes、constricted pupils、shaded face、clenched teeth……；太用力的换轻一档：glaring → narrowed eyes、streaming tears → tears、full-face blush → blush、sweat → sweatdrop；dark circles、bags under eyes 压到 0.6），立绘、换脸、工作台都过一遍，玩家自己改过词的那张（writer user）照写的画；动作与表情设计师写的表情存之前就收；内置表情（EMOTION_TAGS、EMOTION_FACE、EMOTION_ACTS）调轻；ACTING、SPRITE 提示词加「表情收着画」一条。负面：去掉插件自己加的立绘负面（整张的背景构图负面、角色块的全身侧身大动作、背景图的人物负面、换脸按表情加的负面），立绘设计师不再写 negative（写了也不收），旧记录里设计师写的负面不再带上；只用画风的负面 + 档案「不要出现」+ 玩家给这张写的 + 插画的「额外负面」；换脸和工作台的负面按现在的画风重算。工作台眨眼口型的状态负面（open eyes 之类）是机械的反面，留着。前倾：动作 tag 不再滤掉 leaning forward / bending，提示词改成「一般不前倾，演出需要的一两个可以」。
+  - 自动化：npm test 181/181（acting、face、stature、workbench、sprite-recipe、aa-patch、core 的断言跟着新规则改）；npm run build 通过。用驾驶员存档里柯萝伊的设计过了一遍：10 种表情的词收轻了（如生气 angry, glaring, furrowed brow, clenched teeth → angry, narrowed eyes, furrowed brow）。
+  - 没验：真实 NovelAI 照新词画出来的效果；老立绘要在人物志「动作与表情」点「按这套设计重画」（或单张重画）才会换。
 
 ## 开放风险
 
@@ -86,6 +91,7 @@ updated: 2026-10-12
 - 动作与表情设计只管之后画的：老存档里已经画好的立绘不会自动改，要在人物志「动作与表情」里点「按这套设计重画」；设计多一次大请求（读全部剧情），每人第一次画立绘前跑一次。
 - 剧场按脸框缩放要先量过脸：剧场开着、认脸小模型下好时后台量；没量过的立绘只按身高抬高压低，不缩放。量出来的框离谱（占图高约 22% 以上或 9% 以下）时只缩到 0.6～1.4 倍。
 - 一轮中途变的样子靠导演在那一句写 look：老存档要重新整理那一轮；导演漏写时跟以前一样整轮按结束时的样子。
+- 表情收着画是按词表收的：词表外的吓人写法（比如自造的 tag）挡不住；玩家自己改过词的那张不收。去掉插件自己加的负面后，背景图偶尔可能画进人、立绘偶尔不是大腿以上，要靠画风的负面兜。
 
 ## 下一道门
 
