@@ -1536,7 +1536,7 @@ function playedUnits(units, script) {
   return skip.size ? (units || []).filter((u) => !skip.has(u.id)) : units || [];
 }
 var ALL = /* @__PURE__ */ new Set(["*", "全部", "所有人", "all"]);
-function stageWalk(script, units, carry = [], inside = null) {
+function stageWalk(script, units, carry = [], inside = null, { walkOn = null } = {}) {
   if (!script) return { steps: units.map(() => ({ cast: carry, entered: [], left: [] })), end: carry, inside: null };
   const lines = script.lines || {};
   const home = new Map((script.cast || []).map((c) => [c.name, c.pos]));
@@ -1549,6 +1549,9 @@ function stageWalk(script, units, carry = [], inside = null) {
   const realVoices = /* @__PURE__ */ new Set();
   const layerVoices = /* @__PURE__ */ new Map();
   const recallVoices = /* @__PURE__ */ new Set();
+  const listed = new Set((script.cast || []).map((c) => c.name));
+  const walkOns = /* @__PURE__ */ new Map();
+  const ownExit = /* @__PURE__ */ new Map();
   let layer = false, layerSeen = false, layerStart = -1, split = null;
   units.forEach((u, i) => {
     const line = lines[u.id] || {};
@@ -1580,8 +1583,11 @@ function stageWalk(script, units, carry = [], inside = null) {
         realVoices.add(name2);
         if (!layerSeen) early.add(name2);
         if (!spokeAt.has(name2)) spokeAt.set(name2, i);
+        if (walkOn && walkOn.has(name2) && !listed.has(name2) && !line.as) walkOns.set(i, [...walkOns.get(i) || [], name2]);
       }
     }
+    const leaving = inPerson && !line.mode && !line.scene?.location ? speakers.filter((name2) => (line.exit || []).includes(name2)) : [];
+    if (leaving.length) ownExit.set(i, leaving);
   });
   const carried = new Set(carry.map((c) => c.name));
   const opening = units.length ? lines[units[0].id]?.mode : "";
@@ -1608,27 +1614,39 @@ function stageWalk(script, units, carry = [], inside = null) {
     saved = cast;
     cast = goingOn;
   }
+  let after = [];
+  let lastSaid = [];
   const steps = units.map((u, i) => {
     const line = lines[u.id] || {};
     const before = cast;
+    if (after.length) {
+      cast = cast.filter((c) => !after.includes(c.name));
+      after = [];
+    }
     if (line.mode === "real") {
       if (saved) {
         cast = saved;
         saved = null;
       }
     } else if (line.mode && !saved) saved = cast;
-    const exits = line.exit || [];
+    after = ownExit.get(i) || [];
+    const exits = (line.exit || []).filter((n) => !after.includes(n));
     cast = exits.some((n) => ALL.has(n)) ? [] : cast.filter((c) => !exits.includes(c.name));
-    for (const e of [...line.enter || [], ...implicit.get(i) || []]) {
+    const type = line.type || u.type;
+    const said = type === "narration" ? null : line.sp ? speakersOf(line.sp) : type === "dialogue" ? lastSaid : ["我"];
+    if (type === "dialogue") lastSaid = said;
+    if (said) cast = cast.filter((c) => !c.extra || said.includes(c.name));
+    for (const e of [...line.enter || [], ...implicit.get(i) || [], ...(walkOns.get(i) || []).map((name2) => ({ name: name2, extra: true }))]) {
       if (cast.some((c) => c.name === e.name)) continue;
       const want = e.pos || home.get(e.name);
       const pos = want && !cast.some((c) => c.pos === want) ? want : SLOTS.find((p2) => !cast.some((c) => c.pos === p2)) || want || "center";
-      cast = [...cast, { name: e.name, pos }];
+      cast = [...cast, e.extra ? { name: e.name, pos, extra: true } : { name: e.name, pos }];
     }
     const left = before.filter((c) => !cast.some((x) => x.name === c.name)).map((c) => c.name);
     const entered = cast.filter((c) => !before.some((x) => x.name === c.name)).map((c) => c.name);
     return { cast, entered, left };
   });
+  cast = cast.filter((c) => !after.includes(c.name) && !c.extra);
   return { steps, end: saved || cast, inside: saved ? cast : null };
 }
 
@@ -2285,6 +2303,8 @@ function buildBeats(view) {
   let shown = null;
   const active = /* @__PURE__ */ new Map();
   let recalled = null;
+  const drawn = new Set((view.cast || []).filter((p2) => Object.values(p2.sprites || {}).some((s) => s && s.assetId)).map((p2) => p2.name));
+  const people = (view.cast || []).map((p2) => p2.name);
   turns.forEach((t, ti) => {
     const script = markRecalls(t.script, t.units);
     if (script && script.scene && script.scene.bgm) bgm = script.scene.bgm;
@@ -2294,7 +2314,8 @@ function buildBeats(view) {
     const units = playedUnits(all, script);
     const lines = units.map((u) => script && script.lines && script.lines[u.id] || {});
     const keep = script && layer && lines.length && lines[0].mode === layer.mode ? layer : null;
-    const walk = stageWalk(script, units, cast, keep ? inside : null);
+    const walk = stageWalk(script, units, cast, keep ? inside : null, { walkOn: drawn });
+    const known = [.../* @__PURE__ */ new Set([...(script && script.cast || []).map((c) => c.name), ...people])];
     const steps = walk.steps;
     cast = walk.end;
     inside = walk.inside;
@@ -2319,7 +2340,7 @@ function buildBeats(view) {
       let speaker = "";
       const type = line.type || unit.type;
       if (type === "dialogue") {
-        speaker = line.sp || (line.type ? "" : unit.hint) || lastSpeaker;
+        speaker = line.sp || (line.type ? "" : hintedSpeaker(unit.hint, known, lastSpeaker)) || lastSpeaker;
         lastSpeaker = speaker;
       } else if (type === "thought") speaker = line.sp || "我";
       else if (line.sp) speaker = line.sp;
@@ -2411,10 +2432,18 @@ function buildBeats(view) {
 function actorX(pos) {
   return POS_X[pos] ?? 50;
 }
+function hintedSpeaker(hint, known, last) {
+  if (!hint) return "";
+  if (known.includes(hint)) return hint;
+  const head = known.filter((name2) => name2 && hint.startsWith(name2)).sort((a, b) => b.length - a.length)[0];
+  if (head) return head;
+  return [...hint].length > 4 ? last || "" : hint;
+}
 function onStage(cast, recent, max) {
-  if (!max || cast.length <= max) return cast;
-  const keep = new Set((recent || []).filter((name2) => cast.some((c) => c.name === name2)).concat(cast.map((c) => c.name)).slice(0, max));
-  return cast.filter((c) => keep.has(c.name));
+  const main = cast.filter((c) => !c.extra);
+  if (!max || main.length <= max) return cast;
+  const keep = new Set((recent || []).filter((name2) => main.some((c) => c.name === name2)).concat(main.map((c) => c.name)).slice(0, max));
+  return cast.filter((c) => c.extra || keep.has(c.name));
 }
 var SPREAD = [0, 0, 20, 30, 36, 38];
 var SHRINK = [1, 1, 1, 1, 0.92, 0.84, 0.76, 0.7, 0.64];
@@ -4277,7 +4306,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const aa = records.find((r) => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest))?.aa || null;
   const record = shown ? records.find((r) => r && shown === assetUrl(r.assetId)) : null;
   const place = placeSprite({ box: faceBoxOf(record, size), size, cm: heightOf(person).cm });
-  const still = shown ? /* @__PURE__ */ import_react4.default.createElement("img", { src: shown, alt: entry.name, className: swap ? "is-swap" : "", draggable: "false" }) : /* @__PURE__ */ import_react4.default.createElement(Silhouette, { name: entry.name, color, appearance: person && person.appearance, gender: person && person.gender });
+  const still = shown ? /* @__PURE__ */ import_react4.default.createElement("img", { src: shown, alt: entry.name, className: swap ? "is-swap" : "", draggable: "false", onError: () => setShown("") }) : /* @__PURE__ */ import_react4.default.createElement(Silhouette, { name: entry.name, color, appearance: person && person.appearance, gender: person && person.gender });
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-actor${speaking ? " is-speaking" : ""}${uploaded ? " is-upload" : ""}${leaving ? " is-leaving" : ""}${aa ? " is-aa" : ""}`, style: { "--x": (entry.x ?? actorX(entry.pos)) + "%", "--s": entry.scale ?? 1, "--side": SIDE[entry.pos] || "0%", "--k": place.k, "--lift": place.lift, "--head": place.head * 100 + "%" }, "data-name": entry.name }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { aa, talk: speaking && talk && talk.key === beat.key ? talk : null, fallback: still, className: "fg-aa", label: entry.name }) : still), speaking && beat.sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: beat.sym })));
 }
 var LEAVE_MS = 450;

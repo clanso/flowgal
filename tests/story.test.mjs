@@ -8,7 +8,7 @@ import { cleanTurnText } from '../lib/clean.js'
 import { segmentTurn, joinUnits, pairUnits } from '../lib/segment.js'
 import { normalizeScript, rawSection, scriptScenes, sceneAfter, playingAfter, previousBrief } from '../lib/director.js'
 import { playedUnits, castAtEnd, stageWalk } from '../lib/staging.js'
-import { buildBeats, cgEntrance, cgExit, cgStay, cgHoldMs, CG_IN_MS, beatHold, PAUSE_MS, TRANSITION_MS } from '../src/client/theater/playback.js'
+import { buildBeats, onStage, hintedSpeaker, cgEntrance, cgExit, cgStay, cgHoldMs, CG_IN_MS, beatHold, PAUSE_MS, TRANSITION_MS } from '../src/client/theater/playback.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 
@@ -434,6 +434,62 @@ test('gate: 导演漏写了主角开场就在、只在后面换场时「全部�
   assert.equal(who(stageWalk(script, units).steps)[1], '柯萝伊', '布琳希尔德到 U3 才上场')
   const described = { ...script, lines: { ...script.lines, U2: { sp: '柯萝伊', voice: 'phone' } } }
   assert.equal(who(stageWalk(described, units).steps)[0], '-', '只被描写、隔着电话说话的：开场不在，到 U4 才进回忆')
+})
+
+test('gate: 导演把告别那句的说话人写进了同一句的 exit：说完这句再走，不在开口那一拍就消失；清场、换地方的那句照旧当场生效', () => {
+  // 照玩家存档：「……抱歉。我去透透气」这一句同时写了阿黛尔 exit
+  const units = ['dialogue', 'dialogue', 'narration', 'dialogue'].map((type, i) => ({ id: 'U' + (i + 1), type }))
+  const script = {
+    cast: [{ name: '柯萝伊', pos: 'center' }, { name: '阿黛尔', pos: 'left' }],
+    lines: { U1: { sp: '柯萝伊' }, U2: { sp: '阿黛尔', exit: ['阿黛尔'] }, U4: { sp: '柯萝伊' } },
+  }
+  const who = steps => steps.map(s => s.cast.map(c => c.name).join('+') || '-')
+  const walk = stageWalk(script, units)
+  assert.deepEqual(who(walk.steps), ['柯萝伊+阿黛尔', '柯萝伊+阿黛尔', '柯萝伊', '柯萝伊'])
+  assert.deepEqual(walk.steps[2].left, ['阿黛尔'], '下一拍才退场')
+  assert.deepEqual(stageWalk({ ...script, lines: { ...script.lines, U4: undefined } }, units.slice(0, 2)).end.map(c => c.name), ['柯萝伊'], '一轮最后一句说完就走的，不留到下一轮')
+  // 别人的 exit、清场、换地方照旧当场生效
+  const other = { ...script, lines: { ...script.lines, U2: { sp: '阿黛尔', exit: ['柯萝伊'] } } }
+  assert.deepEqual(who(stageWalk(other, units).steps).slice(0, 2), ['柯萝伊+阿黛尔', '阿黛尔'])
+  const clear = { ...script, lines: { ...script.lines, U2: { sp: '阿黛尔', exit: ['*'] } } }
+  assert.equal(who(stageWalk(clear, units).steps)[1], '-')
+  const moved = { ...script, lines: { ...script.lines, U2: { sp: '阿黛尔', exit: ['阿黛尔'], scene: { location: '檐廊' } } } }
+  assert.equal(who(stageWalk(moved, units).steps)[1], '柯萝伊')
+})
+
+test('gate: 导演漏列进 cast 的配角：已经有立绘、在现实里当面开口时临时上台，别人接话时退下，不挤掉列着的人', () => {
+  // 照玩家存档：台上五个人，伊薇特的队员罗伊（画过立绘）插了两句话，导演没把他列进 cast
+  const units = ['dialogue', 'dialogue', 'narration', 'dialogue', 'dialogue', 'dialogue', 'dialogue', 'dialogue'].map((type, i) => ({ id: 'U' + (i + 1), type, text: 'U' + (i + 1) }))
+  const five = ['柯萝伊', '布琳希尔德', '伊薇特', '卡西安', '马科斯']
+  const script = {
+    scene: {},
+    cast: five.map((name, i) => ({ name, pos: ['center', 'left', 'right', 'farright', 'farleft'][i] })),
+    lines: { U1: { sp: '卡西安' }, U2: { sp: '罗伊' }, U4: {}, U5: { sp: '马科斯' }, U6: { sp: '罗伊', as: '？？？' }, U7: { sp: '罗伊', voice: 'offscreen' }, U8: { sp: '艾拉' } },
+  }
+  const who = steps => steps.map(s => s.cast.map(c => c.name).join('+'))
+  const drawn = new Set([...five, '罗伊'])
+  const walk = stageWalk(script, units, [], null, { walkOn: drawn })
+  assert.deepEqual(who(walk.steps).map(w => w.replace(five.join('+'), '五人')), ['五人', '五人+罗伊', '五人+罗伊', '五人+罗伊', '五人', '五人', '五人', '五人'],
+    '描写他的旁白、他接着说的那句（没写 sp）都还在；身份没揭晓、隔着门喊的不上台；没画过立绘的艾拉不上台')
+  assert.equal(walk.steps[1].cast.find(c => c.name === '罗伊').extra, true)
+  assert.deepEqual(who(stageWalk(script, units).steps)[1], five.join('+'), '不传 walkOn（导演那边）照旧')
+  // 剧场：同屏五人的上限不算他，主角不会被他挤下去
+  const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script }], images: [], cast: [...drawn].map(name => ({ name, sprites: { k: { assetId: name + '.png' } } })) })
+  assert.deepEqual(onStage(beats[1].cast, beats[1].recent, 5).map(c => c.name), [...five, '罗伊'])
+  assert.equal(stageWalk(script, units.slice(0, 2), [], null, { walkOn: drawn }).end.length, 5, '临时上台的不带到下一轮')
+})
+
+test('gate: 导演没给台词写 sp 时用切分猜的说话人：「宋棠打断她」取认得的名字，认不出的长串当作上一位接着说', () => {
+  const known = ['宋棠', '唐小满', '秦国栋']
+  assert.equal(hintedSpeaker('宋棠打断她', known, '唐小满'), '宋棠')
+  assert.equal(hintedSpeaker('秦语气没什么起伏', known, '秦国栋'), '秦国栋')
+  assert.equal(hintedSpeaker('唐小满', known, '宋棠'), '唐小满')
+  assert.equal(hintedSpeaker('路人玩家', known, '宋棠'), '路人玩家', '短的照旧当名字（没建档的路人）')
+  assert.equal(hintedSpeaker('', known, '宋棠'), '')
+  const units = [{ id: 'U1', type: 'dialogue', text: '看了一眼不算数。' }, { id: 'U2', type: 'narration', text: '宋棠打断她，' }, { id: 'U3', type: 'dialogue', text: '别在心里念数字。', hint: '宋棠打断她' }]
+  const script = { scene: {}, cast: [{ name: '宋棠', pos: 'center' }, { name: '唐小满', pos: 'left' }], lines: { U1: { sp: '唐小满' } } }
+  const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script }], images: [] })
+  assert.equal(beats[2].speaker, '宋棠', '名牌不再是「宋棠打断她」')
 })
 
 test('gate: 回忆演到下一轮：接着演的那几句台上还是回忆里的人，现在的人等回到现实再上来', () => {

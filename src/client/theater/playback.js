@@ -52,6 +52,9 @@ export function buildBeats(view) {
   let shown = null // 上一拍画面上的场景和段落：判断新一轮开场要不要转场
   const active = new Map() // 每个人最近一次说话、登场是第几拍：台上人太多时，最久没动静的先下场
   let recalled = null // 上一拍所在的短闪回：进出闪回时白闪一下
+  // 有立绘的人：导演漏列进 cast、却当面开口时让他上台（lib/staging.js 的 walkOn）
+  const drawn = new Set((view.cast || []).filter(p => Object.values(p.sprites || {}).some(s => s && s.assetId)).map(p => p.name))
+  const people = (view.cast || []).map(p => p.name)
   turns.forEach((t, ti) => {
     // 正文里框起来的闪回、回忆里的声音：导演没写 recall 也按短闪回演
     const script = markRecalls(t.script, t.units)
@@ -62,7 +65,8 @@ export function buildBeats(view) {
     const units = playedUnits(all, script)
     const lines = units.map(u => (script && script.lines && script.lines[u.id]) || {})
     const keep = script && layer && lines.length && lines[0].mode === layer.mode ? layer : null
-    const walk = stageWalk(script, units, cast, keep ? inside : null)
+    const walk = stageWalk(script, units, cast, keep ? inside : null, { walkOn: drawn })
+    const known = [...new Set([...((script && script.cast) || []).map(c => c.name), ...people])]
     const steps = walk.steps
     cast = walk.end
     inside = walk.inside
@@ -91,7 +95,7 @@ export function buildBeats(view) {
       let speaker = ''
       const type = line.type || unit.type
       // 导演只给换人那一句写说话人：同一人连续说话沿用上一位。旁白写了 sp 表示描写的是谁（立绘高亮、换表情，不显示名牌）。
-      if (type === 'dialogue') { speaker = line.sp || (line.type ? '' : unit.hint) || lastSpeaker; lastSpeaker = speaker }
+      if (type === 'dialogue') { speaker = line.sp || (line.type ? '' : hintedSpeaker(unit.hint, known, lastSpeaker)) || lastSpeaker; lastSpeaker = speaker }
       else if (type === 'thought') speaker = line.sp || '我'
       else if (line.sp) speaker = line.sp
       const speakers = speakersOf(speaker)
@@ -174,11 +178,24 @@ export function buildBeats(view) {
 
 export function actorX(pos) { return POS_X[pos] ?? 50 }
 
-/** 同屏最多站几个人：超出的，最久没说话、没登场的先下场（还算在场，轮到他说话就回来）。max 为 0 不限。 */
+/**
+ * 切分时从引号前后猜的说话人（弱提示，导演没给这句写 sp 时才用）：认得的名字照用；
+ * 「宋棠打断她，」这样连动作一起截进来的，取开头那个认得的名字；认不出、又不像名字（超过四个字，比如「秦语气没什么起伏」）的，当作上一位接着说。
+ */
+export function hintedSpeaker(hint, known, last) {
+  if (!hint) return ''
+  if (known.includes(hint)) return hint
+  const head = known.filter(name => name && hint.startsWith(name)).sort((a, b) => b.length - a.length)[0]
+  if (head) return head
+  return [...hint].length > 4 ? last || '' : hint
+}
+
+/** 同屏最多站几个人：超出的，最久没说话、没登场的先下场（还算在场，轮到他说话就回来）。临时上台说一两句的（extra）不算在内。max 为 0 不限。 */
 export function onStage(cast, recent, max) {
-  if (!max || cast.length <= max) return cast
-  const keep = new Set((recent || []).filter(name => cast.some(c => c.name === name)).concat(cast.map(c => c.name)).slice(0, max))
-  return cast.filter(c => keep.has(c.name))
+  const main = cast.filter(c => !c.extra)
+  if (!max || main.length <= max) return cast
+  const keep = new Set((recent || []).filter(name => main.some(c => c.name === name)).concat(main.map(c => c.name)).slice(0, max))
+  return cast.filter(c => c.extra || keep.has(c.name))
 }
 
 // 两个人以上时从中间往两边排开的半宽（舞台宽度的百分比），以及人多时立绘缩小的比例（像站远了一点）。

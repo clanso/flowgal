@@ -248,7 +248,8 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   // 头一样大、按身高站：按显示中那张图的脸框缩放，按这个人的身高抬高或压低（lib/stature.js）
   const record = shown ? records.find(r => r && shown === assetUrl(r.assetId)) : null
   const place = placeSprite({ box: faceBoxOf(record, size), size, cm: heightOf(person).cm })
-  const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
+  // 图片文件读不出来（被删了、数据目录搬了）时退回剪影，不留一个破图标
+  const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" onError={() => setShown('')} /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
   return (
     <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}${aa ? ' is-aa' : ''}`} style={{ '--x': (entry.x ?? actorX(entry.pos)) + '%', '--s': entry.scale ?? 1, '--side': SIDE[entry.pos] || '0%', '--k': place.k, '--lift': place.lift, '--head': place.head * 100 + '%' }} data-name={entry.name}>
       <div className="fg-actor-body">
