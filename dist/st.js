@@ -1831,6 +1831,7 @@ lines 规则：
 images 规则（选哪个瞬间画成插画）：
 - 先判断这一轮有没有值得定格的瞬间：情绪高潮、关键动作、初次登场、壮丽场景。没有就给空数组，不要为了画而画。
 - 候选必须是一个看得见的瞬间：有明确的主体、动作或状态、场景。纯对话只有伴随值得画的表情、肢体动作、关系或环境变化时才选；心理活动和过渡不选。
+- 亲密、露骨的场面（接吻、爱抚、性爱）和别的高潮一样是候选：正文写到了，就按它在这一轮里的分量取舍，不因为露骨跳过它，也不换成前后不露骨的瞬间；moment 照正文写清两人在做什么、衣服是什么样子。只画成年人：入画的人里有未成年人（包括回忆里还是孩子的时候），就不选带性内容的瞬间。
 - 优先突出主角和主要人物的神情、状态、行动和关系；有没有档案不影响取舍。多张时彼此要明显不同，不要用同一件事的相邻动作或换个镜头凑数。
 - 最多 {{maxImages}} 张。after 选在画面需要的事实刚刚成立、还没切到下一个场景的那个单元：聊天里插画挂在它后面，剧场里从这一句开始全屏显示。
 - until 是剧场里这张插画显示到的最后一句，下一句收起、回到立绘：画面里的瞬间结束、有人离开或进来、动作换了、场面转到别处时就该收。画面一直成立到这一轮结束就省略。
@@ -1981,7 +1982,7 @@ people 规则（角色档案；立绘按「服装 × 长期状态 × 情绪」�
 - 表情要活：一个情绪词 + 一两个面部细节（furrowed brow, narrowed eyes, parted lips, lip biting, clenched teeth, tearing up, puffy cheeks, sweatdrop……）+ 镜头看得到时一个头部或肢体语言（head tilt, head down, hand on own chest, crossed arms, leaning forward……），都用真实存在的 Danbooru tag。光写 serious、expressionless 或 frown 再配 looking at viewer，会画成证件照；严肃、生气、难过的脸必须带一个紧绷的细节。正文没写表情就按处境和关系推断最合理的情绪，expressionless 只给正文明说木然、面无表情的人。nl 里用一句话写出这个神情和它的缘由。
 - 视线必须写，只写一个：looking at viewer, looking at another, eye contact, looking away, looking to the side, sideways glance, looking down, looking up, looking back, closed eyes。视线跟着注意力走：在和谁说话、给谁递东西就 looking at another，两人对视用 eye contact，不要默认 looking at viewer。
 - 动作要完整：及物动作只写动词会画成半截（只写 pouring，酒就倒到地上了）。写清用哪只手、拿着什么（时代合适的具体器物）、落到哪个看得见的地方、必要时的结果。两人之间的动作，各自手里的东西写进各自的块；「倒进对方手里的杯子」这种连接两人的结果写进 Base，并用 source# / target# / mutual# 标出谁施谁受（source#pouring / target#pouring）。景别必须把落点框进来。
-- 正文明确是露骨场景时，如实写出镜头里实际看得见的身体部位，归到它所属的那个人的块里，不要用 nsfw、nude 这类含糊的词代替；被遮住或在画面外的不写。
+- 正文明确是露骨场景时，如实画：Base 里写上 nsfw（NovelAI 这类模型靠它放开），再把镜头里实际看得见的身体部位和动作具体写出来，归到它所属的那个人的块里，不能只写 nsfw、nude 这类笼统的词；被遮住或在画面外的不写。导演挑的是露骨的瞬间，就照这个瞬间画，不要改成穿好衣服的拥抱，也不要换一个瞬间。只画成年人：未成年人不出现在任何带性内容的画面里。
 
 四、服装
 - 不要只写类别词：pajamas、dress、uniform、kimono 单独出现就是没写完。每套看得见的衣服写成 3～5 个 tag 的「指纹」：款式剪裁 + 主色（有花纹写花纹）+ 一两个关键部件或配饰，比如 pale blue pajamas, striped pajamas, button-up pajama shirt, long sleeves。
