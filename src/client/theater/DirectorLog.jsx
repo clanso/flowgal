@@ -5,6 +5,7 @@ import React from 'react'
 import { api, toast, useDirectorLog, hostName } from '../api.js'
 import { Panel } from './Panels.jsx'
 import { formatLook } from '../../../lib/look.js'
+import { MOVE_LABEL, ENTER_HOW_LABEL, EXIT_HOW_LABEL } from '../../../lib/vocab.js'
 import { emotionEntry } from '../../../lib/emotions.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, RECALL_TONE_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL, VOICE_LABEL, CG_IN_LABEL, CG_OUT_LABEL, CG_MOTION_LABEL } from './playback.js'
 
@@ -153,8 +154,10 @@ function ScriptView({ script, units }) {
               l.scene && <Chip key="scene" k="场景">{sceneChange(l.scene)}</Chip>,
               l.bgm && <Chip key="bgm" k="换歌">{l.bgm === 'none' ? '停' : l.bgm}</Chip>,
               l.amb && <Chip key="amb" k="环境音">{l.amb === 'none' ? '停' : l.amb}</Chip>,
-              l.enter && <Chip key="in" k="登场">{l.enter.map(e => e.name + (e.pos ? `（${POS_LABEL[e.pos] || e.pos}）` : '')).join('、')}</Chip>,
-              l.exit && <Chip key="out" k="退场">{l.exit.join('、')}</Chip>,
+              l.react && <Chip key="react" k="反应">{l.react.map(r => (r.name === '*' ? '全员' : r.name) + ' ' + [r.emo && emotionLabel(r.emo), r.sym && (SYMBOL_LABEL[r.sym] || r.sym)].filter(Boolean).join(' · ')).join('、')}</Chip>,
+              l.move && <Chip key="move" k="走位">{l.move.map(m => `${m.name === '*' ? '全员' : m.name} ${MOVE_LABEL[m.act] || m.act}${m.to ? ' ' + m.to : ''}`).join('、')}</Chip>,
+              l.enter && <Chip key="in" k="登场">{l.enter.map(e => e.name + (e.pos ? `（${POS_LABEL[e.pos] || e.pos}）` : '') + (e.how ? ` · ${ENTER_HOW_LABEL[e.how] || e.how}` : '')).join('、')}</Chip>,
+              l.exit && <Chip key="out" k="退场">{l.exit.map(n => n + (l.exitHow && l.exitHow[n] ? ` · ${EXIT_HOW_LABEL[l.exitHow[n]] || l.exitHow[n]}` : '')).join('、')}</Chip>,
             ].filter(Boolean)
             return (
               <div key={u.id} className={`fg-dlog-line${marks.length ? '' : ' is-plain'}`}>

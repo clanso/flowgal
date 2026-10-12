@@ -8,8 +8,9 @@ import { stageWalk, playedUnits } from '../../../lib/staging.js'
 import { walkScenes, recallRuns, markRecalls, autoRecallTone, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
 import { shiftsAhead } from '../../../lib/look.js'
+import { reactsOf, poseTracker, blockLayout } from '../../../lib/blocking.js'
 
-export { placeKey }
+export { placeKey, blockLayout }
 export { emotionLabel } from '../../../lib/emotions.js'
 
 export const TIME_LABEL = { dawn: '黎明', morning: '清晨', noon: '正午', afternoon: '午后', dusk: '黄昏', evening: '傍晚', night: '夜', midnight: '深夜' }
@@ -91,6 +92,8 @@ export function buildBeats(view) {
       .sort((a, b) => a.at - b.at)
     let lastSpeaker = ''
     let split = null // 分屏：电话另一头的人在画面一侧，写 off 或这一轮结束时收起
+    const blocking = poseTracker() // 走位：每一轮、每换一堂布景从原位开始
+    const exitWay = {} // 写了怎么走、还没走的人（告别那句说完下一拍才走）
     units.forEach((unit, ui) => {
       const line = lines[ui]
       const at = scenes[ui]
@@ -117,8 +120,18 @@ export function buildBeats(view) {
         transition = !opened ? '' : at.transition || (at.mode && (!shown || at.mode !== shown.mode) ? MODE_TRANSITION[at.mode] : enter ? opening : 'fade')
       }
       shown = at
-      if (enter) set += 1
-      for (const name of [...speakers, ...steps[ui].entered]) active.set(name, beats.length)
+      if (enter) { set += 1; blocking.newSet() }
+      // 没在说话的人的反应：换表情（从这句起保持）、头顶出符号、身子一动
+      const onStageNames = steps[ui].cast.map(c => c.name)
+      const reacts = reactsOf(line, onStageNames, speakers)
+      for (const r of reacts) if (r.emo) emotions[r.name] = r.emo
+      // 走位和进出的样子
+      const ways = Object.fromEntries((line.enter || []).filter(e => e.how && steps[ui].entered.includes(e.name)).map(e => [e.name, e.how]))
+      Object.assign(exitWay, line.exitHow || {})
+      const gone = {}
+      for (const name of steps[ui].left) if (exitWay[name]) { gone[name] = exitWay[name]; delete exitWay[name] }
+      const block = blocking.step({ onStage: onStageNames, left: steps[ui].left, speakers, moves: line.move || [], peeks: Object.keys(ways).filter(name => ways[name] === 'peek') })
+      for (const name of [...speakers, ...steps[ui].entered, ...reacts.map(r => r.name), ...block.moves.map(m => m.name)]) active.set(name, beats.length)
       const recall = recalls[ui]
       // 导演没写基调的闪回：进闪回那一句按闪回里的情绪（自定义情绪看它的基础情绪）和这一刻的场景基调挑
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map(e => ((view.emotions || []).find(x => x.id === e) || {}).base || e), at.scene.mood)
@@ -163,6 +176,11 @@ export function buildBeats(view) {
         recent: steps[ui].cast.map(c => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)), // 台上的人，最近有动静的在前
         entered: steps[ui].entered,
         left: steps[ui].left,
+        ...(reacts.length ? { reacts } : {}), // 没在说话的人的反应 [{ name, emo, sym }]
+        ...(Object.keys(block.poses).length ? { poses: block.poses } : {}), // 走位：每个人现在的样子（靠近谁、上前、背对……）
+        ...(block.moves.length ? { moves: block.moves } : {}), // 这一拍发生的走位
+        ...(Object.keys(ways).length ? { enterHow: ways } : {}), // 跑进来、探头、慢慢走进来
+        ...(Object.keys(gone).length ? { exitHow: gone } : {}), // 甩头离开、跑开、慢慢走远
         emotions: { ...emotions },
         cg,
         cgAnchor: Boolean(cgEntry && cgEntry.at === ui),

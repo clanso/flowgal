@@ -3,11 +3,12 @@
 import React from 'react'
 import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
-import { SKY, placeKey, actorX, onStage, stageLayout, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
+import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
 import { heightOf, placeSprite, faceCrop } from '../../../lib/stature.js'
+import { reactKind } from '../../../lib/blocking.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger } from './audio.js'
 
@@ -215,8 +216,43 @@ function faceBoxOf(record, size) {
   return rects && size ? faceBoxFrom(rects, size[0], size[1]) : null
 }
 
+/**
+ * 没在说话的人的反应：身子跟着一动（lib/blocking.js 的 reactKind 按情绪挑）。走位时走两步的起伏、回眸时回头那一下。
+ * 用 Web Animations 动 .fg-actor-react 这一层，不碰呼吸、说话时的轻跳和登场退场。
+ */
+const REACT_FRAMES = {
+  jolt: [[{ transform: 'none' }, { transform: 'translateY(-2.6%) scale(1.012)', offset: 0.22 }, { transform: 'translateY(.5%)', offset: 0.55 }, { transform: 'none' }], 520],
+  shrink: [[{ transform: 'none' }, { transform: 'translateY(1%) scale(.988) rotate(-.8deg)', offset: 0.35 }, { transform: 'translateY(.7%) scale(.992) rotate(-.5deg)', offset: 0.7 }, { transform: 'none' }], 1100],
+  bounce: [[{ transform: 'none' }, { transform: 'translateY(-1.4%)', offset: 0.2 }, { transform: 'none', offset: 0.4 }, { transform: 'translateY(-.9%)', offset: 0.6 }, { transform: 'none' }], 620],
+  droop: [[{ transform: 'none' }, { transform: 'translateY(1.6%) scale(.99)', offset: 0.45 }, { transform: 'translateY(1.2%) scale(.993)', offset: 0.8 }, { transform: 'none' }], 1500],
+  shake: [[{ transform: 'none' }, { transform: 'translateX(-.8%)', offset: 0.15 }, { transform: 'translateX(.8%)', offset: 0.35 }, { transform: 'translateX(-.5%)', offset: 0.55 }, { transform: 'translateX(.3%)', offset: 0.75 }, { transform: 'none' }], 460],
+  nod: [[{ transform: 'none' }, { transform: 'translateY(.9%)', offset: 0.35 }, { transform: 'none', offset: 0.7 }, { transform: 'none' }], 560],
+  tilt: [[{ transform: 'none' }, { transform: 'rotate(2.2deg)', offset: 0.3 }, { transform: 'rotate(1.6deg)', offset: 0.7 }, { transform: 'none' }], 1000],
+  step: [[{ transform: 'none' }, { transform: 'translateY(-.9%)', offset: 0.25 }, { transform: 'none', offset: 0.5 }, { transform: 'translateY(-.7%)', offset: 0.75 }, { transform: 'none' }], 560],
+  glance: [[{ transform: 'none' }, { transform: 'translateY(-1%) rotate(-1.2deg)', offset: 0.4 }, { transform: 'none' }], 520],
+}
+const STEP_MOVES = new Set(['approach', 'apart', 'forward', 'back'])
+/** 上前 / 退后：立绘放大或缩小多少、脚往下或往上挪多少（占舞台高度）。 */
+const DEPTH = { 1: [1.1, '-6%'], [-1]: [0.88, '3%'] }
+/** 退场方式演多久（毫秒），样式在 theater.css 的 data-exit。 */
+const EXIT_MS = { storm: 650, run: 420, slow: 1300 }
+
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name)
+  const reaction = !leaving && !speaking && beat.reacts ? beat.reacts.find(r => r.name === entry.name) : null
+  const move = !leaving && beat.moves ? beat.moves.find(m => m.name === entry.name) : null
+  // 怎么进来的（跑进来、慢慢走进来、探头）：上台那一拍定下，之后不再变（换了 animation 会让登场动画重放一遍）
+  const [entrance] = React.useState(() => (beat.enterHow && beat.enterHow[entry.name]) || '')
+  const reactRef = React.useRef(null)
+  React.useEffect(() => {
+    const el = reactRef.current
+    if (!el || typeof el.animate !== 'function' || (!reaction && !move)) return
+    if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const base = reaction ? (((emotions || []).find(e => e.id === reaction.emo) || {}).base || reaction.emo) : ''
+    const kind = reaction && (reaction.emo || !move) ? reactKind(base) : move.act === 'lookback' || move.act === 'turn' || move.act === 'face' ? 'glance' : STEP_MOVES.has(move.act) ? 'step' : ''
+    const frames = REACT_FRAMES[kind]
+    if (frames) el.animate(frames[0], { duration: frames[1], easing: 'cubic-bezier(.3, .7, .3, 1)' })
+  }, [beat.key])
   const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name])
   const src = sprite ? assetUrl(sprite) : ''
   const color = (person && person.color) || '#9b7bff'
@@ -250,13 +286,21 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const place = placeSprite({ box: faceBoxOf(record, size), size, cm: heightOf(person).cm })
   // 图片文件读不出来（被删了、数据目录搬了）时退回剪影，不留一个破图标
   const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" onError={() => setShown('')} /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
+  const [d, db] = DEPTH[entry.depth] || [1, '0%']
+  const sym = speaking ? beat.sym : reaction ? reaction.sym : ''
+  const cls = ['fg-actor', speaking && 'is-speaking', reaction && 'is-reacting', uploaded && 'is-upload', leaving && 'is-leaving', aa && 'is-aa', entry.away && 'is-away', entry.peek && 'is-peek'].filter(Boolean).join(' ')
   return (
-    <div className={`fg-actor${speaking ? ' is-speaking' : ''}${uploaded ? ' is-upload' : ''}${leaving ? ' is-leaving' : ''}${aa ? ' is-aa' : ''}`} style={{ '--x': (entry.x ?? actorX(entry.pos)) + '%', '--s': entry.scale ?? 1, '--side': SIDE[entry.pos] || '0%', '--k': place.k, '--lift': place.lift, '--head': place.head * 100 + '%' }} data-name={entry.name}>
-      <div className="fg-actor-body">
-        {aa ? <AaSprite aa={aa} talk={speaking && talk && talk.key === beat.key ? talk : null} fallback={still} className="fg-aa" label={entry.name} /> : still}
+    <div className={cls} style={{ '--x': (entry.x ?? actorX(entry.pos)) + '%', '--s': entry.scale ?? 1, '--d': d, '--db': db, '--side': SIDE[entry.pos] || '0%', '--edge': (entry.x ?? actorX(entry.pos)) < 50 ? '-40%' : '40%', '--k': place.k, '--lift': place.lift, '--head': place.head * 100 + '%' }}
+      data-name={entry.name} data-enter={entrance || undefined} data-exit={leaving && entry.how ? entry.how : undefined} data-peek={entry.peek || undefined} data-depth={entry.depth || undefined}>
+      <div className="fg-actor-turn">
+        <div className="fg-actor-react" ref={reactRef}>
+          <div className="fg-actor-body">
+            {aa ? <AaSprite aa={aa} talk={speaking && talk && talk.key === beat.key ? talk : null} fallback={still} className="fg-aa" label={entry.name} /> : still}
+          </div>
+        </div>
       </div>
-      {speaking && beat.sym && (
-        <div className="fg-symbol-anchor"><MangaSymbol key={beat.key} kind={beat.sym} /></div>
+      {sym && (
+        <div className="fg-symbol-anchor"><MangaSymbol key={beat.key} kind={sym} /></div>
       )}
     </div>
   )
@@ -264,23 +308,31 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
 
 const LEAVE_MS = 450
 
-/** 刚离开舞台的人：再留 LEAVE_MS 毫秒演完退场动画。渲染时就算好，避免先消失一帧再淡出。 */
-function useLeaving(cast) {
+/**
+ * 刚离开舞台的人：再留一会儿演完退场动画（平常 LEAVE_MS 毫秒，甩头离开、跑开、慢慢走远按 EXIT_MS）。渲染时就算好，避免先消失一帧再淡出。
+ * 怎么走的看这一拍的 exitHow（告别那句说完、下一拍才走的也记在下一拍上）。
+ */
+function useLeaving(cast, beat) {
   const prev = React.useRef([])
   const leaving = React.useRef(new Map())
   const [, refresh] = React.useReducer(n => n + 1, 0)
   const now = Date.now()
-  for (const p of prev.current) if (!cast.some(c => c.id === p.id) && !leaving.current.has(p.id)) leaving.current.set(p.id, { entry: p, at: now })
+  for (const p of prev.current) {
+    if (cast.some(c => c.id === p.id) || leaving.current.has(p.id)) continue
+    const how = (beat && beat.exitHow && beat.exitHow[p.name]) || ''
+    leaving.current.set(p.id, { entry: how ? { ...p, how } : p, at: now, ms: EXIT_MS[how] || LEAVE_MS })
+  }
   for (const c of cast) leaving.current.delete(c.id)
   prev.current = cast
   const pending = leaving.current.size
   React.useEffect(() => {
     if (!pending) return undefined
+    const wait = Math.max(16, Math.min(...[...leaving.current.values()].map(l => l.at + l.ms)) - Date.now())
     const t = setTimeout(() => {
-      const cut = Date.now() - LEAVE_MS
-      for (const [name, l] of leaving.current) if (l.at <= cut) leaving.current.delete(name)
+      const at = Date.now() + 16
+      for (const [name, l] of leaving.current) if (l.at + l.ms <= at) leaving.current.delete(name)
       refresh()
-    }, LEAVE_MS)
+    }, wait)
     return () => clearTimeout(t)
   })
   return [...leaving.current.values()].map(l => l.entry)
@@ -297,8 +349,9 @@ export function Cast({ beat, view, talk, max = 5 }) {
   // 人太多时最久没动静的先下场，剩下的按站位均匀排开。
   // 换了一堂布景（换地方、进出回忆）时同一个人也算新登场：跟着旧画面一起退，在新画面里重新出来，不从旧站位滑到新站位
   // 退场的人按最后在台上那一拍的样子退（从回忆里退下去的还穿着当时的衣服），不在退场途中换成现在的样子
-  cast = stageLayout(onStage(cast, beat.recent, max)).map(entry => ({ ...entry, id: entry.name + '@' + (beat.set || 0), seen: beat }))
-  const leaving = useLeaving(cast)
+  // 走位（靠近、拉开、上前、背过身、探头）叠在排好的站位上
+  cast = blockLayout(stageLayout(onStage(cast, beat.recent, max)), beat.poses).map(entry => ({ ...entry, id: entry.name + '@' + (beat.set || 0), seen: beat }))
+  const leaving = useLeaving(cast, beat)
   // 插画全屏盖住舞台：立绘照常在下面，插画收起时直接露出来。
   return (
     <div className="fg-cast" data-split={split ? 'on' : undefined}>
