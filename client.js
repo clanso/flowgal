@@ -822,6 +822,68 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-fw-rise { 0% { opacity: 1; top: 100%; } 85% { opacity: 1; } 100% { opacity: 0; top: var(--y); } }
 @keyframes fg-fw-burst { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.1); } 60% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -40%) scale(1); } }
 @keyframes fg-fw-glow { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+/* 手机：来电 / 拨出时右边滑进来一部响着的手机，接通后收成右上角的「通话中」；挂断的小卡；视频通话的小窗；通知横幅 */
+.fg-phone { position: absolute; right: 4.5%; top: 13%; z-index: 18; pointer-events: none; animation: fg-phone-in .5s cubic-bezier(.2, .9, .3, 1.1) both; }
+.fg-phone-card { width: 17cqw; box-sizing: border-box; padding: 1.5cqw 1.4cqw 1.6cqw; border-radius: 2cqw; text-align: center; color: #fff;
+  background: linear-gradient(180deg, rgba(40, 44, 58, .86), rgba(18, 20, 28, .9)); border: 1px solid rgba(255, 255, 255, .16); box-shadow: 0 1.4cqw 3.4cqw rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.fg-phone[data-side="left"] { right: auto; left: 4.5%; } /* 分屏在右边开着时 */
+.fg-phone[data-dir="in"] .fg-phone-card { animation: fg-phone-buzz .78s ease-in-out .1s 2; }
+.fg-phone-label { display: flex; align-items: center; justify-content: center; gap: .4cqw; font-size: 1.05cqw; letter-spacing: .24em; color: rgba(255, 255, 255, .72); }
+.fg-phone-label svg { width: 1.2cqw; height: 1.2cqw; }
+.fg-phone-avatar { position: relative; width: 7.4cqw; height: 7.4cqw; margin: 1.2cqw auto .8cqw; }
+.fg-phone-face, .fg-pip-face, .fg-notify-icon { position: relative; overflow: hidden; display: grid; place-items: center; color: #fff; font-weight: 700; background: radial-gradient(circle at 50% 35%, color-mix(in oklab, var(--who, #8aa4ff) 70%, #fff), var(--who, #8aa4ff)); }
+.fg-phone-face img, .fg-pip-face img, .fg-notify-icon img { position: absolute; max-width: none; height: auto; }
+.fg-phone-face { width: 100%; height: 100%; border-radius: 50%; font-size: 3.2cqw; box-shadow: 0 0 0 .25cqw rgba(255, 255, 255, .85), 0 .5cqw 1.4cqw rgba(0, 0, 0, .4); }
+.fg-phone-ripple { position: absolute; inset: 0; border-radius: 50%; border: .2cqw solid rgba(140, 255, 190, .8); opacity: 0; animation: fg-phone-ripple 1.2s ease-out infinite; }
+.fg-phone-name { font-family: var(--font-display); font-size: 2cqw; font-weight: 700; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fg-phone-keys { display: flex; justify-content: center; gap: 3.4cqw; margin-top: 1.4cqw; }
+.fg-phone-key { display: grid; place-items: center; width: 3.6cqw; height: 3.6cqw; border-radius: 50%; color: #fff; background: #f2484f; box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35); }
+.fg-phone-key svg { width: 55%; height: 55%; }
+.fg-phone-key.is-decline svg { transform: rotate(135deg); }
+.fg-phone-key.is-accept { background: #34c759; animation: fg-phone-accept 1.1s ease-in-out infinite; }
+.fg-phone[data-dir="out"] .fg-phone-label::after { content: ""; display: inline-block; width: 1.6cqw; height: .3cqw; margin-left: .3cqw; background: radial-gradient(circle, currentColor 40%, transparent 45%) 0 50% / .55cqw .3cqw repeat-x; animation: fg-phone-dots 1.2s steps(4) infinite; }
+.fg-phone.is-end { animation: fg-phone-in .4s cubic-bezier(.2, .9, .3, 1.1) both, fg-fade-out .45s ease var(--hold, 2s) forwards; }
+.fg-phone.is-end .fg-phone-face { filter: grayscale(.6) brightness(.85); }
+.fg-phone-result { display: flex; align-items: center; justify-content: center; gap: .5cqw; margin-top: .6cqw; font-size: 1.3cqw; letter-spacing: .12em; color: rgba(255, 255, 255, .8); font-variant-numeric: tabular-nums; }
+.fg-phone-result i { display: grid; place-items: center; width: 1.9cqw; height: 1.9cqw; border-radius: 50%; background: #f2484f; }
+.fg-phone-result svg { width: 60%; height: 60%; transform: rotate(135deg); color: #fff; }
+.fg-phone.is-end[data-result="missed"] .fg-phone-result, .fg-phone.is-end[data-result="declined"] .fg-phone-result, .fg-phone.is-end[data-result="hungup"] .fg-phone-result { color: #ff8a8f; }
+@keyframes fg-phone-in { from { opacity: 0; transform: translateX(6cqw) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes fg-phone-buzz { 0%, 46%, 100% { transform: none; } 6%, 18%, 30% { transform: translateX(-.3cqw) rotate(-1.5deg); } 12%, 24%, 36% { transform: translateX(.3cqw) rotate(1.5deg); } }
+@keyframes fg-phone-ripple { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.55); } }
+@keyframes fg-phone-accept { 0%, 100% { transform: none; box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35), 0 0 0 0 rgba(52, 199, 89, .6); } 50% { transform: translateY(-.25cqw); box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35), 0 0 0 .8cqw rgba(52, 199, 89, 0); } }
+@keyframes fg-phone-dots { from { width: 0; } to { width: 1.65cqw; } }
+.fg-call-chip { color: #b8ffd0; border-color: rgba(52, 199, 89, .55); background: rgba(10, 40, 22, .62); animation: fg-call-chip .45s cubic-bezier(.2, .9, .3, 1.2) both; }
+.fg-call-chip svg { width: 1.05cqw; height: 1.05cqw; }
+.fg-call-chip b { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .06em; color: #fff; }
+.fg-call-dot { width: .6cqw; height: .6cqw; border-radius: 50%; background: #34c759; box-shadow: 0 0 .6cqw #34c759; animation: fg-call-dot 1.4s ease-in-out infinite; }
+@keyframes fg-call-chip { from { opacity: 0; transform: translateX(3cqw) scale(.8); } to { opacity: 1; transform: none; } }
+@keyframes fg-call-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.fg-pip { position: absolute; right: 2.2%; top: 10%; z-index: 17; width: 12cqw; aspect-ratio: 3 / 4; border-radius: 1.2cqw; overflow: hidden; pointer-events: none;
+  border: .2cqw solid rgba(255, 255, 255, .75); box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .5); background: #111; animation: fg-phone-in .5s cubic-bezier(.2, .9, .3, 1.1) both; transition: border-color .3s, box-shadow .3s; }
+.fg-pip.is-talking { border-color: #34c759; box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .5), 0 0 1.4cqw rgba(52, 199, 89, .6); }
+.fg-pip-face { position: absolute; inset: 0; font-size: 4cqw; }
+.fg-pip-face img { filter: saturate(1.05) contrast(1.03); }
+.fg-pip-face::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .03) 0 1px, transparent 1px 3px), linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, .55)); }
+.fg-pip-name { position: absolute; left: .8cqw; right: .8cqw; bottom: .7cqw; display: flex; align-items: center; gap: .4cqw; font-size: 1.05cqw; letter-spacing: .1em; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fg-pip-name i { flex: none; width: .55cqw; height: .55cqw; border-radius: 50%; background: #ff453a; animation: fg-call-dot 1.4s ease-in-out infinite; }
+.fg-notify { position: absolute; left: 50%; top: 3%; z-index: 23; display: flex; gap: 1cqw; align-items: flex-start; width: 36cqw; box-sizing: border-box; padding: 1cqw 1.3cqw; border-radius: 1.6cqw; pointer-events: none; color: #fff;
+  background: rgba(30, 32, 40, .78); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .45); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  transform: translateX(-50%); animation: fg-notify-in .5s cubic-bezier(.2, .9, .3, 1.15) both, fg-notify-out .4s cubic-bezier(.6, 0, .8, .4) var(--hold, 3s) forwards; }
+.fg-notify-icon { flex: none; width: 3.4cqw; height: 3.4cqw; border-radius: .9cqw; font-size: 1.7cqw; }
+.fg-notify-body { flex: 1; min-width: 0; }
+.fg-notify-head { display: flex; justify-content: space-between; gap: 1cqw; font-size: 1.15cqw; }
+.fg-notify-head b { font-weight: 700; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fg-notify-head span { flex: none; color: rgba(255, 255, 255, .55); font-size: 1cqw; }
+.fg-notify-text { margin-top: .2cqw; font-size: 1.3cqw; line-height: 1.45; color: rgba(255, 255, 255, .9); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fg-notify-wave { display: flex; align-items: center; gap: .22cqw; height: 2cqw; margin-top: .4cqw; }
+.fg-notify-wave i { width: .22cqw; height: var(--h, 50%); border-radius: 1px; background: rgba(255, 255, 255, .75); transform-origin: 50% 50%; animation: fg-notify-wave .9s ease-in-out infinite alternate; }
+.fg-notify-wave .fg-notify-play { width: 0; height: 0; margin-right: .6cqw; border-radius: 0; background: none; border-left: .9cqw solid #34c759; border-top: .55cqw solid transparent; border-bottom: .55cqw solid transparent; animation: none; }
+.fg-notify[data-kind="voicemail"] .fg-notify-head b { color: #b8ffd0; }
+@keyframes fg-notify-in { from { opacity: 0; transform: translateX(-50%) translateY(-120%); } to { opacity: 1; transform: translateX(-50%); } }
+@keyframes fg-notify-out { to { opacity: 0; transform: translateX(-50%) translateY(-120%); } }
+@keyframes fg-notify-wave { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
 /* 被打的不在台上（主角、画外的人）：整个画面替他挨这一下 */
 .fg-hurt { position: absolute; inset: 0; z-index: 17; pointer-events: none; animation: fg-hurt .7s ease-out both; background: radial-gradient(ellipse at center, transparent 45%, rgba(220, 20, 40, .55)); }
 .fg-hurt[data-effect="crit"] { background: radial-gradient(ellipse at center, rgba(255, 40, 40, .12) 30%, rgba(230, 10, 30, .75)); animation-duration: 1s; }
@@ -1721,6 +1783,17 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
   .fg-recall-face { width: 17cqw; }
+  .fg-phone { top: 16%; } .fg-phone-card { width: 34cqw; padding: 3cqw 2.6cqw; border-radius: 4cqw; }
+  .fg-phone-label { font-size: 2.4cqw; } .fg-phone-label svg { width: 2.6cqw; height: 2.6cqw; }
+  .fg-phone-avatar { width: 15cqw; height: 15cqw; margin: 2.4cqw auto 1.6cqw; } .fg-phone-face { font-size: 6.4cqw; }
+  .fg-phone-name { font-size: 4.2cqw; } .fg-phone-keys { gap: 7cqw; margin-top: 2.6cqw; } .fg-phone-key { width: 8cqw; height: 8cqw; }
+  .fg-phone-result { font-size: 2.8cqw; } .fg-phone-result i { width: 4cqw; height: 4cqw; }
+  .fg-call-chip svg { width: 2.6cqw; height: 2.6cqw; } .fg-call-dot { width: 1.4cqw; height: 1.4cqw; }
+  .fg-pip { width: 24cqw; top: 9%; border-radius: 2.4cqw; } .fg-pip-name { font-size: 2.4cqw; left: 1.6cqw; bottom: 1.4cqw; } .fg-pip-name i { width: 1.2cqw; height: 1.2cqw; }
+  .fg-notify { width: 88cqw; top: 2.4%; padding: 2.2cqw 2.8cqw; gap: 2.2cqw; border-radius: 3.4cqw; }
+  .fg-notify-icon { width: 8cqw; height: 8cqw; border-radius: 2cqw; font-size: 4cqw; }
+  .fg-notify-head { font-size: 2.8cqw; } .fg-notify-head span { font-size: 2.4cqw; } .fg-notify-text { font-size: 3.2cqw; }
+  .fg-notify-wave { height: 4.4cqw; gap: .5cqw; } .fg-notify-wave i { width: .5cqw; }
   .fg-text { font-size: 4.6cqw; top: 18%; bottom: 26%; }
   .fg-progress { bottom: 12%; right: 4.2%; }
   .fg-quick { bottom: 5%; left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }
@@ -1951,6 +2024,8 @@ var EMOTION_POSE = {
 var BATTLE_END_LABEL = { win: "胜利", lose: "败北", flee: "撤退" };
 var HIT_EFFECT_LABEL = { hit: "命中", crit: "暴击", miss: "闪避", block: "格挡", down: "击倒", heal: "治疗" };
 var MOMENT_LABEL = { photo: "拍照", touch: "触碰", pat: "摸头", poke: "戳脸", cheers: "干杯", fireworks: "烟花", cook: "做好一道菜", nickname: "新称呼", promise: "约定", contact: "交换联系方式" };
+var PHONE_LABEL = { call: "来电", dial: "拨出", end: "挂断", notify: "通知", voicemail: "语音留言" };
+var CALL_END_LABEL = { missed: "没接通", declined: "拒接", hungup: "对方挂断" };
 var MOVE_LABEL = { approach: "靠近", apart: "拉开", forward: "上前", back: "后退", turn: "背过身", face: "转身面对", lookback: "回眸", reset: "复位" };
 var ENTER_HOW_LABEL = { run: "跑进来", peek: "探头", slow: "慢慢走进来" };
 var EXIT_HOW_LABEL = { storm: "甩头离开", run: "跑开", slow: "慢慢走远" };
@@ -1987,7 +2062,7 @@ function playedUnits(units, script) {
   return skip.size ? (units || []).filter((u) => !skip.has(u.id)) : units || [];
 }
 var ALL = /* @__PURE__ */ new Set(["*", "全部", "所有人", "all"]);
-function stageWalk(script, units, carry = [], inside = null, { walkOn = null } = {}) {
+function stageWalk(script, units, carry = [], inside = null, { walkOn = null, calling = "" } = {}) {
   if (!script) return { steps: units.map(() => ({ cast: carry, entered: [], left: [] })), end: carry, inside: null };
   const lines = script.lines || {};
   const home = new Map((script.cast || []).map((c) => [c.name, c.pos]));
@@ -2003,7 +2078,7 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null } =
   const listed = new Set((script.cast || []).map((c) => c.name));
   const walkOns = /* @__PURE__ */ new Map();
   const ownExit = /* @__PURE__ */ new Map();
-  let layer = false, layerSeen = false, layerStart = -1, split = null;
+  let layer = false, layerSeen = false, layerStart = -1, split = null, caller = calling || "";
   units.forEach((u, i) => {
     const line = lines[u.id] || {};
     const returning = line.mode === "real" && layer;
@@ -2014,6 +2089,11 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null } =
     }
     if (line.split === "off") split = null;
     else if (line.split) split = line.split;
+    const phone = line.phone && line.phone.kind;
+    if (phone === "call" || phone === "dial") caller = line.phone.who || "";
+    if (caller && (line.enter || []).some((e) => e.name === caller)) caller = "";
+    const onPhone = caller;
+    if (phone === "end") caller = "";
     const note = (name2, kind) => {
       const seen = returning ? back : layer ? inLayer : first;
       if (seen.has(name2)) return;
@@ -2027,7 +2107,7 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null } =
     if (line.recall) for (const name2 of speakers) recallVoices.add(name2);
     const inPerson = !line.recall && (!line.voice || line.voice === "chorus");
     for (const name2 of inPerson ? speakers : []) {
-      if (split && split.who?.includes(name2)) continue;
+      if (split && split.who?.includes(name2) || name2 === onPhone) continue;
       if (layer) {
         if (!layerVoices.has(name2)) layerVoices.set(name2, layerStart);
       } else {
@@ -2942,6 +3022,7 @@ function buildBeats(view) {
   const active = /* @__PURE__ */ new Map();
   let recalled = null;
   let battle = null;
+  let call2 = null;
   let set = 0;
   const drawn = new Set((view.cast || []).filter((p3) => Object.values(p3.sprites || {}).some((s) => s && s.assetId)).map((p3) => p3.name));
   const people = (view.cast || []).map((p3) => p3.name);
@@ -2954,7 +3035,9 @@ function buildBeats(view) {
     const units = playedUnits(all, script);
     const lines = units.map((u) => script && script.lines && script.lines[u.id] || {});
     const keep = script && layer && lines.length && lines[0].mode === layer.mode ? layer : null;
-    const walk = stageWalk(script, units, cast, keep ? inside : null, { walkOn: drawn });
+    if (call2 && !(script && lines.some((l) => l.phone || l.voice === "phone" || l.split || call2.who && speakersOf(l.sp).includes(call2.who)))) call2 = null;
+    if (call2) call2 = { ...call2, live: true, unanswered: false };
+    const walk = stageWalk(script, units, cast, keep ? inside : null, { walkOn: drawn, calling: call2 ? call2.who : "" });
     const known = [.../* @__PURE__ */ new Set([...(script && script.cast || []).map((c) => c.name), ...people])];
     const steps = walk.steps;
     cast = walk.end;
@@ -3030,7 +3113,25 @@ function buildBeats(view) {
       const recall = recalls[ui2];
       const cutin = recall ? "" : line.cutin === true ? speakers[0] || "" : line.cutin || "";
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map((e) => ((view.emotions || []).find((x) => x.id === e) || {}).base || e), at2.scene.mood);
-      const voice = recall && type !== "narration" && (!line.voice || line.voice === "echo") ? "memory" : line.voice;
+      const phone = line.phone || null;
+      if (call2 && call2.who && steps[ui2].entered.includes(call2.who)) call2 = null;
+      const before = call2;
+      let phoneEdge = null;
+      if (phone && (phone.kind === "call" || phone.kind === "dial")) {
+        const next = lines.slice(ui2 + 1).find((l) => l.phone && ["call", "dial", "end"].includes(l.phone.kind));
+        const unanswered = Boolean(next && next.phone.kind === "end" && (next.phone.result === "missed" || next.phone.result === "declined"));
+        call2 = { who: phone.who || "", ...phone.video ? { video: true } : {}, dir: phone.kind === "call" ? "in" : "out", id: `${t.turn}:${unit.id}`, live: false, unanswered };
+        phoneEdge = phone;
+      } else if (phone && phone.kind === "end") {
+        const was = call2 || {};
+        if (call2 || phone.who) phoneEdge = { kind: "end", who: phone.who || was.who || "", ...was.id ? { id: was.id } : {}, ...was.dir ? { dir: was.dir } : {}, ...was.video ? { video: true } : {}, ...was.live ? { live: true } : {}, ...phone.result ? { result: phone.result } : {} };
+        call2 = null;
+      } else if (phone) phoneEdge = phone;
+      const calling = call2 ? { who: call2.who, ...call2.video ? { video: true } : {}, dir: call2.dir, id: call2.id, state: call2.live ? "live" : "ringing" } : null;
+      if (call2 && !call2.unanswered) call2.live = true;
+      const caller = (before || calling || {}).who;
+      const onPhone = Boolean(caller) && type === "dialogue" && speakers.includes(caller) && !onStageNames.includes(caller);
+      const voice = recall && type !== "narration" && (!line.voice || line.voice === "echo") ? "memory" : line.voice || (onPhone ? "phone" : "");
       const recallEdge = recall === recalled ? "" : recall ? "in" : "out";
       recalled = recall;
       beats.push({
@@ -3064,6 +3165,10 @@ function buildBeats(view) {
         // 一次出手：招式名横幅、被打的人一震
         ...line.moment ? { moment: line.moment } : {},
         // 小瞬间：拍照、摸头、干杯、约定……
+        ...calling ? { call: calling } : {},
+        // 正在打的电话：响着（ringing）还是接通了（live）
+        ...phoneEdge ? { phone: phoneEdge } : {},
+        // 手机这一句的事：来电、拨出、挂断、通知、语音留言
         say: line.say || "",
         stress: line.stress || "",
         ...line.textfx ? { textfx: line.textfx } : {},
@@ -3177,6 +3282,7 @@ var BATTLE_CARD_MS = { start: 1900, end: 1700 };
 var HIT_IMPACT_MS = 420;
 var HIT_LEAD_MS = 700;
 var MOMENT_LEAD_MS = { photo: 650, fireworks: 900, cook: 450, nickname: 600, promise: 600, contact: 450 };
+var PHONE_LEAD_MS = { call: 1e3, dial: 800 };
 var SCENE_BEAT_MS = 300;
 var WAKE_SWAP_MS = 1700;
 var WAKE_MS = 3600;
@@ -3201,6 +3307,7 @@ function beatHold(beat, { cg = "", was = {} } = {}) {
   if (beat.battleEdge) ms = Math.max(ms, BATTLE_CARD_MS[beat.battleEdge.kind] || 0);
   if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS);
   if (beat.moment) ms = Math.max(ms, MOMENT_LEAD_MS[beat.moment.kind] || 0);
+  if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0);
   const wake = was.mode === "memory" && (beat.mode || "") !== "memory" && !beat.cut && WAKE_FROM.has(beat.transition);
   if (wake) {
     ms = Math.max(ms, WAKE_MS);
@@ -3639,6 +3746,7 @@ function aimCamera(cam, face) {
 // lib/foley.js
 var p2 = (wave, f, dur, gain, more = {}) => ({ wave, f, dur, gain, ...more });
 var crackle = (n, start, gap) => Array.from({ length: n }, (_, i) => p2("noise", 3e3 + i % 3 * 900, 0.03, 0.05 + i % 2 * 0.02, { q: 2.5, at: start + i * gap * (0.7 + i * 7 % 5 / 8) }));
+var ringtone = (start) => [1319, 1568, 1976, 1568].flatMap((f, i) => [p2("sine", f, 0.17, 0.06, { attack: 3e-3, at: start + i * 0.12 }), p2("triangle", f / 2, 0.12, 0.025, { attack: 3e-3, at: start + i * 0.12 })]);
 var FOLEY = Object.freeze({
   // 快门：咔、嚓两声，带一点机械的高音
   shutter: [p2("noise", 4200, 0.035, 0.22, { q: 1.4 }), p2("square", 1800, 0.02, 0.015, { attack: 1e-3, lp: 3200 }), p2("noise", 2600, 0.05, 0.16, { q: 1.1, at: 0.085 })],
@@ -3665,10 +3773,25 @@ var FOLEY = Object.freeze({
   // 约定：两声风铃
   promise: [p2("sine", 1760, 1, 0.045), p2("sine", 2217, 0.9, 0.035, { at: 0.14 }), p2("sine", 2637, 1.1, 0.03, { at: 0.28 })],
   // 交换联系方式：手机提示音（嘀嘟）
-  contact: [p2("sine", 988, 0.12, 0.06, { attack: 3e-3 }), p2("sine", 1319, 0.22, 0.06, { attack: 3e-3, at: 0.11 })]
+  contact: [p2("sine", 988, 0.12, 0.06, { attack: 3e-3 }), p2("sine", 1319, 0.22, 0.06, { attack: 3e-3, at: 0.11 })],
+  // 手机：来电铃声（一段木琴似的旋律响两遍，底下手机振动的嗡嗡）
+  ring: [...ringtone(0), ...ringtone(0.78), p2("square", 150, 0.42, 0.02, { lp: 420, hold: 0.3 }), p2("square", 150, 0.42, 0.02, { lp: 420, hold: 0.3, at: 0.78 })],
+  // 拨出去等对方接：嘟——
+  ringback: [p2("sine", 450, 1.05, 0.07, { attack: 0.02, hold: 0.95 }), p2("sine", 454, 1.05, 0.025, { attack: 0.02, hold: 0.95 })],
+  // 接通：咔哒一下，两声往上
+  pickup: [p2("noise", 2400, 0.03, 0.08, { q: 2 }), p2("sine", 880, 0.09, 0.05, { at: 0.05 }), p2("sine", 1175, 0.14, 0.05, { at: 0.13 })],
+  // 挂断：两声往下
+  hangup: [p2("sine", 1175, 0.1, 0.05), p2("sine", 784, 0.18, 0.05, { at: 0.11 })],
+  // 忙音：嘟、嘟、嘟
+  busy: [0, 0.7, 1.4].map((at2) => p2("sine", 450, 0.36, 0.06, { attack: 0.01, hold: 0.3, at: at2 })),
+  // 通知：叮咚
+  notify: [p2("sine", 1760, 0.18, 0.06, { attack: 2e-3 }), p2("sine", 2349, 0.4, 0.05, { attack: 2e-3, at: 0.1 }), p2("sine", 4699, 0.12, 8e-3, { attack: 2e-3, at: 0.1 })],
+  // 语音留言：录音机的「嘀——」
+  voicemail: [p2("sine", 1e3, 0.55, 0.05, { attack: 0.01, hold: 0.45 })]
 });
 var FOLEY_IDS = new Set(Object.keys(FOLEY));
 var MOMENT_FOLEY = Object.freeze({ photo: "shutter", touch: "heartbeat", pat: "pat", poke: "poke", cook: "cook", nickname: "nickname", promise: "promise", contact: "contact" });
+var PHONE_FOLEY = Object.freeze({ call: "ring", dial: "ringback", pickup: "pickup", end: "hangup", busy: "busy", notify: "notify", voicemail: "voicemail" });
 
 // src/client/theater/AaSprite.jsx
 var import_react3 = __toESM(require("react"), 1);
@@ -4708,6 +4831,7 @@ function playParts(ac, parts, { rate = 1, volume = 1, at: at2 = ac.currentTime, 
       g.gain.setValueAtTime(1e-4, t);
       g.gain.exponentialRampToValueAtTime(peak, t + attack);
     } else g.gain.setValueAtTime(peak, t);
+    if (part.hold) g.gain.setValueAtTime(peak, t + attack + part.hold);
     g.gain.exponentialRampToValueAtTime(1e-4, end);
     let src, head;
     if (part.wave === "noise") {
@@ -5357,12 +5481,9 @@ function RecallLayer({ beat, view, talk, light = false, tone = "" }) {
   const ghostBeat = { ...shown.beat, then: shown.recall.then, ...leaving ? { speaker: "", speakers: null, sym: "" } : {} };
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-recall${leaving ? " is-leave" : ""}`, "data-tone": mood, style: { "--fade": (leaving ? RECALL_LEAVE_MS : RECALL_IN_MS) + "ms" }, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-recall-veil" }), ghosts.map((entry) => /* @__PURE__ */ import_react4.default.createElement(Actor, { key: entry.name, entry, person: people.get(entry.name), beat: ghostBeat, emo: shown.beat.emotions[entry.name] || "neutral", emotions: view && view.emotions, talk: leaving ? null : talk })));
 }
-function RecallFace({ beat, view, tone = "" }) {
-  const recall = beat && beat.recall;
-  const people = new Map((view && view.cast || []).map((p3) => [p3.name, p3]));
-  const name2 = recall && beat.type !== "narration" ? (beat.speakers || [beat.speaker]).find((n) => recall.who.includes(n) && people.has(n)) : "";
-  const person = name2 ? people.get(name2) : null;
-  const sprite = person ? spriteFor(person, beat.turn, beat.emotions[name2] || "neutral", view && view.emotions, recall.then && recall.then[name2]) : "";
+function useFace(person, beat, view, then = null) {
+  const name2 = person ? person.name : "";
+  const sprite = person ? spriteFor(person, beat.turn, beat.emotions[name2] || "neutral", view && view.emotions, then) : "";
   const src = sprite ? assetUrl(sprite) : "";
   const [size, setSize] = import_react4.default.useState(null);
   import_react4.default.useEffect(() => {
@@ -5378,9 +5499,17 @@ function RecallFace({ beat, view, tone = "" }) {
       live = false;
     };
   }, [src]);
-  if (!src) return null;
+  if (!src) return { src: "", crop: null };
   const record = Object.values(person.sprites || {}).find((r) => r && r.assetId === sprite);
-  const crop = faceCrop(faceBoxOf(record, size), size);
+  return { src, crop: faceCrop(faceBoxOf(record, size), size) };
+}
+function RecallFace({ beat, view, tone = "" }) {
+  const recall = beat && beat.recall;
+  const people = new Map((view && view.cast || []).map((p3) => [p3.name, p3]));
+  const name2 = recall && beat.type !== "narration" ? (beat.speakers || [beat.speaker]).find((n) => recall.who.includes(n) && people.has(n)) : "";
+  const person = name2 ? people.get(name2) : null;
+  const { src, crop } = useFace(person, beat, view, recall && recall.then && recall.then[name2]);
+  if (!src) return null;
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-recall-face", key: name2, "data-tone": tone || recall.tone || "warm", style: { "--speaker": person.color || void 0 }, "aria-hidden": "true" }, crop && /* @__PURE__ */ import_react4.default.createElement("img", { src, alt: "", draggable: "false", style: { width: crop.width + "%", left: crop.left + "%", top: crop.top + "%" } }));
 }
 var CUTIN_HOLD_MS = 1500;
@@ -5504,6 +5633,81 @@ function Fireworks({ sound = true }) {
   }, []);
   if (gone) return null;
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-fireworks", "aria-hidden": "true", style: { "--rise": FIREWORK_RISE_MS + "ms" } }, BURSTS.map((b, i) => /* @__PURE__ */ import_react4.default.createElement("div", { key: i, className: "fg-firework", style: { "--x": b.x + "%", "--y": b.y + "%", "--hue": b.hue, "--at": b.at + "ms" } }, /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-fw-glow" }), /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-fw-trail" }), /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-fw-burst" }), /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-fw-burst is-inner" }))));
+}
+var PHONE_END_MS = 2600;
+var PHONE_BANNER_MS = { notify: 3800, voicemail: 4800 };
+var callClock = /* @__PURE__ */ new Map();
+var clock = (ms) => {
+  const s = Math.max(0, Math.round(ms / 1e3));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+};
+var firstChar = (name2) => Array.from(String(name2 || ""))[0] || "?";
+function PhoneFace({ person, beat, view, name: name2, className = "fg-phone-face" }) {
+  const { src, crop } = useFace(person, beat, view);
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className, style: person && person.color ? { "--who": person.color } : void 0 }, src && crop ? /* @__PURE__ */ import_react4.default.createElement("img", { src, alt: "", draggable: "false", style: { width: crop.width + "%", left: crop.left + "%", top: crop.top + "%" } }) : /* @__PURE__ */ import_react4.default.createElement("span", null, firstChar(name2)));
+}
+var personOf = (view, name2) => (name2 ? (view && view.cast || []).find((p3) => p3.name === name2) : null) || null;
+var HANDSET = /* @__PURE__ */ import_react4.default.createElement("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("path", { d: "M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z", fill: "currentColor" }));
+var CAMERA = /* @__PURE__ */ import_react4.default.createElement("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("path", { d: "M4 6h11a2 2 0 0 1 2 2v1.5l4-2.5v10l-4-2.5V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z", fill: "currentColor" }));
+function PhoneRing({ beat, view, sound = true }) {
+  const call2 = beat.call;
+  import_react4.default.useEffect(() => {
+    if (sound) foley(PHONE_FOLEY[call2.dir === "in" ? "call" : "dial"]);
+  }, [beat.key]);
+  const person = personOf(view, call2.who);
+  const incoming = call2.dir === "in";
+  const label = incoming ? call2.video ? "视频通话邀请" : "来电" : call2.video ? "正在发起视频通话…" : "正在呼叫…";
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone", "data-dir": call2.dir, "data-video": call2.video ? "" : void 0, "data-side": beat.split ? "left" : void 0, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone-card" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone-label" }, call2.video && CAMERA, label), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone-avatar" }, incoming && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-phone-ripple" }), /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-phone-ripple", style: { animationDelay: ".6s" } })), /* @__PURE__ */ import_react4.default.createElement(PhoneFace, { person, beat, view, name: call2.who })), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone-name" }, call2.who || "未知号码"), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone-keys" }, /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-phone-key is-decline" }, HANDSET), incoming && /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-phone-key is-accept" }, call2.video ? CAMERA : HANDSET))));
+}
+function CallChip({ call: call2, sound = true }) {
+  const [now, setNow] = import_react4.default.useState(() => Date.now());
+  import_react4.default.useEffect(() => {
+    if (!callClock.has(call2.id)) callClock.set(call2.id, Date.now());
+    if (sound) foley(PHONE_FOLEY.pickup);
+    const t = setInterval(() => setNow(Date.now()), 1e3);
+    return () => clearInterval(t);
+  }, []);
+  return /* @__PURE__ */ import_react4.default.createElement("span", { className: "fg-pill fg-call-chip", "data-video": call2.video ? "" : void 0, title: call2.video ? "视频通话中" : "通话中" }, /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-call-dot" }), call2.video ? CAMERA : HANDSET, call2.who || "通话中", /* @__PURE__ */ import_react4.default.createElement("b", null, clock(now - (callClock.get(call2.id) || now))));
+}
+function VideoPip({ beat, view }) {
+  const call2 = beat.call;
+  const person = personOf(view, call2.who);
+  const talking = (beat.speakers || [beat.speaker]).includes(call2.who);
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-pip${talking ? " is-talking" : ""}`, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement(PhoneFace, { person, beat, view, name: call2.who, className: "fg-pip-face" }), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-pip-name" }, /* @__PURE__ */ import_react4.default.createElement("i", null), call2.who || "视频通话"));
+}
+var END_TEXT = {
+  missed: { in: "未接来电", out: "无人接听" },
+  declined: { in: "已拒接", out: "对方已拒接" },
+  hungup: { in: "对方挂断了", out: "对方挂断了" }
+};
+function PhoneEnd({ beat, view, sound = true }) {
+  const end = beat.phone;
+  const dir = end.dir || "in";
+  const [gone, setGone] = import_react4.default.useState(false);
+  const started = end.live && end.id ? callClock.get(end.id) : 0;
+  import_react4.default.useEffect(() => {
+    if (sound) foley(end.result === "hungup" || end.result === "declined" && dir === "out" ? PHONE_FOLEY.busy : end.result === "missed" && dir === "in" ? "" : PHONE_FOLEY.end);
+    const t = setTimeout(() => setGone(true), PHONE_END_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const [ended] = import_react4.default.useState(() => Date.now());
+  if (gone) return null;
+  const text = end.result ? END_TEXT[end.result][dir] : "通话结束";
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone is-end", "data-result": end.result || "ended", style: { "--hold": PHONE_END_MS - 450 + "ms" }, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone-card" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone-avatar" }, /* @__PURE__ */ import_react4.default.createElement(PhoneFace, { person: personOf(view, end.who), beat, view, name: end.who })), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone-name" }, end.who || "通话"), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-phone-result" }, /* @__PURE__ */ import_react4.default.createElement("i", null, HANDSET), text, !end.result && started ? ` · ${clock(ended - started)}` : "")));
+}
+function PhoneBanner({ beat, view, sound = true }) {
+  const m = beat.phone;
+  const [gone, setGone] = import_react4.default.useState(false);
+  const hold = PHONE_BANNER_MS[m.kind] || 3800;
+  import_react4.default.useEffect(() => {
+    if (sound) foley(PHONE_FOLEY[m.kind]);
+    const t = setTimeout(() => setGone(true), hold);
+    return () => clearTimeout(t);
+  }, []);
+  if (gone) return null;
+  const person = personOf(view, m.who);
+  const voicemail = m.kind === "voicemail";
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-notify", "data-kind": m.kind, style: { "--hold": hold - 500 + "ms" }, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement(PhoneFace, { person, beat, view, name: m.who || (voicemail ? "留" : "通"), className: "fg-notify-icon" }), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-notify-body" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-notify-head" }, /* @__PURE__ */ import_react4.default.createElement("b", null, voicemail ? `语音留言 · ${m.who || "未知号码"}` : m.who || "通知"), /* @__PURE__ */ import_react4.default.createElement("span", null, "现在")), voicemail && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-notify-wave" }, /* @__PURE__ */ import_react4.default.createElement("i", { className: "fg-notify-play" }), Array.from({ length: 18 }, (_, i) => /* @__PURE__ */ import_react4.default.createElement("i", { key: i, style: { "--h": 30 + i * 37 % 70 + "%", animationDelay: -i * 0.09 + "s" } }))), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-notify-text" }, voicemail ? `「${m.text}」` : m.text)));
 }
 var PAN_BELOW = 0.85;
 function usePanRatio(ref, src, version) {
@@ -8220,7 +8424,7 @@ var shiftText = (s) => [s.name, s.outfit ? `换上${s.outfit}` : "", ...(s.on ||
 var entryTitle = (e) => e.kind === "sprite" ? `立绘 · ${e.name}` : e.kind === "acting" ? `动作与表情 · ${e.name}` : e.kind === "cg" ? `插画 · 第 ${e.turn} 轮` : `第 ${e.turn} 轮`;
 var num = (n) => Number(n || 0).toLocaleString("en-US");
 var secs = (ms) => ms >= 6e4 ? `${Math.floor(ms / 6e4)} 分 ${Math.round(ms % 6e4 / 1e3)} 秒` : `${(ms / 1e3).toFixed(1)} 秒`;
-var clock = (at2) => new Date(at2).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+var clock2 = (at2) => new Date(at2).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 var usageText = (usage) => Object.entries(usage || {}).map(([k, v]) => `${USAGE_LABEL[k] || k} ${num(v)}`).join(" · ");
 function useNow(active) {
   const [now, setNow] = import_react10.default.useState(Date.now());
@@ -8265,7 +8469,7 @@ function StatusPill({ status }) {
   return /* @__PURE__ */ import_react10.default.createElement("span", { className: `fg-dlog-status ${cls}` }, label);
 }
 function LogRow({ e, on, onClick }) {
-  return /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: `fg-dlog-row${on ? " is-on" : ""}`, onClick }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-row-head" }, /* @__PURE__ */ import_react10.default.createElement("b", null, entryTitle(e)), /* @__PURE__ */ import_react10.default.createElement(StatusPill, { status: e.status })), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-row-meta" }, clock(e.at), " · ", e.status === "running" ? "进行中" : secs(e.ms), e.attempts > 1 ? ` · ${e.attempts} 次尝试` : ""), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-row-meta" }, e.model || "（没有模型）"), e.summary && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-row-sum" }, e.summary), e.error && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-row-sum fg-err" }, e.error));
+  return /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: `fg-dlog-row${on ? " is-on" : ""}`, onClick }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-row-head" }, /* @__PURE__ */ import_react10.default.createElement("b", null, entryTitle(e)), /* @__PURE__ */ import_react10.default.createElement(StatusPill, { status: e.status })), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-row-meta" }, clock2(e.at), " · ", e.status === "running" ? "进行中" : secs(e.ms), e.attempts > 1 ? ` · ${e.attempts} 次尝试` : ""), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-row-meta" }, e.model || "（没有模型）"), e.summary && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-row-sum" }, e.summary), e.error && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-row-sum fg-err" }, e.error));
 }
 var TYPE_LABEL = { dialogue: "台词", narration: "旁白", thought: "心声" };
 function sceneChange(c) {
@@ -8296,6 +8500,7 @@ function ScriptView({ script, units }) {
       l.cutin && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cutin", k: "切入" }, l.cutin === true ? l.sp || "说话的人" : l.cutin),
       l.battle && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "battle", k: "战斗" }, l.battle.foe ? `开战 · ${l.battle.foe}${l.battle.title ? `（${l.battle.title}）` : ""}` : `结束${BATTLE_END_LABEL[l.battle.end] ? " · " + BATTLE_END_LABEL[l.battle.end] : ""}`),
       l.moment && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "moment", k: "瞬间" }, [MOMENT_LABEL[l.moment.kind] || l.moment.kind, l.moment.who, l.moment.text && `「${l.moment.text}」`, l.moment.place].filter(Boolean).join(" ")),
+      l.phone && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "phone", k: "手机" }, [(l.phone.video ? "视频" : "") + (PHONE_LABEL[l.phone.kind] || l.phone.kind), l.phone.who, l.phone.result && CALL_END_LABEL[l.phone.result], l.phone.text && `「${l.phone.text}」`].filter(Boolean).join(" ")),
       l.hit && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "hit", k: "出手" }, [l.hit.from, l.hit.to && "→ " + l.hit.to, l.hit.move && `「${l.hit.move}」`, HIT_EFFECT_LABEL[l.hit.effect] || l.hit.effect].filter(Boolean).join(" ")),
       l.card && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "card", k: "卡片" }, CARD_LABEL[l.card] || l.card),
       l.cut && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cut", k: "字卡" }, l.cut.text),
@@ -8373,7 +8578,7 @@ function LogDetail({ gameId, summary }) {
   const tabs = running ? [["live", "实时输出"], ["prompt", "提示词"]] : [["result", acting ? "设计结果" : writer ? "写出的提示词" : "整理结果"], ["raw", `原始输出${summary.attempts > 1 ? ` · ${summary.attempts} 次` : ""}`], ["prompt", "提示词"]];
   const live = summary.live || { output: "", reasoning: "", chars: 0, note: "" };
   const elapsed = running ? Math.max(summary.ms, now - summary.at) : summary.ms;
-  return /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-detail" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-head" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-title" }, sprite || acting ? `${entryTitle(summary)}（读到第 ${summary.turn} 轮）` : entryTitle(summary), " ", /* @__PURE__ */ import_react10.default.createElement(StatusPill, { status: summary.status }), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-spacer" }), running && /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn", disabled: stopping, onClick: stop }, writer ? "停止" : "停止整理")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-facts" }, /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "模型"), summary.model || "—", summary.provider ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, " · ", summary.provider) : null, sourceLabel() ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "（", sourceLabel(), "）") : null), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "时间"), clock(summary.at), " · ", secs(elapsed), " · ", REASON[summary.reason] || summary.reason), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "最大输出"), num(summary.maxTokens), " token", entry && entry.temperature != null ? ` · 温度 ${entry.temperature}` : ""), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "模型窗口"), summary.window ? `${num(summary.window)} token` : "宿主没给窗口大小，按设置原样发", entry && entry.outputDefault ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, " · 模型默认输出 ", num(entry.outputDefault)) : null), entry && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "资料"), entry.contextLength ? `发了 ${num(entry.contextChars)} 字（人物卡与世界书共 ${num(entry.contextLength)} 字）` : "这张卡没有人物卡 / 世界书资料"), entry && writer && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "剧情"), `发了 ${num(entry.storyChars)} 字（到这一轮为止共 ${num(entry.storyLength)} 字）`), summary.usage && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "用量"), usageText(summary.usage))), summary.notes.map((n, i) => /* @__PURE__ */ import_react10.default.createElement("div", { key: i, className: "fg-dlog-notice" }, "⚠ ", n)), summary.error && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-err fg-dlog-error" }, summary.error)), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-tabs fg-dlog-tabs" }, tabs.map(([id, label]) => /* @__PURE__ */ import_react10.default.createElement("button", { key: id, type: "button", className: `fg-tab${tab === id ? " is-on" : ""}`, onClick: () => setTab(id) }, label))), loadError && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-err" }, loadError), tab === "live" && /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-meter" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-dlog-dot" }), live.note || `第 ${summary.attempts || 1} 次请求`, " · 已收到 ", num(live.chars), " 字", live.chars ? "" : live.reasoning ? " · 模型在思考" : " · 等模型开口…"), live.reasoning && /* @__PURE__ */ import_react10.default.createElement(Block, { label: "模型思考（实时）" }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: live.reasoning, follow: true })), /* @__PURE__ */ import_react10.default.createElement(Block, { label: "模型输出（实时）" }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: live.output, follow: true, cursor: true, empty: "还没有输出" }))), tab === "result" && (entry ? sprite ? /* @__PURE__ */ import_react10.default.createElement(SpritesView, { sprites: entry.sprites }) : acting ? /* @__PURE__ */ import_react10.default.createElement(ActingView, { acting: entry.acting }) : cg ? /* @__PURE__ */ import_react10.default.createElement(CgsView, { cgs: entry.cgs }) : /* @__PURE__ */ import_react10.default.createElement(ScriptView, { script: entry.script, units: entry.units || [] }) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "raw" && (entry ? /* @__PURE__ */ import_react10.default.createElement(Attempts, { attempts: entry.attempts || [] }) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "prompt" && (entry ? /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(Block, { label: `系统提示词 · ${num((entry.system || "").length)} 字`, text: entry.system }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: entry.system })), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `用户消息 · ${num((entry.user || "").length)} 字${sprite ? "（资料 + 全部剧情 + 角色档案 + 要画的差分）" : acting ? "（资料 + 全部剧情 + 角色档案 + 要设计的情绪）" : cg ? "（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）" : "（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）"}`, text: entry.user }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: entry.user }))) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")));
+  return /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-detail" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-head" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-title" }, sprite || acting ? `${entryTitle(summary)}（读到第 ${summary.turn} 轮）` : entryTitle(summary), " ", /* @__PURE__ */ import_react10.default.createElement(StatusPill, { status: summary.status }), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-spacer" }), running && /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn", disabled: stopping, onClick: stop }, writer ? "停止" : "停止整理")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-facts" }, /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "模型"), summary.model || "—", summary.provider ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, " · ", summary.provider) : null, sourceLabel() ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "（", sourceLabel(), "）") : null), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "时间"), clock2(summary.at), " · ", secs(elapsed), " · ", REASON[summary.reason] || summary.reason), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "最大输出"), num(summary.maxTokens), " token", entry && entry.temperature != null ? ` · 温度 ${entry.temperature}` : ""), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "模型窗口"), summary.window ? `${num(summary.window)} token` : "宿主没给窗口大小，按设置原样发", entry && entry.outputDefault ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, " · 模型默认输出 ", num(entry.outputDefault)) : null), entry && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "资料"), entry.contextLength ? `发了 ${num(entry.contextChars)} 字（人物卡与世界书共 ${num(entry.contextLength)} 字）` : "这张卡没有人物卡 / 世界书资料"), entry && writer && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "剧情"), `发了 ${num(entry.storyChars)} 字（到这一轮为止共 ${num(entry.storyLength)} 字）`), summary.usage && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "用量"), usageText(summary.usage))), summary.notes.map((n, i) => /* @__PURE__ */ import_react10.default.createElement("div", { key: i, className: "fg-dlog-notice" }, "⚠ ", n)), summary.error && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-err fg-dlog-error" }, summary.error)), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-tabs fg-dlog-tabs" }, tabs.map(([id, label]) => /* @__PURE__ */ import_react10.default.createElement("button", { key: id, type: "button", className: `fg-tab${tab === id ? " is-on" : ""}`, onClick: () => setTab(id) }, label))), loadError && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-err" }, loadError), tab === "live" && /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-meter" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-dlog-dot" }), live.note || `第 ${summary.attempts || 1} 次请求`, " · 已收到 ", num(live.chars), " 字", live.chars ? "" : live.reasoning ? " · 模型在思考" : " · 等模型开口…"), live.reasoning && /* @__PURE__ */ import_react10.default.createElement(Block, { label: "模型思考（实时）" }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: live.reasoning, follow: true })), /* @__PURE__ */ import_react10.default.createElement(Block, { label: "模型输出（实时）" }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: live.output, follow: true, cursor: true, empty: "还没有输出" }))), tab === "result" && (entry ? sprite ? /* @__PURE__ */ import_react10.default.createElement(SpritesView, { sprites: entry.sprites }) : acting ? /* @__PURE__ */ import_react10.default.createElement(ActingView, { acting: entry.acting }) : cg ? /* @__PURE__ */ import_react10.default.createElement(CgsView, { cgs: entry.cgs }) : /* @__PURE__ */ import_react10.default.createElement(ScriptView, { script: entry.script, units: entry.units || [] }) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "raw" && (entry ? /* @__PURE__ */ import_react10.default.createElement(Attempts, { attempts: entry.attempts || [] }) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "prompt" && (entry ? /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(Block, { label: `系统提示词 · ${num((entry.system || "").length)} 字`, text: entry.system }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: entry.system })), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `用户消息 · ${num((entry.user || "").length)} 字${sprite ? "（资料 + 全部剧情 + 角色档案 + 要画的差分）" : acting ? "（资料 + 全部剧情 + 角色档案 + 要设计的情绪）" : cg ? "（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）" : "（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）"}`, text: entry.user }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: entry.user }))) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")));
 }
 function DirectorLog({ gameId, onClose, focusTurn = null }) {
   const { log, error } = useDirectorLog(gameId);
@@ -8837,12 +9042,16 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     beat && !title && beat.cutin && /* @__PURE__ */ import_react11.default.createElement(CutIn, { key: beat.key, beat, view, sound: sfxOn }),
     beat && !title && beat.hit && /* @__PURE__ */ import_react11.default.createElement(HitBanner, { key: beat.key, beat, sound: sfxOn, fx: hit }),
     beat && !title && beat.moment && /* @__PURE__ */ import_react11.default.createElement(MomentLayer, { key: beat.key, beat, view, sound: sfxOn }),
+    beat && !title && beat.call && beat.call.state === "ringing" && /* @__PURE__ */ import_react11.default.createElement(PhoneRing, { key: beat.call.id, beat, view, sound: sfxOn }),
+    beat && !title && beat.call && beat.call.state === "live" && beat.call.video && !(beat.split && beat.split.who.includes(beat.call.who)) && /* @__PURE__ */ import_react11.default.createElement(VideoPip, { key: beat.call.id, beat, view }),
+    beat && !title && beat.phone && beat.phone.kind === "end" && /* @__PURE__ */ import_react11.default.createElement(PhoneEnd, { key: beat.key, beat, view, sound: sfxOn }),
+    beat && !title && beat.phone && (beat.phone.kind === "notify" || beat.phone.kind === "voicemail") && /* @__PURE__ */ import_react11.default.createElement(PhoneBanner, { key: beat.key, beat, view, sound: sfxOn }),
     beat && !title && beat.battleEdge && speed > 0 && /* @__PURE__ */ import_react11.default.createElement(BattleCard, { key: beat.key, beat, sound: sfxOn }),
     !panel && /* @__PURE__ */ import_react11.default.createElement(RestartNotice, { floating: true }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(TitleCard, { beat, delay: speed > 0 ? beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0 : 0 }),
     beat && !title && beat.cut && speed > 0 && /* @__PURE__ */ import_react11.default.createElement(CutCard, { beat, out: !cutting }),
     !title && beat && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react11.default.createElement("div", null, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-place" }, hud.scene.location || `第 ${hud.turn} 轮`), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-meta" }, hud.mode && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-mode" }, MODE_LABEL[hud.mode]), hud.battle && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-battle", title: hud.battle.title || "" }, "交战 · ", hud.battle.foe), /* @__PURE__ */ import_react11.default.createElement("span", null, TIME_LABEL[hud.scene.time] || ""), hud.scene.weather && hud.scene.weather !== "clear" && /* @__PURE__ */ import_react11.default.createElement("span", null, WEATHER_LABEL[hud.scene.weather]), LIGHT_LABEL[hud.scene.light] && /* @__PURE__ */ import_react11.default.createElement("span", null, LIGHT_LABEL[hud.scene.light]), FX_LABEL[hud.scene.fx] && /* @__PURE__ */ import_react11.default.createElement("span", null, FX_LABEL[hud.scene.fx]), ROMANCE_LABEL[hud.scene.romance] && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-romance" }, "♡ ", ROMANCE_LABEL[hud.scene.romance]), SENSE_LABEL[hud.scene.sense] && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-sense" }, SENSE_LABEL[hud.scene.sense]), hud.scene.mood && /* @__PURE__ */ import_react11.default.createElement("span", null, "♪ ", MOOD_LABEL[hud.scene.mood])))),
-    !title && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, directing && /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), drawing > 0 && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), track && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill", title: track.name }, "♪ ", track.name), viewError && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
+    !title && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, directing && /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), drawing > 0 && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), beat && beat.call && beat.call.state === "live" && /* @__PURE__ */ import_react11.default.createElement(CallChip, { key: beat.call.id, call: beat.call, sound: sfxOn }), track && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill", title: track.name }, "♪ ", track.name), viewError && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
     beat && !title && beat.card && /* @__PURE__ */ import_react11.default.createElement(SceneCard, { beat }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(
       DialogBox,

@@ -55,6 +55,7 @@ export function buildBeats(view) {
   const active = new Map() // 每个人最近一次说话、登场是第几拍：台上人太多时，最久没动静的先下场
   let recalled = null // 上一拍所在的短闪回：进出闪回时白闪一下
   let battle = null // 正在打的仗 { foe, title, place }：跨轮带着，写了结束或者换了地方收起
+  let call = null // 正在打的电话 { who, video, dir, id, live, unanswered }：跨轮带着，挂断、电话那头的人走进画面时收起
   let set = 0 // 第几堂布景：换了地方、进出回忆这类段落时加一，台上的人跟着旧画面一起退、在新画面里重新登场，不从旧站位滑过去
   // 有立绘的人：导演漏列进 cast、却当面开口时让他上台（lib/staging.js 的 walkOn）
   const drawn = new Set((view.cast || []).filter(p => Object.values(p.sprites || {}).some(s => s && s.assetId)).map(p => p.name))
@@ -69,7 +70,10 @@ export function buildBeats(view) {
     const units = playedUnits(all, script)
     const lines = units.map(u => (script && script.lines && script.lines[u.id]) || {})
     const keep = script && layer && lines.length && lines[0].mode === layer.mode ? layer : null
-    const walk = stageWalk(script, units, cast, keep ? inside : null, { walkOn: drawn })
+    // 上一轮没挂的电话：这一轮里还有电话那头的动静（手机、电话里的声音、分屏、对方开口）才接着通，接着通的就是已经接通了；不然当作挂了
+    if (call && !(script && lines.some(l => l.phone || l.voice === 'phone' || l.split || (call.who && speakersOf(l.sp).includes(call.who))))) call = null
+    if (call) call = { ...call, live: true, unanswered: false }
+    const walk = stageWalk(script, units, cast, keep ? inside : null, { walkOn: drawn, calling: call ? call.who : '' })
     const known = [...new Set([...((script && script.cast) || []).map(c => c.name), ...people])]
     const steps = walk.steps
     cast = walk.end
@@ -150,8 +154,28 @@ export function buildBeats(view) {
       const cutin = recall ? '' : line.cutin === true ? speakers[0] || '' : line.cutin || ''
       // 导演没写基调的闪回：进闪回那一句按闪回里的情绪（自定义情绪看它的基础情绪）和这一刻的场景基调挑
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map(e => ((view.emotions || []).find(x => x.id === e) || {}).base || e), at.scene.mood)
+      // 手机：打来、拨出的那一句响起；这一轮里接下来写的是没接通、被拒接，就一直响到那一句，不然下一句起就接通了，右上角挂着「通话中」
+      const phone = line.phone || null
+      if (call && call.who && steps[ui].entered.includes(call.who)) call = null // 电话那头的人走进了画面：不用再打了
+      const before = call
+      let phoneEdge = null
+      if (phone && (phone.kind === 'call' || phone.kind === 'dial')) {
+        const next = lines.slice(ui + 1).find(l => l.phone && ['call', 'dial', 'end'].includes(l.phone.kind))
+        const unanswered = Boolean(next && next.phone.kind === 'end' && (next.phone.result === 'missed' || next.phone.result === 'declined'))
+        call = { who: phone.who || '', ...(phone.video ? { video: true } : {}), dir: phone.kind === 'call' ? 'in' : 'out', id: `${t.turn}:${unit.id}`, live: false, unanswered }
+        phoneEdge = phone
+      } else if (phone && phone.kind === 'end') {
+        const was = call || {}
+        if (call || phone.who) phoneEdge = { kind: 'end', who: phone.who || was.who || '', ...(was.id ? { id: was.id } : {}), ...(was.dir ? { dir: was.dir } : {}), ...(was.video ? { video: true } : {}), ...(was.live ? { live: true } : {}), ...(phone.result ? { result: phone.result } : {}) }
+        call = null
+      } else if (phone) phoneEdge = phone
+      const calling = call ? { who: call.who, ...(call.video ? { video: true } : {}), dir: call.dir, id: call.id, state: call.live ? 'live' : 'ringing' } : null
+      if (call && !call.unanswered) call.live = true
+      // 通话里电话那头的人开口（人不在台上）：导演没写声音的样子也按电话里的声音演
+      const caller = (before || calling || {}).who
+      const onPhone = Boolean(caller) && type === 'dialogue' && speakers.includes(caller) && !onStageNames.includes(caller)
       // 短闪回里开口的人用回忆里的声音（老脚本写的是回声，一并换掉）
-      const voice = recall && type !== 'narration' && (!line.voice || line.voice === 'echo') ? 'memory' : line.voice
+      const voice = recall && type !== 'narration' && (!line.voice || line.voice === 'echo') ? 'memory' : line.voice || (onPhone ? 'phone' : '')
       const recallEdge = recall === recalled ? '' : recall ? 'in' : 'out'
       recalled = recall
       beats.push({
@@ -176,6 +200,8 @@ export function buildBeats(view) {
         ...(battleEdge ? { battleEdge } : {}), // 开战卡 / 结束卡
         ...(hit ? { hit } : {}), // 一次出手：招式名横幅、被打的人一震
         ...(line.moment ? { moment: line.moment } : {}), // 小瞬间：拍照、摸头、干杯、约定……
+        ...(calling ? { call: calling } : {}), // 正在打的电话：响着（ringing）还是接通了（live）
+        ...(phoneEdge ? { phone: phoneEdge } : {}), // 手机这一句的事：来电、拨出、挂断、通知、语音留言
         say: line.say || '',
         stress: line.stress || '',
         ...(line.textfx ? { textfx: line.textfx } : {}), // 句中文字效果：某几个字发抖、放大、越说越小……
@@ -306,6 +332,8 @@ export const HIT_IMPACT_MS = 420
 export const HIT_LEAD_MS = 700
 /** 小瞬间：拍照的白闪、烟花升空、卡片落下来之后字再出；摸头、戳脸、触碰、干杯跟着字一起演。 */
 export const MOMENT_LEAD_MS = { photo: 650, fireworks: 900, cook: 450, nickname: 600, promise: 600, contact: 450 }
+/** 手机：来电、拨出时手机先响一下（滑进来、响第一声）字再出；挂断、通知、留言不打断。 */
+export const PHONE_LEAD_MS = { call: 1000, dial: 800 }
 /** 换了地方：转场演完再停这么久才出字。 */
 const SCENE_BEAT_MS = 300
 /**
@@ -337,6 +365,7 @@ export function beatHold(beat, { cg = '', was = {} } = {}) {
   if (beat.battleEdge) ms = Math.max(ms, BATTLE_CARD_MS[beat.battleEdge.kind] || 0)
   if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS)
   if (beat.moment) ms = Math.max(ms, MOMENT_LEAD_MS[beat.moment.kind] || 0)
+  if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0)
   const wake = was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
   if (wake) { ms = Math.max(ms, WAKE_MS); away = true }
   return { ms, away, ...(wake ? { wake } : {}) }
