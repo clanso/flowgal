@@ -477,11 +477,32 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-actor[data-depth="1"] { z-index: 3; }
 .fg-actor[data-depth="-1"] { filter: brightness(.62) saturate(.72); }
 .fg-actor-turn, .fg-actor-react { position: absolute; inset: 0; transform-origin: 50% 100%; }
-.fg-actor-turn { transform: rotate(var(--lean, 0deg)) scaleX(var(--flip, 1)); transition: transform .5s cubic-bezier(.45, .05, .3, 1), filter .5s ease; }
+.fg-actor-turn { transform: translateY(var(--drop, 0%)) rotate(var(--lean, 0deg)) scaleX(var(--flip, 1)); transition: transform .5s cubic-bezier(.45, .05, .3, 1), filter .5s ease; }
 /* 没有背面的立绘：转过去以后压成一道背影（几乎看不清脸），边上留一圈淡淡的轮廓光 */
 .fg-actor.is-away .fg-actor-turn { --flip: -1; filter: brightness(.16) saturate(.3) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .28)); }
 .fg-actor.is-peek[data-peek="left"] .fg-actor-turn { --lean: 5deg; }
 .fg-actor.is-peek[data-peek="right"] .fg-actor-turn { --lean: -5deg; }
+/* 战斗里被击倒：歪倒、往下沉、暗下去（打中那一下之后才倒），到他再开口、走位或被治疗时站起来 */
+.fg-actor.is-down .fg-actor-turn { --lean: -11deg; --drop: 14%; filter: brightness(.55) saturate(.5) grayscale(.3); transition-delay: .5s; }
+/* 打中时身上冒的东西：命中、暴击是一道斩痕，其余是一个字（暴击！/ 闪避 / 格挡 / 击倒 / 治疗）；在打中那一刻（--impact）出来 */
+.fg-hit-mark { position: absolute; left: 50%; top: calc(var(--head, 9%) + 14%); width: 0; height: 0; z-index: 5; pointer-events: none; }
+.fg-hit-mark::before { content: ""; position: absolute; left: -9cqw; top: -.25cqw; width: 18cqw; height: .5cqw; border-radius: 1cqw; background: linear-gradient(90deg, transparent, #fff 30%, #fff 70%, transparent); box-shadow: 0 0 1.2cqw rgba(255, 255, 255, .9);
+  transform: rotate(-28deg) scaleX(0); opacity: 0; animation: fg-hit-slash .38s cubic-bezier(.2, .9, .3, 1) var(--impact, .4s) both; }
+.fg-hit-mark[data-effect="crit"]::before { height: .8cqw; background: linear-gradient(90deg, transparent, #fff 25%, #ff5a5a 50%, #fff 75%, transparent); box-shadow: 0 0 1.6cqw rgba(255, 60, 60, .9); }
+.fg-hit-mark:not([data-effect="hit"]):not([data-effect="crit"])::before { display: none; }
+.fg-hit-mark span { position: absolute; left: 0; top: -6cqw; transform: translateX(-50%); white-space: nowrap; font-family: var(--font-display); font-size: 2.6cqw; font-weight: 900; font-style: italic; letter-spacing: .08em; color: #fff;
+  -webkit-text-stroke: .12cqw rgba(0, 0, 0, .55); text-shadow: 0 0 1.2cqw rgba(0, 0, 0, .5); animation: fg-hit-word 1.2s cubic-bezier(.2, .9, .3, 1) var(--impact, .4s) both; }
+.fg-hit-mark[data-effect="crit"] span { color: #ffdf5a; font-size: 3.4cqw; text-shadow: 0 0 1.4cqw rgba(255, 60, 40, .85); }
+.fg-hit-mark[data-effect="miss"] span { color: #d8ecff; font-style: normal; letter-spacing: .3em; }
+.fg-hit-mark[data-effect="block"] span { color: #9fd0ff; text-shadow: 0 0 1.4cqw rgba(80, 160, 255, .9); }
+.fg-hit-mark[data-effect="block"]::after { content: ""; position: absolute; left: -6cqw; top: -6cqw; width: 12cqw; height: 12cqw; border-radius: 50%; border: .35cqw solid rgba(150, 210, 255, .95); box-shadow: 0 0 2cqw rgba(80, 160, 255, .8), inset 0 0 2cqw rgba(80, 160, 255, .5);
+  opacity: 0; animation: fg-hit-ring .5s ease-out var(--impact, .4s) both; }
+.fg-hit-mark[data-effect="down"] span { color: #ff8a8a; font-size: 3cqw; }
+.fg-hit-mark[data-effect="heal"] span { color: #8dffbf; font-style: normal; text-shadow: 0 0 1.4cqw rgba(60, 255, 150, .8); animation-name: fg-hit-rise; animation-duration: 1.6s; }
+@keyframes fg-hit-slash { 0% { opacity: 1; transform: rotate(-28deg) scaleX(0); } 45% { opacity: 1; transform: rotate(-28deg) scaleX(1); } 100% { opacity: 0; transform: rotate(-28deg) scaleX(1.1); } }
+@keyframes fg-hit-word { 0% { opacity: 0; transform: translateX(-50%) scale(1.8); } 15% { opacity: 1; transform: translateX(-50%) scale(.95); } 25% { transform: translateX(-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-1.5cqw); } }
+@keyframes fg-hit-ring { 0% { opacity: 1; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes fg-hit-rise { 0% { opacity: 0; transform: translateX(-50%) translateY(2cqw); } 25% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-3cqw); } }
 /* 进来的样子：跑进来（从远一点的地方冲进来、刹一下）、慢慢走进来、探头（从边上探出来） */
 .fg-actor[data-enter="run"] { animation: fg-actor-run-in .5s cubic-bezier(.2, .8, .3, 1.15) both; }
 .fg-actor[data-enter="slow"] { animation: fg-actor-in 1.6s cubic-bezier(.3, .4, .3, 1) both; }
@@ -686,6 +707,49 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-cutin-face { from { transform: scale(1.12) translateX(-2%); } to { transform: none; } }
 @keyframes fg-cutin-lines { 50% { transform: rotate(1.2deg); } }
 @keyframes fg-cutin-name { from { opacity: 0; transform: translateX(3cqw) skewX(-12deg); } to { opacity: 1; transform: none; } }
+/* ── 战斗（导演 battle / hit，Stage.jsx 的 BattleCard / HitBanner） ──
+   开战卡：横贯画面的暗带、红色斜线、对手名和称号；结束卡：胜利金、败北灰蓝、撤退青。停 --hold 后收起 */
+.fg-battle { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; pointer-events: none; animation: fg-fade-out .35s ease var(--hold, 1.5s) forwards; }
+.fg-battle-band { position: relative; width: 100%; padding: 2.6cqw 0 2.4cqw; text-align: center; background: linear-gradient(90deg, transparent, rgba(8, 4, 10, .9) 14%, rgba(8, 4, 10, .9) 86%, transparent);
+  animation: fg-battle-in .45s cubic-bezier(.2, .9, .25, 1) both; overflow: hidden; }
+.fg-battle-band::before, .fg-battle-band::after { content: ""; position: absolute; left: 0; right: 0; height: .35cqw; background: linear-gradient(90deg, transparent, #ff3a4a 20%, #ff3a4a 80%, transparent); box-shadow: 0 0 1.4cqw rgba(255, 40, 60, .8); }
+.fg-battle-band::before { top: 0; } .fg-battle-band::after { bottom: 0; }
+.fg-battle-kicker { font-family: var(--font-display); font-size: 1.3cqw; font-weight: 700; letter-spacing: .8em; color: #ff5a68; animation: fg-battle-kick .5s .1s ease both; }
+.fg-battle-main { margin-top: .4cqw; font-family: var(--font-display); font-size: 5.4cqw; font-weight: 900; letter-spacing: .14em; color: #fff; text-shadow: .3cqw .3cqw 0 rgba(200, 20, 40, .8), 0 0 3cqw rgba(255, 50, 70, .5); animation: fg-battle-slam .5s .12s cubic-bezier(.2, .9, .25, 1) both; }
+.fg-battle-sub { margin-top: .5cqw; font-size: 1.4cqw; letter-spacing: .5em; color: rgba(255, 220, 225, .85); animation: fg-battle-kick .5s .3s ease both; }
+.fg-battle[data-kind="end"] .fg-battle-band::before, .fg-battle[data-kind="end"] .fg-battle-band::after { background: linear-gradient(90deg, transparent, #ffd36b 20%, #ffd36b 80%, transparent); box-shadow: 0 0 1.4cqw rgba(255, 200, 80, .7); }
+.fg-battle[data-kind="end"] .fg-battle-kicker { color: #ffd36b; }
+.fg-battle[data-kind="end"] .fg-battle-main { text-shadow: .3cqw .3cqw 0 rgba(160, 110, 20, .8), 0 0 3cqw rgba(255, 200, 80, .5); }
+.fg-battle[data-result="lose"] .fg-battle-band::before, .fg-battle[data-result="lose"] .fg-battle-band::after { background: linear-gradient(90deg, transparent, #8aa0c8 20%, #8aa0c8 80%, transparent); box-shadow: none; }
+.fg-battle[data-result="lose"] .fg-battle-kicker { color: #8aa0c8; }
+.fg-battle[data-result="lose"] .fg-battle-main { color: #c9d4ea; text-shadow: .3cqw .3cqw 0 rgba(20, 30, 60, .9); }
+.fg-battle[data-result="flee"] .fg-battle-band::before, .fg-battle[data-result="flee"] .fg-battle-band::after { background: linear-gradient(90deg, transparent, #6fe3d6 20%, #6fe3d6 80%, transparent); box-shadow: none; }
+.fg-battle[data-result="flee"] .fg-battle-kicker { color: #6fe3d6; }
+.fg-battle[data-result="flee"] .fg-battle-main { text-shadow: .3cqw .3cqw 0 rgba(20, 90, 90, .8); }
+@keyframes fg-battle-in { from { transform: scaleY(0); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fg-battle-slam { from { opacity: 0; transform: scale(2.2); letter-spacing: .6em; } 60% { opacity: 1; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes fg-battle-kick { from { opacity: 0; transform: translateY(.6cqw); } to { opacity: 1; transform: none; } }
+/* 招式名横幅：从出手的人那边斜着冲过去，停一下再甩出去 */
+.fg-movebar { position: absolute; left: 0; right: 0; top: 13%; height: 11%; z-index: 19; pointer-events: none; animation: fg-cutin-in .28s cubic-bezier(.2, .9, .25, 1) both, fg-cutin-out .3s cubic-bezier(.6, 0, .85, .3) 1.3s forwards; }
+.fg-movebar[data-from="right"] { animation-name: fg-movebar-in-r, fg-movebar-out-r; }
+.fg-movebar-band { position: absolute; inset: 0 14%; display: flex; align-items: center; justify-content: center; gap: 1.6cqw; clip-path: polygon(3% 0, 100% 0, 97% 100%, 0 100%);
+  background: linear-gradient(90deg, rgba(10, 6, 14, .2), rgba(10, 6, 14, .88) 20%, rgba(10, 6, 14, .88) 80%, rgba(10, 6, 14, .2)); border-top: .3cqw solid rgba(255, 255, 255, .85); border-bottom: .3cqw solid rgba(255, 255, 255, .85); }
+.fg-movebar-who { font-size: 1.2cqw; letter-spacing: .3em; color: rgba(255, 255, 255, .7); }
+.fg-movebar-name { font-family: var(--font-display); font-size: 3.2cqw; font-weight: 900; font-style: italic; letter-spacing: .16em; color: #fff; text-shadow: .2cqw .2cqw 0 rgba(255, 60, 90, .7), 0 0 1.6cqw rgba(255, 120, 150, .5); }
+.fg-movebar[data-effect="heal"] .fg-movebar-band { border-color: rgba(150, 255, 200, .85); }
+.fg-movebar[data-effect="heal"] .fg-movebar-name { font-style: normal; text-shadow: .2cqw .2cqw 0 rgba(40, 200, 120, .7), 0 0 1.6cqw rgba(110, 255, 170, .6); }
+.fg-movebar[data-effect="crit"] .fg-movebar-name { color: #ffdf5a; }
+@keyframes fg-movebar-in-r { from { transform: translateX(105%); } to { transform: none; } }
+@keyframes fg-movebar-out-r { to { transform: translateX(-105%); opacity: .4; } }
+/* 被打的不在台上（主角、画外的人）：整个画面替他挨这一下 */
+.fg-hurt { position: absolute; inset: 0; z-index: 17; pointer-events: none; animation: fg-hurt .7s ease-out both; background: radial-gradient(ellipse at center, transparent 45%, rgba(220, 20, 40, .55)); }
+.fg-hurt[data-effect="crit"] { background: radial-gradient(ellipse at center, rgba(255, 40, 40, .12) 30%, rgba(230, 10, 30, .75)); animation-duration: 1s; }
+.fg-hurt[data-effect="down"] { background: radial-gradient(ellipse at center, rgba(0, 0, 0, .3) 30%, rgba(120, 0, 20, .85)); animation: fg-hurt-down 2.2s ease-out both; }
+.fg-hurt[data-effect="block"] { background: radial-gradient(ellipse at center, transparent 50%, rgba(80, 160, 255, .5)); }
+.fg-hurt[data-effect="heal"] { background: radial-gradient(ellipse at center, rgba(120, 255, 170, .1) 30%, rgba(60, 230, 140, .45)); animation-duration: 1.6s; }
+@keyframes fg-hurt { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes fg-hurt-down { 0% { opacity: 0; } 10% { opacity: 1; } 70% { opacity: .85; } 100% { opacity: 0; } }
+.fg-hud-battle { color: #ff6a76; text-shadow: 0 0 .8cqw rgba(255, 50, 70, .6); }
 .fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }
 .fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }
 .fg-flash.is-black { background: #000; animation: fg-black 1.6s ease both; }
@@ -1492,6 +1556,8 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-camera[data-cam="whip"] { animation: none !important; }
   .fg-cutin { animation: fg-fade-in .25s ease both, fg-fade-out .3s ease var(--hold, 1.5s) forwards !important; }
   .fg-cutin-band img, .fg-cutin-lines, .fg-cutin-name { animation: none !important; }
+  .fg-movebar { animation: fg-fade-in .2s ease both, fg-fade-out .3s ease 1.3s forwards !important; }
+  .fg-battle-band, .fg-battle-main, .fg-battle-kicker, .fg-battle-sub, .fg-hit-mark span { animation-name: fg-fade-in !important; }
   .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */
   .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }
   .fg-text.is-wait .fg-char { animation: none !important; }
@@ -1729,6 +1795,8 @@ var EMOTION_POSE = {
   confused: "chin",
   teasing: "chin"
 };
+var BATTLE_END_LABEL = { win: "胜利", lose: "败北", flee: "撤退" };
+var HIT_EFFECT_LABEL = { hit: "命中", crit: "暴击", miss: "闪避", block: "格挡", down: "击倒", heal: "治疗" };
 var MOVE_LABEL = { approach: "靠近", apart: "拉开", forward: "上前", back: "后退", turn: "背过身", face: "转身面对", lookback: "回眸", reset: "复位" };
 var ENTER_HOW_LABEL = { run: "跑进来", peek: "探头", slow: "慢慢走进来" };
 var EXIT_HOW_LABEL = { storm: "甩头离开", run: "跑开", slow: "慢慢走远" };
@@ -2553,7 +2621,7 @@ var reactKind = (base) => REACT_KIND[base] || "nod";
 function poseTracker() {
   let poses = /* @__PURE__ */ new Map();
   const get = (name2) => {
-    if (!poses.has(name2)) poses.set(name2, { near: [], far: [], depth: 0, away: false, peek: false });
+    if (!poses.has(name2)) poses.set(name2, { near: [], far: [], depth: 0, away: false, peek: false, down: false });
     return poses.get(name2);
   };
   const unlink = (a, b) => {
@@ -2577,15 +2645,19 @@ function poseTracker() {
       poses = /* @__PURE__ */ new Map();
     },
     /**
-     * 这一拍：onStage 台上的人，left 这一拍下台的，speakers 说话的人，moves 导演写的走位，peeks 这一拍探头登场的人。
+     * 这一拍：onStage 台上的人，left 这一拍下台的，speakers 说话的人，moves 导演写的走位，peeks 这一拍探头登场的人，
+     * downs 这一拍被击倒的人，heals 这一拍被治疗的人（被击倒的站起来）。
      * 返回这一拍的 { poses: { 名字: 样子 }（只列跟平常不一样的）, moves: [{ name, act }]（这一拍发生的走位，剧场按它演一下）}。
      */
-    step({ onStage: onStage2 = [], left = [], speakers = [], moves = [], peeks = [] }) {
+    step({ onStage: onStage2 = [], left = [], speakers = [], moves = [], peeks = [], downs = [], heals = [] }) {
       for (const name2 of left) clear(name2);
       const here = new Set(onStage2);
-      for (const name2 of speakers) {
+      for (const name2 of [...speakers, ...heals]) {
         const p2 = poses.get(name2);
-        if (p2 && p2.peek) p2.peek = false;
+        if (p2) {
+          p2.peek = false;
+          p2.down = false;
+        }
       }
       const done = [];
       for (const m of moves) {
@@ -2594,6 +2666,7 @@ function poseTracker() {
           if (!here.has(name2)) continue;
           const p2 = get(name2);
           p2.peek = false;
+          p2.down = false;
           const to = m.to && m.to !== name2 && here.has(m.to) ? m.to : "";
           if (m.act === "reset") {
             clear(name2);
@@ -2619,13 +2692,14 @@ function poseTracker() {
         }
       }
       for (const name2 of peeks) if (here.has(name2)) get(name2).peek = true;
+      for (const name2 of downs) if (here.has(name2)) get(name2).down = true;
       const out = {};
       for (const [name2, p2] of poses) {
         if (!here.has(name2)) continue;
         const near = p2.near.filter((n) => here.has(n));
         const far = p2.far.filter((n) => here.has(n));
-        if (!near.length && !far.length && !p2.depth && !p2.away && !p2.peek) continue;
-        out[name2] = { ...near.length ? { near } : {}, ...far.length ? { far } : {}, ...p2.depth ? { depth: p2.depth } : {}, ...p2.away ? { away: true } : {}, ...p2.peek ? { peek: true } : {} };
+        if (!near.length && !far.length && !p2.depth && !p2.away && !p2.peek && !p2.down) continue;
+        out[name2] = { ...near.length ? { near } : {}, ...far.length ? { far } : {}, ...p2.depth ? { depth: p2.depth } : {}, ...p2.away ? { away: true } : {}, ...p2.peek ? { peek: true } : {}, ...p2.down ? { down: true } : {} };
       }
       return { poses: out, moves: done };
     }
@@ -2646,7 +2720,7 @@ function blockLayout(entries, poses) {
     const peek = p2.peek ? e.x <= 50 ? "left" : "right" : "";
     if (peek) x = PEEK_X[peek];
     x = Math.round(Math.max(peek ? 4 : 10, Math.min(peek ? 96 : 90, x)) * 10) / 10;
-    return { ...e, x, ...p2.depth ? { depth: p2.depth } : {}, ...p2.away ? { away: true } : {}, ...peek ? { peek } : {} };
+    return { ...e, x, ...p2.depth ? { depth: p2.depth } : {}, ...p2.away ? { away: true } : {}, ...peek ? { peek } : {}, ...p2.down ? { down: true } : {} };
   });
 }
 
@@ -2708,6 +2782,7 @@ function buildBeats(view) {
   let shown = null;
   const active = /* @__PURE__ */ new Map();
   let recalled = null;
+  let battle = null;
   let set = 0;
   const drawn = new Set((view.cast || []).filter((p2) => Object.values(p2.sprites || {}).some((s) => s && s.assetId)).map((p2) => p2.name));
   const people = (view.cast || []).map((p2) => p2.name);
@@ -2781,8 +2856,18 @@ function buildBeats(view) {
         gone[name2] = exitWay[name2];
         delete exitWay[name2];
       }
-      const block = blocking.step({ onStage: onStageNames, left: steps[ui2].left, speakers, moves: line.move || [], peeks: Object.keys(ways).filter((name2) => ways[name2] === "peek") });
-      for (const name2 of [...speakers, ...steps[ui2].entered, ...reacts.map((r) => r.name), ...block.moves.map((m) => m.name)]) active.set(name2, beats.length);
+      let battleEdge = null;
+      if (battle && !at2.mode && at2.scene.location !== battle.place && !(line.battle && line.battle.foe)) battle = null;
+      if (line.battle && line.battle.foe) {
+        battle = { foe: line.battle.foe, ...line.battle.title ? { title: line.battle.title } : {}, place: at2.scene.location };
+        battleEdge = { kind: "start", foe: battle.foe, ...battle.title ? { title: battle.title } : {} };
+      } else if (line.battle && line.battle.end) battleEdge = { kind: "end", ...line.battle.end !== true ? { result: line.battle.end } : {}, ...battle ? { foe: battle.foe } : {} };
+      if (line.battle && line.battle.end) battle = null;
+      const fighting = battle ? { foe: battle.foe, ...battle.title ? { title: battle.title } : {} } : null;
+      const hit = line.hit || null;
+      const target = hit && hit.to && onStageNames.includes(hit.to) ? [hit.to] : [];
+      const block = blocking.step({ onStage: onStageNames, left: steps[ui2].left, speakers, moves: line.move || [], peeks: Object.keys(ways).filter((name2) => ways[name2] === "peek"), downs: hit && hit.effect === "down" ? target : [], heals: hit && hit.effect === "heal" ? target : [] });
+      for (const name2 of [...speakers, ...steps[ui2].entered, ...reacts.map((r) => r.name), ...block.moves.map((m) => m.name), ...hit ? [hit.from, hit.to].filter((n) => n && onStageNames.includes(n)) : []]) active.set(name2, beats.length);
       const recall = recalls[ui2];
       const cutin = recall ? "" : line.cutin === true ? speakers[0] || "" : line.cutin || "";
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map((e) => ((view.emotions || []).find((x) => x.id === e) || {}).base || e), at2.scene.mood);
@@ -2812,6 +2897,12 @@ function buildBeats(view) {
         // 镜头对准谁（不写是说话的人）
         ...cutin ? { cutin } : {},
         // 漫画式切入：这个人的脸部特写从侧面冲进来
+        ...fighting ? { battle: fighting } : {},
+        // 正在打的仗（左上角挂「交战」）
+        ...battleEdge ? { battleEdge } : {},
+        // 开战卡 / 结束卡
+        ...hit ? { hit } : {},
+        // 一次出手：招式名横幅、被打的人一震
         say: line.say || "",
         stress: line.stress || "",
         ...line.textfx ? { textfx: line.textfx } : {},
@@ -2921,6 +3012,9 @@ function cgHoldMs(img, mood) {
 var TRANSITION_MS = { dissolve: 1100, fade: 2600, cinematic: 1500, wipe: 1e3, iris: 1200, strips: 800, black: 1800, flash: 1e3, blink: 1500, glitch: 700, swirl: 1900, haze: 2600, wake: 1900, none: 0 };
 var PAUSE_MS = { beat: 900, silence: 2400 };
 var CUTIN_LEAD_MS = 380;
+var BATTLE_CARD_MS = { start: 1900, end: 1700 };
+var HIT_IMPACT_MS = 420;
+var HIT_LEAD_MS = 700;
 var SCENE_BEAT_MS = 300;
 var WAKE_SWAP_MS = 1700;
 var WAKE_MS = 3600;
@@ -2942,6 +3036,8 @@ function beatHold(beat, { cg = "", was = {} } = {}) {
     if (beat.pause === "silence") away = true;
   }
   if (beat.cutin) ms = Math.max(ms, CUTIN_LEAD_MS);
+  if (beat.battleEdge) ms = Math.max(ms, BATTLE_CARD_MS[beat.battleEdge.kind] || 0);
+  if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS);
   const wake = was.mode === "memory" && (beat.mode || "") !== "memory" && !beat.cut && WAKE_FROM.has(beat.transition);
   if (wake) {
     ms = Math.max(ms, WAKE_MS);
@@ -4844,6 +4940,16 @@ var REACT_FRAMES = {
   glance: [[{ transform: "none" }, { transform: "translateY(-1%) rotate(-1.2deg)", offset: 0.4 }, { transform: "none" }], 520]
 };
 var STEP_MOVES = /* @__PURE__ */ new Set(["approach", "apart", "forward", "back"]);
+var HIT_FRAMES = {
+  hit: [[{ transform: "none", filter: "none" }, { transform: "translateX(-2.4%) rotate(-1.6deg)", filter: "brightness(2.2)", offset: 0.12 }, { transform: "translateX(1.4%) rotate(.6deg)", filter: "none", offset: 0.4 }, { transform: "none" }], 420],
+  crit: [[{ transform: "none", filter: "none" }, { transform: "translateX(-4%) rotate(-3deg) scale(1.02)", filter: "brightness(2.4) sepia(1) saturate(5) hue-rotate(-40deg)", offset: 0.1 }, { transform: "translateX(2.6%) rotate(1.4deg)", filter: "sepia(.6) saturate(3) hue-rotate(-40deg)", offset: 0.35 }, { transform: "translateX(-1%)", filter: "none", offset: 0.65 }, { transform: "none" }], 640],
+  miss: [[{ transform: "none", opacity: 1, filter: "none" }, { transform: "translateX(10%) skewX(-6deg)", opacity: 0.45, filter: "blur(3px)", offset: 0.25 }, { transform: "translateX(8%)", opacity: 1, filter: "none", offset: 0.55 }, { transform: "none" }], 720],
+  block: [[{ transform: "none", filter: "none" }, { transform: "translateX(-3%) scale(.985)", filter: "brightness(1.5) saturate(.6)", offset: 0.18 }, { transform: "translateX(-2%)", filter: "none", offset: 0.5 }, { transform: "none" }], 520],
+  down: [[{ transform: "none", filter: "none" }, { transform: "translateX(-3%) rotate(-3deg)", filter: "brightness(2)", offset: 0.15 }, { transform: "translateX(-1%) rotate(-1deg)", filter: "none", offset: 0.5 }, { transform: "none" }], 560],
+  heal: [[{ filter: "none" }, { filter: "brightness(1.35) drop-shadow(0 0 1.6cqw rgba(110, 255, 170, .9))", offset: 0.3 }, { filter: "brightness(1.15) drop-shadow(0 0 1cqw rgba(110, 255, 170, .6))", offset: 0.7 }, { filter: "none" }], 1300]
+};
+var LUNGE = (dir) => [[{ transform: "none" }, { transform: `translateX(${dir * 7}%) translateY(-1%)`, offset: 0.35 }, { transform: `translateX(${dir * 5}%)`, offset: 0.6 }, { transform: "none" }], 620];
+var HIT_MARK = { crit: "暴击！", miss: "闪避", block: "格挡", down: "击倒", heal: "治疗" };
 var DEPTH = { 1: [1.1, "-6%"], [-1]: [0.88, "3%"] };
 var EXIT_MS = { storm: 650, run: 420, slow: 1300 };
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
@@ -4860,6 +4966,23 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     const kind = reaction && (reaction.emo || !move) ? reactKind(base) : move.act === "lookback" || move.act === "turn" || move.act === "face" ? "glance" : STEP_MOVES.has(move.act) ? "step" : "";
     const frames = REACT_FRAMES[kind];
     if (frames) el.animate(frames[0], { duration: frames[1], easing: "cubic-bezier(.3, .7, .3, 1)" });
+  }, [beat.key]);
+  const struck = !leaving && beat.hit && beat.hit.to === entry.name ? beat.hit.effect : "";
+  const striking = !leaving && beat.hit && beat.hit.from === entry.name && beat.hit.to !== entry.name;
+  import_react4.default.useEffect(() => {
+    const el = reactRef.current;
+    if (!el || typeof el.animate !== "function" || !struck && !striking) return void 0;
+    if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return void 0;
+    if (striking) {
+      const [frames, ms] = LUNGE((entry.x ?? 50) < 50 ? 1 : -1);
+      el.animate(frames, { duration: ms, easing: "cubic-bezier(.3, .7, .3, 1)" });
+    }
+    if (!struck) return void 0;
+    const t = setTimeout(() => {
+      const [frames, ms] = HIT_FRAMES[struck] || HIT_FRAMES.hit;
+      el.animate(frames, { duration: ms, easing: "cubic-bezier(.2, .8, .3, 1)" });
+    }, HIT_IMPACT_MS);
+    return () => clearTimeout(t);
   }, [beat.key]);
   const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name]);
   const src = sprite ? assetUrl(sprite) : "";
@@ -4902,7 +5025,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const still = shown ? /* @__PURE__ */ import_react4.default.createElement("img", { src: shown, alt: entry.name, className: swap ? "is-swap" : "", draggable: "false", onError: () => setShown("") }) : /* @__PURE__ */ import_react4.default.createElement(Silhouette, { name: entry.name, color, appearance: person && person.appearance, gender: person && person.gender });
   const [d, db] = DEPTH[entry.depth] || [1, "0%"];
   const sym = speaking ? beat.sym : reaction ? reaction.sym : "";
-  const cls = ["fg-actor", speaking && "is-speaking", reaction && "is-reacting", uploaded && "is-upload", leaving && "is-leaving", aa && "is-aa", entry.away && "is-away", entry.peek && "is-peek"].filter(Boolean).join(" ");
+  const cls = ["fg-actor", speaking && "is-speaking", reaction && "is-reacting", uploaded && "is-upload", leaving && "is-leaving", aa && "is-aa", entry.away && "is-away", entry.peek && "is-peek", entry.down && "is-down"].filter(Boolean).join(" ");
   return /* @__PURE__ */ import_react4.default.createElement(
     "div",
     {
@@ -4915,7 +5038,8 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
       "data-depth": entry.depth || void 0
     },
     /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-turn" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-react", ref: reactRef }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { aa, talk: speaking && talk && talk.key === beat.key ? talk : null, fallback: still, className: "fg-aa", label: entry.name }) : still))),
-    sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: sym }))
+    sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: sym })),
+    struck && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-hit-mark", key: "hit" + beat.key, "data-effect": struck, style: { "--impact": HIT_IMPACT_MS + "ms" }, "aria-hidden": "true" }, HIT_MARK[struck] && /* @__PURE__ */ import_react4.default.createElement("span", null, HIT_MARK[struck]))
   );
 }
 var LEAVE_MS = 450;
@@ -5076,6 +5200,42 @@ function CutIn({ beat, view, sound = true }) {
   const record = person && src ? Object.values(person.sprites || {}).find((r) => r && r.assetId === sprite) : null;
   const crop = size && aspect ? bandCrop(faceBoxOf(record, size), size, aspect) : null;
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin", style: { "--speaker": person && person.color || void 0, "--hold": CUTIN_HOLD_MS + "ms" }, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-edge" }), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-band", ref: bandRef }, crop && /* @__PURE__ */ import_react4.default.createElement("img", { src, alt: "", draggable: "false", style: { width: crop.width + "%", left: crop.left + "%", top: crop.top + "%" } }), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-lines" }), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-name" }, beat.speaker === name2 && beat.alias ? beat.alias : name2)));
+}
+var BATTLE_END_EN = { win: "VICTORY", lose: "DEFEAT", flee: "ESCAPED" };
+var BATTLE_SOUND = { start: "slam", win: "ding", lose: "stab", flee: "whoosh" };
+function BattleCard({ beat, sound = true }) {
+  const edge = beat.battleEdge;
+  const ms = BATTLE_CARD_MS[edge.kind] || 1600;
+  const [gone, setGone] = import_react4.default.useState(false);
+  import_react4.default.useEffect(() => {
+    if (sound) stinger(BATTLE_SOUND[edge.kind === "start" ? "start" : edge.result] || "whoosh");
+    const t = setTimeout(() => setGone(true), ms);
+    return () => clearTimeout(t);
+  }, []);
+  if (gone) return null;
+  const start = edge.kind === "start";
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-battle", "data-kind": edge.kind, "data-result": edge.result || void 0, style: { "--hold": ms - 350 + "ms" }, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-battle-band" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-battle-kicker" }, start ? "ENCOUNTER" : BATTLE_END_EN[edge.result] || "BATTLE OVER"), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-battle-main" }, start ? edge.foe : BATTLE_END_LABEL[edge.result] || "战斗结束"), start && edge.title && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-battle-sub" }, edge.title)));
+}
+var HIT_SOUND = { hit: "impact", crit: "slam", miss: "whoosh", block: "impact", down: "slam", heal: "ding" };
+var HIT_SHAKE = { hit: [["shake", 1]], crit: [["shake", 3], ["redflash", 1]], block: [["shake", 1]], down: [["shake", 2]] };
+function HitBanner({ beat, sound = true, fx = null }) {
+  const hit = beat.hit;
+  const onStage2 = (beat.cast || []).some((c) => c.name === hit.to);
+  const fromLeft = (() => {
+    const from = (beat.cast || []).find((c) => c.name === hit.from);
+    return !from || ["left", "farleft", "center"].includes(from.pos);
+  })();
+  const [impact, setImpact] = import_react4.default.useState(false);
+  import_react4.default.useEffect(() => {
+    if (sound && hit.move && hit.effect !== "heal") stinger("whoosh");
+    const t = setTimeout(() => {
+      setImpact(true);
+      if (sound) stinger(HIT_SOUND[hit.effect] || "impact");
+      if (fx) for (const [kind, power] of HIT_SHAKE[hit.effect] || []) fx({ kind, power });
+    }, HIT_IMPACT_MS);
+    return () => clearTimeout(t);
+  }, []);
+  return /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, hit.move && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-movebar", "data-from": fromLeft ? "left" : "right", "data-effect": hit.effect, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-movebar-band" }, hit.from && /* @__PURE__ */ import_react4.default.createElement("span", { className: "fg-movebar-who" }, hit.from), /* @__PURE__ */ import_react4.default.createElement("span", { className: "fg-movebar-name" }, hit.move))), impact && !onStage2 && hit.effect !== "miss" && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-hurt", "data-effect": hit.effect, "aria-hidden": "true" }));
 }
 var PAN_BELOW = 0.85;
 function usePanRatio(ref, src, version) {
@@ -7866,6 +8026,8 @@ function ScriptView({ script, units }) {
       l.sym && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "sym", k: "符号" }, SYMBOL_LABEL[l.sym] || l.sym),
       l.cam && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cam", k: "镜头" }, CAMERA_LABEL[l.cam] || l.cam, l.camOn ? ` · ${l.camOn}` : ""),
       l.cutin && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cutin", k: "切入" }, l.cutin === true ? l.sp || "说话的人" : l.cutin),
+      l.battle && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "battle", k: "战斗" }, l.battle.foe ? `开战 · ${l.battle.foe}${l.battle.title ? `（${l.battle.title}）` : ""}` : `结束${BATTLE_END_LABEL[l.battle.end] ? " · " + BATTLE_END_LABEL[l.battle.end] : ""}`),
+      l.hit && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "hit", k: "出手" }, [l.hit.from, l.hit.to && "→ " + l.hit.to, l.hit.move && `「${l.hit.move}」`, HIT_EFFECT_LABEL[l.hit.effect] || l.hit.effect].filter(Boolean).join(" ")),
       l.card && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "card", k: "卡片" }, CARD_LABEL[l.card] || l.card),
       l.cut && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cut", k: "字卡" }, l.cut.text),
       l.mode && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "mode", k: "段落" }, MODE_LABEL[l.mode] || l.mode),
@@ -8371,10 +8533,12 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking }),
     /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),
     beat && !title && beat.cutin && /* @__PURE__ */ import_react11.default.createElement(CutIn, { key: beat.key, beat, view, sound: sfxOn }),
+    beat && !title && beat.hit && /* @__PURE__ */ import_react11.default.createElement(HitBanner, { key: beat.key, beat, sound: sfxOn, fx: hit }),
+    beat && !title && beat.battleEdge && speed > 0 && /* @__PURE__ */ import_react11.default.createElement(BattleCard, { key: beat.key, beat, sound: sfxOn }),
     !panel && /* @__PURE__ */ import_react11.default.createElement(RestartNotice, { floating: true }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(TitleCard, { beat, delay: speed > 0 ? beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0 : 0 }),
     beat && !title && beat.cut && speed > 0 && /* @__PURE__ */ import_react11.default.createElement(CutCard, { beat, out: !cutting }),
-    !title && beat && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react11.default.createElement("div", null, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-place" }, hud.scene.location || `第 ${hud.turn} 轮`), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-meta" }, hud.mode && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-mode" }, MODE_LABEL[hud.mode]), /* @__PURE__ */ import_react11.default.createElement("span", null, TIME_LABEL[hud.scene.time] || ""), hud.scene.weather && hud.scene.weather !== "clear" && /* @__PURE__ */ import_react11.default.createElement("span", null, WEATHER_LABEL[hud.scene.weather]), LIGHT_LABEL[hud.scene.light] && /* @__PURE__ */ import_react11.default.createElement("span", null, LIGHT_LABEL[hud.scene.light]), FX_LABEL[hud.scene.fx] && /* @__PURE__ */ import_react11.default.createElement("span", null, FX_LABEL[hud.scene.fx]), hud.scene.mood && /* @__PURE__ */ import_react11.default.createElement("span", null, "♪ ", MOOD_LABEL[hud.scene.mood])))),
+    !title && beat && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react11.default.createElement("div", null, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-place" }, hud.scene.location || `第 ${hud.turn} 轮`), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-meta" }, hud.mode && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-mode" }, MODE_LABEL[hud.mode]), hud.battle && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-battle", title: hud.battle.title || "" }, "交战 · ", hud.battle.foe), /* @__PURE__ */ import_react11.default.createElement("span", null, TIME_LABEL[hud.scene.time] || ""), hud.scene.weather && hud.scene.weather !== "clear" && /* @__PURE__ */ import_react11.default.createElement("span", null, WEATHER_LABEL[hud.scene.weather]), LIGHT_LABEL[hud.scene.light] && /* @__PURE__ */ import_react11.default.createElement("span", null, LIGHT_LABEL[hud.scene.light]), FX_LABEL[hud.scene.fx] && /* @__PURE__ */ import_react11.default.createElement("span", null, FX_LABEL[hud.scene.fx]), hud.scene.mood && /* @__PURE__ */ import_react11.default.createElement("span", null, "♪ ", MOOD_LABEL[hud.scene.mood])))),
     !title && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, directing && /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), drawing > 0 && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), track && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill", title: track.name }, "♪ ", track.name), viewError && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
     beat && !title && beat.card && /* @__PURE__ */ import_react11.default.createElement(SceneCard, { beat }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(

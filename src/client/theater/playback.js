@@ -54,6 +54,7 @@ export function buildBeats(view) {
   let shown = null // 上一拍画面上的场景和段落：判断新一轮开场要不要转场
   const active = new Map() // 每个人最近一次说话、登场是第几拍：台上人太多时，最久没动静的先下场
   let recalled = null // 上一拍所在的短闪回：进出闪回时白闪一下
+  let battle = null // 正在打的仗 { foe, title, place }：跨轮带着，写了结束或者换了地方收起
   let set = 0 // 第几堂布景：换了地方、进出回忆这类段落时加一，台上的人跟着旧画面一起退、在新画面里重新登场，不从旧站位滑过去
   // 有立绘的人：导演漏列进 cast、却当面开口时让他上台（lib/staging.js 的 walkOn）
   const drawn = new Set((view.cast || []).filter(p => Object.values(p.sprites || {}).some(s => s && s.assetId)).map(p => p.name))
@@ -130,8 +131,20 @@ export function buildBeats(view) {
       Object.assign(exitWay, line.exitHow || {})
       const gone = {}
       for (const name of steps[ui].left) if (exitWay[name]) { gone[name] = exitWay[name]; delete exitWay[name] }
-      const block = blocking.step({ onStage: onStageNames, left: steps[ui].left, speakers, moves: line.move || [], peeks: Object.keys(ways).filter(name => ways[name] === 'peek') })
-      for (const name of [...speakers, ...steps[ui].entered, ...reacts.map(r => r.name), ...block.moves.map(m => m.name)]) active.set(name, beats.length)
+      // 战斗：开战、结束各出一张卡；打着的时候左上角挂着「交战」。换了地方（不在特殊段落里）就当打完了
+      let battleEdge = null
+      if (battle && !at.mode && at.scene.location !== battle.place && !(line.battle && line.battle.foe)) battle = null
+      if (line.battle && line.battle.foe) {
+        battle = { foe: line.battle.foe, ...(line.battle.title ? { title: line.battle.title } : {}), place: at.scene.location }
+        battleEdge = { kind: 'start', foe: battle.foe, ...(battle.title ? { title: battle.title } : {}) }
+      } else if (line.battle && line.battle.end) battleEdge = { kind: 'end', ...(line.battle.end !== true ? { result: line.battle.end } : {}), ...(battle ? { foe: battle.foe } : {}) }
+      if (line.battle && line.battle.end) battle = null // 结束卡出来时左上角的「交战」一起收起
+      const fighting = battle ? { foe: battle.foe, ...(battle.title ? { title: battle.title } : {}) } : null
+      // 一次出手：被击倒的人倒在那里，到他开口、走位或被治疗为止
+      const hit = line.hit || null
+      const target = hit && hit.to && onStageNames.includes(hit.to) ? [hit.to] : []
+      const block = blocking.step({ onStage: onStageNames, left: steps[ui].left, speakers, moves: line.move || [], peeks: Object.keys(ways).filter(name => ways[name] === 'peek'), downs: hit && hit.effect === 'down' ? target : [], heals: hit && hit.effect === 'heal' ? target : [] })
+      for (const name of [...speakers, ...steps[ui].entered, ...reacts.map(r => r.name), ...block.moves.map(m => m.name), ...(hit ? [hit.from, hit.to].filter(n => n && onStageNames.includes(n)) : [])]) active.set(name, beats.length)
       const recall = recalls[ui]
       // 漫画式切入切谁：写 true 是说话的人（旁白没说话的人就不切），短闪回里不切
       const cutin = recall ? '' : line.cutin === true ? speakers[0] || '' : line.cutin || ''
@@ -159,6 +172,9 @@ export function buildBeats(view) {
         cam: line.cam || '',
         ...(line.camOn ? { camOn: line.camOn } : {}), // 镜头对准谁（不写是说话的人）
         ...(cutin ? { cutin } : {}), // 漫画式切入：这个人的脸部特写从侧面冲进来
+        ...(fighting ? { battle: fighting } : {}), // 正在打的仗（左上角挂「交战」）
+        ...(battleEdge ? { battleEdge } : {}), // 开战卡 / 结束卡
+        ...(hit ? { hit } : {}), // 一次出手：招式名横幅、被打的人一震
         say: line.say || '',
         stress: line.stress || '',
         ...(line.textfx ? { textfx: line.textfx } : {}), // 句中文字效果：某几个字发抖、放大、越说越小……
@@ -283,6 +299,10 @@ export const TRANSITION_MS = { dissolve: 1100, fade: 2600, cinematic: 1500, wipe
 export const PAUSE_MS = { beat: 900, silence: 2400 }
 /** 漫画式切入的带子先冲进来、站稳，字再出来。 */
 export const CUTIN_LEAD_MS = 380
+/** 开战卡、结束卡停多久（字等它收起再出）；出手时招式名横幅冲过去、打中的那一刻（HIT_IMPACT_MS），字等打中之后再出。 */
+export const BATTLE_CARD_MS = { start: 1900, end: 1700 }
+export const HIT_IMPACT_MS = 420
+export const HIT_LEAD_MS = 700
 /** 换了地方：转场演完再停这么久才出字。 */
 const SCENE_BEAT_MS = 300
 /**
@@ -311,6 +331,8 @@ export function beatHold(beat, { cg = '', was = {} } = {}) {
   if (moved && !beat.cut && TRANSITION_MS[beat.transition]) { ms = Math.max(ms, TRANSITION_MS[beat.transition] + SCENE_BEAT_MS); away = true }
   if (PAUSE_MS[beat.pause]) { ms = Math.max(ms, PAUSE_MS[beat.pause]); if (beat.pause === 'silence') away = true }
   if (beat.cutin) ms = Math.max(ms, CUTIN_LEAD_MS)
+  if (beat.battleEdge) ms = Math.max(ms, BATTLE_CARD_MS[beat.battleEdge.kind] || 0)
+  if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS)
   const wake = was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
   if (wake) { ms = Math.max(ms, WAKE_MS); away = true }
   return { ms, away, ...(wake ? { wake } : {}) }

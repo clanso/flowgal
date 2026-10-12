@@ -3,13 +3,14 @@
 import React from 'react'
 import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
-import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
+import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, HIT_IMPACT_MS, BATTLE_CARD_MS, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
 import { heightOf, placeSprite, faceCrop, bandCrop, FACE_RATIO } from '../../../lib/stature.js'
 import { aimCamera } from '../../../lib/camera.js'
 import { reactKind } from '../../../lib/blocking.js'
+import { BATTLE_END_LABEL } from '../../../lib/vocab.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger } from './audio.js'
 
@@ -233,6 +234,21 @@ const REACT_FRAMES = {
   glance: [[{ transform: 'none' }, { transform: 'translateY(-1%) rotate(-1.2deg)', offset: 0.4 }, { transform: 'none' }], 520],
 }
 const STEP_MOVES = new Set(['approach', 'apart', 'forward', 'back'])
+/**
+ * 战斗里一次出手：被打的人在打中那一刻（HIT_IMPACT_MS）怎么一动（同样动 .fg-actor-react 这一层），出手的人往前冲一下。
+ * 命中一震、暴击震得更狠还泛红、闪避侧身一闪、格挡被推开一点、击倒先一震（倒下去的样子在 theater.css 的 .is-down）、治疗泛起绿光。
+ */
+const HIT_FRAMES = {
+  hit: [[{ transform: 'none', filter: 'none' }, { transform: 'translateX(-2.4%) rotate(-1.6deg)', filter: 'brightness(2.2)', offset: 0.12 }, { transform: 'translateX(1.4%) rotate(.6deg)', filter: 'none', offset: 0.4 }, { transform: 'none' }], 420],
+  crit: [[{ transform: 'none', filter: 'none' }, { transform: 'translateX(-4%) rotate(-3deg) scale(1.02)', filter: 'brightness(2.4) sepia(1) saturate(5) hue-rotate(-40deg)', offset: 0.1 }, { transform: 'translateX(2.6%) rotate(1.4deg)', filter: 'sepia(.6) saturate(3) hue-rotate(-40deg)', offset: 0.35 }, { transform: 'translateX(-1%)', filter: 'none', offset: 0.65 }, { transform: 'none' }], 640],
+  miss: [[{ transform: 'none', opacity: 1, filter: 'none' }, { transform: 'translateX(10%) skewX(-6deg)', opacity: 0.45, filter: 'blur(3px)', offset: 0.25 }, { transform: 'translateX(8%)', opacity: 1, filter: 'none', offset: 0.55 }, { transform: 'none' }], 720],
+  block: [[{ transform: 'none', filter: 'none' }, { transform: 'translateX(-3%) scale(.985)', filter: 'brightness(1.5) saturate(.6)', offset: 0.18 }, { transform: 'translateX(-2%)', filter: 'none', offset: 0.5 }, { transform: 'none' }], 520],
+  down: [[{ transform: 'none', filter: 'none' }, { transform: 'translateX(-3%) rotate(-3deg)', filter: 'brightness(2)', offset: 0.15 }, { transform: 'translateX(-1%) rotate(-1deg)', filter: 'none', offset: 0.5 }, { transform: 'none' }], 560],
+  heal: [[{ filter: 'none' }, { filter: 'brightness(1.35) drop-shadow(0 0 1.6cqw rgba(110, 255, 170, .9))', offset: 0.3 }, { filter: 'brightness(1.15) drop-shadow(0 0 1cqw rgba(110, 255, 170, .6))', offset: 0.7 }, { filter: 'none' }], 1300],
+}
+const LUNGE = dir => [[{ transform: 'none' }, { transform: `translateX(${dir * 7}%) translateY(-1%)`, offset: 0.35 }, { transform: `translateX(${dir * 5}%)`, offset: 0.6 }, { transform: 'none' }], 620]
+/** 打中时被打的人身上冒的字（命中只有一道斩痕，不写字）。 */
+const HIT_MARK = { crit: '暴击！', miss: '闪避', block: '格挡', down: '击倒', heal: '治疗' }
 /** 上前 / 退后：立绘放大或缩小多少、脚往下或往上挪多少（占舞台高度）。 */
 const DEPTH = { 1: [1.1, '-6%'], [-1]: [0.88, '3%'] }
 /** 退场方式演多久（毫秒），样式在 theater.css 的 data-exit。 */
@@ -253,6 +269,18 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     const kind = reaction && (reaction.emo || !move) ? reactKind(base) : move.act === 'lookback' || move.act === 'turn' || move.act === 'face' ? 'glance' : STEP_MOVES.has(move.act) ? 'step' : ''
     const frames = REACT_FRAMES[kind]
     if (frames) el.animate(frames[0], { duration: frames[1], easing: 'cubic-bezier(.3, .7, .3, 1)' })
+  }, [beat.key])
+  // 战斗里一次出手：出手的人往对面冲一下，被打的人在打中那一刻一动
+  const struck = !leaving && beat.hit && beat.hit.to === entry.name ? beat.hit.effect : ''
+  const striking = !leaving && beat.hit && beat.hit.from === entry.name && beat.hit.to !== entry.name
+  React.useEffect(() => {
+    const el = reactRef.current
+    if (!el || typeof el.animate !== 'function' || (!struck && !striking)) return undefined
+    if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+    if (striking) { const [frames, ms] = LUNGE((entry.x ?? 50) < 50 ? 1 : -1); el.animate(frames, { duration: ms, easing: 'cubic-bezier(.3, .7, .3, 1)' }) }
+    if (!struck) return undefined
+    const t = setTimeout(() => { const [frames, ms] = HIT_FRAMES[struck] || HIT_FRAMES.hit; el.animate(frames, { duration: ms, easing: 'cubic-bezier(.2, .8, .3, 1)' }) }, HIT_IMPACT_MS)
+    return () => clearTimeout(t)
   }, [beat.key])
   const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name])
   const src = sprite ? assetUrl(sprite) : ''
@@ -289,7 +317,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" onError={() => setShown('')} /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
   const [d, db] = DEPTH[entry.depth] || [1, '0%']
   const sym = speaking ? beat.sym : reaction ? reaction.sym : ''
-  const cls = ['fg-actor', speaking && 'is-speaking', reaction && 'is-reacting', uploaded && 'is-upload', leaving && 'is-leaving', aa && 'is-aa', entry.away && 'is-away', entry.peek && 'is-peek'].filter(Boolean).join(' ')
+  const cls = ['fg-actor', speaking && 'is-speaking', reaction && 'is-reacting', uploaded && 'is-upload', leaving && 'is-leaving', aa && 'is-aa', entry.away && 'is-away', entry.peek && 'is-peek', entry.down && 'is-down'].filter(Boolean).join(' ')
   return (
     <div className={cls} style={{ '--x': (entry.x ?? actorX(entry.pos)) + '%', '--s': entry.scale ?? 1, '--d': d, '--db': db, '--side': SIDE[entry.pos] || '0%', '--edge': (entry.x ?? actorX(entry.pos)) < 50 ? '-40%' : '40%', '--k': place.k, '--lift': place.lift, '--head': place.head * 100 + '%' }}
       data-name={entry.name} data-enter={entrance || undefined} data-exit={leaving && entry.how ? entry.how : undefined} data-peek={entry.peek || undefined} data-depth={entry.depth || undefined}>
@@ -303,6 +331,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
       {sym && (
         <div className="fg-symbol-anchor"><MangaSymbol key={beat.key} kind={sym} /></div>
       )}
+      {struck && <div className="fg-hit-mark" key={'hit' + beat.key} data-effect={struck} style={{ '--impact': HIT_IMPACT_MS + 'ms' }} aria-hidden="true">{HIT_MARK[struck] && <span>{HIT_MARK[struck]}</span>}</div>}
     </div>
   )
 }
@@ -534,6 +563,73 @@ export function CutIn({ beat, view, sound = true }) {
         <div className="fg-cutin-name">{beat.speaker === name && beat.alias ? beat.alias : name}</div>
       </div>
     </div>
+  )
+}
+
+/**
+ * 战斗的开战卡 / 结束卡（playback.js 的 battleEdge）：开战是横贯画面的暗带、红色斜线、对手名和称号，砸一下；
+ * 结束是胜利（金）/ 败北（灰蓝）/ 撤退（青）/ 没分胜负的「战斗结束」。停 BATTLE_CARD_MS 后收起。
+ */
+const BATTLE_END_EN = { win: 'VICTORY', lose: 'DEFEAT', flee: 'ESCAPED' }
+const BATTLE_SOUND = { start: 'slam', win: 'ding', lose: 'stab', flee: 'whoosh' }
+export function BattleCard({ beat, sound = true }) {
+  const edge = beat.battleEdge
+  const ms = BATTLE_CARD_MS[edge.kind] || 1600
+  const [gone, setGone] = React.useState(false)
+  React.useEffect(() => {
+    if (sound) stinger(BATTLE_SOUND[edge.kind === 'start' ? 'start' : edge.result] || 'whoosh')
+    const t = setTimeout(() => setGone(true), ms)
+    return () => clearTimeout(t)
+  }, [])
+  if (gone) return null
+  const start = edge.kind === 'start'
+  return (
+    <div className="fg-battle" data-kind={edge.kind} data-result={edge.result || undefined} style={{ '--hold': ms - 350 + 'ms' }} aria-hidden="true">
+      <div className="fg-battle-band">
+        <div className="fg-battle-kicker">{start ? 'ENCOUNTER' : BATTLE_END_EN[edge.result] || 'BATTLE OVER'}</div>
+        <div className="fg-battle-main">{start ? edge.foe : BATTLE_END_LABEL[edge.result] || '战斗结束'}</div>
+        {start && edge.title && <div className="fg-battle-sub">{edge.title}</div>}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 一次出手（playback.js 的 hit）：招式名横幅从出手的人那边冲过去；打中那一刻（HIT_IMPACT_MS）按效果响一声、震屏或闪一下。
+ * 被打的不在台上（主角「我」、画外的人）时，整个画面替他挨这一下：命中 / 暴击 / 击倒四周泛红，格挡泛蓝，治疗泛绿，闪避只有「唰」的一声。
+ * fx 是剧场的落字特效（useHits）。
+ */
+const HIT_SOUND = { hit: 'impact', crit: 'slam', miss: 'whoosh', block: 'impact', down: 'slam', heal: 'ding' }
+const HIT_SHAKE = { hit: [['shake', 1]], crit: [['shake', 3], ['redflash', 1]], block: [['shake', 1]], down: [['shake', 2]] }
+export function HitBanner({ beat, sound = true, fx = null }) {
+  const hit = beat.hit
+  const onStage = (beat.cast || []).some(c => c.name === hit.to)
+  const fromLeft = (() => {
+    const from = (beat.cast || []).find(c => c.name === hit.from)
+    return !from || ['left', 'farleft', 'center'].includes(from.pos)
+  })()
+  const [impact, setImpact] = React.useState(false)
+  React.useEffect(() => {
+    if (sound && hit.move && hit.effect !== 'heal') stinger('whoosh') // 治疗不是挥出去的一下
+    const t = setTimeout(() => {
+      setImpact(true)
+      if (sound) stinger(HIT_SOUND[hit.effect] || 'impact')
+      if (fx) for (const [kind, power] of HIT_SHAKE[hit.effect] || []) fx({ kind, power })
+    }, HIT_IMPACT_MS)
+    return () => clearTimeout(t)
+  }, [])
+  return (
+    <>
+      {hit.move && (
+        <div className="fg-movebar" data-from={fromLeft ? 'left' : 'right'} data-effect={hit.effect} aria-hidden="true">
+          <div className="fg-movebar-band">
+            {hit.from && <span className="fg-movebar-who">{hit.from}</span>}
+            <span className="fg-movebar-name">{hit.move}</span>
+          </div>
+        </div>
+      )}
+      {impact && !onStage && hit.effect !== 'miss' && <div className="fg-hurt" data-effect={hit.effect} aria-hidden="true" />}
+    </>
   )
 }
 
