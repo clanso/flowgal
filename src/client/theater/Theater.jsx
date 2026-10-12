@@ -2,7 +2,7 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS } from './playback.js'
-import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, CutIn, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -189,6 +189,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])
   // 灵光一闪（漫画符号是灯泡）：逆转裁判那一声「叮」
   React.useEffect(() => { if (beat && beat.sym === 'bulb' && sfxOn) stinger('ding') }, [beat && beat.key])
+  // 甩镜：「唰」一下（跟漫画切入同一个音效）
+  React.useEffect(() => { if (beat && beat.cam === 'whip' && !title && sfxOn) stinger('whoosh') }, [beat && beat.key])
   const cameraRef = React.useRef(null)
   const cam = useCamera(title ? null : beat, cameraRef)
   const atEnd = beat && index === beats.length - 1
@@ -369,6 +371,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} />
         {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
+        {beat && !title && beat.cutin && <CutIn key={beat.key} beat={beat} view={view} sound={sfxOn} />}
         {!panel && <RestartNotice floating />}
         {beat && !title && <TitleCard beat={beat} delay={speed > 0 ? (beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0) : 0} />}
         {beat && !title && beat.cut && speed > 0 && <CutCard beat={beat} out={!cutting} />}

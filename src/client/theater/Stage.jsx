@@ -7,7 +7,7 @@ import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, cgSrc, cgEntr
 import { SYMBOL_SVG } from './symbols.js'
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
-import { heightOf, placeSprite, faceCrop, FACE_RATIO } from '../../../lib/stature.js'
+import { heightOf, placeSprite, faceCrop, bandCrop, FACE_RATIO } from '../../../lib/stature.js'
 import { aimCamera } from '../../../lib/camera.js'
 import { reactKind } from '../../../lib/blocking.js'
 import { AaSprite } from './AaSprite.jsx'
@@ -484,6 +484,55 @@ export function RecallFace({ beat, view, tone = '' }) {
   return (
     <div className="fg-recall-face" key={name} data-tone={tone || recall.tone || 'warm'} style={{ '--speaker': person.color || undefined }} aria-hidden="true">
       {crop && <img src={src} alt="" draggable="false" style={{ width: crop.width + '%', left: crop.left + '%', top: crop.top + '%' }} />}
+    </div>
+  )
+}
+
+/** 漫画式切入在画面上停多久（之后从另一边甩出去），整段演完多久。 */
+export const CUTIN_HOLD_MS = 1500
+const CUTIN_MS = CUTIN_HOLD_MS + 400
+
+/**
+ * 漫画式切入（导演 cutin）：一条斜切的带子从左边冲进来，里面是这个人这一刻表情的脸部特写（按脸框裁，lib/stature.js 的 bandCrop）和集中线，
+ * 名字压在右下，「唰」的一声；停一下再从右边甩出去。还没画立绘的人只有带子和名字。每一拍挂一次（key 是这一拍）。
+ */
+export function CutIn({ beat, view, sound = true }) {
+  const name = beat.cutin
+  const person = ((view && view.cast) || []).find(p => p.name === name) || null
+  const sprite = person ? spriteFor(person, beat.turn, (beat.emotions && beat.emotions[name]) || 'neutral', view && view.emotions, beat.then && beat.then[name], beat.ahead && beat.ahead[name]) : ''
+  const src = sprite ? assetUrl(sprite) : ''
+  const bandRef = React.useRef(null)
+  const [size, setSize] = React.useState(null)
+  const [aspect, setAspect] = React.useState(0)
+  const [gone, setGone] = React.useState(false)
+  React.useLayoutEffect(() => {
+    const el = bandRef.current
+    if (el && el.clientHeight) setAspect(el.clientWidth / el.clientHeight)
+  }, [])
+  React.useEffect(() => {
+    if (sound) stinger('whoosh')
+    const t = setTimeout(() => setGone(true), CUTIN_MS)
+    return () => clearTimeout(t)
+  }, [])
+  React.useEffect(() => {
+    if (!src) return undefined
+    let live = true
+    const img = new Image()
+    img.onload = () => { if (live && img.naturalHeight) setSize([img.naturalWidth, img.naturalHeight]) }
+    img.src = src
+    return () => { live = false }
+  }, [src])
+  if (gone) return null
+  const record = person && src ? Object.values(person.sprites || {}).find(r => r && r.assetId === sprite) : null
+  const crop = size && aspect ? bandCrop(faceBoxOf(record, size), size, aspect) : null
+  return (
+    <div className="fg-cutin" style={{ '--speaker': (person && person.color) || undefined, '--hold': CUTIN_HOLD_MS + 'ms' }} aria-hidden="true">
+      <div className="fg-cutin-edge" />
+      <div className="fg-cutin-band" ref={bandRef}>
+        {crop && <img src={src} alt="" draggable="false" style={{ width: crop.width + '%', left: crop.left + '%', top: crop.top + '%' }} />}
+        <div className="fg-cutin-lines" />
+        <div className="fg-cutin-name">{beat.speaker === name && beat.alias ? beat.alias : name}</div>
+      </div>
     </div>
   )
 }

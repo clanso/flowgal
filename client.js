@@ -667,6 +667,25 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }
 @keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }
 @keyframes fg-blur { 0% { filter: blur(0); } 30% { filter: blur(6px); } 100% { filter: blur(0); } }
+/* ── 漫画式切入（导演 cutin，Stage.jsx 的 CutIn）：斜切的带子从左边冲进来，白边、说话人颜色的底、脸部特写、集中线、名字；
+   停 --hold 之后从右边甩出去。在对话框下面、画面上面 ── */
+.fg-cutin { position: absolute; left: 0; right: 0; top: 19%; height: 33%; z-index: 19; pointer-events: none;
+  animation: fg-cutin-in .3s cubic-bezier(.2, .9, .25, 1) both, fg-cutin-out .3s cubic-bezier(.6, 0, .85, .3) var(--hold, 1.5s) forwards; }
+.fg-cutin-edge, .fg-cutin-band { position: absolute; clip-path: polygon(0 18%, 100% 0, 100% 82%, 0 100%); }
+.fg-cutin-edge { inset: 0; background: #fff; box-shadow: 0 0 3cqw rgba(0, 0, 0, .5); }
+.fg-cutin-band { inset: .5cqw 0; overflow: hidden; background: linear-gradient(100deg, color-mix(in oklab, var(--speaker, #9b7bff) 55%, #0b0716), color-mix(in oklab, var(--speaker, #9b7bff) 22%, #05030a) 70%); }
+.fg-cutin-band img { position: absolute; max-width: none; height: auto; filter: contrast(1.08) saturate(1.1); animation: fg-cutin-face var(--hold, 1.5s) ease-out both; transform-origin: 30% 55%; }
+/* 集中线：从脸往外放射，脸周围留空 */
+.fg-cutin-lines { position: absolute; inset: -30% -10%; background: repeating-conic-gradient(from 0deg at 33% 55%, rgba(255, 255, 255, .34) 0 .7deg, transparent .7deg 4.6deg);
+  -webkit-mask-image: radial-gradient(ellipse 34% 60% at 33% 55%, transparent 55%, #000 100%); mask-image: radial-gradient(ellipse 34% 60% at 33% 55%, transparent 55%, #000 100%);
+  mix-blend-mode: screen; animation: fg-cutin-lines .1s steps(2) infinite; }
+.fg-cutin-name { position: absolute; right: 7%; bottom: 16%; font-family: var(--font-display); font-size: 3.4cqw; font-weight: 900; font-style: italic; letter-spacing: .12em; color: #fff;
+  text-shadow: .2cqw .2cqw 0 color-mix(in oklab, var(--speaker, #9b7bff) 60%, #000), 0 0 1.4cqw rgba(0, 0, 0, .55); animation: fg-cutin-name .4s .12s cubic-bezier(.2, .9, .25, 1) both; }
+@keyframes fg-cutin-in { from { transform: translateX(-105%); } to { transform: none; } }
+@keyframes fg-cutin-out { to { transform: translateX(105%); opacity: .4; } }
+@keyframes fg-cutin-face { from { transform: scale(1.12) translateX(-2%); } to { transform: none; } }
+@keyframes fg-cutin-lines { 50% { transform: rotate(1.2deg); } }
+@keyframes fg-cutin-name { from { opacity: 0; transform: translateX(3cqw) skewX(-12deg); } to { opacity: 1; transform: none; } }
 .fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }
 .fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }
 .fg-flash.is-black { background: #000; animation: fg-black 1.6s ease both; }
@@ -1471,11 +1490,15 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-cg.is-leaving { animation: fg-cg-fade-out .6s ease both !important; }
   .fg-cg::before { display: none; }
   .fg-camera[data-cam="whip"] { animation: none !important; }
+  .fg-cutin { animation: fg-fade-in .25s ease both, fg-fade-out .3s ease var(--hold, 1.5s) forwards !important; }
+  .fg-cutin-band img, .fg-cutin-lines, .fg-cutin-name { animation: none !important; }
   .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */
   .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
 @container stage (max-aspect-ratio: 4/5) {
+  .fg-cutin { top: 24%; height: 20%; }
+  .fg-cutin-name { font-size: 6cqw; }
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
   .fg-recall-face { width: 17cqw; }
@@ -2175,6 +2198,19 @@ var SOUND_SLOTS = Object.freeze([
     ]
   },
   {
+    id: "whoosh",
+    label: "漫画切入",
+    hint: "脸部特写切进来、甩镜的那一下",
+    group: "stage",
+    presets: [
+      { id: "swish", label: "唰", parts: [p("noise", 700, 0.26, 0.2, { to: 5200, q: 1.4, attack: 0.04 }), p("noise", 2600, 0.12, 0.08, { q: 2, at: 0.12 })] },
+      { id: "blade", label: "刀光", parts: [p("noise", 1800, 0.18, 0.16, { to: 7e3, q: 2.2, attack: 0.02 }), p("sine", 2400, 0.3, 0.035, { to: 3600, at: 0.1 })] },
+      { id: "wind", label: "风声", parts: [p("noise", 300, 0.42, 0.22, { to: 1800, q: 0.9, attack: 0.12 })] },
+      { id: "zip", label: "嗖", parts: [p("sawtooth", 300, 0.14, 0.05, { to: 2400, lp: 4e3 }), p("noise", 3e3, 0.1, 0.1, { q: 1.6 })] },
+      { id: "hit", label: "唰 + 咚", parts: [p("noise", 900, 0.2, 0.18, { to: 5e3, q: 1.4, attack: 0.03 }), p("sine", 120, 0.3, 0.24, { to: 50, at: 0.17 })] }
+    ]
+  },
+  {
     id: "select",
     label: "点按钮",
     hint: "菜单、选项、快捷键",
@@ -2362,6 +2398,17 @@ function faceCrop(box, size) {
   const side = Math.min((y1 - y0) / 0.48, w, h);
   const pct2 = (v) => round(v / side * 100);
   return { width: pct2(w), left: pct2(-((x0 + x1) / 2 - side / 2)), top: pct2(-((y0 + y1) / 2 - side * 0.52)) };
+}
+var CUTIN_FILL = 0.9;
+var CUTIN_AT = [0.3, 0.55];
+function bandCrop(box, size, aspect) {
+  if (!Array.isArray(size) || !(size[0] > 0) || !(size[1] > 0) || !(aspect > 0)) return null;
+  const [w, h] = size;
+  const ok = Array.isArray(box) && box.length === 4 && box.every(Number.isFinite) && box[2] > box[0] && box[3] > box[1];
+  const [x0, y0, x1, y1] = ok ? box : [w / 2 - FACE_RATIO * h / 2, (FACE_CENTER - FACE_RATIO / 2) * h, w / 2 + FACE_RATIO * h / 2, (FACE_CENTER + FACE_RATIO / 2) * h];
+  const scale = CUTIN_FILL / (y1 - y0);
+  const r = (v) => Math.round(v * 10) / 10;
+  return { width: r(w * scale / aspect * 100), left: r((CUTIN_AT[0] * aspect - (x0 + x1) / 2 * scale) / aspect * 100), top: r((CUTIN_AT[1] - (y0 + y1) / 2 * scale) * 100) };
 }
 
 // lib/cast.js
@@ -2737,6 +2784,7 @@ function buildBeats(view) {
       const block = blocking.step({ onStage: onStageNames, left: steps[ui2].left, speakers, moves: line.move || [], peeks: Object.keys(ways).filter((name2) => ways[name2] === "peek") });
       for (const name2 of [...speakers, ...steps[ui2].entered, ...reacts.map((r) => r.name), ...block.moves.map((m) => m.name)]) active.set(name2, beats.length);
       const recall = recalls[ui2];
+      const cutin = recall ? "" : line.cutin === true ? speakers[0] || "" : line.cutin || "";
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map((e) => ((view.emotions || []).find((x) => x.id === e) || {}).base || e), at2.scene.mood);
       const voice = recall && type !== "narration" && (!line.voice || line.voice === "echo") ? "memory" : line.voice;
       const recallEdge = recall === recalled ? "" : recall ? "in" : "out";
@@ -2762,6 +2810,8 @@ function buildBeats(view) {
         cam: line.cam || "",
         ...line.camOn ? { camOn: line.camOn } : {},
         // 镜头对准谁（不写是说话的人）
+        ...cutin ? { cutin } : {},
+        // 漫画式切入：这个人的脸部特写从侧面冲进来
         say: line.say || "",
         stress: line.stress || "",
         ...line.textfx ? { textfx: line.textfx } : {},
@@ -2870,6 +2920,7 @@ function cgHoldMs(img, mood) {
 }
 var TRANSITION_MS = { dissolve: 1100, fade: 2600, cinematic: 1500, wipe: 1e3, iris: 1200, strips: 800, black: 1800, flash: 1e3, blink: 1500, glitch: 700, swirl: 1900, haze: 2600, wake: 1900, none: 0 };
 var PAUSE_MS = { beat: 900, silence: 2400 };
+var CUTIN_LEAD_MS = 380;
 var SCENE_BEAT_MS = 300;
 var WAKE_SWAP_MS = 1700;
 var WAKE_MS = 3600;
@@ -2890,6 +2941,7 @@ function beatHold(beat, { cg = "", was = {} } = {}) {
     ms = Math.max(ms, PAUSE_MS[beat.pause]);
     if (beat.pause === "silence") away = true;
   }
+  if (beat.cutin) ms = Math.max(ms, CUTIN_LEAD_MS);
   const wake = was.mode === "memory" && (beat.mode || "") !== "memory" && !beat.cut && WAKE_FROM.has(beat.transition);
   if (wake) {
     ms = Math.max(ms, WAKE_MS);
@@ -4987,6 +5039,43 @@ function RecallFace({ beat, view, tone = "" }) {
   const record = Object.values(person.sprites || {}).find((r) => r && r.assetId === sprite);
   const crop = faceCrop(faceBoxOf(record, size), size);
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-recall-face", key: name2, "data-tone": tone || recall.tone || "warm", style: { "--speaker": person.color || void 0 }, "aria-hidden": "true" }, crop && /* @__PURE__ */ import_react4.default.createElement("img", { src, alt: "", draggable: "false", style: { width: crop.width + "%", left: crop.left + "%", top: crop.top + "%" } }));
+}
+var CUTIN_HOLD_MS = 1500;
+var CUTIN_MS = CUTIN_HOLD_MS + 400;
+function CutIn({ beat, view, sound = true }) {
+  const name2 = beat.cutin;
+  const person = (view && view.cast || []).find((p2) => p2.name === name2) || null;
+  const sprite = person ? spriteFor(person, beat.turn, beat.emotions && beat.emotions[name2] || "neutral", view && view.emotions, beat.then && beat.then[name2], beat.ahead && beat.ahead[name2]) : "";
+  const src = sprite ? assetUrl(sprite) : "";
+  const bandRef = import_react4.default.useRef(null);
+  const [size, setSize] = import_react4.default.useState(null);
+  const [aspect, setAspect] = import_react4.default.useState(0);
+  const [gone, setGone] = import_react4.default.useState(false);
+  import_react4.default.useLayoutEffect(() => {
+    const el = bandRef.current;
+    if (el && el.clientHeight) setAspect(el.clientWidth / el.clientHeight);
+  }, []);
+  import_react4.default.useEffect(() => {
+    if (sound) stinger("whoosh");
+    const t = setTimeout(() => setGone(true), CUTIN_MS);
+    return () => clearTimeout(t);
+  }, []);
+  import_react4.default.useEffect(() => {
+    if (!src) return void 0;
+    let live = true;
+    const img = new Image();
+    img.onload = () => {
+      if (live && img.naturalHeight) setSize([img.naturalWidth, img.naturalHeight]);
+    };
+    img.src = src;
+    return () => {
+      live = false;
+    };
+  }, [src]);
+  if (gone) return null;
+  const record = person && src ? Object.values(person.sprites || {}).find((r) => r && r.assetId === sprite) : null;
+  const crop = size && aspect ? bandCrop(faceBoxOf(record, size), size, aspect) : null;
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin", style: { "--speaker": person && person.color || void 0, "--hold": CUTIN_HOLD_MS + "ms" }, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-edge" }), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-band", ref: bandRef }, crop && /* @__PURE__ */ import_react4.default.createElement("img", { src, alt: "", draggable: "false", style: { width: crop.width + "%", left: crop.left + "%", top: crop.top + "%" } }), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-lines" }), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-name" }, beat.speaker === name2 && beat.alias ? beat.alias : name2)));
 }
 var PAN_BELOW = 0.85;
 function usePanRatio(ref, src, version) {
@@ -7776,6 +7865,7 @@ function ScriptView({ script, units }) {
       l.split && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "split", k: "分屏" }, l.split === "off" ? "收起" : l.split.who.join("、") + (l.split.location ? ` @ ${l.split.location}` : "")),
       l.sym && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "sym", k: "符号" }, SYMBOL_LABEL[l.sym] || l.sym),
       l.cam && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cam", k: "镜头" }, CAMERA_LABEL[l.cam] || l.cam, l.camOn ? ` · ${l.camOn}` : ""),
+      l.cutin && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cutin", k: "切入" }, l.cutin === true ? l.sp || "说话的人" : l.cutin),
       l.card && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "card", k: "卡片" }, CARD_LABEL[l.card] || l.card),
       l.cut && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cut", k: "字卡" }, l.cut.text),
       l.mode && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "mode", k: "段落" }, MODE_LABEL[l.mode] || l.mode),
@@ -8054,6 +8144,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   import_react11.default.useEffect(() => {
     if (beat && beat.sym === "bulb" && sfxOn) stinger("ding");
   }, [beat && beat.key]);
+  import_react11.default.useEffect(() => {
+    if (beat && beat.cam === "whip" && !title && sfxOn) stinger("whoosh");
+  }, [beat && beat.key]);
   const cameraRef = import_react11.default.useRef(null);
   const cam = useCamera(title ? null : beat, cameraRef);
   const atEnd = beat && index === beats.length - 1;
@@ -8277,6 +8370,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "mode", value: atmosphere ? stageMode : "", ms: stageTr === "wake" ? 200 : stageTr === "haze" ? 2400 : 1200 }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking }),
     /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),
+    beat && !title && beat.cutin && /* @__PURE__ */ import_react11.default.createElement(CutIn, { key: beat.key, beat, view, sound: sfxOn }),
     !panel && /* @__PURE__ */ import_react11.default.createElement(RestartNotice, { floating: true }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(TitleCard, { beat, delay: speed > 0 ? beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0 : 0 }),
     beat && !title && beat.cut && speed > 0 && /* @__PURE__ */ import_react11.default.createElement(CutCard, { beat, out: !cutting }),
