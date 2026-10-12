@@ -11,8 +11,9 @@ import { heightOf, placeSprite, faceCrop, bandCrop, FACE_RATIO } from '../../../
 import { aimCamera } from '../../../lib/camera.js'
 import { reactKind } from '../../../lib/blocking.js'
 import { BATTLE_END_LABEL } from '../../../lib/vocab.js'
+import { MOMENT_FOLEY } from '../../../lib/foley.js'
 import { AaSprite } from './AaSprite.jsx'
-import { stinger } from './audio.js'
+import { stinger, foley } from './audio.js'
 
 /** 转场的动画；时长在 playback.js 的 TRANSITION_MS（换场时对话框按它让开）。 */
 const TRANSITION_ANIM = {
@@ -249,6 +250,14 @@ const HIT_FRAMES = {
 const LUNGE = dir => [[{ transform: 'none' }, { transform: `translateX(${dir * 7}%) translateY(-1%)`, offset: 0.35 }, { transform: `translateX(${dir * 5}%)`, offset: 0.6 }, { transform: 'none' }], 620]
 /** 打中时被打的人身上冒的字（命中只有一道斩痕，不写字）。 */
 const HIT_MARK = { crit: '暴击！', miss: '闪避', block: '格挡', down: '击倒', heal: '治疗' }
+/**
+ * 小瞬间里被摸头、被戳脸的人（同样动 .fg-actor-react 这一层）：摸头往下一压一压，戳脸往旁边一歪再弹回来。
+ */
+const TOUCH_FRAMES = {
+  pat: [[{ transform: 'none' }, { transform: 'translateY(1.2%) scaleY(.975)', offset: 0.16 }, { transform: 'none', offset: 0.34 }, { transform: 'translateY(1.2%) scaleY(.975)', offset: 0.56 }, { transform: 'none', offset: 0.74 }, { transform: 'none' }], 1000],
+  poke: [[{ transform: 'none' }, { transform: 'translateX(-1.6%) rotate(-2.5deg)', offset: 0.15 }, { transform: 'translateX(.8%) rotate(1.4deg)', offset: 0.4 }, { transform: 'translateX(-.3%) rotate(-.5deg)', offset: 0.65 }, { transform: 'none' }], 700],
+}
+const TOUCH_MARK = { pat: '摸摸', poke: '戳' }
 /** 上前 / 退后：立绘放大或缩小多少、脚往下或往上挪多少（占舞台高度）。 */
 const DEPTH = { 1: [1.1, '-6%'], [-1]: [0.88, '3%'] }
 /** 退场方式演多久（毫秒），样式在 theater.css 的 data-exit。 */
@@ -280,6 +289,15 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     if (striking) { const [frames, ms] = LUNGE((entry.x ?? 50) < 50 ? 1 : -1); el.animate(frames, { duration: ms, easing: 'cubic-bezier(.3, .7, .3, 1)' }) }
     if (!struck) return undefined
     const t = setTimeout(() => { const [frames, ms] = HIT_FRAMES[struck] || HIT_FRAMES.hit; el.animate(frames, { duration: ms, easing: 'cubic-bezier(.2, .8, .3, 1)' }) }, HIT_IMPACT_MS)
+    return () => clearTimeout(t)
+  }, [beat.key])
+  // 小瞬间：被摸头、被戳脸的人一动，头上冒个字
+  const touched = !leaving && beat.moment && beat.moment.who === entry.name && TOUCH_FRAMES[beat.moment.kind] ? beat.moment.kind : ''
+  React.useEffect(() => {
+    const el = reactRef.current
+    if (!el || typeof el.animate !== 'function' || !touched) return undefined
+    if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+    const t = setTimeout(() => { const [frames, ms] = TOUCH_FRAMES[touched]; el.animate(frames, { duration: ms, easing: 'cubic-bezier(.3, .7, .3, 1)' }) }, 150)
     return () => clearTimeout(t)
   }, [beat.key])
   const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name])
@@ -331,6 +349,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
       {sym && (
         <div className="fg-symbol-anchor"><MangaSymbol key={beat.key} kind={sym} /></div>
       )}
+      {touched && <div className="fg-touch-mark" key={'touch' + beat.key} data-kind={touched} aria-hidden="true"><span>{TOUCH_MARK[touched]}</span></div>}
       {struck && <div className="fg-hit-mark" key={'hit' + beat.key} data-effect={struck} style={{ '--impact': HIT_IMPACT_MS + 'ms' }} aria-hidden="true">{HIT_MARK[struck] && <span>{HIT_MARK[struck]}</span>}</div>}
     </div>
   )
@@ -630,6 +649,122 @@ export function HitBanner({ beat, sound = true, fx = null }) {
       )}
       {impact && !onStage && hit.effect !== 'miss' && <div className="fg-hurt" data-effect={hit.effect} aria-hidden="true" />}
     </>
+  )
+}
+
+/**
+ * 小瞬间（playback.js 的 moment）：拍照（白闪一下，拍立得的白框框住这一刻，外面压暗，下面写题字）、触碰（一圈圈粉色涟漪和动作两个字）、
+ * 干杯（两只杯子从两边碰到一起）、做好一道菜 / 新称呼 / 约定 / 交换联系方式（一张小卡片落下来），各响一声合成的拟音（lib/foley.js）。
+ * 摸头、戳脸演在被摸的人身上（Actor），人不在台上时在画面中间冒字；烟花在天上（Fireworks）。
+ */
+export const MOMENT_HOLD_MS = { photo: 2700, touch: 2200, pat: 1300, poke: 1100, cheers: 1900, cook: 2600, nickname: 2900, promise: 3000, contact: 2600 }
+const CLINK_AT_MS = 520
+/** 干杯的杯子：按材质画（玻璃是高脚杯，易拉罐、塑料杯、陶瓷 / 木头 / 金属的马克杯）。 */
+function Cup({ kind }) {
+  if (kind === 'glass') return (
+    <svg viewBox="0 0 40 64" aria-hidden="true"><path d="M7 3h26q1 21-13 27Q6 24 7 3z" fill="rgba(235,245,255,.35)" stroke="#fff" strokeWidth="1.6" /><path d="M8.5 12h23q-1.5 14-11.5 16.5Q10 26 8.5 12z" fill="#e8577a" opacity=".85" /><path d="M19 30h2v22h-2z" fill="#fff" /><ellipse cx="20" cy="54" rx="10" ry="2.6" fill="#fff" /></svg>
+  )
+  if (kind === 'can') return (
+    <svg viewBox="0 0 40 64" aria-hidden="true"><rect x="8" y="6" width="24" height="52" rx="4" fill="#d9534f" stroke="#fff" strokeWidth="1.4" /><ellipse cx="20" cy="7" rx="11" ry="2.6" fill="#e9e9ee" /><rect x="8" y="24" width="24" height="12" fill="#fff" opacity=".85" /></svg>
+  )
+  if (kind === 'plastic') return (
+    <svg viewBox="0 0 40 64" aria-hidden="true"><path d="M6 6h28l-4 52H10z" fill="rgba(255,255,255,.5)" stroke="#fff" strokeWidth="1.4" /><path d="M8.6 20h22.8l-2.6 36H11.2z" fill="#f5b041" opacity=".85" /></svg>
+  )
+  const fill = { wood: '#a8743f', metal: '#c3c8d2' }[kind] || '#f4f1ea'
+  return (
+    <svg viewBox="0 0 52 64" aria-hidden="true"><path d="M36 20h6q6 0 6 9v4q0 9-6 9h-6" fill="none" stroke={fill} strokeWidth="4" /><rect x="4" y="10" width="33" height="48" rx="5" fill={fill} stroke="#fff" strokeWidth="1.4" /><path d="M4 14q4-8 8-3 4-7 8-1 5-6 9 0 4-5 8 2v4H4z" fill="#fff8e8" /></svg>
+  )
+}
+export function MomentLayer({ beat, view, sound = true }) {
+  const m = beat.moment
+  const [gone, setGone] = React.useState(false)
+  React.useEffect(() => {
+    if (sound) {
+      if (m.kind === 'cheers') foley('clink-' + (m.text || 'glass'), CLINK_AT_MS)
+      else if (MOMENT_FOLEY[m.kind]) foley(MOMENT_FOLEY[m.kind], m.kind === 'pat' || m.kind === 'poke' ? 150 : 0)
+    }
+    const t = setTimeout(() => setGone(true), MOMENT_HOLD_MS[m.kind] || 2400)
+    return () => clearTimeout(t)
+  }, [])
+  if (gone || m.kind === 'fireworks') return null
+  const hold = { '--hold': (MOMENT_HOLD_MS[m.kind] || 2400) - 450 + 'ms' }
+  if (m.kind === 'pat' || m.kind === 'poke') {
+    if (m.who && (beat.cast || []).some(c => c.name === m.who)) return null
+    return <div className="fg-moment" data-kind={m.kind} style={hold} aria-hidden="true"><div className="fg-moment-word">{TOUCH_MARK[m.kind]}</div></div>
+  }
+  if (m.kind === 'photo') return (
+    <div className="fg-moment" data-kind="photo" style={hold} aria-hidden="true">
+      <div className="fg-photo-flash" />
+      <div className="fg-photo">{m.text && <div className="fg-photo-caption">{m.text}</div>}</div>
+    </div>
+  )
+  if (m.kind === 'touch') return (
+    <div className="fg-moment" data-kind="touch" style={hold} aria-hidden="true">
+      <i className="fg-touch-ring" /><i className="fg-touch-ring" style={{ animationDelay: '.45s' }} /><i className="fg-touch-ring" style={{ animationDelay: '.9s' }} />
+      {m.text && <div className="fg-moment-word">{m.text}</div>}
+    </div>
+  )
+  if (m.kind === 'cheers') return (
+    <div className="fg-moment" data-kind="cheers" style={{ ...hold, '--clink': CLINK_AT_MS + 'ms' }} aria-hidden="true">
+      <div className="fg-cup is-left"><Cup kind={m.text} /></div>
+      <div className="fg-cup is-right"><Cup kind={m.text} /></div>
+      <i className="fg-clink" />
+    </div>
+  )
+  const person = m.who ? ((view && view.cast) || []).find(p => p.name === m.who) : null
+  const color = (person && person.color) || ''
+  return (
+    <div className="fg-moment" data-kind={m.kind} style={hold} aria-hidden="true">
+      <div className="fg-moment-card" style={color ? { '--who': color } : undefined}>
+        {m.kind === 'cook' && <>
+          <div className="fg-steam"><i /><i /><i /></div>
+          <div className="fg-moment-kicker">COMPLETE</div>
+          <div className="fg-moment-main">{m.text}</div>
+          <div className="fg-moment-sub">做好了</div>
+        </>}
+        {m.kind === 'nickname' && <>
+          <div className="fg-moment-kicker">NEW NAME</div>
+          <div className="fg-moment-main">「{m.text}」</div>
+          <div className="fg-moment-sub">{m.who ? `${m.who}第一次这样叫你` : '第一次这样叫你'}</div>
+        </>}
+        {m.kind === 'promise' && <>
+          <div className="fg-moment-kicker">PROMISE</div>
+          <div className="fg-moment-sub">约定</div>
+          <div className="fg-moment-main">{m.text}</div>
+          {m.place && <div className="fg-moment-place">{m.place}</div>}
+        </>}
+        {m.kind === 'contact' && <>
+          <div className="fg-moment-kicker">CONTACT</div>
+          <div className="fg-contact">
+            <i className="fg-contact-face">{m.who ? Array.from(m.who)[0] : '♪'}</i>
+            <div><div className="fg-moment-main">{m.who || '新的联系人'}</div><div className="fg-moment-sub">已交换联系方式</div></div>
+          </div>
+        </>}
+      </div>
+    </div>
+  )
+}
+
+/** 烟花：天上错开炸开三朵（颜色不同），每朵炸开时天上跟着亮一下；咻地升空、砰地炸开、噼里啪啦。在背景和立绘之间。 */
+const BURSTS = [{ x: 30, y: 24, hue: 340, at: 0 }, { x: 70, y: 16, hue: 45, at: 650 }, { x: 52, y: 30, hue: 195, at: 1300 }]
+const FIREWORK_RISE_MS = 700
+export const FIREWORKS_MS = 3800
+export function Fireworks({ sound = true }) {
+  const [gone, setGone] = React.useState(false)
+  React.useEffect(() => {
+    if (sound) for (const b of BURSTS) { foley('firework-launch', b.at); foley('firework-boom', b.at + FIREWORK_RISE_MS) }
+    const t = setTimeout(() => setGone(true), FIREWORKS_MS)
+    return () => clearTimeout(t)
+  }, [])
+  if (gone) return null
+  return (
+    <div className="fg-fireworks" aria-hidden="true" style={{ '--rise': FIREWORK_RISE_MS + 'ms' }}>
+      {BURSTS.map((b, i) => (
+        <div key={i} className="fg-firework" style={{ '--x': b.x + '%', '--y': b.y + '%', '--hue': b.hue, '--at': b.at + 'ms' }}>
+          <i className="fg-fw-glow" /><i className="fg-fw-trail" /><i className="fg-fw-burst" /><i className="fg-fw-burst is-inner" />
+        </div>
+      ))}
+    </div>
   )
 }
 

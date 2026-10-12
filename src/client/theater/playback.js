@@ -175,6 +175,7 @@ export function buildBeats(view) {
         ...(fighting ? { battle: fighting } : {}), // 正在打的仗（左上角挂「交战」）
         ...(battleEdge ? { battleEdge } : {}), // 开战卡 / 结束卡
         ...(hit ? { hit } : {}), // 一次出手：招式名横幅、被打的人一震
+        ...(line.moment ? { moment: line.moment } : {}), // 小瞬间：拍照、摸头、干杯、约定……
         say: line.say || '',
         stress: line.stress || '',
         ...(line.textfx ? { textfx: line.textfx } : {}), // 句中文字效果：某几个字发抖、放大、越说越小……
@@ -303,6 +304,8 @@ export const CUTIN_LEAD_MS = 380
 export const BATTLE_CARD_MS = { start: 1900, end: 1700 }
 export const HIT_IMPACT_MS = 420
 export const HIT_LEAD_MS = 700
+/** 小瞬间：拍照的白闪、烟花升空、卡片落下来之后字再出；摸头、戳脸、触碰、干杯跟着字一起演。 */
+export const MOMENT_LEAD_MS = { photo: 650, fireworks: 900, cook: 450, nickname: 600, promise: 600, contact: 450 }
 /** 换了地方：转场演完再停这么久才出字。 */
 const SCENE_BEAT_MS = 300
 /**
@@ -333,6 +336,7 @@ export function beatHold(beat, { cg = '', was = {} } = {}) {
   if (beat.cutin) ms = Math.max(ms, CUTIN_LEAD_MS)
   if (beat.battleEdge) ms = Math.max(ms, BATTLE_CARD_MS[beat.battleEdge.kind] || 0)
   if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS)
+  if (beat.moment) ms = Math.max(ms, MOMENT_LEAD_MS[beat.moment.kind] || 0)
   const wake = was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
   if (wake) { ms = Math.max(ms, WAKE_MS); away = true }
   return { ms, away, ...(wake ? { wake } : {}) }
