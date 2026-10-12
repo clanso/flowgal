@@ -750,6 +750,8 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-hurt { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes fg-hurt-down { 0% { opacity: 0; } 10% { opacity: 1; } 70% { opacity: .85; } 100% { opacity: 0; } }
 .fg-hud-battle { color: #ff6a76; text-shadow: 0 0 .8cqw rgba(255, 50, 70, .6); }
+.fg-hud-romance { color: #ff9ec4; }
+.fg-hud-sense { color: #c9b8ff; }
 .fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }
 .fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }
 .fg-flash.is-black { background: #000; animation: fg-black 1.6s ease both; }
@@ -842,12 +844,12 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-black { 0% { opacity: 0; } 35%, 60% { opacity: 1; } 100% { opacity: 0; } }
 
 /* ───────────── 气氛：逐句可变 ─────────────
-   层次（都在 .fg-world-in 里）：背景 → 时段调色 → 立绘 → 基调色调 .fg-tone → 光线 .fg-light → 插画 → 天气粒子
-   → 画面效果叠层 .fg-fxlayer → 暗角；特殊段落滤镜 .fg-mode 在镜头外面（推镜头时不跟着放大）。每层由 FadeLayer 换值时淡入淡出（--fade）。 */
+   层次（都在 .fg-world-in 里）：背景 → 时段调色 → 立绘 → 基调色调 .fg-tone → 光线 .fg-light → 亲密氛围 .fg-romance → 插画 → 天气粒子
+   → 画面效果叠层 .fg-fxlayer → 暗角；感官 .fg-sense、特殊段落滤镜 .fg-mode 在镜头外面（推镜头时不跟着放大）。每层由 FadeLayer 换值时淡入淡出（--fade）。 */
 .fg-world, .fg-world-in { position: absolute; inset: 0; transform-origin: 50% 50%; }
-.fg-tone, .fg-light, .fg-fxlayer, .fg-mode { position: absolute; inset: 0; pointer-events: none; animation: fg-layer-in var(--fade, 1.2s) ease both; }
-.fg-tone.is-leave, .fg-light.is-leave, .fg-fxlayer.is-leave, .fg-mode.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }
-.fg-tone::before, .fg-tone::after, .fg-light::before, .fg-light::after, .fg-fxlayer::before, .fg-fxlayer::after, .fg-mode::before, .fg-mode::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.fg-tone, .fg-light, .fg-romance, .fg-fxlayer, .fg-sense, .fg-mode { position: absolute; inset: 0; pointer-events: none; animation: fg-layer-in var(--fade, 1.2s) ease both; }
+.fg-tone.is-leave, .fg-light.is-leave, .fg-romance.is-leave, .fg-fxlayer.is-leave, .fg-sense.is-leave, .fg-mode.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }
+.fg-tone::before, .fg-tone::after, .fg-light::before, .fg-light::after, .fg-romance::before, .fg-romance::after, .fg-fxlayer::before, .fg-fxlayer::after, .fg-sense::before, .fg-sense::after, .fg-mode::before, .fg-mode::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
 @keyframes fg-layer-in { from { opacity: 0; } }
 @keyframes fg-layer-out { to { opacity: 0; } }
 .fg-theater { --fg-noise: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27><filter id=%27n%27><feTurbulence type=%27fractalNoise%27 baseFrequency=%27.85%27 numOctaves=%272%27 stitchTiles=%27stitch%27/><feColorMatrix values=%270 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .9 0%27/></filter><rect width=%27100%%27 height=%27100%%27 filter=%27url(%23n)%27/></svg>"); }
@@ -898,6 +900,64 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-light[data-v="flicker"] { background: rgba(6, 8, 24, .78); mix-blend-mode: multiply; }
 .fg-light[data-v="flicker"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-flicker 4.5s steps(1) infinite; }
 @keyframes fg-flicker { 0%, 100% { opacity: 1; } 8% { opacity: .25; } 9% { opacity: 1; } 11% { opacity: .35; } 12% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .15; } 50% { opacity: .9; } 51% { opacity: .3; } 53% { opacity: 1; } 78% { opacity: .45; } 79% { opacity: 1; } }
+
+/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密更暖，人离得更近一点，四角像心跳一样一明一暗。压在背景和立绘上，插画不受影响。 */
+.fg-romance { z-index: 5; }
+.fg-romance[data-v="ambiguous"] { background: radial-gradient(120% 95% at 50% 40%, rgba(255, 215, 235, .05) 35%, rgba(255, 150, 195, .3)); backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); -webkit-backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); }
+.fg-romance[data-v="ambiguous"]::before { bottom: -100%; background:
+    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .5) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .42) 0 .8cqw, transparent 1.6cqw),
+    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .32) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .45) 0 1.1cqw, transparent 2cqw),
+    radial-gradient(circle at 80% 54%, rgba(255, 195, 222, .38) 0 1.6cqw, transparent 2.6cqw), radial-gradient(circle at 93% 90%, rgba(255, 236, 246, .4) 0 .9cqw, transparent 1.7cqw);
+  background-size: 100% 50%; filter: blur(.2cqw); animation: fg-bokeh-rise 24s linear infinite, fg-bokeh-twinkle 4.5s ease-in-out infinite alternate; }
+.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .28), transparent 72%); }
+.fg-romance[data-v="intimate"] { background: radial-gradient(110% 90% at 50% 45%, rgba(255, 190, 150, .14) 25%, rgba(235, 95, 125, .42)); backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); -webkit-backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); }
+.fg-romance[data-v="intimate"]::after { background: radial-gradient(90% 76% at 50% 46%, transparent 40%, rgba(110, 0, 40, .5) 78%, rgba(80, 0, 30, .72)); animation: fg-romance-beat 1.15s ease-out infinite; }
+[data-romance="intimate"] .fg-cast { scale: 1.035; }
+@keyframes fg-bokeh-rise { to { transform: translateY(-50%); } }
+@keyframes fg-bokeh-twinkle { from { opacity: .55; } to { opacity: .95; } }
+@keyframes fg-romance-beat { 0%, 100% { opacity: .55; } 12% { opacity: 1; } 24% { opacity: .7; } 36% { opacity: .9; } 62% { opacity: .55; } }
+/* 感官主导的一段：蒙眼、耳边、触碰、发烫、发凉、香气、屏息、失神。在镜头外面（特写时不跟着放大），叠在插画和天气上面（眼睛被蒙住时什么都看不见），对话框不受影响。 */
+.fg-sense { z-index: 9; }
+.fg-sense[data-v="blind"] { background: #050307; opacity: .95; }
+.fg-sense[data-v="blind"]::before { background: radial-gradient(46% 12% at 50% 70%, rgba(255, 222, 192, .16), transparent 70%), radial-gradient(48% 10% at 50% 0%, rgba(255, 222, 192, .1), transparent 70%); animation: fg-blind-breathe 4.8s ease-in-out infinite; }
+.fg-sense[data-v="blind"]::after { background-image: var(--fg-noise); opacity: .05; }
+.fg-sense[data-v^="ear"]::before { backdrop-filter: blur(3px) brightness(.85); -webkit-backdrop-filter: blur(3px) brightness(.85); -webkit-mask-image: linear-gradient(90deg, #000 8%, transparent 62%); mask-image: linear-gradient(90deg, #000 8%, transparent 62%); }
+.fg-sense[data-v^="ear"]::after { background: repeating-radial-gradient(circle at 100% 45%, transparent 0 4.4cqw, rgba(255, 214, 226, .14) 4.6cqw 4.9cqw, transparent 5.1cqw 6.2cqw), radial-gradient(55% 75% at 100% 45%, rgba(255, 172, 192, .6), rgba(255, 150, 172, .18) 55%, transparent 75%);
+  -webkit-mask-image: linear-gradient(270deg, #000 15%, transparent 55%); mask-image: linear-gradient(270deg, #000 15%, transparent 55%); transform-origin: 100% 45%; animation: fg-ear-breath 3.6s ease-in-out infinite; }
+.fg-sense[data-v="ear-left"]::before { -webkit-mask-image: linear-gradient(270deg, #000 8%, transparent 62%); mask-image: linear-gradient(270deg, #000 8%, transparent 62%); }
+.fg-sense[data-v="ear-left"]::after { background: repeating-radial-gradient(circle at 0% 45%, transparent 0 4.4cqw, rgba(255, 214, 226, .14) 4.6cqw 4.9cqw, transparent 5.1cqw 6.2cqw), radial-gradient(55% 75% at 0% 45%, rgba(255, 172, 192, .6), rgba(255, 150, 172, .18) 55%, transparent 75%); transform-origin: 0 45%;
+  -webkit-mask-image: linear-gradient(90deg, #000 15%, transparent 55%); mask-image: linear-gradient(90deg, #000 15%, transparent 55%); }
+.fg-sense[data-v="touch"] { background: radial-gradient(40% 36% at 50% 55%, rgba(255, 226, 210, .22), transparent 70%), radial-gradient(100% 85% at 50% 50%, transparent 50%, rgba(255, 170, 160, .26)); backdrop-filter: saturate(1.1) brightness(1.03); -webkit-backdrop-filter: saturate(1.1) brightness(1.03); }
+.fg-sense[data-v="touch"]::before, .fg-sense[data-v="touch"]::after { inset: auto; left: 50%; top: 55%; width: 32cqw; height: 32cqw; border-radius: 50%;
+  transform: translate(-50%, -50%); background: radial-gradient(circle, transparent 30%, rgba(255, 232, 214, .55) 52%, rgba(255, 190, 178, .22) 60%, transparent 70%); animation: fg-touch-ripple 3.2s ease-out infinite; }
+.fg-sense[data-v="touch"]::after { animation-delay: 1.6s; }
+.fg-sense[data-v="heat"] { background: radial-gradient(110% 90% at 50% 50%, rgba(255, 120, 80, .1) 30%, rgba(220, 50, 40, .36)); backdrop-filter: saturate(1.25) contrast(1.04) sepia(.15); -webkit-backdrop-filter: saturate(1.25) contrast(1.04) sepia(.15); }
+.fg-sense[data-v="heat"]::before { backdrop-filter: blur(1px); -webkit-backdrop-filter: blur(1px); -webkit-mask-image: linear-gradient(180deg, transparent, rgba(0, 0, 0, .7) 50%, transparent); mask-image: linear-gradient(180deg, transparent, rgba(0, 0, 0, .7) 50%, transparent);
+  -webkit-mask-size: 100% 3.6cqw; mask-size: 100% 3.6cqw; animation: fg-heat-rise 1.8s linear infinite; }
+.fg-sense[data-v="heat"]::after { background: radial-gradient(70% 40% at 50% 100%, rgba(255, 140, 90, .3), transparent 70%); animation: fg-blind-breathe 2.8s ease-in-out infinite; }
+.fg-sense[data-v="cold"] { background: linear-gradient(180deg, rgba(150, 190, 255, .2), rgba(90, 130, 210, .26)); backdrop-filter: saturate(.6) brightness(.96); -webkit-backdrop-filter: saturate(.6) brightness(.96); }
+.fg-sense[data-v="cold"]::before { background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(225, 240, 255, .5) 85%, rgba(242, 249, 255, .78)); filter: blur(.3cqw); }
+.fg-sense[data-v="cold"]::after { background: radial-gradient(60% 22% at 30% 100%, rgba(230, 242, 255, .3), transparent 70%), radial-gradient(50% 18% at 75% 100%, rgba(230, 242, 255, .24), transparent 70%); animation: fg-scent-drift 8s ease-in-out infinite alternate; }
+.fg-sense[data-v="scent"] { background: radial-gradient(110% 90% at 50% 45%, rgba(255, 244, 236, .12) 30%, rgba(255, 214, 236, .34)); backdrop-filter: brightness(1.07) saturate(1.08) contrast(.94) blur(.5px); -webkit-backdrop-filter: brightness(1.07) saturate(1.08) contrast(.94) blur(.5px); }
+.fg-sense[data-v="scent"]::before { bottom: -100%; background:
+    radial-gradient(circle at 14% 70%, rgba(255, 248, 232, .85) 0 .35cqw, transparent .9cqw), radial-gradient(circle at 33% 22%, rgba(255, 238, 248, .8) 0 .3cqw, transparent .8cqw),
+    radial-gradient(circle at 52% 84%, rgba(255, 248, 232, .8) 0 .4cqw, transparent 1cqw), radial-gradient(circle at 71% 40%, rgba(255, 238, 248, .8) 0 .32cqw, transparent .85cqw),
+    radial-gradient(circle at 88% 12%, rgba(255, 248, 232, .75) 0 .38cqw, transparent .95cqw), radial-gradient(circle at 23% 46%, rgba(255, 238, 248, .7) 0 .25cqw, transparent .7cqw),
+    radial-gradient(circle at 62% 6%, rgba(255, 248, 232, .7) 0 .28cqw, transparent .75cqw), radial-gradient(circle at 80% 76%, rgba(255, 238, 248, .7) 0 .3cqw, transparent .8cqw);
+  background-size: 100% 50%; animation: fg-bokeh-rise 30s linear infinite, fg-bokeh-twinkle 3s ease-in-out infinite alternate; }
+.fg-sense[data-v="scent"]::after { background: radial-gradient(46% 18% at 30% 66%, rgba(255, 240, 248, .42), transparent 70%), radial-gradient(40% 16% at 70% 38%, rgba(255, 244, 232, .38), transparent 70%), radial-gradient(34% 12% at 52% 14%, rgba(255, 240, 248, .3), transparent 70%); filter: blur(.6cqw); animation: fg-scent-drift 9s ease-in-out infinite alternate; }
+.fg-sense[data-v="breath"] { backdrop-filter: saturate(.75); -webkit-backdrop-filter: saturate(.75); }
+.fg-sense[data-v="breath"]::before { background: radial-gradient(70% 60% at 50% 44%, transparent 30%, rgba(0, 0, 0, .62) 72%, rgba(0, 0, 0, .9)); animation: fg-breath-close 1.8s cubic-bezier(.2, .7, .2, 1) both; }
+.fg-world-in[data-sense="breath"] :is(.fg-actor-body, .fg-symbol-art) { animation-play-state: paused !important; }
+.fg-sense[data-v="daze"] { background: radial-gradient(100% 80% at 50% 50%, rgba(255, 255, 255, .05) 30%, rgba(228, 222, 255, .24)); backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); -webkit-backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); }
+.fg-world-in[data-sense="daze"] .fg-cast { filter: drop-shadow(1.4cqw 0 0 rgba(255, 120, 160, .26)) drop-shadow(-1.4cqw 0 0 rgba(120, 200, 255, .26)); animation: fg-daze-sway 6s ease-in-out infinite; }
+@keyframes fg-blind-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes fg-ear-breath { 0%, 100% { opacity: .55; transform: scale(.96); } 45% { opacity: 1; transform: scale(1.04); } }
+@keyframes fg-touch-ripple { from { transform: translate(-50%, -50%) scale(.3); opacity: .9; } to { transform: translate(-50%, -50%) scale(2.4); opacity: 0; } }
+@keyframes fg-heat-rise { to { -webkit-mask-position: 0 -3.6cqw; mask-position: 0 -3.6cqw; } }
+@keyframes fg-scent-drift { from { transform: translateX(-3%); } to { transform: translateX(3%); } }
+@keyframes fg-breath-close { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fg-daze-sway { 0%, 100% { translate: -.8% 0; rotate: -.5deg; } 50% { translate: .8% .4%; rotate: .5deg; } }
 
 /* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。 */
 .fg-world[data-fx="sway"] { animation: fg-fx-sway 7s ease-in-out infinite; }
@@ -1546,6 +1606,8 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @media (prefers-reduced-motion: reduce) {
   .fg-bg, .fg-cg-img, .fg-cg-art, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-symbol-art, .fg-symbol-art svg { animation: none !important; }
   .fg-recall::after, .fg-recall-face { animation: none !important; } /* 闪回里的光斑漂移、心跳脉动、小头像错位 */
+  .fg-romance::before, .fg-romance::after, .fg-sense::after, .fg-world-in[data-sense] .fg-cast { animation: none !important; } /* 光斑漂移、心跳暗角、耳边的呼吸、触碰的涟漪、失神的晃 */
+  .fg-sense[data-v="heat"]::before, .fg-sense[data-v="touch"]::before, .fg-sense[data-v="scent"]::before { animation: none !important; }
   .fg-dialog[data-recall] .fg-box, .fg-dialog[data-recall] .fg-box::after, .fg-dialog[data-recall] .fg-line, .fg-dialog[data-recall] .fg-name-plate { animation: none !important; } /* 闪回对话框里的光斑、脉动、抖动、名牌忽隐忽现 */
   .fg-dialog[data-recall] .fg-char { animation-name: fg-char-in !important; }
   .fg-flash.is-dread { animation: fg-bloom .6s ease-out both !important; } /* 撕裂闪烁换成淡入淡出 */
@@ -1802,6 +1864,8 @@ var ENTER_HOW_LABEL = { run: "跑进来", peek: "探头", slow: "慢慢走进来
 var EXIT_HOW_LABEL = { storm: "甩头离开", run: "跑开", slow: "慢慢走远" };
 var DELIVERY_LABEL = { menace: "威压", excited: "激动", shout: "怒吼", hesitant: "迟疑", whisper: "低语", breakdown: "崩溃" };
 var TEXT_FX_LABEL = { shake: "发抖", wave: "波浪", big: "放大", roar: "吼", grow: "越说越大", dwindle: "越说越小", small: "小声", faint: "轻淡", glow: "发光强调" };
+var ROMANCE_LABEL = { none: "", ambiguous: "暧昧", intimate: "亲密" };
+var SENSE_LABEL = { none: "", blind: "蒙眼", ear: "耳边", touch: "触碰", heat: "发烫", cold: "发凉", scent: "香气", breath: "屏息", daze: "失神" };
 var CG_INS = ["dissolve", "slow", "black", "flash", "focus", "cut", "impact"];
 var CG_OUTS = ["dissolve", "slow", "black", "flash", "cut"];
 var CG_MOTIONS = ["still", "push", "pan"];
@@ -1946,7 +2010,7 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null } =
 }
 
 // lib/scenes.js
-var SCENE_DEFAULTS = { location: "", time: "afternoon", weather: "clear", mood: "daily", light: "normal", fx: "none", bg: "" };
+var SCENE_DEFAULTS = { location: "", time: "afternoon", weather: "clear", mood: "daily", light: "normal", fx: "none", romance: "none", sense: "none", bg: "" };
 var MODE_TRANSITION = { memory: "haze", dream: "swirl", illusion: "glitch", imagine: "iris", pov: "blink", inner: "black", screen: "glitch", tale: "dissolve", vision: "flash", digital: "glitch" };
 function applyDelta(scene, delta, known) {
   if (!delta) return scene;
@@ -1956,6 +2020,8 @@ function applyDelta(scene, delta, known) {
     if (!change.bg) next.bg = known.get(change.location) || "";
     if (!change.light) next.light = "normal";
     if (!change.fx) next.fx = "none";
+    if (!change.romance) next.romance = "none";
+    if (!change.sense) next.sense = "none";
   }
   if (next.bg && next.location) known.set(next.location, next.bg);
   return next;
@@ -8001,7 +8067,7 @@ function LogRow({ e, on, onClick }) {
 }
 var TYPE_LABEL = { dialogue: "台词", narration: "旁白", thought: "心声" };
 function sceneChange(c) {
-  return [c.location, TIME_LABEL[c.time], WEATHER_LABEL[c.weather], c.light && (LIGHT_LABEL[c.light] || "正常光线"), c.fx && (FX_LABEL[c.fx] || "停止效果"), c.mood && "♪ " + (MOOD_LABEL[c.mood] || c.mood), c.transition && (TRANSITION_LABEL[c.transition] || c.transition)].filter(Boolean).join(" · ");
+  return [c.location, TIME_LABEL[c.time], WEATHER_LABEL[c.weather], c.light && (LIGHT_LABEL[c.light] || "正常光线"), c.fx && (FX_LABEL[c.fx] || "停止效果"), c.romance && (ROMANCE_LABEL[c.romance] ? "♡ " + ROMANCE_LABEL[c.romance] : "收起亲密氛围"), c.sense && (SENSE_LABEL[c.sense] ? "感官：" + SENSE_LABEL[c.sense] : "感官恢复"), c.mood && "♪ " + (MOOD_LABEL[c.mood] || c.mood), c.transition && (TRANSITION_LABEL[c.transition] || c.transition)].filter(Boolean).join(" · ");
 }
 function Chip({ k, children }) {
   return /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-dlog-chip" }, k && /* @__PURE__ */ import_react10.default.createElement("i", null, k), children);
@@ -8011,7 +8077,7 @@ function ScriptView({ script, units }) {
   const s = script.scene;
   const tagged = units.filter((u) => script.lines[u.id] && Object.keys(script.lines[u.id]).length).length;
   const skipped = new Set(script.skip || []);
-  return /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(Block, { label: "场景" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "地点" }, s.location || "—"), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "时段" }, TIME_LABEL[s.time] || s.time), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "天气" }, WEATHER_LABEL[s.weather] || s.weather), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "基调" }, MOOD_LABEL[s.mood] || s.mood), LIGHT_LABEL[s.light] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "光线" }, LIGHT_LABEL[s.light]), FX_LABEL[s.fx] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "效果" }, FX_LABEL[s.fx]), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "转场" }, TRANSITION_LABEL[s.transition] || s.transition)), s.bg && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "背景提示词：", s.bg)), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `出场 · ${script.cast.length}` }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, script.cast.map((c) => /* @__PURE__ */ import_react10.default.createElement(Chip, { key: c.name, k: POS_LABEL[c.pos] || c.pos }, c.name)), !script.cast.length && /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "没有人物上场"))), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `逐句标注 · ${tagged} / ${units.length - skipped.size} 句${skipped.size ? ` · 不演 ${skipped.size} 句` : ""}` }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-lines" }, units.map((u) => {
+  return /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(Block, { label: "场景" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "地点" }, s.location || "—"), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "时段" }, TIME_LABEL[s.time] || s.time), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "天气" }, WEATHER_LABEL[s.weather] || s.weather), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "基调" }, MOOD_LABEL[s.mood] || s.mood), LIGHT_LABEL[s.light] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "光线" }, LIGHT_LABEL[s.light]), FX_LABEL[s.fx] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "效果" }, FX_LABEL[s.fx]), ROMANCE_LABEL[s.romance] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "氛围" }, ROMANCE_LABEL[s.romance]), SENSE_LABEL[s.sense] && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "感官" }, SENSE_LABEL[s.sense]), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "转场" }, TRANSITION_LABEL[s.transition] || s.transition)), s.bg && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "背景提示词：", s.bg)), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `出场 · ${script.cast.length}` }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, script.cast.map((c) => /* @__PURE__ */ import_react10.default.createElement(Chip, { key: c.name, k: POS_LABEL[c.pos] || c.pos }, c.name)), !script.cast.length && /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "没有人物上场"))), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `逐句标注 · ${tagged} / ${units.length - skipped.size} 句${skipped.size ? ` · 不演 ${skipped.size} 句` : ""}` }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-lines" }, units.map((u) => {
     const l = script.lines[u.id] || {};
     if (skipped.has(u.id)) return /* @__PURE__ */ import_react10.default.createElement("div", { key: u.id, className: "fg-dlog-line is-skipped" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-dlog-uid" }, u.id), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-utext" }, u.text), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "不是故事 · 不演")));
     const marks = [
@@ -8144,6 +8210,13 @@ var writePos = (gameId, key) => {
   }
 };
 var TIME_FLOW = { slowmo: 0.12, timestop: 0 };
+var SENSE_FLOW = { breath: 0.25 };
+function senseLayer(beat, scene) {
+  const sense = scene.sense && scene.sense !== "none" ? scene.sense : "";
+  if (sense !== "ear") return sense;
+  const who = beat && (beat.cast || []).find((c) => c.name === beat.speaker);
+  return who && ["left", "farleft"].includes(who.pos) ? "ear-left" : "ear-right";
+}
 var GLYPH_AHEAD = 12;
 var GLYPH_WAIT = 1200;
 var glyphsOf = (list2) => ({
@@ -8476,6 +8549,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? "wake" : stageBeat && stageBeat.transition;
   const stageScene = stageBeat ? stageBeat.scene : { location: "", time: "night", weather: "stars", mood: "calm", light: "normal", fx: "none" };
   const stageMode = stageBeat && stageBeat.mode || "";
+  const romance = stageScene.romance && stageScene.romance !== "none" ? stageScene.romance : "";
+  const sense = stageScene.sense && stageScene.sense !== "none" ? stageScene.sense : "";
   const atmosphere = Boolean(stageBeat) && !title;
   const latest = beats.length ? beats[beats.length - 1] : null;
   const cardTitle = view && view.card && view.card.name || "FlowGal";
@@ -8528,7 +8603,29 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         if (!title && !panel && e.deltaY < -30) setPanel("log");
       }
     },
-    /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-camera", ref: cameraRef, "data-cam": cam.kind || void 0, style: cam.style || void 0 }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-world", "data-fx": atmosphere ? stageScene.fx : "" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-world-in", "data-mode": atmosphere ? stageMode : "", "data-tr": stageTr === "haze" || stageTr === "wake" ? stageTr : void 0 }, /* @__PURE__ */ import_react11.default.createElement(Backdrop, { scene: stageScene, view, transition: stageTr || "dissolve" }), /* @__PURE__ */ import_react11.default.createElement("div", { className: `fg-grade${backgroundFor(stageScene, view).src ? " is-drawn" : ""}`, "data-time": stageScene.time }), stageBeat && /* @__PURE__ */ import_react11.default.createElement(Cast, { beat: title || stageBeat.recall || waking ? { ...stageBeat, speaker: "", speakers: null, sym: "" } : stageBeat, view, talk: title || stageBeat.recall || waking ? null : talk, max: ui0.maxOnStage ?? 5 }), /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "tone", value: atmosphere && stageScene.mood !== "daily" ? stageScene.mood : "", ms: 1600 }), /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "light", value: atmosphere && stageScene.light !== "normal" ? stageScene.light : "", ms: 700 }), stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(CgLayer, { beat: stageBeat, sound: sfxOn }), /* @__PURE__ */ import_react11.default.createElement(Particles, { weather: stageScene.weather, enabled: ui0.particles !== false, speed: atmosphere ? TIME_FLOW[stageScene.fx] ?? 1 : 1 }), stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(SplitPanel, { beat: stageBeat, view, talk }), stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(RecallLayer, { beat: stageBeat, view, talk, light: recallStyle !== "ghost", tone: recallTone }), /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "fxlayer", value: atmosphere && stageScene.fx !== "none" ? stageScene.fx : "", ms: 900 }), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-vignette" })))),
+    /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-camera", ref: cameraRef, "data-cam": cam.kind || void 0, style: cam.style || void 0 }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-world", "data-fx": atmosphere ? stageScene.fx : "" }, /* @__PURE__ */ import_react11.default.createElement(
+      "div",
+      {
+        className: "fg-world-in",
+        "data-mode": atmosphere ? stageMode : "",
+        "data-tr": stageTr === "haze" || stageTr === "wake" ? stageTr : void 0,
+        "data-romance": atmosphere && romance ? romance : void 0,
+        "data-sense": atmosphere && sense ? sense : void 0
+      },
+      /* @__PURE__ */ import_react11.default.createElement(Backdrop, { scene: stageScene, view, transition: stageTr || "dissolve" }),
+      /* @__PURE__ */ import_react11.default.createElement("div", { className: `fg-grade${backgroundFor(stageScene, view).src ? " is-drawn" : ""}`, "data-time": stageScene.time }),
+      stageBeat && /* @__PURE__ */ import_react11.default.createElement(Cast, { beat: title || stageBeat.recall || waking ? { ...stageBeat, speaker: "", speakers: null, sym: "" } : stageBeat, view, talk: title || stageBeat.recall || waking ? null : talk, max: ui0.maxOnStage ?? 5 }),
+      /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "tone", value: atmosphere && stageScene.mood !== "daily" ? stageScene.mood : "", ms: 1600 }),
+      /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "light", value: atmosphere && stageScene.light !== "normal" ? stageScene.light : "", ms: 700 }),
+      /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "romance", value: atmosphere ? romance : "", ms: 1600 }),
+      stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(CgLayer, { beat: stageBeat, sound: sfxOn }),
+      /* @__PURE__ */ import_react11.default.createElement(Particles, { weather: stageScene.weather, enabled: ui0.particles !== false, speed: atmosphere ? (TIME_FLOW[stageScene.fx] ?? 1) * (SENSE_FLOW[sense] ?? 1) : 1 }),
+      stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(SplitPanel, { beat: stageBeat, view, talk }),
+      stageBeat && !title && /* @__PURE__ */ import_react11.default.createElement(RecallLayer, { beat: stageBeat, view, talk, light: recallStyle !== "ghost", tone: recallTone }),
+      /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "fxlayer", value: atmosphere && stageScene.fx !== "none" ? stageScene.fx : "", ms: 900 }),
+      /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-vignette" })
+    ))),
+    /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "sense", value: atmosphere ? senseLayer(stageBeat, stageScene) : "", ms: sense === "blind" ? 1400 : 900 }),
     /* @__PURE__ */ import_react11.default.createElement(FadeLayer, { name: "mode", value: atmosphere ? stageMode : "", ms: stageTr === "wake" ? 200 : stageTr === "haze" ? 2400 : 1200 }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking }),
     /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),
@@ -8538,7 +8635,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     !panel && /* @__PURE__ */ import_react11.default.createElement(RestartNotice, { floating: true }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(TitleCard, { beat, delay: speed > 0 ? beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0 : 0 }),
     beat && !title && beat.cut && speed > 0 && /* @__PURE__ */ import_react11.default.createElement(CutCard, { beat, out: !cutting }),
-    !title && beat && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react11.default.createElement("div", null, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-place" }, hud.scene.location || `第 ${hud.turn} 轮`), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-meta" }, hud.mode && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-mode" }, MODE_LABEL[hud.mode]), hud.battle && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-battle", title: hud.battle.title || "" }, "交战 · ", hud.battle.foe), /* @__PURE__ */ import_react11.default.createElement("span", null, TIME_LABEL[hud.scene.time] || ""), hud.scene.weather && hud.scene.weather !== "clear" && /* @__PURE__ */ import_react11.default.createElement("span", null, WEATHER_LABEL[hud.scene.weather]), LIGHT_LABEL[hud.scene.light] && /* @__PURE__ */ import_react11.default.createElement("span", null, LIGHT_LABEL[hud.scene.light]), FX_LABEL[hud.scene.fx] && /* @__PURE__ */ import_react11.default.createElement("span", null, FX_LABEL[hud.scene.fx]), hud.scene.mood && /* @__PURE__ */ import_react11.default.createElement("span", null, "♪ ", MOOD_LABEL[hud.scene.mood])))),
+    !title && beat && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react11.default.createElement("div", null, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-place" }, hud.scene.location || `第 ${hud.turn} 轮`), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-hud-meta" }, hud.mode && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-mode" }, MODE_LABEL[hud.mode]), hud.battle && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-battle", title: hud.battle.title || "" }, "交战 · ", hud.battle.foe), /* @__PURE__ */ import_react11.default.createElement("span", null, TIME_LABEL[hud.scene.time] || ""), hud.scene.weather && hud.scene.weather !== "clear" && /* @__PURE__ */ import_react11.default.createElement("span", null, WEATHER_LABEL[hud.scene.weather]), LIGHT_LABEL[hud.scene.light] && /* @__PURE__ */ import_react11.default.createElement("span", null, LIGHT_LABEL[hud.scene.light]), FX_LABEL[hud.scene.fx] && /* @__PURE__ */ import_react11.default.createElement("span", null, FX_LABEL[hud.scene.fx]), ROMANCE_LABEL[hud.scene.romance] && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-romance" }, "♡ ", ROMANCE_LABEL[hud.scene.romance]), SENSE_LABEL[hud.scene.sense] && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-hud-sense" }, SENSE_LABEL[hud.scene.sense]), hud.scene.mood && /* @__PURE__ */ import_react11.default.createElement("span", null, "♪ ", MOOD_LABEL[hud.scene.mood])))),
     !title && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, directing && /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), drawing > 0 && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), track && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill", title: track.name }, "♪ ", track.name), viewError && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
     beat && !title && beat.card && /* @__PURE__ */ import_react11.default.createElement(SceneCard, { beat }),
     beat && !title && /* @__PURE__ */ import_react11.default.createElement(
