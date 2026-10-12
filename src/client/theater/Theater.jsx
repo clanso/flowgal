@@ -7,7 +7,7 @@ import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
 import { useFaceFramer } from './faceFramer.js'
-import { playBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds } from './audio.js'
+import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds } from './audio.js'
 import { ONOMATOPOEIA } from '../../../lib/foley.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
 import { castVoices, lineVoice } from '../../../lib/sounds.js'
@@ -230,6 +230,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const musicBeat = waking ? null : beat
   const track = React.useMemo(() => (ui0.bgm ? pickTrack(musicBeat, tracks, assetUrl) : null), [ui0.bgm, tracks, musicBeat && musicBeat.bgm, scene && scene.mood, scene && scene.location])
   React.useEffect(() => { if (!closingRef.current && (track || !ui0.bgm || waking)) playBgm(track, ui0.bgmVolume) }, [track && track.id, ui0.bgm, ui0.bgmVolume])
+  // 配乐留白：屏住呼吸的那几句配乐停在原处，过了几句从停下的地方淡回来
+  const hushed = Boolean(musicBeat && musicBeat.hush)
+  React.useEffect(() => { if (!closingRef.current) hushBgm(hushed) }, [hushed])
   // 环境音和剧情音效：导演从音效库里配的（音效库是空的就什么都不响）。剧情音效读到那句时响一次，快进时不响。
   const soundlib = useSoundlib()
   const soundById = React.useMemo(() => new Map((soundlib || []).map(s => [s.id, s])), [soundlib])
@@ -437,7 +440,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
             {directing && <button type="button" className="fg-pill is-busy is-link" title="看导演正在写什么" onClick={() => setPanel('director')}>导演整理中 ›</button>}
             {drawing > 0 && <span className="fg-pill is-busy">出图 {drawing}</span>}
             {beat && beat.call && beat.call.state === 'live' && <CallChip key={beat.call.id} call={beat.call} sound={sfxOn} />}
-            {track && <span className="fg-pill" title={track.name}>♪ {track.name}</span>}
+            {track && <span className={'fg-pill' + (hushed ? ' is-hushed' : '')} title={hushed ? `${track.name}（留白，一会儿回来）` : track.name}>♪ {track.name}</span>}
             {viewError && <span className="fg-pill fg-err" title={viewError}>连接中断，重连中</span>}
             <button type="button" className="fg-iconbtn" title="回到聊天（Esc）" onClick={close}>✕</button>
           </div>

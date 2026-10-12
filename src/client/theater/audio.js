@@ -21,10 +21,13 @@ function audioCtx() {
 function fade(el, to, ms, done) {
   const from = el.volume
   const start = performance.now()
+  // 同一条声音又开始了新的淡入淡出（留白停下又马上回来这类）：旧的那次让给新的，不然两边抢着改音量
+  const turn = (el._fgFadeTurn = (el._fgFadeTurn || 0) + 1)
   let over = false
-  const end = () => { if (over) return; over = true; el.volume = Math.max(0, Math.min(1, to)); if (done) done() }
+  const end = () => { if (over) return; over = true; if (el._fgFadeTurn !== turn) return; el.volume = Math.max(0, Math.min(1, to)); if (done) done() }
   const tick = now => {
     if (over) return
+    if (el._fgFadeTurn !== turn) { over = true; return }
     const k = Math.min(1, (now - start) / ms)
     el.volume = Math.max(0, Math.min(1, from + (to - from) * k))
     if (k < 1) requestAnimationFrame(tick)
@@ -35,24 +38,32 @@ function fade(el, to, ms, done) {
   setTimeout(end, ms + 150)
 }
 
-/** 一条循环播放的声音（配乐、环境音各一条）：换的时候交叉淡入淡出，试听时压到 0。 */
+/** 配乐留白：停下时淡出得快（字出来之前就静了），回来时慢慢淡回来。 */
+const HUSH_OUT_MS = 600
+const HUSH_BACK_MS = 2600
+
+/** 一条循环播放的声音（配乐、环境音各一条）：换的时候交叉淡入淡出，试听时压到 0；留白时停在原处，回来时接着放。 */
 function loopPlayer() {
   let cur = null // { el, id, volume }
+  let hushed = false
   const halt = el => { el._fgStopped = true; el.pause(); el.src = '' }
+  const audible = volume => (preview || hushed ? 0 : volume)
   return {
     get current() { return cur },
+    /** 现在该有的音量：试听、留白时是 0。 */
+    get level() { return cur ? audible(cur.volume) : 0 },
     play(item, volume) {
       if (!item) { this.stop(); return }
       volume = Math.max(0, Math.min(1, volume))
-      const audible = preview ? 0 : volume
-      if (cur && cur.id === item.id) { cur.volume = volume; cur.el.volume = Math.min(cur.el.volume, audible); fade(cur.el, audible, 400); return }
+      if (cur && cur.id === item.id) { cur.volume = volume; cur.el.volume = Math.min(cur.el.volume, audible(volume)); fade(cur.el, audible(volume), 400); return }
+      hushed = false // 换了一首：留白自然结束
       const old = cur
       const el = new Audio()
       el.src = item.url
       el.loop = true
       el.volume = 0
       // 曲子加载得慢、开始播放前已经被停掉（关了剧场、换了歌）：别再响起来
-      el.play().then(() => { if (el._fgStopped) halt(el); else if (!el._fgFading) fade(el, preview ? 0 : volume, 1800) }).catch(() => {})
+      el.play().then(() => { if (el._fgStopped) halt(el); else if (!el._fgFading) fade(el, audible(volume), 1800) }).catch(() => {})
       cur = { el, id: item.id, volume }
       if (old) { old.el._fgFading = true; fade(old.el, 0, 1400, () => halt(old.el)) }
     },
@@ -61,14 +72,27 @@ function loopPlayer() {
       cur = null
       if (old) { old.el._fgFading = true; fade(old.el, 0, 900, () => halt(old.el)) }
     },
+    /** 留白：on 淡出、停在原处；off 从停下的地方接着放、慢慢淡回来。 */
+    hush(on) {
+      on = Boolean(on)
+      if (on === hushed) return
+      hushed = on
+      const now = cur
+      if (!now) return
+      if (on) fade(now.el, 0, HUSH_OUT_MS, () => { if (hushed && cur === now) now.el.pause() })
+      else { now.el.play().catch(() => {}); fade(now.el, audible(now.volume), HUSH_BACK_MS) }
+    },
   }
 }
 const music = loopPlayer()
 const ambience = loopPlayer()
+const players = [music, ambience]
 const loops = () => [music.current, ambience.current].filter(Boolean)
 
 export function playBgm(track, volume = 0.45) { music.play(track, volume) }
 export function stopBgm() { music.stop() }
+/** 配乐留白（导演写 bgm: hush 的那几句）：true 停下，false 回到原来的曲子。 */
+export function hushBgm(on) { music.hush(on) }
 /** 环境音：{ id, url }，null 停掉。 */
 export function playAmbience(sound, volume = 0.35) { ambience.play(sound, volume) }
 export function stopAmbience() { ambience.stop() }
@@ -76,6 +100,7 @@ export function stopAmbience() { ambience.stop() }
 /** 关剧场：配乐、环境音淡出停下，试听和还在响的剧情音效立刻停。 */
 export function stopAll() {
   music.stop()
+  music.hush(false)
   ambience.stop()
   stopPreview()
   for (const src of [...oneShots]) { try { src.stop() } catch {} }
@@ -100,7 +125,7 @@ export function stopPreview() {
   preview = null
   p.el.pause()
   p.el.src = ''
-  for (const loop of loops()) fade(loop.el, loop.volume, 800)
+  for (const player of players) if (player.current) fade(player.current.el, player.level, 800)
   if (p.onEnd) p.onEnd()
 }
 
