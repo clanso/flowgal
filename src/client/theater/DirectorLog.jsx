@@ -91,9 +91,9 @@ function LogRow({ e, on, onClick }) {
 
 const TYPE_LABEL = { dialogue: '台词', narration: '旁白', thought: '心声' }
 
-/** 一句里的场景变化写成一行字：地点 · 时段 · 天气 · 光线 · 效果 · 亲密氛围 · 感官 · 基调 · 转场。 */
+/** 一句里的场景变化写成一行字：地点 · 时段 · 天气 · 光线 · 效果 · 亲密氛围 · 感官 · 黑边 · 基调 · 转场。 */
 function sceneChange(c) {
-  return [c.location, TIME_LABEL[c.time], WEATHER_LABEL[c.weather], c.light && (LIGHT_LABEL[c.light] || '正常光线'), c.fx && (FX_LABEL[c.fx] || '停止效果'), c.romance && (ROMANCE_LABEL[c.romance] ? '♡ ' + ROMANCE_LABEL[c.romance] : '收起亲密氛围'), c.sense && (SENSE_LABEL[c.sense] ? '感官：' + SENSE_LABEL[c.sense] : '感官恢复'), c.mood && '♪ ' + (MOOD_LABEL[c.mood] || c.mood), c.transition && (TRANSITION_LABEL[c.transition] || c.transition)].filter(Boolean).join(' · ')
+  return [c.location, TIME_LABEL[c.time], WEATHER_LABEL[c.weather], c.light && (LIGHT_LABEL[c.light] || '正常光线'), c.fx && (FX_LABEL[c.fx] || '停止效果'), c.romance && (ROMANCE_LABEL[c.romance] ? '♡ ' + ROMANCE_LABEL[c.romance] : '收起亲密氛围'), c.sense && (SENSE_LABEL[c.sense] ? '感官：' + SENSE_LABEL[c.sense] : '感官恢复'), c.bars && (c.bars === 'on' ? '电影黑边' : '收起黑边'), c.mood && '♪ ' + (MOOD_LABEL[c.mood] || c.mood), c.transition && (TRANSITION_LABEL[c.transition] || c.transition)].filter(Boolean).join(' · ')
 }
 
 function Chip({ k, children }) {
@@ -118,6 +118,7 @@ function ScriptView({ script, units }) {
           {FX_LABEL[s.fx] && <Chip k="效果">{FX_LABEL[s.fx]}</Chip>}
           {ROMANCE_LABEL[s.romance] && <Chip k="氛围">{ROMANCE_LABEL[s.romance]}</Chip>}
           {SENSE_LABEL[s.sense] && <Chip k="感官">{SENSE_LABEL[s.sense]}</Chip>}
+          {s.bars === 'on' && <Chip k="画幅">电影黑边</Chip>}
           <Chip k="转场">{TRANSITION_LABEL[s.transition] || s.transition}</Chip>
         </div>
         {s.bg && <div className="fg-note">背景提示词：{s.bg}</div>}

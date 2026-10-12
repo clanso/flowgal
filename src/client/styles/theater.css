@@ -615,6 +615,13 @@
 @keyframes fg-breath-close { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes fg-daze-sway { 0%, 100% { translate: -.8% 0; rotate: -.5deg; } 50% { translate: .8% .4%; rotate: .5deg; } }
 
+/* 电影黑边：严肃的一段一直挂着上下黑边（在镜头外面，推镜头时不动），收起时慢慢退出去。左上角的地点、右上角的按钮压在黑边上。 */
+.fg-bars { position: absolute; inset: 0; z-index: 12; pointer-events: none; }
+.fg-bars::before, .fg-bars::after { content: ""; position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height 1.2s cubic-bezier(.6, 0, .2, 1); }
+.fg-bars::before { top: 0; }
+.fg-bars::after { bottom: 0; }
+.fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 10.5%; }
+
 /* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。 */
 .fg-world[data-fx="sway"] { animation: fg-fx-sway 7s ease-in-out infinite; }
 .fg-world[data-fx="ride"] { animation: fg-fx-ride 1.7s ease-in-out infinite; }
@@ -1281,6 +1288,7 @@
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
 @container stage (max-aspect-ratio: 4/5) {
+  .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }
   .fg-cutin { top: 24%; height: 20%; }
   .fg-cutin-name { font-size: 6cqw; }
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
