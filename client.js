@@ -473,7 +473,9 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 /* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */
 .fg-actor.is-aa .fg-actor-body { animation: none; }
 .fg-actor.is-aa.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }
-.fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: 0; height: 100%; width: auto; max-width: none; transform: translateX(-50%);
+/* --k 按脸框缩放（头一样大），--lift 按身高抬高或压低（lib/stature.js）；都按立绘框的高度算 */
+.fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: calc(var(--k, 1) * 100%); width: auto; max-width: none; transform: translateX(-50%);
+  transition: height .4s ease, bottom .4s ease;
   -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 99%), radial-gradient(120% 100% at 50% 40%, #000 62%, transparent 82%);
   -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, #000 78%, transparent 99%); }
 .fg-actor.is-upload img, .fg-actor.is-upload .fg-aa { -webkit-mask-image: none; mask-image: none; }
@@ -486,13 +488,13 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-expr-swap { from { opacity: .4; filter: brightness(1.4); } }
 
 /* 没有立绘时的剪影立绘：角色色渐变 + 轮廓光。 */
-.fg-silhouette { position: absolute; left: 50%; bottom: 0; height: 94%; aspect-ratio: 0.52; transform: translateX(-50%); }
+.fg-silhouette { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: 94%; aspect-ratio: 0.52; transform: translateX(-50%); }
 .fg-silhouette svg { width: 100%; height: 100%; overflow: visible; }
 .fg-silhouette .sil-rim { fill: none; stroke: color-mix(in oklab, var(--c) 55%, #fff); stroke-width: 2.4; opacity: .85; filter: drop-shadow(0 0 5px var(--c)) drop-shadow(0 0 14px var(--c)); stroke-dasharray: 1400; animation: fg-rim-draw 2.4s cubic-bezier(.4, 0, .2, 1) both; }
 @keyframes fg-rim-draw { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
 .fg-silhouette-name { position: absolute; left: 50%; top: 50%; transform: translateX(-50%); font-family: var(--font-display); font-size: 5.4cqw; font-weight: 900; letter-spacing: .25em; color: transparent; -webkit-text-stroke: 1px color-mix(in oklab, var(--c) 40%, #fff); opacity: .5; writing-mode: vertical-rl; white-space: nowrap; }
 .fg-silhouette-tag { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); font-family: var(--font-latin); font-size: .75cqw; letter-spacing: .5em; white-space: nowrap; color: rgba(255, 255, 255, .55); }
-.fg-symbol-anchor { position: absolute; left: 50%; top: 9%; width: 0; height: 0; z-index: 4; }
+.fg-symbol-anchor { position: absolute; left: 50%; top: var(--head, 9%); width: 0; height: 0; z-index: 4; }
 /* 漫画符号：外层管弹出与淡出（--life），内层按种类循环一个小动作。 */
 .fg-symbol { position: absolute; left: 3cqw; top: -2cqw; width: 6cqw; height: 6cqw; pointer-events: none; transform-origin: 30% 90%; animation: fg-sym-life var(--life, 2.6s) cubic-bezier(.2, .9, .3, 1.2) both; }
 .fg-symbol-art, .fg-symbol-art svg { display: block; width: 100%; height: 100%; }
@@ -2028,6 +2030,69 @@ function lineVoice(type, speaker, voices, ui2) {
   return voice && type === "thought" ? { ...voice, gain: 0.7 } : voice;
 }
 
+// lib/stature.js
+var keysOf = (text) => String(text || "").split(/[,，\n]+/).map((t) => t.trim().replace(/^-?\d*\.?\d+::|::$/g, "").replace(/^[{[(]+|[}\])]+$/g, "").trim().toLowerCase().replace(/\s+/g, " ")).filter(Boolean);
+var BASE_HEIGHT = { female: 160, male: 172, other: 165 };
+var MIN_HEIGHT = 60;
+var MAX_HEIGHT = 260;
+var ABSOLUTE = [
+  [/^(?:toddler|baby|infant)$/, 95],
+  [/^(?:child|kid|loli|shota|little girl|little boy|young child|aged down|chibi)$/, 128],
+  [/^(?:dwarf|halfling|hobbit|gnome)$/, 125],
+  [/^(?:giant|giantess|ogre|troll)$/, 230]
+];
+var RELATIVE = [
+  [[/^(?:very tall|towering)$/, 16], [/^(?:tall|tall female|tall male)$/, 10], [/^(?:petite|short|short stature|small|tiny|small stature)$/, -10]],
+  [[/^(?:teen|teenage|teenager|young teen)$/, -4], [/^(?:elderly|old man|old woman|old)$/, -3]]
+];
+var FEMALE = /^(?:\d?girls?|woman|women|female|mature female|lady)$/;
+var MALE = /^(?:\d?boys?|man|men|male|mature male|old man)$/;
+function genderOf(person) {
+  if (person?.gender === "female" || person?.gender === "male") return person.gender;
+  const keys = keysOf(person?.appearance);
+  if (keys.some((k) => FEMALE.test(k))) return "female";
+  if (keys.some((k) => MALE.test(k))) return "male";
+  return "other";
+}
+function guessHeight(person) {
+  const keys = keysOf(person?.appearance);
+  for (const [re, cm2] of ABSOLUTE) if (keys.some((k) => re.test(k))) return cm2;
+  let cm = BASE_HEIGHT[genderOf(person)];
+  for (const group of RELATIVE) {
+    const hit = group.find(([re]) => keys.some((k) => re.test(k)));
+    if (hit) cm += hit[1];
+  }
+  return cm;
+}
+function cleanHeight(value) {
+  if (value === null || value === void 0 || value === "") return null;
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) && n >= MIN_HEIGHT && n <= MAX_HEIGHT ? n : null;
+}
+function heightOf(person) {
+  const own = cleanHeight(person?.height);
+  if (own) return { cm: own, from: "user" };
+  const designed = cleanHeight(person?.acting?.height);
+  if (designed) return { cm: designed, from: "acting" };
+  return { cm: guessHeight(person), from: "guess" };
+}
+var FACE_RATIO = 0.13;
+var FACE_CENTER = 0.24;
+var PER_CM = 6e-3;
+var clamp2 = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+function placeSprite({ box = null, size = null, cm = BASE_HEIGHT.female } = {}) {
+  const ok = Array.isArray(box) && box.length === 4 && box.every(Number.isFinite) && box[3] > box[1] && Array.isArray(size) && size[1] > 0;
+  const ratio = ok ? (box[3] - box[1]) / size[1] : FACE_RATIO;
+  const center2 = ok ? (box[1] + box[3]) / 2 / size[1] : FACE_CENTER;
+  const top = ok ? box[1] / size[1] : FACE_CENTER - FACE_RATIO / 2;
+  const k = clamp2(FACE_RATIO / ratio, 0.6, 1.4);
+  const want = clamp2(1 - FACE_CENTER + (cm - BASE_HEIGHT.female) * PER_CM, 0.42, 0.86);
+  const lift = clamp2(want - (1 - center2) * k, -0.5, 0.3);
+  const head = clamp2(1 - lift - (1 - top) * k - 0.08 * k, -0.2, 0.9);
+  return { k: round(k), lift: round(lift), head: round(head) };
+}
+var round = (v) => Math.round(v * 1e3) / 1e3;
+
 // lib/cast.js
 var NAME_COLORS = ["#f2739b", "#7aa2ff", "#ffb35c", "#5fd3b3", "#c58bff", "#ff7a6b", "#59c3ff", "#e5c34f", "#9be36b", "#ff8ad8"];
 var nameColor = (name2) => NAME_COLORS[fnv1a(name2) % NAME_COLORS.length];
@@ -2681,7 +2746,7 @@ function Particles({ weather, enabled = true, speed = 1 }) {
 var OUTLINE = 'stroke="#fff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"';
 var HEART = "M50 86C20 64 8 48 8 32C8 18 19 9 31 9C40 9 46 14 50 21C54 14 60 9 69 9C81 9 92 18 92 32C92 48 80 64 50 86Z";
 var svg = (body) => `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}</svg>`;
-var round = (n) => Math.round(n * 10) / 10;
+var round2 = (n) => Math.round(n * 10) / 10;
 function star(cx, cy, r) {
   return `M${cx} ${cy - r}Q${cx} ${cy} ${cx + r} ${cy}Q${cx} ${cy} ${cx} ${cy + r}Q${cx} ${cy} ${cx - r} ${cy}Q${cx} ${cy} ${cx} ${cy - r}Z`;
 }
@@ -2690,7 +2755,7 @@ function burst(points, outer, inner) {
   for (let i = 0; i < points * 2; i++) {
     const r = i % 2 ? inner : outer;
     const a = Math.PI * i / points - Math.PI / 2;
-    out.push(`${round(50 + r * Math.cos(a))} ${round(50 + r * Math.sin(a))}`);
+    out.push(`${round2(50 + r * Math.cos(a))} ${round2(50 + r * Math.sin(a))}`);
   }
   return "M" + out.join("L") + "Z";
 }
@@ -2700,7 +2765,7 @@ function spiral(turns, maxR) {
   for (let i = 0; i <= steps; i++) {
     const a = i / 24 * Math.PI * 2;
     const r = i / steps * maxR;
-    out.push(`${round(50 + r * Math.cos(a))} ${round(50 + r * Math.sin(a))}`);
+    out.push(`${round2(50 + r * Math.cos(a))} ${round2(50 + r * Math.sin(a))}`);
   }
   return "M" + out.join("L");
 }
@@ -2719,7 +2784,7 @@ var SYMBOL_SVG = {
   zzz: svg([[12, 68, 16], [34, 42, 22], [60, 10, 30]].map(([x, y, s]) => `<path d="${zed(x, y, s)}" fill="none" stroke="#fff" stroke-width="12" stroke-linejoin="round" stroke-linecap="round"/><path d="${zed(x, y, s)}" fill="none" stroke="#8fa8ff" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>`).join("")),
   bulb: svg(`<g stroke="#ffd94a" stroke-width="5" stroke-linecap="round">${[-150, -120, -90, -60, -30].map((deg) => {
     const a = deg * Math.PI / 180;
-    return `<path d="M${round(50 + 32 * Math.cos(a))} ${round(42 + 32 * Math.sin(a))}L${round(50 + 44 * Math.cos(a))} ${round(42 + 44 * Math.sin(a))}"/>`;
+    return `<path d="M${round2(50 + 32 * Math.cos(a))} ${round2(42 + 32 * Math.sin(a))}L${round2(50 + 44 * Math.cos(a))} ${round2(42 + 44 * Math.sin(a))}"/>`;
   }).join("")}</g><circle cx="50" cy="44" r="22" fill="#fff36b" ${OUTLINE}/><path d="M41 66H59V78Q59 84 53 84H47Q41 84 41 78Z" fill="#c8c9d8" ${OUTLINE}/><path d="M42 72H58" stroke="#8e90a6" stroke-width="3"/><path d="M40 38Q42 30 50 28" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>`),
   heartbreak: svg(`<path d="M50 21C46 14 40 9 31 9C19 9 8 18 8 32C8 48 20 64 50 86${CRACK}Z" transform="translate(-5 3) rotate(-7 30 50)" fill="#ff4f7b" ${OUTLINE}/><path d="M50 21C54 14 60 9 69 9C81 9 92 18 92 32C92 48 80 64 50 86${CRACK}Z" transform="translate(5 3) rotate(7 70 50)" fill="#e83d68" ${OUTLINE}/>`),
   sigh: svg(`<g fill="#eef2ff" stroke="#9aa6c8" stroke-width="4"><circle cx="62" cy="52" r="18"/><circle cx="80" cy="44" r="13"/><circle cx="78" cy="64" r="11"/><circle cx="62" cy="52" r="16" stroke="none"/></g><path d="M8 50H36M14 63H38M16 37H36" fill="none" stroke="#c7d0ee" stroke-width="5" stroke-linecap="round"/>`),
@@ -2729,6 +2794,54 @@ var SYMBOL_SVG = {
   bloom: svg(`<g fill="#ffb7d5" ${OUTLINE}>${[0, 72, 144, 216, 288].map((deg) => `<ellipse cx="50" cy="27" rx="15" ry="22" transform="rotate(${deg} 50 50)"/>`).join("")}</g><circle cx="50" cy="50" r="12" fill="#ffe066" ${OUTLINE}/>`),
   silence: svg(`<path d="M14 18H86Q94 18 94 26V62Q94 70 86 70H44L28 86V70H14Q6 70 6 62V26Q6 18 14 18Z" fill="#fff" stroke="#6d6f86" stroke-width="4" stroke-linejoin="round"/><g fill="#6d6f86"><circle cx="32" cy="44" r="6"/><circle cx="50" cy="44" r="6"/><circle cx="68" cy="44" r="6"/></g>`)
 };
+
+// lib/face.js
+var POSE_IDS = Object.keys(POSES);
+function poseOf(emotion, custom = [], overrides = {}) {
+  if (POSES[overrides?.[emotion]]) return overrides[emotion];
+  if (EMOTION_POSE[emotion]) return EMOTION_POSE[emotion];
+  const base = emotionEntry(emotion, custom).base;
+  if (base && POSES[overrides?.[base]]) return overrides[base];
+  return EMOTION_POSE[base] || "daily";
+}
+function anchorOf(pose, custom = [], overrides = {}) {
+  const preset2 = POSES[pose]?.anchor;
+  if (preset2 && poseOf(preset2, custom, overrides) === pose) return preset2;
+  return Object.keys(EMOTIONS).find((e) => poseOf(e, custom, overrides) === pose) || "";
+}
+var poseMembers = (pose, custom = [], overrides = {}) => Object.keys(EMOTIONS).filter((e) => poseOf(e, custom, overrides) === pose);
+var FACE_PART = new RegExp([
+  "\\b(?:smil(?:e|ing)|smirk(?:ing)?|grin(?:ning)?|frown(?:ing)?|pout(?:ing)?|blush(?:ing)?|tears?|teary|tearing up|teardrops?|crying|sobbing|laugh(?:ing)?|giggl(?:e|ing)|scowl(?:ing)?|sneer(?:ing)?|winc(?:e|ing)|sigh(?:ing)?|gasp(?:ing)?|squint(?:ing)?|yawn(?:ing)?)\\b",
+  "\\b(?:teeth|lips?|mouth|tongue|fangs?|cheeks?|eyebrows?|brows?|glar(?:e|ing)|wink(?:ing)?|star(?:e|ing)|gaze|glance|pupils|sweat(?:drop|ing)?|expression(?:less)?)\\b",
+  "\\b(?:closed|half-closed|narrowed|downcast|squinting|sparkling|empty|half-lidded|watery|teary|rolling|averted|averting|crazy|shaded|cold|gentle|sleepy|tired|wide|dull|glazed|shining|soft|lowered)[ -]eyes?\\b",
+  "\\beyes? (?:closed|open|widened|narrowed|shut|lowered)\\b",
+  "wide-eyed",
+  "bags under eyes",
+  "eye contact",
+  "^looking (?:at viewer|at another|away|down|up|to the side|back|afar)$",
+  "^sideways glance$",
+  "^[:;=>^@x-][a-z3<>^_;@\\-o]{0,2}$"
+].join("|"));
+var snap8 = (v) => Math.round(v / 8) * 8;
+function cleanFaceBox(box, width, height) {
+  const [x0, y0, x1, y1] = (Array.isArray(box) ? box : []).map(Number);
+  if (![x0, y0, x1, y1, width, height].every(Number.isFinite)) return null;
+  const b = [Math.max(0, snap8(Math.min(x0, x1))), Math.max(0, snap8(Math.min(y0, y1))), Math.min(width, snap8(Math.max(x0, x1))), Math.min(height, snap8(Math.max(y0, y1)))];
+  if (b[2] - b[0] < 32 || b[3] - b[1] < 32) return null;
+  if ((b[2] - b[0]) * (b[3] - b[1]) > width * height / 6) return null;
+  return b;
+}
+function faceBoxFrom(rects, width, height) {
+  const ok = (r) => Array.isArray(r) && r.length === 4 && r.every(Number.isFinite) && r[2] > r[0] && r[3] > r[1];
+  const eyes = (rects?.eyes || []).filter(ok).slice(0, 2);
+  if (!eyes.length) return null;
+  const mouth = (rects?.mouth || []).find(ok);
+  const cx = (r) => (r[0] + r[2]) / 2, cy = (r) => (r[1] + r[3]) / 2;
+  const d = eyes.length === 2 ? Math.hypot(cx(eyes[1]) - cx(eyes[0]), cy(eyes[1]) - cy(eyes[0])) : (eyes[0][2] - eyes[0][0]) * 1.5;
+  const eyeBottom = Math.max(...eyes.map((r) => r[3]));
+  const bottom = mouth ? Math.max(mouth[3], eyeBottom) : eyeBottom + 0.75 * d;
+  return cleanFaceBox([Math.min(...eyes.map((r) => r[0])) - 0.15 * d, Math.min(...eyes.map((r) => r[1])) - 0.22 * d, Math.max(...eyes.map((r) => r[2])) + 0.15 * d, bottom + 0.22 * d], width, height);
+}
 
 // src/client/theater/AaSprite.jsx
 var import_react3 = __toESM(require("react"), 1);
@@ -2914,7 +3027,7 @@ function visemeOf(ch) {
   }
   return "E";
 }
-var clamp2 = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+var clamp3 = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 function mouthTrack(talk, plan) {
   const chars = plan?.chars || [];
   const times = plan?.times || [];
@@ -2925,7 +3038,7 @@ function mouthTrack(talk, plan) {
   const level = plan.mouth === "soft" ? "soft" : plan.mouth === "wide" || plan.mouth === "syllable" ? "loud" : "normal";
   const shapes = talk.shapes || {};
   const release = talk.release || {};
-  const attack = clamp2(talk.attack ?? 0.6, 0.3, 0.9);
+  const attack = clamp3(talk.attack ?? 0.6, 0.3, 0.9);
   const keys = [];
   let prevPeak = "";
   let cls = "A";
@@ -3382,9 +3495,9 @@ var AA_STEPS_LITE = [["eyes", "closed"], ["mouth", "half"]];
 function stateRects(rects, part, state2, height = Infinity) {
   const list2 = rects[part] || [];
   if (part !== "mouth" || state2 !== "round") return list2;
-  return list2.map(([x0, y0, x1, y1]) => [x0, y0, x1, Math.min(height, y1 + Math.max(8, snap8((y1 - y0) / 2)))]);
+  return list2.map(([x0, y0, x1, y1]) => [x0, y0, x1, Math.min(height, y1 + Math.max(8, snap82((y1 - y0) / 2)))]);
 }
-var snap8 = (v) => Math.round(v / 8) * 8;
+var snap82 = (v) => Math.round(v / 8) * 8;
 function cleanRects(rects, width, height) {
   const out = {};
   let area2 = 0;
@@ -3393,7 +3506,7 @@ function cleanRects(rects, width, height) {
     out[part] = list2.map((r) => {
       const [x0, y0, x1, y1] = (Array.isArray(r) ? r : []).map(Number);
       if (![x0, y0, x1, y1].every(Number.isFinite)) throw new Error(`${AA_PARTS[part].label}的框不对`);
-      const a = [Math.max(0, snap8(Math.min(x0, x1))), Math.max(0, snap8(Math.min(y0, y1))), Math.min(width, snap8(Math.max(x0, x1))), Math.min(height, snap8(Math.max(y0, y1)))];
+      const a = [Math.max(0, snap82(Math.min(x0, x1))), Math.max(0, snap82(Math.min(y0, y1))), Math.min(width, snap82(Math.max(x0, x1))), Math.min(height, snap82(Math.max(y0, y1)))];
       if (a[2] - a[0] < 8 || a[3] - a[1] < 8) throw new Error(`${AA_PARTS[part].label}的框太小`);
       area2 += (a[2] - a[0]) * (a[3] - a[1]);
       return a;
@@ -3407,7 +3520,7 @@ function rectsBox(list2) {
   return [Math.min(...list2.map((r) => r[0])), Math.min(...list2.map((r) => r[1])), Math.max(...list2.map((r) => r[2])), Math.max(...list2.map((r) => r[3]))];
 }
 function defaultRects(width, height) {
-  const at2 = (fx0, fy0, fx1, fy1) => [snap8(width * fx0), snap8(height * fy0), snap8(width * fx1), snap8(height * fy1)];
+  const at2 = (fx0, fy0, fx1, fy1) => [snap82(width * fx0), snap82(height * fy0), snap82(width * fx1), snap82(height * fy1)];
   return { eyes: [at2(0.385, 0.176, 0.471, 0.229), at2(0.51, 0.171, 0.606, 0.224)], mouth: [at2(0.471, 0.257, 0.519, 0.27)] };
 }
 function motionPack({ name: name2, width, height, still, patches }) {
@@ -4081,6 +4194,13 @@ function spriteFor(person, turn, emo, emotions, then = null) {
   return pickSprite(person.sprites, look, emo, custom ? custom.base : "", { strict: Boolean(then) });
 }
 var SIDE = { farleft: "-40%", left: "-28%", center: "0%", right: "28%", farright: "40%" };
+function faceBoxOf(record, size) {
+  if (!record) return null;
+  if (record.faceBox) return record.faceBox;
+  if (record.face && record.face.box) return record.face.box;
+  const rects = record.aa && record.aa.rects;
+  return rects && size ? faceBoxFrom(rects, size[0], size[1]) : null;
+}
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name);
   const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name]);
@@ -4088,6 +4208,19 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const color = person && person.color || "#9b7bff";
   const [shown, setShown] = import_react4.default.useState(src);
   const [swap, setSwap] = import_react4.default.useState(false);
+  const [size, setSize] = import_react4.default.useState(null);
+  import_react4.default.useEffect(() => {
+    if (!shown) return void 0;
+    let live = true;
+    const img = new Image();
+    img.onload = () => {
+      if (live && img.naturalHeight) setSize([img.naturalWidth, img.naturalHeight]);
+    };
+    img.src = shown;
+    return () => {
+      live = false;
+    };
+  }, [shown]);
   import_react4.default.useEffect(() => {
     if (src === shown) return void 0;
     if (!src) {
@@ -4103,10 +4236,13 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     const t = setTimeout(() => setSwap(false), 300);
     return () => clearTimeout(t);
   }, [src]);
-  const uploaded = Boolean(person && Object.values(person.sprites || {}).some((r) => r && r.assetId === sprite && r.uploaded));
-  const aa = (person && Object.values(person.sprites || {}).find((r) => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null;
+  const records = Object.values(person && person.sprites || {});
+  const uploaded = records.some((r) => r && r.assetId === sprite && r.uploaded);
+  const aa = records.find((r) => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest))?.aa || null;
+  const record = shown ? records.find((r) => r && shown === assetUrl(r.assetId)) : null;
+  const place = placeSprite({ box: faceBoxOf(record, size), size, cm: heightOf(person).cm });
   const still = shown ? /* @__PURE__ */ import_react4.default.createElement("img", { src: shown, alt: entry.name, className: swap ? "is-swap" : "", draggable: "false" }) : /* @__PURE__ */ import_react4.default.createElement(Silhouette, { name: entry.name, color, appearance: person && person.appearance, gender: person && person.gender });
-  return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-actor${speaking ? " is-speaking" : ""}${uploaded ? " is-upload" : ""}${leaving ? " is-leaving" : ""}${aa ? " is-aa" : ""}`, style: { "--x": (entry.x ?? actorX(entry.pos)) + "%", "--s": entry.scale ?? 1, "--side": SIDE[entry.pos] || "0%" }, "data-name": entry.name }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { aa, talk: speaking && talk && talk.key === beat.key ? talk : null, fallback: still, className: "fg-aa", label: entry.name }) : still), speaking && beat.sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: beat.sym })));
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-actor${speaking ? " is-speaking" : ""}${uploaded ? " is-upload" : ""}${leaving ? " is-leaving" : ""}${aa ? " is-aa" : ""}`, style: { "--x": (entry.x ?? actorX(entry.pos)) + "%", "--s": entry.scale ?? 1, "--side": SIDE[entry.pos] || "0%", "--k": place.k, "--lift": place.lift, "--head": place.head * 100 + "%" }, "data-name": entry.name }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { aa, talk: speaking && talk && talk.key === beat.key ? talk : null, fallback: still, className: "fg-aa", label: entry.name }) : still), speaking && beat.sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: beat.sym })));
 }
 var LEAVE_MS = 450;
 function useLeaving(cast) {
@@ -5696,6 +5832,16 @@ function facesToFrame(view) {
   }
   return out;
 }
+function facesToMeasure(view) {
+  const out = [];
+  for (const p2 of view && view.cast || []) {
+    for (const [key, r] of Object.entries(p2.sprites || {})) {
+      if (!r || !r.assetId || r.faceBox || r.face || r.aa && r.aa.rects || out.some((w) => w.assetId === r.assetId)) continue;
+      out.push({ name: p2.name, key, assetId: r.assetId, measure: true });
+    }
+  }
+  return out;
+}
 var tried = /* @__PURE__ */ new Map();
 var framedResult = (assetId) => tried.get(assetId) || "";
 var noModelAt = 0;
@@ -5703,7 +5849,8 @@ function useFaceFramer(gameId, view) {
   const busy = import_react8.default.useRef(false);
   import_react8.default.useEffect(() => {
     if (!gameId || !view || view.gameId !== gameId || busy.current) return;
-    const work = facesToFrame(view).filter((w) => !tried.has(w.assetId));
+    const waiting = facesToFrame(view);
+    const work = [...waiting, ...facesToMeasure(view).filter((m) => !waiting.some((w) => w.assetId === m.assetId))].filter((w) => !tried.has(w.assetId));
     if (!work.length || Date.now() - noModelAt < 6e4) return;
     busy.current = true;
     (async () => {
@@ -5717,17 +5864,19 @@ function useFaceFramer(gameId, view) {
         for (const w of work) {
           let r = null;
           try {
-            r = await frameSprite(status, assetUrl(w.assetId));
+            r = await frameSprite(status, assetUrl(w.assetId), { big: !w.measure });
           } catch {
           }
           if (r && r.confidence !== "low") {
             try {
-              await api.cast(gameId, "face-box", { name: w.name, key: w.key, rects: r.rects });
+              await api.cast(gameId, "face-box", { name: w.name, key: w.key, rects: r.rects, measure: Boolean(w.measure) });
               tried.set(w.assetId, "ok");
             } catch (e) {
               tried.set(w.assetId, "miss");
-              toast(`${w.name} 的脸框没存上：${e.message}`, "error");
+              if (!w.measure) toast(`${w.name} 的脸框没存上：${e.message}`, "error");
             }
+          } else if (w.measure) {
+            tried.set(w.assetId, "miss");
           } else {
             tried.set(w.assetId, "miss");
             toast(`没认准 ${w.name} 的脸：在人物志里点开那张动作底图框一下脸，同组表情就会换好`, "error");
@@ -5868,54 +6017,6 @@ function writeSoundSidecar(sounds2, note = "") {
       ...s.volume !== void 0 && s.volume !== 1 ? { volume: s.volume } : {}
     }))
   }, null, 2) + "\n";
-}
-
-// lib/face.js
-var POSE_IDS = Object.keys(POSES);
-function poseOf(emotion, custom = [], overrides = {}) {
-  if (POSES[overrides?.[emotion]]) return overrides[emotion];
-  if (EMOTION_POSE[emotion]) return EMOTION_POSE[emotion];
-  const base = emotionEntry(emotion, custom).base;
-  if (base && POSES[overrides?.[base]]) return overrides[base];
-  return EMOTION_POSE[base] || "daily";
-}
-function anchorOf(pose, custom = [], overrides = {}) {
-  const preset2 = POSES[pose]?.anchor;
-  if (preset2 && poseOf(preset2, custom, overrides) === pose) return preset2;
-  return Object.keys(EMOTIONS).find((e) => poseOf(e, custom, overrides) === pose) || "";
-}
-var poseMembers = (pose, custom = [], overrides = {}) => Object.keys(EMOTIONS).filter((e) => poseOf(e, custom, overrides) === pose);
-var FACE_PART = new RegExp([
-  "\\b(?:smil(?:e|ing)|smirk(?:ing)?|grin(?:ning)?|frown(?:ing)?|pout(?:ing)?|blush(?:ing)?|tears?|teary|tearing up|teardrops?|crying|sobbing|laugh(?:ing)?|giggl(?:e|ing)|scowl(?:ing)?|sneer(?:ing)?|winc(?:e|ing)|sigh(?:ing)?|gasp(?:ing)?|squint(?:ing)?|yawn(?:ing)?)\\b",
-  "\\b(?:teeth|lips?|mouth|tongue|fangs?|cheeks?|eyebrows?|brows?|glar(?:e|ing)|wink(?:ing)?|star(?:e|ing)|gaze|glance|pupils|sweat(?:drop|ing)?|expression(?:less)?)\\b",
-  "\\b(?:closed|half-closed|narrowed|downcast|squinting|sparkling|empty|half-lidded|watery|teary|rolling|averted|averting|crazy|shaded|cold|gentle|sleepy|tired|wide|dull|glazed|shining|soft|lowered)[ -]eyes?\\b",
-  "\\beyes? (?:closed|open|widened|narrowed|shut|lowered)\\b",
-  "wide-eyed",
-  "bags under eyes",
-  "eye contact",
-  "^looking (?:at viewer|at another|away|down|up|to the side|back|afar)$",
-  "^sideways glance$",
-  "^[:;=>^@x-][a-z3<>^_;@\\-o]{0,2}$"
-].join("|"));
-var snap82 = (v) => Math.round(v / 8) * 8;
-function cleanFaceBox(box, width, height) {
-  const [x0, y0, x1, y1] = (Array.isArray(box) ? box : []).map(Number);
-  if (![x0, y0, x1, y1, width, height].every(Number.isFinite)) return null;
-  const b = [Math.max(0, snap82(Math.min(x0, x1))), Math.max(0, snap82(Math.min(y0, y1))), Math.min(width, snap82(Math.max(x0, x1))), Math.min(height, snap82(Math.max(y0, y1)))];
-  if (b[2] - b[0] < 32 || b[3] - b[1] < 32) return null;
-  if ((b[2] - b[0]) * (b[3] - b[1]) > width * height / 6) return null;
-  return b;
-}
-function faceBoxFrom(rects, width, height) {
-  const ok = (r) => Array.isArray(r) && r.length === 4 && r.every(Number.isFinite) && r[2] > r[0] && r[3] > r[1];
-  const eyes = (rects?.eyes || []).filter(ok).slice(0, 2);
-  if (!eyes.length) return null;
-  const mouth = (rects?.mouth || []).find(ok);
-  const cx = (r) => (r[0] + r[2]) / 2, cy = (r) => (r[1] + r[3]) / 2;
-  const d = eyes.length === 2 ? Math.hypot(cx(eyes[1]) - cx(eyes[0]), cy(eyes[1]) - cy(eyes[0])) : (eyes[0][2] - eyes[0][0]) * 1.5;
-  const eyeBottom = Math.max(...eyes.map((r) => r[3]));
-  const bottom = mouth ? Math.max(mouth[3], eyeBottom) : eyeBottom + 0.75 * d;
-  return cleanFaceBox([Math.min(...eyes.map((r) => r[0])) - 0.15 * d, Math.min(...eyes.map((r) => r[1])) - 0.22 * d, Math.max(...eyes.map((r) => r[2])) + 0.15 * d, bottom + 0.22 * d], width, height);
 }
 
 // src/client/theater/Panels.jsx
@@ -6111,6 +6212,7 @@ function ProfileEditor({ gameId, person, cast }) {
     note: p2.note || "",
     negative: p2.negative || "",
     seed: p2.seedCustom ? String(p2.seed) : "",
+    height: p2.height ? String(p2.height) : "",
     voice: p2.voice || "",
     voicePitch: String(p2.voicePitch || 0)
   });
@@ -6120,19 +6222,20 @@ function ProfileEditor({ gameId, person, cast }) {
   const ui2 = cfg ? cfg.config.ui : null;
   import_react9.default.useEffect(() => {
     setForm(pick(person));
-  }, [person.appearance, JSON.stringify(person.appearanceFields || {}), person.gender, person.note, person.negative, person.seed, person.seedCustom, person.voice, person.voicePitch]);
+  }, [person.appearance, JSON.stringify(person.appearanceFields || {}), person.gender, person.note, person.negative, person.seed, person.seedCustom, person.height, person.voice, person.voicePitch]);
   const dirty = JSON.stringify(form) !== JSON.stringify(pick(person));
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const setLook = (f) => (e) => setForm({ ...form, look: { ...form.look, [f]: e.target.value } });
   const save = () => {
     const { look, ...rest } = form;
-    return run("save", () => api.cast(gameId, person.global ? "global-save" : "save", { name: person.name, patch: { ...rest, appearanceFields: look, appearance: lookTags(look, person.appearance), seed: form.seed === "" ? null : Number(form.seed), voicePitch: Number(form.voicePitch) } }), "档案已保存");
+    return run("save", () => api.cast(gameId, person.global ? "global-save" : "save", { name: person.name, patch: { ...rest, appearanceFields: look, appearance: lookTags(look, person.appearance), seed: form.seed === "" ? null : Number(form.seed), height: form.height === "" ? null : Number(form.height), voicePitch: Number(form.voicePitch) } }), "档案已保存");
   };
   const others = (cast || []).filter((p2) => p2.name !== person.name);
   const draft = { ...person, gender: form.gender, voice: form.voice, voicePitch: Number(form.voicePitch) };
   const voiceNow = castVoices([...others, draft], ui2).get(person.name);
+  const guess = heightOf({ ...person, gender: form.gender, height: null });
   const autoVoice2 = castVoices([...others, { ...draft, voice: "" }], ui2).get(person.name);
-  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "固定外貌"), /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-look-grid" }, LOOK_FIELDS.map((f) => /* @__PURE__ */ import_react9.default.createElement("label", { key: f, className: `fg-look-field${f === "other" ? " is-wide" : ""}` }, /* @__PURE__ */ import_react9.default.createElement("span", null, LOOK_FIELD_LABELS[f]), f === "other" ? /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] }) : /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] })))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: ".5cqw" } }, "出图时用：", lookTags(form.look, person.appearance) || "（空）", person.appearance && lookTags(form.look, person.appearance) === person.appearance ? "（tag 没变，已画好的立绘照用）" : "", "　衣服不写在这里，走「衣橱与状态」。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "性别 / 种子"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.gender, onChange: set("gender") }, GENDERS.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.seed, placeholder: `默认 ${person.seed}`, onChange: (e) => setForm({ ...form, seed: e.target.value.replace(/\D/g, "") }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", title: "换一个随机种子", onClick: () => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) }) }, "🎲"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "所有立绘差分共用这个种子"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "声音"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voice, onChange: set("voice"), "aria-label": "打字音音色" }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "" }, "自动（", voiceText(autoVoice2), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "off" }, "不出声"), VOICE_GROUPS.map(([g, label]) => /* @__PURE__ */ import_react9.default.createElement("optgroup", { key: g, label }, VOICES.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v.id, value: v.id }, v.label))))), /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voicePitch, onChange: set("voicePitch"), "aria-label": "音高", title: "升降几个半音" }, PITCHES.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !voiceNow, onClick: () => previewVoice(voiceNow, ui2 || void 0) }, "▶ 试听"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "这个角色说话时的打字音"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "立绘备注"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.note, onChange: set("note"), onKeyDown: (e) => e.stopPropagation(), placeholder: "写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "不要出现"), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.negative, onChange: set("negative"), onKeyDown: (e) => e.stopPropagation(), placeholder: "glasses, ponytail（每张立绘都加进负面词）" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存档案")));
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "固定外貌"), /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-look-grid" }, LOOK_FIELDS.map((f) => /* @__PURE__ */ import_react9.default.createElement("label", { key: f, className: `fg-look-field${f === "other" ? " is-wide" : ""}` }, /* @__PURE__ */ import_react9.default.createElement("span", null, LOOK_FIELD_LABELS[f]), f === "other" ? /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] }) : /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] })))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: ".5cqw" } }, "出图时用：", lookTags(form.look, person.appearance) || "（空）", person.appearance && lookTags(form.look, person.appearance) === person.appearance ? "（tag 没变，已画好的立绘照用）" : "", "　衣服不写在这里，走「衣橱与状态」。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "性别 / 种子"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.gender, onChange: set("gender") }, GENDERS.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.seed, placeholder: `默认 ${person.seed}`, onChange: (e) => setForm({ ...form, seed: e.target.value.replace(/\D/g, "") }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", title: "换一个随机种子", onClick: () => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) }) }, "🎲"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "所有立绘差分共用这个种子"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "身高"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.height, placeholder: `约 ${guess.cm}`, onChange: (e) => setForm({ ...form, height: e.target.value.replace(/\D/g, "").slice(0, 3) }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "厘米。剧场里大家的头缩放到一样大，高的人站得高、矮的站得低。留空用", guess.from === "acting" ? "设计师读资料估的" : "按性别和外貌估的", "（", guess.cm, "）。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "声音"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voice, onChange: set("voice"), "aria-label": "打字音音色" }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "" }, "自动（", voiceText(autoVoice2), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "off" }, "不出声"), VOICE_GROUPS.map(([g, label]) => /* @__PURE__ */ import_react9.default.createElement("optgroup", { key: g, label }, VOICES.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v.id, value: v.id }, v.label))))), /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voicePitch, onChange: set("voicePitch"), "aria-label": "音高", title: "升降几个半音" }, PITCHES.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !voiceNow, onClick: () => previewVoice(voiceNow, ui2 || void 0) }, "▶ 试听"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "这个角色说话时的打字音"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "立绘备注"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.note, onChange: set("note"), onKeyDown: (e) => e.stopPropagation(), placeholder: "写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "不要出现"), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.negative, onChange: set("negative"), onKeyDown: (e) => e.stopPropagation(), placeholder: "glasses, ponytail（每张立绘都加进负面词）" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存档案")));
 }
 function WardrobeEditor({ gameId, person }) {
   const [, run] = useBusy();
@@ -6260,7 +6363,7 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
 function ActingEditor({ gameId, person, emotions, group, turn }) {
   const [busy, run] = useBusy();
   const acting = person.acting;
-  const copy2 = (a) => a ? JSON.parse(JSON.stringify({ read: a.read || "", poses: a.poses || [], faces: a.faces || {} })) : null;
+  const copy2 = (a) => a ? JSON.parse(JSON.stringify({ read: a.read || "", ...a.height ? { height: a.height } : {}, poses: a.poses || [], faces: a.faces || {} })) : null;
   const [draft, setDraft] = import_react9.default.useState(() => copy2(acting));
   import_react9.default.useEffect(() => {
     setDraft(copy2(acting));
@@ -6288,7 +6391,7 @@ function ActingEditor({ gameId, person, emotions, group, turn }) {
     run("redraw", () => api.cast(gameId, "sprite", { name: person.name, emotions: drawn, rewrite: true, keepFaces: true, ...at2 }), "已排队：照这套设计重画");
   };
   const input = (value, onChange, placeholder, style) => /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style, value: value || "", placeholder, onChange: (e) => onChange(e.target.value), onKeyDown: (e) => e.stopPropagation() });
-  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form fg-acting" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, acting.by === "user" ? "你改过的设计" : `立绘设计师读到第 ${acting.turn != null ? acting.turn : "?"} 轮设计的`, " · ", draft.poses.length, " 个动作"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: designing, onClick: design }, designing ? "设计中…" : "重新设计"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !reachable || dirty || !drawn.length || busy === "redraw", title: dirty ? "先保存修改" : "", onClick: redraw }, "按这套设计重画「", lookLabel(group.look), "」", drawn.length ? `（${drawn.length} 张）` : "")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "怎么流露情绪"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: draft.read, onChange: (e) => setDraft({ ...draft, read: e.target.value }), onKeyDown: (e) => e.stopPropagation(), placeholder: "这个人的性格、经历让他怎么流露情绪" })), draft.poses.map((p2) => /* @__PURE__ */ import_react9.default.createElement("div", { key: p2.id, className: "fg-acting-pose" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-acting-head" }, input(p2.label, (v) => setPose(p2.id, { label: v }), "动作名", { width: "13cqw", fontWeight: 600 }), input(p2.desc, (v) => setPose(p2.id, { desc: v }), "这个动作什么样、为什么是他", { flex: 1 }), /* @__PURE__ */ import_react9.default.createElement("label", { className: "fg-row fg-note", style: { gap: ".3em" }, title: "整张按侧身画：侧脸、看向一旁" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "checkbox", checked: Boolean(p2.side), onChange: (e) => setPose(p2.id, { side: e.target.checked }) }), "侧身")), input(p2.tags, (v) => setPose(p2.id, { tags: v }), "身体的英文 tag：hands behind back, weight on one leg", { width: "100%" }), p2.emotions.map((e, i) => {
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form fg-acting" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, acting.by === "user" ? "你改过的设计" : `立绘设计师读到第 ${acting.turn != null ? acting.turn : "?"} 轮设计的`, " · ", draft.poses.length, " 个动作", acting.height ? ` · 估的身高 ${acting.height} 厘米${person.height ? `（档案里写的 ${person.height} 优先）` : "（档案里能改）"}` : ""), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: designing, onClick: design }, designing ? "设计中…" : "重新设计"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !reachable || dirty || !drawn.length || busy === "redraw", title: dirty ? "先保存修改" : "", onClick: redraw }, "按这套设计重画「", lookLabel(group.look), "」", drawn.length ? `（${drawn.length} 张）` : "")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "怎么流露情绪"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: draft.read, onChange: (e) => setDraft({ ...draft, read: e.target.value }), onKeyDown: (e) => e.stopPropagation(), placeholder: "这个人的性格、经历让他怎么流露情绪" })), draft.poses.map((p2) => /* @__PURE__ */ import_react9.default.createElement("div", { key: p2.id, className: "fg-acting-pose" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-acting-head" }, input(p2.label, (v) => setPose(p2.id, { label: v }), "动作名", { width: "13cqw", fontWeight: 600 }), input(p2.desc, (v) => setPose(p2.id, { desc: v }), "这个动作什么样、为什么是他", { flex: 1 }), /* @__PURE__ */ import_react9.default.createElement("label", { className: "fg-row fg-note", style: { gap: ".3em" }, title: "整张按侧身画：侧脸、看向一旁" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "checkbox", checked: Boolean(p2.side), onChange: (e) => setPose(p2.id, { side: e.target.checked }) }), "侧身")), input(p2.tags, (v) => setPose(p2.id, { tags: v }), "身体的英文 tag：hands behind back, weight on one leg", { width: "100%" }), p2.emotions.map((e, i) => {
     const face = draft.faces[e] || {};
     return /* @__PURE__ */ import_react9.default.createElement("div", { key: e, className: "fg-acting-emo" }, /* @__PURE__ */ import_react9.default.createElement("b", null, label(e), i === 0 ? /* @__PURE__ */ import_react9.default.createElement("i", null, "底图") : null), /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", value: p2.id, onChange: (ev) => move(e, ev.target.value), title: "挪到别的动作" }, draft.poses.map((q) => /* @__PURE__ */ import_react9.default.createElement("option", { key: q.id, value: q.id }, q.label || q.id))), input(face.desc, (v) => setFace(e, { desc: v }), "他的这种情绪什么样"), input(face.tags, (v) => setFace(e, { tags: v }), "脸上的英文 tag（没写就用内置的）"), i > 0 && !p2.emotions.includes("neutral") ? /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => toFront(e), title: "这个动作的底图整张画这个情绪" }, "设为底图") : /* @__PURE__ */ import_react9.default.createElement("span", null));
   }), !p2.emotions.length && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "（空着：保存时去掉这个动作）"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "改了只影响之后画的；平静总在第一个动作的底图上（登场立绘就是它）。"), dirty && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setDraft(copy2(acting)) }, "撤销修改"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存设计")));

@@ -25,7 +25,7 @@ test('gate: 立绘 V5 透明底：Base 是画师串 → 质量词 → 透明底 
   // 整张图的负面：画风那套 + 立绘专用（背景、景别、机位、多人、文字边框）+ 透明底时连纯色底也不要
   for (const tag of ['worst quality', 'outdoors', 'floor', 'full body', 'from below', 'dutch angle', 'multiple people', 'upper body', 'head out of frame', 'props', 'drop shadow', 'border', 'solid background', 'white background']) assert.ok(p.negative.split(', ').includes(tag), tag)
   // 这个人的负面：档案「不要出现」+ 这张额外的 + 不要全身侧身大动作
-  assert.equal(p.characterNegatives[0], 'glasses, wings, full body, feet, side view, off-center, tilted, dynamic pose, hands raised high, holding object, weapon, multiple people, dutch angle, from side, profile')
+  assert.equal(p.characterNegatives[0], 'glasses, wings, full body, feet, side view, off-center, tilted, dynamic pose, leaning forward, hands raised high, holding object, weapon, multiple people, dutch angle, from side, profile')
 })
 
 test('gate: 立绘请求参数跟柏宝绘 / IGS 一致：V5 用 params_version 4、角色块居中按坐标画、透明底带 straight_alpha、布朗噪声', () => {

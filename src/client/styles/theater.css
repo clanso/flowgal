@@ -129,7 +129,9 @@
 /* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */
 .fg-actor.is-aa .fg-actor-body { animation: none; }
 .fg-actor.is-aa.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }
-.fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: 0; height: 100%; width: auto; max-width: none; transform: translateX(-50%);
+/* --k 按脸框缩放（头一样大），--lift 按身高抬高或压低（lib/stature.js）；都按立绘框的高度算 */
+.fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: calc(var(--k, 1) * 100%); width: auto; max-width: none; transform: translateX(-50%);
+  transition: height .4s ease, bottom .4s ease;
   -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 99%), radial-gradient(120% 100% at 50% 40%, #000 62%, transparent 82%);
   -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, #000 78%, transparent 99%); }
 .fg-actor.is-upload img, .fg-actor.is-upload .fg-aa { -webkit-mask-image: none; mask-image: none; }
@@ -142,13 +144,13 @@
 @keyframes fg-expr-swap { from { opacity: .4; filter: brightness(1.4); } }
 
 /* 没有立绘时的剪影立绘：角色色渐变 + 轮廓光。 */
-.fg-silhouette { position: absolute; left: 50%; bottom: 0; height: 94%; aspect-ratio: 0.52; transform: translateX(-50%); }
+.fg-silhouette { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: 94%; aspect-ratio: 0.52; transform: translateX(-50%); }
 .fg-silhouette svg { width: 100%; height: 100%; overflow: visible; }
 .fg-silhouette .sil-rim { fill: none; stroke: color-mix(in oklab, var(--c) 55%, #fff); stroke-width: 2.4; opacity: .85; filter: drop-shadow(0 0 5px var(--c)) drop-shadow(0 0 14px var(--c)); stroke-dasharray: 1400; animation: fg-rim-draw 2.4s cubic-bezier(.4, 0, .2, 1) both; }
 @keyframes fg-rim-draw { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
 .fg-silhouette-name { position: absolute; left: 50%; top: 50%; transform: translateX(-50%); font-family: var(--font-display); font-size: 5.4cqw; font-weight: 900; letter-spacing: .25em; color: transparent; -webkit-text-stroke: 1px color-mix(in oklab, var(--c) 40%, #fff); opacity: .5; writing-mode: vertical-rl; white-space: nowrap; }
 .fg-silhouette-tag { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); font-family: var(--font-latin); font-size: .75cqw; letter-spacing: .5em; white-space: nowrap; color: rgba(255, 255, 255, .55); }
-.fg-symbol-anchor { position: absolute; left: 50%; top: 9%; width: 0; height: 0; z-index: 4; }
+.fg-symbol-anchor { position: absolute; left: 50%; top: var(--head, 9%); width: 0; height: 0; z-index: 4; }
 /* 漫画符号：外层管弹出与淡出（--life），内层按种类循环一个小动作。 */
 .fg-symbol { position: absolute; left: 3cqw; top: -2cqw; width: 6cqw; height: 6cqw; pointer-events: none; transform-origin: 30% 90%; animation: fg-sym-life var(--life, 2.6s) cubic-bezier(.2, .9, .3, 1.2) both; }
 .fg-symbol-art, .fg-symbol-art svg { display: block; width: 100%; height: 100%; }
