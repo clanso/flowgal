@@ -1,7 +1,8 @@
 // 预览用的一小段原创剧情（三轮 + 一轮演示「先文本后整理」），以及每轮对应的导演输出和插画分镜。
 // 第 2 轮导演自创一个复合情绪「害羞地强装镇定」，第 4 轮林岚换上冬季制服，用来演示立绘差分。
 // 第 1 轮的插画是竖版，用来演示剧场里竖图的摇镜；第 2 轮的插画显示三句就收起。
-// 登场 / 退场：第 2、3 轮苏晴中途跑进来，第 3 轮又冒雨跑走；第 4 轮林岚在说话那一句才出现。
+// 登场 / 退场：第 2 轮苏晴中途跑进来，第 3 轮从边上探头、开口时才走进来，又冒雨跑走；第 4 轮林岚在说话那一句才出现。
+// 同屏的人：第 2 轮我说「很可疑」时苏晴赌气、林岚偷笑，林岚塞信封时上前一步；第 3 轮苏晴喊「不能去」时上前一步。
 // 台词演法与重音：威压（不许走神）、迟疑（抱歉……）、激动（苏晴喊人）、重音（很可疑）、低语（信封那两句），
 // 第 3 轮苏晴的怒吼、说说停停和崩溃（旧校舍的事）。
 // 第 3 轮的原文像很多角色卡那样夹着状态栏、变量更新和章节尾巴（raw），导演把它们标成不演。
@@ -114,12 +115,12 @@ export function directorReply(turn, units) {
     scene: { location: '竹林小径', time: 'dusk', weather: 'fireflies', mood: 'calm', transition: 'dissolve', bg: 'bamboo forest path, dusk, fireflies, scenery, no humans' },
     cast: [{ name: '林岚', pos: 'left' }, { name: '苏晴', pos: 'right' }],
     lines: [
-      L('你们俩在这儿啊', { sp: '苏晴', emo: 'happy', sym: 'surprise', say: 'excited' }),
+      L('你们俩在这儿啊', { sp: '苏晴', emo: 'happy', sym: 'surprise', say: 'excited', voice: 'offscreen' }),
       L('好巧啊', { sp: '苏晴', emo: 'teasing', sym: 'note' }),
-      L('这句话本身就很可疑', { sp: '我', sym: 'sweat', stress: '很可疑' }),
-      L('苏晴从小路另一头', { sp: '苏晴', emo: 'tired', sym: 'sweat', enter: [{ name: '苏晴', pos: 'right' }] }),
+      L('这句话本身就很可疑', { sp: '我', sym: 'sweat', stress: '很可疑', react: [{ name: '苏晴', emo: 'pout', sym: 'anger' }, { name: '林岚', emo: 'smile' }] }),
+      L('苏晴从小路另一头', { sp: '苏晴', emo: 'tired', sym: 'sweat', enter: [{ name: '苏晴', pos: 'right', how: 'run' }] }),
       L('不过我可不是跟踪', { sp: '苏晴', emo: 'smug' }),
-      L('悄悄把一个小信封', { sp: '林岚', emo: '害羞地强装镇定' }),
+      L('悄悄把一个小信封', { sp: '林岚', emo: '害羞地强装镇定', move: [{ name: '林岚', act: 'forward' }] }),
       L('回家以后再看', { sp: '林岚', emo: 'blush', sym: 'blush', say: 'whisper' }),
       L('只给你一个人', { sp: '林岚', emo: 'love', sym: 'heart', say: 'whisper', stress: '只给你' }),
     ],
@@ -137,16 +138,16 @@ export function directorReply(turn, units) {
     cast: [{ name: '苏晴', pos: 'right' }],
     lines: [
       L('明天放学后', { sp: '林岚', card: 'note' }),
-      L('不知什么时候凑了过来', { sp: '苏晴', emo: 'surprised', enter: [{ name: '苏晴' }] }),
+      L('不知什么时候凑了过来', { sp: '苏晴', emo: 'surprised', enter: [{ name: '苏晴', how: 'peek' }] }),
       L('别让苏晴看到', { sp: '林岚', emo: 'blush', say: 'whisper', recall: true }),
       L('旧校舍……那里', { sp: '苏晴', emo: 'scared', sym: 'surprise', cam: 'zoom', say: 'hesitant', stress: '三年前' }),
-      L('你绝对不能去那里', { sp: '苏晴', emo: 'angry', sym: 'anger', say: 'shout' }),
+      L('你绝对不能去那里', { sp: '苏晴', emo: 'angry', sym: 'anger', say: 'shout', move: [{ name: '苏晴', act: 'forward' }] }),
       L('……为什么', { sp: '我', emo: 'confused' }),
       L('那、那间教室里', { sp: '苏晴', emo: 'scared', sym: 'sweat' }),
       L('她的声音一下子乱了', { sp: '苏晴', emo: 'scared' }),
       L('有人从窗口', { sp: '苏晴', emo: 'cry', say: 'breakdown', stress: '掉下去了', scene: { fx: 'slowmo' } }),
       L('一道闪电', { cam: 'flash', scene: { light: 'flicker', fx: 'none' } }),
-      L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: ['苏晴'], scene: { light: 'dim', mood: 'sad' } }),
+      L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: [{ name: '苏晴', how: 'run' }], scene: { light: 'dim', mood: 'sad' } }),
       L('口袋里的手机震了起来', { split: { who: ['林岚'], location: '琴房', bg: 'music room, grand piano, night, moonlight through window, scenery, no humans' } }),
       L('信，看到了吗', { sp: '林岚', emo: 'smile', voice: 'phone' }),
       L('学姐，旧校舍到底', { sp: '我', emo: 'worried', say: 'hesitant' }),

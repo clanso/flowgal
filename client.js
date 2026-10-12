@@ -463,14 +463,40 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-split-in { from { transform: translateX(105%); } }
 @keyframes fg-split-out { to { transform: translateX(105%); } }
 .fg-actor {
-  position: absolute; bottom: -2%; height: calc(92% * var(--s, 1)); width: calc(34% * var(--s, 1));
+  position: absolute; bottom: calc(-2% + var(--db, 0%)); height: calc(92% * var(--s, 1) * var(--d, 1)); width: calc(34% * var(--s, 1) * var(--d, 1));
   left: var(--x, 50%); transform: translateX(-50%);
-  transition: left .55s cubic-bezier(.4, .1, .2, 1), height .55s cubic-bezier(.4, .1, .2, 1), width .55s cubic-bezier(.4, .1, .2, 1), filter .4s ease, opacity .45s ease;
+  transition: left .55s cubic-bezier(.4, .1, .2, 1), height .55s cubic-bezier(.4, .1, .2, 1), width .55s cubic-bezier(.4, .1, .2, 1), bottom .55s cubic-bezier(.4, .1, .2, 1), filter .4s ease, opacity .45s ease;
   filter: brightness(.7) saturate(.78);
   animation: fg-actor-in .6s cubic-bezier(.2, .7, .2, 1) both;
 }
 .fg-actor.is-speaking { filter: brightness(1.04) saturate(1.05) drop-shadow(0 0 1.4cqw rgba(255, 255, 255, .18)); z-index: 2; }
 .fg-actor.is-leaving { animation: fg-actor-out .45s ease both; }
+/* 没在说话、但对这句有反应的人：比旁边站着的人亮一点（说话的人更亮） */
+.fg-actor.is-reacting { filter: brightness(.9) saturate(.92); z-index: 1; }
+/* 走位：上前一步的站到前面；背过身：转过去（scaleX 过 0 像转身）、暗成背影；探头：站在舞台边上，身子往里探 */
+.fg-actor[data-depth="1"] { z-index: 3; }
+.fg-actor[data-depth="-1"] { filter: brightness(.62) saturate(.72); }
+.fg-actor-turn, .fg-actor-react { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.fg-actor-turn { transform: rotate(var(--lean, 0deg)) scaleX(var(--flip, 1)); transition: transform .5s cubic-bezier(.45, .05, .3, 1), filter .5s ease; }
+/* 没有背面的立绘：转过去以后压成一道背影（几乎看不清脸），边上留一圈淡淡的轮廓光 */
+.fg-actor.is-away .fg-actor-turn { --flip: -1; filter: brightness(.16) saturate(.3) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .28)); }
+.fg-actor.is-peek[data-peek="left"] .fg-actor-turn { --lean: 5deg; }
+.fg-actor.is-peek[data-peek="right"] .fg-actor-turn { --lean: -5deg; }
+/* 进来的样子：跑进来（从远一点的地方冲进来、刹一下）、慢慢走进来、探头（从边上探出来） */
+.fg-actor[data-enter="run"] { animation: fg-actor-run-in .5s cubic-bezier(.2, .8, .3, 1.15) both; }
+.fg-actor[data-enter="slow"] { animation: fg-actor-in 1.6s cubic-bezier(.3, .4, .3, 1) both; }
+.fg-actor[data-enter="peek"] { animation: fg-actor-peek-in .9s cubic-bezier(.2, .7, .2, 1) both; }
+/* 走的样子：甩头离开（一扭身、快步走掉）、跑开、慢慢走远（缩小、淡掉）；时长对上 Stage.jsx 的 EXIT_MS */
+.fg-actor.is-leaving[data-exit="storm"] { animation: fg-actor-storm .65s cubic-bezier(.5, 0, .8, .4) both; }
+.fg-actor.is-leaving[data-exit="storm"] .fg-actor-turn { --flip: -1; transition-duration: .2s; }
+.fg-actor.is-leaving[data-exit="run"] { animation: fg-actor-run-out .42s cubic-bezier(.5, 0, .9, .5) both; }
+.fg-actor.is-leaving[data-exit="slow"] { animation: fg-actor-slow-out 1.3s ease-in both; }
+/* --edge：离这个人近的那一边（站在中间的按他在左半边还是右半边），跑进跑出、探头都从那边来、往那边去 */
+@keyframes fg-actor-run-in { 0% { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.6)); } 55% { opacity: 1; } 82% { transform: translateX(calc(-50% - var(--edge, 40%) * .05)); } 100% { transform: translateX(-50%); } }
+@keyframes fg-actor-peek-in { from { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * .5)); } }
+@keyframes fg-actor-storm { 0%, 22% { opacity: 1; transform: translateX(-50%); } 100% { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.3)); } }
+@keyframes fg-actor-run-out { to { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.6)); } }
+@keyframes fg-actor-slow-out { to { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * .35)) scale(.92); } }
 .fg-actor-body { position: absolute; inset: 0; transform-origin: 50% 100%; animation: fg-breathe 4.8s ease-in-out infinite; }
 .fg-actor.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1), fg-breathe 4.8s ease-in-out .42s infinite; }
 /* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */
@@ -1409,7 +1435,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
 @container stage (max-aspect-ratio: 4/5) {
-  .fg-actor { width: calc(60% * var(--s, 1)); height: calc(60% * var(--s, 1)); bottom: 23%; }
+  .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
   .fg-recall-face { width: 17cqw; }
   .fg-text { font-size: 4.6cqw; top: 18%; bottom: 26%; }
@@ -1639,6 +1665,9 @@ var EMOTION_POSE = {
   confused: "chin",
   teasing: "chin"
 };
+var MOVE_LABEL = { approach: "靠近", apart: "拉开", forward: "上前", back: "后退", turn: "背过身", face: "转身面对", lookback: "回眸", reset: "复位" };
+var ENTER_HOW_LABEL = { run: "跑进来", peek: "探头", slow: "慢慢走进来" };
+var EXIT_HOW_LABEL = { storm: "甩头离开", run: "跑开", slow: "慢慢走远" };
 var CG_INS = ["dissolve", "slow", "black", "flash", "focus", "cut", "impact"];
 var CG_OUTS = ["dissolve", "slow", "black", "flash", "cut"];
 var CG_MOTIONS = ["still", "push", "pan"];
@@ -2394,6 +2423,143 @@ function sizeFor(config, shape) {
   return { width: Number(w) || 1216, height: Number(h) || 832 };
 }
 
+// lib/blocking.js
+var ALL2 = /* @__PURE__ */ new Set(["*", "全员", "全部", "所有人", "all"]);
+var isEveryone = (name2) => ALL2.has(String(name2 || "").trim());
+function reactsOf(line, onStage2 = [], speakers = []) {
+  const out = [];
+  const seen = new Set(speakers);
+  for (const r of line && line.react || []) {
+    const names = isEveryone(r.name) ? onStage2 : [r.name];
+    for (const name2 of names) {
+      if (!name2 || seen.has(name2)) continue;
+      seen.add(name2);
+      out.push({ name: name2, ...r.emo ? { emo: r.emo } : {}, ...r.sym ? { sym: r.sym } : {} });
+    }
+  }
+  return out;
+}
+var REACT_KIND = {
+  surprised: "jolt",
+  scared: "jolt",
+  shy: "shrink",
+  blush: "shrink",
+  love: "shrink",
+  happy: "bounce",
+  laugh: "bounce",
+  smug: "bounce",
+  teasing: "bounce",
+  sad: "droop",
+  cry: "droop",
+  tired: "droop",
+  worried: "droop",
+  angry: "shake",
+  pout: "shake",
+  cold: "shake",
+  confused: "tilt",
+  thinking: "tilt"
+};
+var reactKind = (base) => REACT_KIND[base] || "nod";
+function poseTracker() {
+  let poses = /* @__PURE__ */ new Map();
+  const get = (name2) => {
+    if (!poses.has(name2)) poses.set(name2, { near: [], far: [], depth: 0, away: false, peek: false });
+    return poses.get(name2);
+  };
+  const unlink = (a, b) => {
+    for (const [x, y] of [[a, b], [b, a]]) {
+      const p2 = poses.get(x);
+      if (p2) {
+        p2.near = p2.near.filter((n) => n !== y);
+        p2.far = p2.far.filter((n) => n !== y);
+      }
+    }
+  };
+  const clear = (name2) => {
+    poses.delete(name2);
+    for (const p2 of poses.values()) {
+      p2.near = p2.near.filter((n) => n !== name2);
+      p2.far = p2.far.filter((n) => n !== name2);
+    }
+  };
+  return {
+    newSet() {
+      poses = /* @__PURE__ */ new Map();
+    },
+    /**
+     * 这一拍：onStage 台上的人，left 这一拍下台的，speakers 说话的人，moves 导演写的走位，peeks 这一拍探头登场的人。
+     * 返回这一拍的 { poses: { 名字: 样子 }（只列跟平常不一样的）, moves: [{ name, act }]（这一拍发生的走位，剧场按它演一下）}。
+     */
+    step({ onStage: onStage2 = [], left = [], speakers = [], moves = [], peeks = [] }) {
+      for (const name2 of left) clear(name2);
+      const here = new Set(onStage2);
+      for (const name2 of speakers) {
+        const p2 = poses.get(name2);
+        if (p2 && p2.peek) p2.peek = false;
+      }
+      const done = [];
+      for (const m of moves) {
+        const names = isEveryone(m.name) ? [...here] : [m.name];
+        for (const name2 of names) {
+          if (!here.has(name2)) continue;
+          const p2 = get(name2);
+          p2.peek = false;
+          const to = m.to && m.to !== name2 && here.has(m.to) ? m.to : "";
+          if (m.act === "reset") {
+            clear(name2);
+            done.push({ name: name2, act: "reset" });
+            continue;
+          }
+          if (m.act === "approach" && to) {
+            unlink(name2, to);
+            p2.near.push(to);
+            get(to).near.push(name2);
+          } else if (m.act === "apart" && to) {
+            unlink(name2, to);
+            p2.far.push(to);
+            get(to).far.push(name2);
+          } else if (m.act === "approach" || m.act === "forward") p2.depth = Math.min(1, p2.depth + 1);
+          else if (m.act === "apart" || m.act === "back") p2.depth = Math.max(-1, p2.depth - 1);
+          else if (m.act === "turn") p2.away = true;
+          else if (m.act === "face" || m.act === "lookback") {
+            p2.away = false;
+            if (to && m.act === "face") get(to).away = false;
+          } else continue;
+          done.push(to ? { name: name2, act: m.act, to } : { name: name2, act: m.act });
+        }
+      }
+      for (const name2 of peeks) if (here.has(name2)) get(name2).peek = true;
+      const out = {};
+      for (const [name2, p2] of poses) {
+        if (!here.has(name2)) continue;
+        const near = p2.near.filter((n) => here.has(n));
+        const far = p2.far.filter((n) => here.has(n));
+        if (!near.length && !far.length && !p2.depth && !p2.away && !p2.peek) continue;
+        out[name2] = { ...near.length ? { near } : {}, ...far.length ? { far } : {}, ...p2.depth ? { depth: p2.depth } : {}, ...p2.away ? { away: true } : {}, ...p2.peek ? { peek: true } : {} };
+      }
+      return { poses: out, moves: done };
+    }
+  };
+}
+var NEAR_SHARE = 0.25;
+var FAR_STEP = 9;
+var PEEK_X = { left: 5, right: 95 };
+function blockLayout(entries, poses) {
+  if (!poses) return entries;
+  const at2 = new Map(entries.map((e) => [e.name, e.x]));
+  return entries.map((e) => {
+    const p2 = poses[e.name];
+    if (!p2) return e;
+    let x = e.x;
+    for (const other of p2.near || []) if (at2.has(other)) x += (at2.get(other) - e.x) * NEAR_SHARE;
+    for (const other of p2.far || []) if (at2.has(other)) x += (e.x === at2.get(other) ? e.x < 50 ? -1 : 1 : Math.sign(e.x - at2.get(other))) * FAR_STEP;
+    const peek = p2.peek ? e.x <= 50 ? "left" : "right" : "";
+    if (peek) x = PEEK_X[peek];
+    x = Math.round(Math.max(peek ? 4 : 10, Math.min(peek ? 96 : 90, x)) * 10) / 10;
+    return { ...e, x, ...p2.depth ? { depth: p2.depth } : {}, ...p2.away ? { away: true } : {}, ...peek ? { peek } : {} };
+  });
+}
+
 // lib/emotions.js
 var LABEL_TO_KEY = new Map(Object.entries(EMOTIONS).map(([k, v]) => [v, k]));
 var isBuiltinEmotion = (id) => Object.prototype.hasOwnProperty.call(EMOTIONS, id);
@@ -2484,6 +2650,8 @@ function buildBeats(view) {
     }).sort((a, b) => a.at - b.at);
     let lastSpeaker = "";
     let split = null;
+    const blocking = poseTracker();
+    const exitWay = {};
     units.forEach((unit, ui2) => {
       const line = lines[ui2];
       const at2 = scenes[ui2];
@@ -2509,8 +2677,22 @@ function buildBeats(view) {
         transition = !opened ? "" : at2.transition || (at2.mode && (!shown || at2.mode !== shown.mode) ? MODE_TRANSITION[at2.mode] : enter ? opening : "fade");
       }
       shown = at2;
-      if (enter) set += 1;
-      for (const name2 of [...speakers, ...steps[ui2].entered]) active.set(name2, beats.length);
+      if (enter) {
+        set += 1;
+        blocking.newSet();
+      }
+      const onStageNames = steps[ui2].cast.map((c) => c.name);
+      const reacts = reactsOf(line, onStageNames, speakers);
+      for (const r of reacts) if (r.emo) emotions[r.name] = r.emo;
+      const ways = Object.fromEntries((line.enter || []).filter((e) => e.how && steps[ui2].entered.includes(e.name)).map((e) => [e.name, e.how]));
+      Object.assign(exitWay, line.exitHow || {});
+      const gone = {};
+      for (const name2 of steps[ui2].left) if (exitWay[name2]) {
+        gone[name2] = exitWay[name2];
+        delete exitWay[name2];
+      }
+      const block = blocking.step({ onStage: onStageNames, left: steps[ui2].left, speakers, moves: line.move || [], peeks: Object.keys(ways).filter((name2) => ways[name2] === "peek") });
+      for (const name2 of [...speakers, ...steps[ui2].entered, ...reacts.map((r) => r.name), ...block.moves.map((m) => m.name)]) active.set(name2, beats.length);
       const recall = recalls[ui2];
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map((e) => ((view.emotions || []).find((x) => x.id === e) || {}).base || e), at2.scene.mood);
       const voice = recall && type !== "narration" && (!line.voice || line.voice === "echo") ? "memory" : line.voice;
@@ -2561,6 +2743,16 @@ function buildBeats(view) {
         // 台上的人，最近有动静的在前
         entered: steps[ui2].entered,
         left: steps[ui2].left,
+        ...reacts.length ? { reacts } : {},
+        // 没在说话的人的反应 [{ name, emo, sym }]
+        ...Object.keys(block.poses).length ? { poses: block.poses } : {},
+        // 走位：每个人现在的样子（靠近谁、上前、背对……）
+        ...block.moves.length ? { moves: block.moves } : {},
+        // 这一拍发生的走位
+        ...Object.keys(ways).length ? { enterHow: ways } : {},
+        // 跑进来、探头、慢慢走进来
+        ...Object.keys(gone).length ? { exitHow: gone } : {},
+        // 甩头离开、跑开、慢慢走远
         emotions: { ...emotions },
         cg,
         cgAnchor: Boolean(cgEntry && cgEntry.at === ui2),
@@ -4461,8 +4653,35 @@ function faceBoxOf(record, size) {
   const rects = record.aa && record.aa.rects;
   return rects && size ? faceBoxFrom(rects, size[0], size[1]) : null;
 }
+var REACT_FRAMES = {
+  jolt: [[{ transform: "none" }, { transform: "translateY(-2.6%) scale(1.012)", offset: 0.22 }, { transform: "translateY(.5%)", offset: 0.55 }, { transform: "none" }], 520],
+  shrink: [[{ transform: "none" }, { transform: "translateY(1%) scale(.988) rotate(-.8deg)", offset: 0.35 }, { transform: "translateY(.7%) scale(.992) rotate(-.5deg)", offset: 0.7 }, { transform: "none" }], 1100],
+  bounce: [[{ transform: "none" }, { transform: "translateY(-1.4%)", offset: 0.2 }, { transform: "none", offset: 0.4 }, { transform: "translateY(-.9%)", offset: 0.6 }, { transform: "none" }], 620],
+  droop: [[{ transform: "none" }, { transform: "translateY(1.6%) scale(.99)", offset: 0.45 }, { transform: "translateY(1.2%) scale(.993)", offset: 0.8 }, { transform: "none" }], 1500],
+  shake: [[{ transform: "none" }, { transform: "translateX(-.8%)", offset: 0.15 }, { transform: "translateX(.8%)", offset: 0.35 }, { transform: "translateX(-.5%)", offset: 0.55 }, { transform: "translateX(.3%)", offset: 0.75 }, { transform: "none" }], 460],
+  nod: [[{ transform: "none" }, { transform: "translateY(.9%)", offset: 0.35 }, { transform: "none", offset: 0.7 }, { transform: "none" }], 560],
+  tilt: [[{ transform: "none" }, { transform: "rotate(2.2deg)", offset: 0.3 }, { transform: "rotate(1.6deg)", offset: 0.7 }, { transform: "none" }], 1e3],
+  step: [[{ transform: "none" }, { transform: "translateY(-.9%)", offset: 0.25 }, { transform: "none", offset: 0.5 }, { transform: "translateY(-.7%)", offset: 0.75 }, { transform: "none" }], 560],
+  glance: [[{ transform: "none" }, { transform: "translateY(-1%) rotate(-1.2deg)", offset: 0.4 }, { transform: "none" }], 520]
+};
+var STEP_MOVES = /* @__PURE__ */ new Set(["approach", "apart", "forward", "back"]);
+var DEPTH = { 1: [1.1, "-6%"], [-1]: [0.88, "3%"] };
+var EXIT_MS = { storm: 650, run: 420, slow: 1300 };
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name);
+  const reaction = !leaving && !speaking && beat.reacts ? beat.reacts.find((r) => r.name === entry.name) : null;
+  const move = !leaving && beat.moves ? beat.moves.find((m) => m.name === entry.name) : null;
+  const [entrance] = import_react4.default.useState(() => beat.enterHow && beat.enterHow[entry.name] || "");
+  const reactRef = import_react4.default.useRef(null);
+  import_react4.default.useEffect(() => {
+    const el = reactRef.current;
+    if (!el || typeof el.animate !== "function" || !reaction && !move) return;
+    if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const base = reaction ? ((emotions || []).find((e) => e.id === reaction.emo) || {}).base || reaction.emo : "";
+    const kind = reaction && (reaction.emo || !move) ? reactKind(base) : move.act === "lookback" || move.act === "turn" || move.act === "face" ? "glance" : STEP_MOVES.has(move.act) ? "step" : "";
+    const frames = REACT_FRAMES[kind];
+    if (frames) el.animate(frames[0], { duration: frames[1], easing: "cubic-bezier(.3, .7, .3, 1)" });
+  }, [beat.key]);
   const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name]);
   const src = sprite ? assetUrl(sprite) : "";
   const color = person && person.color || "#9b7bff";
@@ -4502,25 +4721,46 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const record = shown ? records.find((r) => r && shown === assetUrl(r.assetId)) : null;
   const place = placeSprite({ box: faceBoxOf(record, size), size, cm: heightOf(person).cm });
   const still = shown ? /* @__PURE__ */ import_react4.default.createElement("img", { src: shown, alt: entry.name, className: swap ? "is-swap" : "", draggable: "false", onError: () => setShown("") }) : /* @__PURE__ */ import_react4.default.createElement(Silhouette, { name: entry.name, color, appearance: person && person.appearance, gender: person && person.gender });
-  return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-actor${speaking ? " is-speaking" : ""}${uploaded ? " is-upload" : ""}${leaving ? " is-leaving" : ""}${aa ? " is-aa" : ""}`, style: { "--x": (entry.x ?? actorX(entry.pos)) + "%", "--s": entry.scale ?? 1, "--side": SIDE[entry.pos] || "0%", "--k": place.k, "--lift": place.lift, "--head": place.head * 100 + "%" }, "data-name": entry.name }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { aa, talk: speaking && talk && talk.key === beat.key ? talk : null, fallback: still, className: "fg-aa", label: entry.name }) : still), speaking && beat.sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: beat.sym })));
+  const [d, db] = DEPTH[entry.depth] || [1, "0%"];
+  const sym = speaking ? beat.sym : reaction ? reaction.sym : "";
+  const cls = ["fg-actor", speaking && "is-speaking", reaction && "is-reacting", uploaded && "is-upload", leaving && "is-leaving", aa && "is-aa", entry.away && "is-away", entry.peek && "is-peek"].filter(Boolean).join(" ");
+  return /* @__PURE__ */ import_react4.default.createElement(
+    "div",
+    {
+      className: cls,
+      style: { "--x": (entry.x ?? actorX(entry.pos)) + "%", "--s": entry.scale ?? 1, "--d": d, "--db": db, "--side": SIDE[entry.pos] || "0%", "--edge": (entry.x ?? actorX(entry.pos)) < 50 ? "-40%" : "40%", "--k": place.k, "--lift": place.lift, "--head": place.head * 100 + "%" },
+      "data-name": entry.name,
+      "data-enter": entrance || void 0,
+      "data-exit": leaving && entry.how ? entry.how : void 0,
+      "data-peek": entry.peek || void 0,
+      "data-depth": entry.depth || void 0
+    },
+    /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-turn" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-react", ref: reactRef }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { aa, talk: speaking && talk && talk.key === beat.key ? talk : null, fallback: still, className: "fg-aa", label: entry.name }) : still))),
+    sym && /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-symbol-anchor" }, /* @__PURE__ */ import_react4.default.createElement(MangaSymbol, { key: beat.key, kind: sym }))
+  );
 }
 var LEAVE_MS = 450;
-function useLeaving(cast) {
+function useLeaving(cast, beat) {
   const prev = import_react4.default.useRef([]);
   const leaving = import_react4.default.useRef(/* @__PURE__ */ new Map());
   const [, refresh] = import_react4.default.useReducer((n) => n + 1, 0);
   const now = Date.now();
-  for (const p2 of prev.current) if (!cast.some((c) => c.id === p2.id) && !leaving.current.has(p2.id)) leaving.current.set(p2.id, { entry: p2, at: now });
+  for (const p2 of prev.current) {
+    if (cast.some((c) => c.id === p2.id) || leaving.current.has(p2.id)) continue;
+    const how = beat && beat.exitHow && beat.exitHow[p2.name] || "";
+    leaving.current.set(p2.id, { entry: how ? { ...p2, how } : p2, at: now, ms: EXIT_MS[how] || LEAVE_MS });
+  }
   for (const c of cast) leaving.current.delete(c.id);
   prev.current = cast;
   const pending = leaving.current.size;
   import_react4.default.useEffect(() => {
     if (!pending) return void 0;
+    const wait = Math.max(16, Math.min(...[...leaving.current.values()].map((l) => l.at + l.ms)) - Date.now());
     const t = setTimeout(() => {
-      const cut = Date.now() - LEAVE_MS;
-      for (const [name2, l] of leaving.current) if (l.at <= cut) leaving.current.delete(name2);
+      const at2 = Date.now() + 16;
+      for (const [name2, l] of leaving.current) if (l.at + l.ms <= at2) leaving.current.delete(name2);
       refresh();
-    }, LEAVE_MS);
+    }, wait);
     return () => clearTimeout(t);
   });
   return [...leaving.current.values()].map((l) => l.entry);
@@ -4531,8 +4771,8 @@ function Cast({ beat, view, talk, max = 5 }) {
   if (!beat.directed && !cast.length && beat.speaker && beat.speaker !== "我" && people.has(beat.speaker)) cast = [{ name: beat.speaker, pos: "center" }];
   const split = beat.split || null;
   if (split) cast = cast.filter((c) => !split.who.includes(c.name));
-  cast = stageLayout(onStage(cast, beat.recent, max)).map((entry) => ({ ...entry, id: entry.name + "@" + (beat.set || 0), seen: beat }));
-  const leaving = useLeaving(cast);
+  cast = blockLayout(stageLayout(onStage(cast, beat.recent, max)), beat.poses).map((entry) => ({ ...entry, id: entry.name + "@" + (beat.set || 0), seen: beat }));
+  const leaving = useLeaving(cast, beat);
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cast", "data-split": split ? "on" : void 0 }, cast.map((entry) => /* @__PURE__ */ import_react4.default.createElement(Actor, { key: entry.id, entry, person: people.get(entry.name), beat, emo: beat.emotions[entry.name] || "neutral", emotions: view && view.emotions, talk })), leaving.map((entry) => /* @__PURE__ */ import_react4.default.createElement(Actor, { key: entry.id, entry, person: people.get(entry.name), beat: entry.seen, emo: entry.seen.emotions[entry.name] || "neutral", emotions: view && view.emotions, leaving: true })));
 }
 function splitBackground(location2, time, view) {
@@ -7393,8 +7633,10 @@ function ScriptView({ script, units }) {
       l.scene && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "scene", k: "场景" }, sceneChange(l.scene)),
       l.bgm && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "bgm", k: "换歌" }, l.bgm === "none" ? "停" : l.bgm),
       l.amb && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "amb", k: "环境音" }, l.amb === "none" ? "停" : l.amb),
-      l.enter && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "in", k: "登场" }, l.enter.map((e) => e.name + (e.pos ? `（${POS_LABEL[e.pos] || e.pos}）` : "")).join("、")),
-      l.exit && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "out", k: "退场" }, l.exit.join("、"))
+      l.react && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "react", k: "反应" }, l.react.map((r) => (r.name === "*" ? "全员" : r.name) + " " + [r.emo && emotionLabel(r.emo), r.sym && (SYMBOL_LABEL[r.sym] || r.sym)].filter(Boolean).join(" · ")).join("、")),
+      l.move && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "move", k: "走位" }, l.move.map((m) => `${m.name === "*" ? "全员" : m.name} ${MOVE_LABEL[m.act] || m.act}${m.to ? " " + m.to : ""}`).join("、")),
+      l.enter && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "in", k: "登场" }, l.enter.map((e) => e.name + (e.pos ? `（${POS_LABEL[e.pos] || e.pos}）` : "") + (e.how ? ` · ${ENTER_HOW_LABEL[e.how] || e.how}` : "")).join("、")),
+      l.exit && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "out", k: "退场" }, l.exit.map((n) => n + (l.exitHow && l.exitHow[n] ? ` · ${EXIT_HOW_LABEL[l.exitHow[n]] || l.exitHow[n]}` : "")).join("、"))
     ].filter(Boolean);
     return /* @__PURE__ */ import_react10.default.createElement("div", { key: u.id, className: `fg-dlog-line${marks.length ? "" : " is-plain"}` }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-dlog-uid" }, u.id), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-utext" }, (l.type || u.type) === "dialogue" ? `「${u.text}」` : (l.type || u.type) === "thought" ? `（${u.text}）` : u.text), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, marks.length ? marks : /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "旁白 · 无演出")));
   }))), script.choices.length > 0 && /* @__PURE__ */ import_react10.default.createElement(Block, { label: `选项 · ${script.choices.length}` }, /* @__PURE__ */ import_react10.default.createElement("ol", { className: "fg-dlog-list-plain" }, script.choices.map((c, i) => /* @__PURE__ */ import_react10.default.createElement("li", { key: i }, c)))), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `插画分镜 · ${script.images.length}` }, script.images.map((img, i) => /* @__PURE__ */ import_react10.default.createElement("div", { key: i, className: "fg-dlog-card" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "标题" }, img.title || "—"), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "显示" }, img.after, img.until && img.until !== img.after ? ` → ${img.until}` : img.until ? "" : " → 本轮结束"), img.who && img.who.length ? /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "入画" }, img.who.join("、")) : null, img.shape && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "画幅" }, SHAPE_LABEL[img.shape] || img.shape), img.enter && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "出现" }, CG_IN_LABEL[img.enter] || img.enter), img.motion && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "停留" }, CG_MOTION_LABEL[img.motion] || img.motion), img.leave && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "消失" }, CG_OUT_LABEL[img.leave] || img.leave)), img.moment && /* @__PURE__ */ import_react10.default.createElement("div", null, img.moment), img.tags && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, img.tags), img.desc && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, img.desc))), !script.images.length && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "导演觉得这一轮不需要插画（或设置里关了自动插画）。")), script.emotions && script.emotions.length > 0 && /* @__PURE__ */ import_react10.default.createElement(Block, { label: `新加进情绪库 · ${script.emotions.length}` }, script.emotions.map((e) => /* @__PURE__ */ import_react10.default.createElement("div", { key: e.name, className: "fg-dlog-card" }, /* @__PURE__ */ import_react10.default.createElement("b", null, e.name), e.base ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, " · 接近 ", emotionLabel(e.base)) : null, e.desc && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, e.desc)))), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `角色档案更新 · ${script.people.length}` }, script.people.map((p2, i) => /* @__PURE__ */ import_react10.default.createElement("div", { key: i, className: "fg-dlog-card" }, /* @__PURE__ */ import_react10.default.createElement("b", null, p2.name), p2.gender ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, " · ", p2.gender) : null, lookText(p2.appearance) && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, "建档：", lookText(p2.appearance)), lookText(p2.change) && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, "永久变化：", lookText(p2.change)), p2.outfit && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, "换装：", p2.outfit, p2.outfitTags ? `（${p2.outfitTags}）` : ""), p2.states && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, "长期状态：", p2.states.length ? p2.states.map((s2) => `${s2.name}${s2.tags ? `（${s2.tags}）` : ""}`).join("、") : "全部结束"), p2.temp && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, "临时状态：", p2.temp))), !script.people.length && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "这一轮没有新建或修改档案。")));

@@ -119,14 +119,40 @@
 @keyframes fg-split-in { from { transform: translateX(105%); } }
 @keyframes fg-split-out { to { transform: translateX(105%); } }
 .fg-actor {
-  position: absolute; bottom: -2%; height: calc(92% * var(--s, 1)); width: calc(34% * var(--s, 1));
+  position: absolute; bottom: calc(-2% + var(--db, 0%)); height: calc(92% * var(--s, 1) * var(--d, 1)); width: calc(34% * var(--s, 1) * var(--d, 1));
   left: var(--x, 50%); transform: translateX(-50%);
-  transition: left .55s cubic-bezier(.4, .1, .2, 1), height .55s cubic-bezier(.4, .1, .2, 1), width .55s cubic-bezier(.4, .1, .2, 1), filter .4s ease, opacity .45s ease;
+  transition: left .55s cubic-bezier(.4, .1, .2, 1), height .55s cubic-bezier(.4, .1, .2, 1), width .55s cubic-bezier(.4, .1, .2, 1), bottom .55s cubic-bezier(.4, .1, .2, 1), filter .4s ease, opacity .45s ease;
   filter: brightness(.7) saturate(.78);
   animation: fg-actor-in .6s cubic-bezier(.2, .7, .2, 1) both;
 }
 .fg-actor.is-speaking { filter: brightness(1.04) saturate(1.05) drop-shadow(0 0 1.4cqw rgba(255, 255, 255, .18)); z-index: 2; }
 .fg-actor.is-leaving { animation: fg-actor-out .45s ease both; }
+/* 没在说话、但对这句有反应的人：比旁边站着的人亮一点（说话的人更亮） */
+.fg-actor.is-reacting { filter: brightness(.9) saturate(.92); z-index: 1; }
+/* 走位：上前一步的站到前面；背过身：转过去（scaleX 过 0 像转身）、暗成背影；探头：站在舞台边上，身子往里探 */
+.fg-actor[data-depth="1"] { z-index: 3; }
+.fg-actor[data-depth="-1"] { filter: brightness(.62) saturate(.72); }
+.fg-actor-turn, .fg-actor-react { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.fg-actor-turn { transform: rotate(var(--lean, 0deg)) scaleX(var(--flip, 1)); transition: transform .5s cubic-bezier(.45, .05, .3, 1), filter .5s ease; }
+/* 没有背面的立绘：转过去以后压成一道背影（几乎看不清脸），边上留一圈淡淡的轮廓光 */
+.fg-actor.is-away .fg-actor-turn { --flip: -1; filter: brightness(.16) saturate(.3) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .28)); }
+.fg-actor.is-peek[data-peek="left"] .fg-actor-turn { --lean: 5deg; }
+.fg-actor.is-peek[data-peek="right"] .fg-actor-turn { --lean: -5deg; }
+/* 进来的样子：跑进来（从远一点的地方冲进来、刹一下）、慢慢走进来、探头（从边上探出来） */
+.fg-actor[data-enter="run"] { animation: fg-actor-run-in .5s cubic-bezier(.2, .8, .3, 1.15) both; }
+.fg-actor[data-enter="slow"] { animation: fg-actor-in 1.6s cubic-bezier(.3, .4, .3, 1) both; }
+.fg-actor[data-enter="peek"] { animation: fg-actor-peek-in .9s cubic-bezier(.2, .7, .2, 1) both; }
+/* 走的样子：甩头离开（一扭身、快步走掉）、跑开、慢慢走远（缩小、淡掉）；时长对上 Stage.jsx 的 EXIT_MS */
+.fg-actor.is-leaving[data-exit="storm"] { animation: fg-actor-storm .65s cubic-bezier(.5, 0, .8, .4) both; }
+.fg-actor.is-leaving[data-exit="storm"] .fg-actor-turn { --flip: -1; transition-duration: .2s; }
+.fg-actor.is-leaving[data-exit="run"] { animation: fg-actor-run-out .42s cubic-bezier(.5, 0, .9, .5) both; }
+.fg-actor.is-leaving[data-exit="slow"] { animation: fg-actor-slow-out 1.3s ease-in both; }
+/* --edge：离这个人近的那一边（站在中间的按他在左半边还是右半边），跑进跑出、探头都从那边来、往那边去 */
+@keyframes fg-actor-run-in { 0% { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.6)); } 55% { opacity: 1; } 82% { transform: translateX(calc(-50% - var(--edge, 40%) * .05)); } 100% { transform: translateX(-50%); } }
+@keyframes fg-actor-peek-in { from { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * .5)); } }
+@keyframes fg-actor-storm { 0%, 22% { opacity: 1; transform: translateX(-50%); } 100% { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.3)); } }
+@keyframes fg-actor-run-out { to { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.6)); } }
+@keyframes fg-actor-slow-out { to { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * .35)) scale(.92); } }
 .fg-actor-body { position: absolute; inset: 0; transform-origin: 50% 100%; animation: fg-breathe 4.8s ease-in-out infinite; }
 .fg-actor.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1), fg-breathe 4.8s ease-in-out .42s infinite; }
 /* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */
@@ -1065,7 +1091,7 @@
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
 @container stage (max-aspect-ratio: 4/5) {
-  .fg-actor { width: calc(60% * var(--s, 1)); height: calc(60% * var(--s, 1)); bottom: 23%; }
+  .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
   .fg-recall-face { width: 17cqw; }
   .fg-text { font-size: 4.6cqw; top: 18%; bottom: 26%; }
