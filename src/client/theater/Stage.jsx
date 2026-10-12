@@ -1,17 +1,15 @@
-// 舞台：背景（生成图 / 程序化天空）、时段调色、天气粒子、立绘、漫画符号、CG、镜头与闪光、地点标题卡，
+// 舞台：背景（生成图 / 程序化天空）、时段调色、天气粒子、立绘、CG、镜头与闪光、地点标题卡，
 // 以及逐句可变的气氛：基调色调、光线、画面效果、特殊段落的滤镜、过场字卡。
 import React from 'react'
 import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
-import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, HIT_IMPACT_MS, BATTLE_CARD_MS, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
-import { SYMBOL_SVG } from './symbols.js'
+import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, HIT_IMPACT_MS, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
 import { heightOf, placeSprite, faceCrop, bandCrop, FACE_RATIO } from '../../../lib/stature.js'
 import { aimCamera } from '../../../lib/camera.js'
 import { reactKind } from '../../../lib/blocking.js'
-import { BATTLE_END_LABEL } from '../../../lib/vocab.js'
-import { MOMENT_FOLEY, PHONE_FOLEY, ONOMATOPOEIA } from '../../../lib/foley.js'
+import { MOMENT_FOLEY, PHONE_FOLEY } from '../../../lib/foley.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger, foley } from './audio.js'
 
@@ -186,13 +184,6 @@ export function Silhouette({ name, color, appearance, gender }) {
   )
 }
 
-/** 漫画符号：弹出、按种类做小动作（爱心跳、怒筋抖、Zzz 往上飘……），life 秒后淡掉。 */
-export function MangaSymbol({ kind, life = 2.6 }) {
-  const svg = SYMBOL_SVG[kind]
-  if (!svg) return null
-  return <span className="fg-symbol" data-kind={kind} style={{ '--life': life + 's' }}><span className="fg-symbol-art" dangerouslySetInnerHTML={{ __html: svg }} /></span>
-}
-
 /**
  * 这一拍该用的立绘：按这一轮的样子（外貌、服装、长期状态）找对应情绪的差分，新情绪没画好时先用它的基础情绪。
  * 段落里导演写了这个人当时的样子（then）就按当时的找；还没画好时先显示剪影，不借现在那套。
@@ -235,6 +226,8 @@ const REACT_FRAMES = {
   glance: [[{ transform: 'none' }, { transform: 'translateY(-1%) rotate(-1.2deg)', offset: 0.4 }, { transform: 'none' }], 520],
 }
 const STEP_MOVES = new Set(['approach', 'apart', 'forward', 'back'])
+/** 导演写的情绪符号（sym）不画出来，只让这个人身子跟着一动：一惊、垂下去、气得一抖、高兴得一颤、害羞缩肩、晕得一歪。 */
+const SYM_MOTION = { surprise: 'jolt', bulb: 'jolt', sweat: 'droop', gloom: 'droop', sigh: 'droop', heartbreak: 'droop', zzz: 'droop', anger: 'shake', fire: 'shake', heart: 'bounce', note: 'bounce', sparkle: 'bounce', bloom: 'bounce', blush: 'shrink', dizzy: 'tilt' }
 /**
  * 战斗里一次出手：被打的人在打中那一刻（HIT_IMPACT_MS）怎么一动（同样动 .fg-actor-react 这一层），出手的人往前冲一下。
  * 命中一震、暴击震得更狠还泛红、闪避侧身一闪、格挡被推开一点、击倒先一震（倒下去的样子在 theater.css 的 .is-down）、治疗泛起绿光。
@@ -248,8 +241,6 @@ const HIT_FRAMES = {
   heal: [[{ filter: 'none' }, { filter: 'brightness(1.35) drop-shadow(0 0 1.6cqw rgba(110, 255, 170, .9))', offset: 0.3 }, { filter: 'brightness(1.15) drop-shadow(0 0 1cqw rgba(110, 255, 170, .6))', offset: 0.7 }, { filter: 'none' }], 1300],
 }
 const LUNGE = dir => [[{ transform: 'none' }, { transform: `translateX(${dir * 7}%) translateY(-1%)`, offset: 0.35 }, { transform: `translateX(${dir * 5}%)`, offset: 0.6 }, { transform: 'none' }], 620]
-/** 打中时被打的人身上冒的字（命中只有一道斩痕，不写字）。 */
-const HIT_MARK = { crit: '暴击！', miss: '闪避', block: '格挡', down: '击倒', heal: '治疗' }
 /**
  * 小瞬间里被摸头、被戳脸的人（同样动 .fg-actor-react 这一层）：摸头往下一压一压，戳脸往旁边一歪再弹回来。
  */
@@ -257,7 +248,6 @@ const TOUCH_FRAMES = {
   pat: [[{ transform: 'none' }, { transform: 'translateY(1.2%) scaleY(.975)', offset: 0.16 }, { transform: 'none', offset: 0.34 }, { transform: 'translateY(1.2%) scaleY(.975)', offset: 0.56 }, { transform: 'none', offset: 0.74 }, { transform: 'none' }], 1000],
   poke: [[{ transform: 'none' }, { transform: 'translateX(-1.6%) rotate(-2.5deg)', offset: 0.15 }, { transform: 'translateX(.8%) rotate(1.4deg)', offset: 0.4 }, { transform: 'translateX(-.3%) rotate(-.5deg)', offset: 0.65 }, { transform: 'none' }], 700],
 }
-const TOUCH_MARK = { pat: '摸摸', poke: '戳' }
 /** 上前 / 退后：立绘放大或缩小多少、脚往下或往上挪多少（占舞台高度）。 */
 const DEPTH = { 1: [1.1, '-6%'], [-1]: [0.88, '3%'] }
 /** 退场方式演多久（毫秒），样式在 theater.css 的 data-exit。 */
@@ -270,12 +260,13 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   // 怎么进来的（跑进来、慢慢走进来、探头）：上台那一拍定下，之后不再变（换了 animation 会让登场动画重放一遍）
   const [entrance] = React.useState(() => (beat.enterHow && beat.enterHow[entry.name]) || '')
   const reactRef = React.useRef(null)
+  const symKind = SYM_MOTION[speaking ? beat.sym : reaction ? reaction.sym : ''] || ''
   React.useEffect(() => {
     const el = reactRef.current
-    if (!el || typeof el.animate !== 'function' || (!reaction && !move)) return
+    if (!el || typeof el.animate !== 'function' || (!reaction && !move && !symKind)) return
     if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const base = reaction ? (((emotions || []).find(e => e.id === reaction.emo) || {}).base || reaction.emo) : ''
-    const kind = reaction && (reaction.emo || !move) ? reactKind(base) : move.act === 'lookback' || move.act === 'turn' || move.act === 'face' ? 'glance' : STEP_MOVES.has(move.act) ? 'step' : ''
+    const kind = symKind || (reaction && (reaction.emo || !move) ? reactKind(base) : move.act === 'lookback' || move.act === 'turn' || move.act === 'face' ? 'glance' : STEP_MOVES.has(move.act) ? 'step' : '')
     const frames = REACT_FRAMES[kind]
     if (frames) el.animate(frames[0], { duration: frames[1], easing: 'cubic-bezier(.3, .7, .3, 1)' })
   }, [beat.key])
@@ -291,7 +282,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     const t = setTimeout(() => { const [frames, ms] = HIT_FRAMES[struck] || HIT_FRAMES.hit; el.animate(frames, { duration: ms, easing: 'cubic-bezier(.2, .8, .3, 1)' }) }, HIT_IMPACT_MS)
     return () => clearTimeout(t)
   }, [beat.key])
-  // 小瞬间：被摸头、被戳脸的人一动，头上冒个字
+  // 小瞬间：被摸头、被戳脸的人一动
   const touched = !leaving && beat.moment && beat.moment.who === entry.name && TOUCH_FRAMES[beat.moment.kind] ? beat.moment.kind : ''
   React.useEffect(() => {
     const el = reactRef.current
@@ -334,7 +325,6 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   // 图片文件读不出来（被删了、数据目录搬了）时退回剪影，不留一个破图标
   const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" onError={() => setShown('')} /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
   const [d, db] = DEPTH[entry.depth] || [1, '0%']
-  const sym = speaking ? beat.sym : reaction ? reaction.sym : ''
   const cls = ['fg-actor', speaking && 'is-speaking', reaction && 'is-reacting', uploaded && 'is-upload', leaving && 'is-leaving', aa && 'is-aa', entry.away && 'is-away', entry.peek && 'is-peek', entry.down && 'is-down'].filter(Boolean).join(' ')
   return (
     <div className={cls} style={{ '--x': (entry.x ?? actorX(entry.pos)) + '%', '--s': entry.scale ?? 1, '--d': d, '--db': db, '--side': SIDE[entry.pos] || '0%', '--edge': (entry.x ?? actorX(entry.pos)) < 50 ? '-40%' : '40%', '--k': place.k, '--lift': place.lift, '--head': place.head * 100 + '%' }}
@@ -345,12 +335,10 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
             {aa ? <AaSprite aa={aa} talk={speaking && talk && talk.key === beat.key ? talk : null} fallback={still} className="fg-aa" label={entry.name} /> : still}
           </div>
         </div>
+        {/* 被击倒的人：上半身沉进一团黑雾里，看不清脸（theater.css 的 .is-down），站起来时散掉 */}
+        <div className="fg-down-mist" aria-hidden="true"><i /><i /><i /><i /></div>
       </div>
-      {sym && (
-        <div className="fg-symbol-anchor"><MangaSymbol key={beat.key} kind={sym} /></div>
-      )}
-      {touched && <div className="fg-touch-mark" key={'touch' + beat.key} data-kind={touched} aria-hidden="true"><span>{TOUCH_MARK[touched]}</span></div>}
-      {struck && <div className="fg-hit-mark" key={'hit' + beat.key} data-effect={struck} style={{ '--impact': HIT_IMPACT_MS + 'ms' }} aria-hidden="true">{HIT_MARK[struck] && <span>{HIT_MARK[struck]}</span>}</div>}
+      {(struck === 'hit' || struck === 'crit' || struck === 'block') && <div className="fg-hit-mark" key={'hit' + beat.key} data-effect={struck} style={{ '--impact': HIT_IMPACT_MS + 'ms' }} aria-hidden="true" />}
     </div>
   )
 }
@@ -543,29 +531,28 @@ export function RecallFace({ beat, view, tone = '' }) {
   )
 }
 
-/** 漫画式切入在画面上停多久（之后从另一边甩出去），整段演完多久。 */
-export const CUTIN_HOLD_MS = 1500
-const CUTIN_MS = CUTIN_HOLD_MS + 400
+/** 眼睛的特写拉开之后停多久（之后合上），整段演完多久。 */
+export const CUTIN_HOLD_MS = 1800
+const CUTIN_MS = CUTIN_HOLD_MS + 600
 
 /**
- * 漫画式切入（导演 cutin）：一条斜切的带子从左边冲进来，里面是这个人这一刻表情的脸部特写（按脸框裁，lib/stature.js 的 bandCrop）和集中线，
- * 名字压在右下，「唰」的一声；停一下再从右边甩出去。还没画立绘的人只有带子和名字。每一拍挂一次（key 是这一拍）。
+ * 眼睛的特写（导演 cutin）：画面压暗一点，中间缓缓拉开一道窄窄的宽银幕，里面是这个人这一刻表情的眼睛（按脸框裁，lib/stature.js 的 bandCrop），
+ * 慢慢推近；停一下再合上。不出声、不写名字。还没画立绘的人只有那道暗下来的宽银幕。每一拍挂一次（key 是这一拍）。
  */
-export function CutIn({ beat, view, sound = true }) {
+export function CutIn({ beat, view }) {
   const name = beat.cutin
   const person = ((view && view.cast) || []).find(p => p.name === name) || null
   const sprite = person ? spriteFor(person, beat.turn, (beat.emotions && beat.emotions[name]) || 'neutral', view && view.emotions, beat.then && beat.then[name], beat.ahead && beat.ahead[name]) : ''
   const src = sprite ? assetUrl(sprite) : ''
-  const bandRef = React.useRef(null)
+  const shotRef = React.useRef(null)
   const [size, setSize] = React.useState(null)
   const [aspect, setAspect] = React.useState(0)
   const [gone, setGone] = React.useState(false)
   React.useLayoutEffect(() => {
-    const el = bandRef.current
+    const el = shotRef.current
     if (el && el.clientHeight) setAspect(el.clientWidth / el.clientHeight)
   }, [])
   React.useEffect(() => {
-    if (sound) stinger('whoosh')
     const t = setTimeout(() => setGone(true), CUTIN_MS)
     return () => clearTimeout(t)
   }, [])
@@ -582,58 +569,27 @@ export function CutIn({ beat, view, sound = true }) {
   const crop = size && aspect ? bandCrop(faceBoxOf(record, size), size, aspect) : null
   return (
     <div className="fg-cutin" style={{ '--speaker': (person && person.color) || undefined, '--hold': CUTIN_HOLD_MS + 'ms' }} aria-hidden="true">
-      <div className="fg-cutin-edge" />
-      <div className="fg-cutin-band" ref={bandRef}>
-        {crop && <img src={src} alt="" draggable="false" style={{ width: crop.width + '%', left: crop.left + '%', top: crop.top + '%' }} />}
-        <div className="fg-cutin-lines" />
-        <div className="fg-cutin-name">{beat.speaker === name && beat.alias ? beat.alias : name}</div>
+      <div className="fg-cutin-band">
+        <div className="fg-cutin-shot" ref={shotRef}>
+          <div className="fg-cutin-lens">
+            {crop && <img src={src} alt="" draggable="false" style={{ width: crop.width + '%', left: crop.left + '%', top: crop.top + '%' }} />}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
 /**
- * 战斗的开战卡 / 结束卡（playback.js 的 battleEdge）：开战是横贯画面的暗带、红色斜线、对手名和称号，砸一下；
- * 结束是胜利（金）/ 败北（灰蓝）/ 撤退（青）/ 没分胜负的「战斗结束」。停 BATTLE_CARD_MS 后收起。
- */
-const BATTLE_END_EN = { win: 'VICTORY', lose: 'DEFEAT', flee: 'ESCAPED' }
-const BATTLE_SOUND = { start: 'slam', win: 'ding', lose: 'stab', flee: 'whoosh' }
-export function BattleCard({ beat, sound = true }) {
-  const edge = beat.battleEdge
-  const ms = BATTLE_CARD_MS[edge.kind] || 1600
-  const [gone, setGone] = React.useState(false)
-  React.useEffect(() => {
-    if (sound) stinger(BATTLE_SOUND[edge.kind === 'start' ? 'start' : edge.result] || 'whoosh')
-    const t = setTimeout(() => setGone(true), ms)
-    return () => clearTimeout(t)
-  }, [])
-  if (gone) return null
-  const start = edge.kind === 'start'
-  return (
-    <div className="fg-battle" data-kind={edge.kind} data-result={edge.result || undefined} style={{ '--hold': ms - 350 + 'ms' }} aria-hidden="true">
-      <div className="fg-battle-band">
-        <div className="fg-battle-kicker">{start ? 'ENCOUNTER' : BATTLE_END_EN[edge.result] || 'BATTLE OVER'}</div>
-        <div className="fg-battle-main">{start ? edge.foe : BATTLE_END_LABEL[edge.result] || '战斗结束'}</div>
-        {start && edge.title && <div className="fg-battle-sub">{edge.title}</div>}
-      </div>
-    </div>
-  )
-}
-
-/**
- * 一次出手（playback.js 的 hit）：招式名横幅从出手的人那边冲过去；打中那一刻（HIT_IMPACT_MS）按效果响一声、震屏或闪一下。
+ * 一次出手（playback.js 的 hit）：有招式名时先「唰」地挥出去，打中那一刻（HIT_IMPACT_MS）按效果响一声、震屏或闪一下。不出横幅、不写字。
  * 被打的不在台上（主角「我」、画外的人）时，整个画面替他挨这一下：命中 / 暴击 / 击倒四周泛红，格挡泛蓝，治疗泛绿，闪避只有「唰」的一声。
  * fx 是剧场的落字特效（useHits）。
  */
 const HIT_SOUND = { hit: 'impact', crit: 'slam', miss: 'whoosh', block: 'impact', down: 'slam', heal: 'ding' }
 const HIT_SHAKE = { hit: [['shake', 1]], crit: [['shake', 3], ['redflash', 1]], block: [['shake', 1]], down: [['shake', 2]] }
-export function HitBanner({ beat, sound = true, fx = null }) {
+export function HitImpact({ beat, sound = true, fx = null }) {
   const hit = beat.hit
   const onStage = (beat.cast || []).some(c => c.name === hit.to)
-  const fromLeft = (() => {
-    const from = (beat.cast || []).find(c => c.name === hit.from)
-    return !from || ['left', 'farleft', 'center'].includes(from.pos)
-  })()
   const [impact, setImpact] = React.useState(false)
   React.useEffect(() => {
     if (sound && hit.move && hit.effect !== 'heal') stinger('whoosh') // 治疗不是挥出去的一下
@@ -644,25 +600,13 @@ export function HitBanner({ beat, sound = true, fx = null }) {
     }, HIT_IMPACT_MS)
     return () => clearTimeout(t)
   }, [])
-  return (
-    <>
-      {hit.move && (
-        <div className="fg-movebar" data-from={fromLeft ? 'left' : 'right'} data-effect={hit.effect} aria-hidden="true">
-          <div className="fg-movebar-band">
-            {hit.from && <span className="fg-movebar-who">{hit.from}</span>}
-            <span className="fg-movebar-name">{hit.move}</span>
-          </div>
-        </div>
-      )}
-      {impact && !onStage && hit.effect !== 'miss' && <div className="fg-hurt" data-effect={hit.effect} aria-hidden="true" />}
-    </>
-  )
+  return impact && !onStage && hit.effect !== 'miss' ? <div className="fg-hurt" data-effect={hit.effect} aria-hidden="true" /> : null
 }
 
 /**
- * 小瞬间（playback.js 的 moment）：拍照（白闪一下，拍立得的白框框住这一刻，外面压暗，下面写题字）、触碰（一圈圈粉色涟漪和动作两个字）、
+ * 小瞬间（playback.js 的 moment）：拍照（白闪一下，拍立得的白框框住这一刻，外面压暗，下面写题字）、触碰（一圈圈粉色涟漪）、
  * 干杯（两只杯子从两边碰到一起）、做好一道菜 / 新称呼 / 约定 / 交换联系方式（一张小卡片落下来），各响一声合成的拟音（lib/foley.js）。
- * 摸头、戳脸演在被摸的人身上（Actor），人不在台上时在画面中间冒字；烟花在天上（Fireworks）。
+ * 摸头、戳脸演在被摸的人身上（Actor），人不在台上时只有声音；烟花在天上（Fireworks）。画面上不写拟声、动作的字。
  */
 export const MOMENT_HOLD_MS = { photo: 2700, touch: 2200, pat: 1300, poke: 1100, cheers: 1900, cook: 2600, nickname: 2900, promise: 3000, contact: 2600 }
 const CLINK_AT_MS = 520
@@ -695,10 +639,7 @@ export function MomentLayer({ beat, view, sound = true }) {
   }, [])
   if (gone || m.kind === 'fireworks') return null
   const hold = { '--hold': (MOMENT_HOLD_MS[m.kind] || 2400) - 450 + 'ms' }
-  if (m.kind === 'pat' || m.kind === 'poke') {
-    if (m.who && (beat.cast || []).some(c => c.name === m.who)) return null
-    return <div className="fg-moment" data-kind={m.kind} style={hold} aria-hidden="true"><div className="fg-moment-word">{TOUCH_MARK[m.kind]}</div></div>
-  }
+  if (m.kind === 'pat' || m.kind === 'poke') return null // 演在被摸的人身上（Actor）；人不在台上时只有声音
   if (m.kind === 'photo') return (
     <div className="fg-moment" data-kind="photo" style={hold} aria-hidden="true">
       <div className="fg-photo-flash" />
@@ -708,7 +649,6 @@ export function MomentLayer({ beat, view, sound = true }) {
   if (m.kind === 'touch') return (
     <div className="fg-moment" data-kind="touch" style={hold} aria-hidden="true">
       <i className="fg-touch-ring" /><i className="fg-touch-ring" style={{ animationDelay: '.45s' }} /><i className="fg-touch-ring" style={{ animationDelay: '.9s' }} />
-      {m.text && <div className="fg-moment-word">{m.text}</div>}
     </div>
   )
   if (m.kind === 'cheers') return (
@@ -771,27 +711,6 @@ export function Fireworks({ sound = true }) {
           <i className="fg-fw-glow" /><i className="fg-fw-trail" /><i className="fg-fw-burst" /><i className="fg-fw-burst is-inner" />
         </div>
       ))}
-    </div>
-  )
-}
-
-/**
- * 拟声字：内置拟声音效（砰、咚、叮……，lib/foley.js 的 ONOMATOPOEIA）响起时画面上蹦出这个字，像漫画的拟声。
- * 位置按这一拍散列在画面左右两侧偏上（不挡中间的脸），样子按 tone：撞击的黄字红边、带感叹号、一震；清脆的亮黄；掠过的青字横着飞过；轻的白字。
- */
-export const SFX_WORD_MS = 1100
-export function SfxWord({ beat }) {
-  const info = ONOMATOPOEIA[beat.sfx]
-  const [gone, setGone] = React.useState(false)
-  React.useEffect(() => { const t = setTimeout(() => setGone(true), SFX_WORD_MS); return () => clearTimeout(t) }, [])
-  if (!info || gone) return null
-  const h = hashOf(beat.key)
-  const x = (h & 1 ? 66 : 12) + ((h >>> 1) % 18)
-  const y = 16 + ((h >>> 6) % 22)
-  const tilt = ((h >>> 11) % 25) - 12
-  return (
-    <div className="fg-sfxword" data-tone={info.tone} style={{ left: x + '%', top: y + '%', '--tilt': tilt + 'deg', '--ms': SFX_WORD_MS + 'ms' }} aria-hidden="true">
-      <span>{info.tone === 'hit' ? beat.sfx + '！' : beat.sfx}</span>
     </div>
   )
 }

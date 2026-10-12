@@ -31,7 +31,7 @@ test('gate: 声音目录：每个音色和音效版本都能照配方发声，�
   assert.ok(VOICES.length >= 15)
   assert.ok(VOICES.filter(v => v.gender === 'female').length >= 5 && VOICES.filter(v => v.gender === 'male').length >= 4)
   // 默认版本照搬以前写死的声音：没改过设置的人听到的跟原来一样。
-  assert.deepEqual(DEFAULT_SOUNDS, { impact: 'thud', slam: 'desk', stab: 'stab', ding: 'ding', whoosh: 'swish', select: 'pop', hover: 'tick', page: 'tone', open: 'arp' }) // 漫画切入是后来加的，没有「以前的声音」
+  assert.deepEqual(DEFAULT_SOUNDS, { impact: 'thud', slam: 'desk', stab: 'stab', ding: 'ding', whoosh: 'swish', select: 'pop', hover: 'tick', page: 'tone', open: 'arp' }) // 挥出（whoosh）是后来加的，没有「以前的声音」
   assert.deepEqual(soundFor({}, 'impact').parts, [{ wave: 'sine', f: 150, to: 52, dur: 0.28, gain: 0.22 }, { wave: 'noise', f: 900, q: 0.8, dur: 0.07, gain: 0.08 }])
   assert.deepEqual(VOICES.find(v => v.id === 'classic').parts, [{ wave: 'triangle', f: 420, dur: 0.05, gain: 0.045, attack: 0.004 }])
   // 选了哪个就放哪个；关掉是 null；「用自己的」有文件放文件，没文件放默认。

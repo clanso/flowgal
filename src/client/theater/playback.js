@@ -54,7 +54,6 @@ export function buildBeats(view) {
   let shown = null // 上一拍画面上的场景和段落：判断新一轮开场要不要转场
   const active = new Map() // 每个人最近一次说话、登场是第几拍：台上人太多时，最久没动静的先下场
   let recalled = null // 上一拍所在的短闪回：进出闪回时白闪一下
-  let battle = null // 正在打的仗 { foe, title, place }：跨轮带着，写了结束或者换了地方收起
   let call = null // 正在打的电话 { who, video, dir, id, live, unanswered }：跨轮带着，挂断、电话那头的人走进画面时收起
   let set = 0 // 第几堂布景：换了地方、进出回忆这类段落时加一，台上的人跟着旧画面一起退、在新画面里重新登场，不从旧站位滑过去
   // 有立绘的人：导演漏列进 cast、却当面开口时让他上台（lib/staging.js 的 walkOn）
@@ -127,7 +126,7 @@ export function buildBeats(view) {
       }
       shown = at
       if (enter) { set += 1; blocking.newSet() }
-      // 没在说话的人的反应：换表情（从这句起保持）、头顶出符号、身子一动
+      // 没在说话的人的反应：换表情（从这句起保持）、身子一动
       const onStageNames = steps[ui].cast.map(c => c.name)
       const reacts = reactsOf(line, onStageNames, speakers)
       for (const r of reacts) if (r.emo) emotions[r.name] = r.emo
@@ -136,22 +135,13 @@ export function buildBeats(view) {
       Object.assign(exitWay, line.exitHow || {})
       const gone = {}
       for (const name of steps[ui].left) if (exitWay[name]) { gone[name] = exitWay[name]; delete exitWay[name] }
-      // 战斗：开战、结束各出一张卡；打着的时候左上角挂着「交战」。换了地方（不在特殊段落里）就当打完了
-      let battleEdge = null
-      if (battle && !at.mode && at.scene.location !== battle.place && !(line.battle && line.battle.foe)) battle = null
-      if (line.battle && line.battle.foe) {
-        battle = { foe: line.battle.foe, ...(line.battle.title ? { title: line.battle.title } : {}), place: at.scene.location }
-        battleEdge = { kind: 'start', foe: battle.foe, ...(battle.title ? { title: battle.title } : {}) }
-      } else if (line.battle && line.battle.end) battleEdge = { kind: 'end', ...(line.battle.end !== true ? { result: line.battle.end } : {}), ...(battle ? { foe: battle.foe } : {}) }
-      if (line.battle && line.battle.end) battle = null // 结束卡出来时左上角的「交战」一起收起
-      const fighting = battle ? { foe: battle.foe, ...(battle.title ? { title: battle.title } : {}) } : null
-      // 一次出手：被击倒的人倒在那里，到他开口、走位或被治疗为止
+      // 一次出手：被击倒的人倒在那里，到他自己开口（台词、心声；旁白写到他不算）、走位或被治疗为止
       const hit = line.hit || null
       const target = hit && hit.to && onStageNames.includes(hit.to) ? [hit.to] : []
-      const block = blocking.step({ onStage: onStageNames, left: steps[ui].left, speakers, moves: line.move || [], peeks: Object.keys(ways).filter(name => ways[name] === 'peek'), downs: hit && hit.effect === 'down' ? target : [], heals: hit && hit.effect === 'heal' ? target : [] })
+      const block = blocking.step({ onStage: onStageNames, left: steps[ui].left, speakers: type === 'narration' ? [] : speakers, moves: line.move || [], peeks: Object.keys(ways).filter(name => ways[name] === 'peek'), downs: hit && hit.effect === 'down' ? target : [], heals: hit && hit.effect === 'heal' ? target : [] })
       for (const name of [...speakers, ...steps[ui].entered, ...reacts.map(r => r.name), ...block.moves.map(m => m.name), ...(hit ? [hit.from, hit.to].filter(n => n && onStageNames.includes(n)) : [])]) active.set(name, beats.length)
       const recall = recalls[ui]
-      // 漫画式切入切谁：写 true 是说话的人（旁白没说话的人就不切），短闪回里不切
+      // 特写切谁：写 true 是说话的人（旁白没说话的人就不切），短闪回里不切
       const cutin = recall ? '' : line.cutin === true ? speakers[0] || '' : line.cutin || ''
       // 导演没写基调的闪回：进闪回那一句按闪回里的情绪（自定义情绪看它的基础情绪）和这一刻的场景基调挑
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map(e => ((view.emotions || []).find(x => x.id === e) || {}).base || e), at.scene.mood)
@@ -200,10 +190,8 @@ export function buildBeats(view) {
         sym: line.sym || '',
         cam: line.cam || '',
         ...(line.camOn ? { camOn: line.camOn } : {}), // 镜头对准谁（不写是说话的人）
-        ...(cutin ? { cutin } : {}), // 漫画式切入：这个人的脸部特写从侧面冲进来
-        ...(fighting ? { battle: fighting } : {}), // 正在打的仗（左上角挂「交战」）
-        ...(battleEdge ? { battleEdge } : {}), // 开战卡 / 结束卡
-        ...(hit ? { hit } : {}), // 一次出手：招式名横幅、被打的人一震
+        ...(cutin ? { cutin } : {}), // 特写：画面中间拉开一道窄窄的宽银幕，里面是这个人的眼睛
+        ...(hit ? { hit } : {}), // 一次出手：被打的人一震
         ...(line.moment ? { moment: line.moment } : {}), // 小瞬间：拍照、摸头、干杯、约定……
         ...(calling ? { call: calling } : {}), // 正在打的电话：响着（ringing）还是接通了（live）
         ...(phoneEdge ? { phone: phoneEdge } : {}), // 手机这一句的事：来电、拨出、挂断、通知、语音留言
@@ -330,10 +318,9 @@ export function cgHoldMs(img, mood) {
 export const TRANSITION_MS = { dissolve: 1100, fade: 2600, cinematic: 1500, wipe: 1000, iris: 1200, strips: 800, black: 1800, flash: 1000, blink: 1500, glitch: 700, swirl: 1900, haze: 2600, wake: 1900, none: 0 }
 /** 导演写的停顿：beat 顿一拍（对话框留着，先不出字），silence 沉默（对话框让开，只剩画面和环境声）。 */
 export const PAUSE_MS = { beat: 900, silence: 2400 }
-/** 漫画式切入的带子先冲进来、站稳，字再出来。 */
-export const CUTIN_LEAD_MS = 380
-/** 开战卡、结束卡停多久（字等它收起再出）；出手时招式名横幅冲过去、打中的那一刻（HIT_IMPACT_MS），字等打中之后再出。 */
-export const BATTLE_CARD_MS = { start: 1900, end: 1700 }
+/** 特写那道宽银幕先拉开、眼睛看清，字再出来。 */
+export const CUTIN_LEAD_MS = 600
+/** 出手时打中的那一刻（HIT_IMPACT_MS），字等打中之后再出。 */
 export const HIT_IMPACT_MS = 420
 export const HIT_LEAD_MS = 700
 /** 小瞬间：拍照的白闪、烟花升空、卡片落下来之后字再出；摸头、戳脸、触碰、干杯跟着字一起演。 */
@@ -374,7 +361,6 @@ export function beatHold(beat, { cg = '', was = {} } = {}) {
   if (moved && !beat.cut && TRANSITION_MS[beat.transition]) { ms = Math.max(ms, TRANSITION_MS[beat.transition] + SCENE_BEAT_MS); away = true }
   if (PAUSE_MS[beat.pause]) { ms = Math.max(ms, PAUSE_MS[beat.pause]); if (beat.pause === 'silence') away = true }
   if (beat.cutin) ms = Math.max(ms, CUTIN_LEAD_MS)
-  if (beat.battleEdge) ms = Math.max(ms, BATTLE_CARD_MS[beat.battleEdge.kind] || 0)
   if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS)
   if (beat.moment) ms = Math.max(ms, MOMENT_LEAD_MS[beat.moment.kind] || 0)
   if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0)

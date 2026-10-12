@@ -1511,7 +1511,7 @@ export function LookSection({ data }) {
 
 // ───────────────────────── 声音 ─────────────────────────
 const VOICE_GENDER = { female: '女声', male: '男声', '': '不分男女' }
-const SOUND_GROUPS = [['stage', '落字音效', '台词演出里的重音、怒吼、崩溃、灵光一闪'], ['ui', '界面音', '按钮、选项、翻页']]
+const SOUND_GROUPS = [['stage', '落字音效', '台词演出里的重音、怒吼、崩溃，打斗的出手'], ['ui', '界面音', '按钮、选项、翻页']]
 
 /** 打字音和音效：试听每个音色、定没指定声音的角色怎么分、旁白用什么；每种音效选版本、试听、换成自己的文件。 */
 function SoundSection({ data }) {
@@ -1796,7 +1796,6 @@ function SoundLibSection({ data }) {
       <div className="fg-section">播放</div>
       <Field label="环境音" hint="雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。"><div className="fg-row"><Toggle value={cfg.ui.amb} onChange={v => p({ amb: v })} /><input type="range" min="0" max="1" step="0.05" value={cfg.ui.ambVolume} onChange={e => p({ ambVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
       <Field label="剧情音效" hint="推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。"><div className="fg-row"><Toggle value={cfg.ui.storySfx} onChange={v => p({ storySfx: v })} /><input type="range" min="0" max="2" step="0.05" value={cfg.ui.storySfxVolume} onChange={e => p({ storySfxVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
-      <Field label="拟声字" hint="内置拟声音效响起时，画面上蹦出这个字（砰！咚！），像漫画那样。"><Toggle value={cfg.ui.sfxWords} onChange={v => p({ sfxWords: v })} /></Field>
       <div className="fg-section">我的音效库{sounds ? ` · ${sounds.length} 个` : ''}</div>
       <div className="fg-note">库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪一幕放什么环境音、哪句配什么音效。所以标签要写正文里会出现的词。</div>
       <div className="fg-row" style={{ margin: '1cqw 0' }}>

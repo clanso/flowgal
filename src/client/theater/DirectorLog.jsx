@@ -5,7 +5,7 @@ import React from 'react'
 import { api, toast, useDirectorLog, hostName } from '../api.js'
 import { Panel } from './Panels.jsx'
 import { formatLook } from '../../../lib/look.js'
-import { MOVE_LABEL, ENTER_HOW_LABEL, EXIT_HOW_LABEL, DELIVERY_LABEL, TEXT_FX_LABEL, BATTLE_END_LABEL, HIT_EFFECT_LABEL, ROMANCE_LABEL, SENSE_LABEL, MOMENT_LABEL, PHONE_LABEL, CALL_END_LABEL } from '../../../lib/vocab.js'
+import { MOVE_LABEL, ENTER_HOW_LABEL, EXIT_HOW_LABEL, DELIVERY_LABEL, TEXT_FX_LABEL, HIT_EFFECT_LABEL, ROMANCE_LABEL, SENSE_LABEL, MOMENT_LABEL, PHONE_LABEL, CALL_END_LABEL } from '../../../lib/vocab.js'
 import { emotionEntry } from '../../../lib/emotions.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, RECALL_TONE_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL, VOICE_LABEL, CG_IN_LABEL, CG_OUT_LABEL, CG_MOTION_LABEL } from './playback.js'
 
@@ -151,8 +151,7 @@ function ScriptView({ script, units }) {
               l.split && <Chip key="split" k="分屏">{l.split === 'off' ? '收起' : l.split.who.join('、') + (l.split.location ? ` @ ${l.split.location}` : '')}</Chip>,
               l.sym && <Chip key="sym" k="符号">{SYMBOL_LABEL[l.sym] || l.sym}</Chip>,
               l.cam && <Chip key="cam" k="镜头">{CAMERA_LABEL[l.cam] || l.cam}{l.camOn ? ` · ${l.camOn}` : ''}</Chip>,
-              l.cutin && <Chip key="cutin" k="切入">{l.cutin === true ? l.sp || '说话的人' : l.cutin}</Chip>,
-              l.battle && <Chip key="battle" k="战斗">{l.battle.foe ? `开战 · ${l.battle.foe}${l.battle.title ? `（${l.battle.title}）` : ''}` : `结束${BATTLE_END_LABEL[l.battle.end] ? ' · ' + BATTLE_END_LABEL[l.battle.end] : ''}`}</Chip>,
+              l.cutin && <Chip key="cutin" k="特写">{l.cutin === true ? l.sp || '说话的人' : l.cutin}</Chip>,
               l.moment && <Chip key="moment" k="瞬间">{[MOMENT_LABEL[l.moment.kind] || l.moment.kind, l.moment.who, l.moment.text && `「${l.moment.text}」`, l.moment.place].filter(Boolean).join(' ')}</Chip>,
               l.phone && <Chip key="phone" k="手机">{[(l.phone.video ? '视频' : '') + (PHONE_LABEL[l.phone.kind] || l.phone.kind), l.phone.who, l.phone.result && CALL_END_LABEL[l.phone.result], l.phone.text && `「${l.phone.text}」`].filter(Boolean).join(' ')}</Chip>,
               l.hit && <Chip key="hit" k="出手">{[l.hit.from, l.hit.to && '→ ' + l.hit.to, l.hit.move && `「${l.hit.move}」`, HIT_EFFECT_LABEL[l.hit.effect] || l.hit.effect].filter(Boolean).join(' ')}</Chip>,
