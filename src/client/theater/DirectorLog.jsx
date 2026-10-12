@@ -148,6 +148,7 @@ function ScriptView({ script, units }) {
               l.split && <Chip key="split" k="分屏">{l.split === 'off' ? '收起' : l.split.who.join('、') + (l.split.location ? ` @ ${l.split.location}` : '')}</Chip>,
               l.sym && <Chip key="sym" k="符号">{SYMBOL_LABEL[l.sym] || l.sym}</Chip>,
               l.cam && <Chip key="cam" k="镜头">{CAMERA_LABEL[l.cam] || l.cam}{l.camOn ? ` · ${l.camOn}` : ''}</Chip>,
+              l.cutin && <Chip key="cutin" k="切入">{l.cutin === true ? l.sp || '说话的人' : l.cutin}</Chip>,
               l.card && <Chip key="card" k="卡片">{CARD_LABEL[l.card] || l.card}</Chip>,
               l.cut && <Chip key="cut" k="字卡">{l.cut.text}</Chip>,
               l.mode && <Chip key="mode" k="段落">{MODE_LABEL[l.mode] || l.mode}</Chip>,

@@ -388,7 +388,7 @@ export function previewVoice(voice, ui = sounds) {
   for (const dt of [0, 0.09, 0.18, 0.42, 0.51, 0.6, 0.69]) playParts(ac, v.parts, { rate: base * (0.96 + Math.random() * 0.08), volume: ui.blipVolume ?? 1, at: t0 + dt })
 }
 
-/** 落字音效：impact / slam / stab / ding，按设置里选的版本或上传的文件；音效关了不响。 */
+/** 落字音效：impact / slam / stab / ding / whoosh，按设置里选的版本或上传的文件；音效关了不响。 */
 export function stinger(kind) {
   if (sounds.sfx !== false) playSound(soundFor(sounds, kind), sounds.sfxVolume ?? 1)
 }

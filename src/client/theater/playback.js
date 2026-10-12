@@ -133,6 +133,8 @@ export function buildBeats(view) {
       const block = blocking.step({ onStage: onStageNames, left: steps[ui].left, speakers, moves: line.move || [], peeks: Object.keys(ways).filter(name => ways[name] === 'peek') })
       for (const name of [...speakers, ...steps[ui].entered, ...reacts.map(r => r.name), ...block.moves.map(m => m.name)]) active.set(name, beats.length)
       const recall = recalls[ui]
+      // 漫画式切入切谁：写 true 是说话的人（旁白没说话的人就不切），短闪回里不切
+      const cutin = recall ? '' : line.cutin === true ? speakers[0] || '' : line.cutin || ''
       // 导演没写基调的闪回：进闪回那一句按闪回里的情绪（自定义情绪看它的基础情绪）和这一刻的场景基调挑
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map(e => ((view.emotions || []).find(x => x.id === e) || {}).base || e), at.scene.mood)
       // 短闪回里开口的人用回忆里的声音（老脚本写的是回声，一并换掉）
@@ -156,6 +158,7 @@ export function buildBeats(view) {
         sym: line.sym || '',
         cam: line.cam || '',
         ...(line.camOn ? { camOn: line.camOn } : {}), // 镜头对准谁（不写是说话的人）
+        ...(cutin ? { cutin } : {}), // 漫画式切入：这个人的脸部特写从侧面冲进来
         say: line.say || '',
         stress: line.stress || '',
         ...(line.textfx ? { textfx: line.textfx } : {}), // 句中文字效果：某几个字发抖、放大、越说越小……
@@ -278,6 +281,8 @@ export function cgHoldMs(img, mood) {
 export const TRANSITION_MS = { dissolve: 1100, fade: 2600, cinematic: 1500, wipe: 1000, iris: 1200, strips: 800, black: 1800, flash: 1000, blink: 1500, glitch: 700, swirl: 1900, haze: 2600, wake: 1900, none: 0 }
 /** 导演写的停顿：beat 顿一拍（对话框留着，先不出字），silence 沉默（对话框让开，只剩画面和环境声）。 */
 export const PAUSE_MS = { beat: 900, silence: 2400 }
+/** 漫画式切入的带子先冲进来、站稳，字再出来。 */
+export const CUTIN_LEAD_MS = 380
 /** 换了地方：转场演完再停这么久才出字。 */
 const SCENE_BEAT_MS = 300
 /**
@@ -305,6 +310,7 @@ export function beatHold(beat, { cg = '', was = {} } = {}) {
   const moved = beat.sceneEnter && beat.scene.location !== was.place && sameLayer
   if (moved && !beat.cut && TRANSITION_MS[beat.transition]) { ms = Math.max(ms, TRANSITION_MS[beat.transition] + SCENE_BEAT_MS); away = true }
   if (PAUSE_MS[beat.pause]) { ms = Math.max(ms, PAUSE_MS[beat.pause]); if (beat.pause === 'silence') away = true }
+  if (beat.cutin) ms = Math.max(ms, CUTIN_LEAD_MS)
   const wake = was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
   if (wake) { ms = Math.max(ms, WAKE_MS); away = true }
   return { ms, away, ...(wake ? { wake } : {}) }

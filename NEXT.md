@@ -127,6 +127,11 @@ updated: 2026-10-12
   - 实现：新镜头 closeup 特写 / focus 背景虚化 / whip 甩镜 / sink 下沉 / rise 升起 / lowangle 仰拍 / dolly 希区柯克变焦 / empty 空镜 / slowpush 缓推；zoom、closeup、lowangle、slowpush、focus 对准一个人（camOn，默认说话的人）。lib/camera.js 的 aimCamera 按脸的位置算放大倍数和平移（脸停在画面中上 50%/36%，推近后看到的那一块不出框）；Stage.jsx 的 faceAt 按布局量脸（offsetLeft / offsetTop，不受反应动画和镜头本身缩放影响；脸中心 = 额头 --head + (0.08 + FACE_RATIO/2) × --k）。停住的镜头改成 CSS 过渡，下一句缓回来；演一下就完的（震动、甩镜、拉远、平移、虚焦）还是动画。背景虚化 / 特写只糊 .fg-bg，空镜淡出 .fg-cast，希区柯克变焦用独立的 scale 属性（不跟背景的慢推动画抢 transform）。一轮上限放宽到 MAX_CAMS_PER_TURN = 14，提示词写清每种镜头什么时候用。导演日志的镜头标签带上对准谁。
   - 自动化：npm test 202/202（新增 tests/camera.test.mjs 3 条）；npm run build 通过。预览截图：第 2 轮「只给你一个人」特写林岚（站左边，脸推到中上、背景糊）、第 3 轮「旧校舍」推近右边的苏晴、第 1 轮「不许走神」背景虚化；仰拍、希区柯克变焦用改 data-cam 的办法看了边缘不露底。预览的占位立绘脸画得比真立绘低，特写时脸落在 60% 左右；真立绘按脸框算会更靠上。
   - 没验：DSH 真机；真实导演会不会用新镜头、用得多不多。
+- 漫画式切入（2026-10-12，计划表第 ⑤ 项）：
+  - IGS 有 cutin（关键台词那一瞬间的漫画式脸部特写）；我们决定性的一句只能推近或震一下。
+  - 实现：导演每句可写 cutin（true 是说话的人，写名字切那个人；一轮 MAX_CUTINS_PER_TURN = 4 次，短闪回里不切）。剧场 Stage.jsx 的 CutIn：斜切的带子（clip-path 平行四边形，白边、说话人颜色的底）从左边冲进来，里面按脸框裁这个人这一刻表情的立绘（lib/stature.js 的 bandCrop：脸框撑满带子高度的 90%，中心在带子 30% / 55%），集中线（repeating-conic-gradient 加径向遮罩）、名字压右下，停 CUTIN_HOLD_MS = 1.5 s 后从右边甩出去；字晚 CUTIN_LEAD_MS = 380 ms 出（beatHold，对话框不让开）。音效新加一个槽「漫画切入」（唰 / 刀光 / 风声 / 嗖 / 唰 + 咚，设置里能换、能上传），甩镜也用它。还没画立绘的人只有带子和名字。减少动态时只淡入淡出。导演日志显示切入。
+  - 自动化：npm test 205/205（新增 tests/cutin.test.mjs 3 条；声音目录的默认值加上 whoosh: swish）；npm run build 通过。预览：第 3 轮苏晴「不行！」（还没画立绘，只有带子、集中线和名字），临时把切入挂到林岚那句看了带图的样子；预览的占位立绘没有量过的脸框，按参照位置估的脸偏上（只露出头发和发饰），真立绘按量出来的脸框裁。
+  - 没验：DSH 真机（真立绘的裁切、音效听感）。
 
 ## 开放风险
 

@@ -5,6 +5,7 @@
 // 同屏的人：第 2 轮我说「很可疑」时苏晴赌气、林岚偷笑，林岚塞信封时上前一步；第 3 轮苏晴喊「不能去」时上前一步。
 // 台词演法与重音：威压（不许走神）、迟疑（抱歉……）、激动（苏晴喊人）、重音（很可疑）、低语（信封那两句），
 // 第 3 轮苏晴的怒吼、说说停停和崩溃（旧校舍的事）。
+// 漫画式切入：第 3 轮苏晴喊「不行！」那一句、第 4 轮林岚「你来了」。
 // 镜头：第 1 轮「你终于来了」推近对准林岚、「不许走神」背景虚化，第 2 轮「只给你一个人」特写，第 3 轮「旧校舍」推近对准右边的苏晴、最后一句空镜，第 4 轮「你来了」仰拍。
 // 句中文字效果：第 1 轮心声「好像有点不一样」越说越小，第 2 轮苏晴「好巧啊」波浪，第 3 轮「旧校舍……那里」「那、那间教室里」发抖、「不行！」吼出来。
 // 第 3 轮的原文像很多角色卡那样夹着状态栏、变量更新和章节尾巴（raw），导演把它们标成不演。
@@ -143,7 +144,7 @@ export function directorReply(turn, units) {
       L('不知什么时候凑了过来', { sp: '苏晴', emo: 'surprised', enter: [{ name: '苏晴', how: 'peek' }] }),
       L('别让苏晴看到', { sp: '林岚', emo: 'blush', say: 'whisper', recall: true }),
       L('旧校舍……那里', { sp: '苏晴', emo: 'scared', sym: 'surprise', cam: 'zoom', say: 'hesitant', stress: '三年前', textfx: [{ text: '旧校舍……那里', style: 'shake' }] }),
-      L('你绝对不能去那里', { sp: '苏晴', emo: 'angry', sym: 'anger', say: 'shout', textfx: [{ text: '不行！', style: 'roar' }], move: [{ name: '苏晴', act: 'forward' }] }),
+      L('你绝对不能去那里', { sp: '苏晴', emo: 'angry', sym: 'anger', say: 'shout', textfx: [{ text: '不行！', style: 'roar' }], cutin: true, move: [{ name: '苏晴', act: 'forward' }] }),
       L('……为什么', { sp: '我', emo: 'confused' }),
       L('那、那间教室里', { sp: '苏晴', emo: 'scared', sym: 'sweat', textfx: [{ text: '那、那间教室里', style: 'shake' }] }),
       L('她的声音一下子乱了', { sp: '苏晴', emo: 'scared' }),
@@ -172,7 +173,7 @@ export function directorReply(turn, units) {
       L('学姐，这是什么曲子', { sp: '我' }),
       L('一首还没写完的曲子', { sp: '林岚', emo: 'smile' }),
       L('琴声戛然而止', { mode: 'real', scene: { light: 'dark', mood: 'eerie', transition: 'none' } }),
-      L('你来了', { sp: '林岚', emo: 'serious', cam: 'lowangle', enter: [{ name: '林岚' }], scene: { light: 'spot', fx: 'drift' } }),
+      L('你来了', { sp: '林岚', emo: 'serious', cam: 'lowangle', cutin: true, enter: [{ name: '林岚' }], scene: { light: 'spot', fx: 'drift' } }),
     ],
     choices: ['走进音乐教室', '先在门口叫她的名字'],
     images: [{ after: find(units, '学姐，这是什么曲子'), until: find(units, '一首还没写完的曲子'), title: '三年前的黄昏', moment: '三年前的音乐教室，夕阳和樱花，林岚坐在钢琴前回头微笑', who: ['林岚'] }],
