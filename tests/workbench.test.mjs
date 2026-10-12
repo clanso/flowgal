@@ -11,6 +11,7 @@ import { inpaintModel } from '../lib/image/novelai.js'
 import { noteEmotionUsers, personEmotions } from '../lib/emotions.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
+import { BUILTIN_STYLES } from '../lib/image/style.js'
 
 const dataUrl = bytes => 'data:image/png;base64,' + Buffer.from(bytes).toString('base64')
 /** 灰度 PNG 解回像素（只认 grayPng 写的那种：每行一个 0 号滤波字节）。 */
@@ -92,6 +93,8 @@ test('gate: 框对齐 8 像素、夹在图里、不能太小太大；遮罩只�
 })
 
 /** 一局里建个林岚，上传一张立绘；返回引擎、这张差分的编号、发给 NovelAI 的请求。 */
+// 画风（画师串）带的负面：局部重绘的负面按现在的画风重算，只用它和玩家写的
+const STYLE = { id: 'wb', name: '工作台', artist: '', positive: '', negative: 'lowres, bad hands' }
 async function setup(dir, { backend = 'novelai' } = {}) {
   const requests = []
   const fetchImpl = async (url, init) => {
@@ -101,7 +104,7 @@ async function setup(dir, { backend = 'novelai' } = {}) {
   }
   const store = createStore(dir)
   const engine = createEngine({ store, services: {}, fetchImpl, logger: { warn() {}, info() {} } })
-  await engine.patchConfig({ images: { backend } })
+  await engine.patchConfig({ images: { backend }, style: { presets: [...BUILTIN_STYLES, STYLE], current: 'wb' } })
   await engine.setSecret('novelai', 'official', 'k')
   await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair, blue eyes', gender: 'female' } })
   const still = await grayPng(832, 1216, () => 200)
@@ -129,7 +132,7 @@ test('gate: 工作台局部重绘：用画这张时的提示词和种子，按�
     assert.equal(body.model, 'nai-diffusion-4-5-full-inpainting')
     assert.match(body.input, /^closed eyes, 1girl, long black hair, light smile/)
     assert.doesNotMatch(body.input, /blue eyes/)
-    assert.equal(body.parameters.negative_prompt, 'lowres, open eyes, eyelashes up')
+    assert.equal(body.parameters.negative_prompt, 'lowres, bad hands, open eyes, eyelashes up', '负面是画风带的，加上闭眼要避开的')
     assert.equal(body.parameters.seed, 4242)
     assert.equal(body.parameters.extra_noise_seed, 4242)
     assert.deepEqual([body.parameters.width, body.parameters.height], [832, 1216])
@@ -165,13 +168,15 @@ test('gate: 按柏宝绘写法画的差分（有角色块）：眨眼口型改�
       characters: ['girl, long black hair, blue eyes, light smile, looking at viewer, cowboy shot'],
       characterNegatives: ['glasses, full body'],
     }))
+    // 以前插件自己加的负面（outdoors、full body）不再带上；玩家给这张写的照带
+    await engine.castAction('g', 'save', { name: '林岚', patch: { negative: 'glasses' } })
     const rects = { eyes: [[320, 216, 392, 280]], mouth: [[392, 312, 432, 328]] }
     await engine.aaInpaint('g', { name: '林岚', key, part: 'eyes', state: 'closed', rects, image: dataUrl(await grayPng(832, 1216, () => 255)) })
     const q = requests.at(-1).body.parameters
     assert.equal(requests.at(-1).body.input, '<artist>a</artist>, transparent background, cowboy shot, solo, looking at viewer', 'Base 原样')
     assert.equal(q.v4_prompt.caption.char_captions[0].char_caption, 'closed eyes, girl, long black hair, light smile, cowboy shot')
-    assert.equal(q.v4_negative_prompt.caption.char_captions[0].char_caption, 'glasses, full body, open eyes, eyelashes up')
-    assert.equal(q.negative_prompt, 'lowres, outdoors')
+    assert.equal(q.v4_negative_prompt.caption.char_captions[0].char_caption, 'glasses, open eyes, eyelashes up')
+    assert.equal(q.negative_prompt, 'lowres, bad hands')
     assert.equal(q.use_coords, true)
     engine.dispose()
   } finally {

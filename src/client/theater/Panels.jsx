@@ -1343,7 +1343,7 @@ function DirectorSection({ data, onDirectorLog }) {
       <Field label="自定义提示词" hint="留空用内置导演提示词。可用 {{maxImages}} {{styleHint}}。情绪库、配乐曲库附在用户消息里，自定义时也生效。">
         <textarea className="fg-textarea" defaultValue={cfg.director.systemPrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.systemPrompt) p({ systemPrompt: e.target.value }) }} />
       </Field>
-      <Field label="立绘设计师提示词" hint="留空用内置的。可用 {{styleHint}}。输出格式必须是 {&quot;sprites&quot;:[{&quot;key&quot;,&quot;tags&quot;,&quot;negative&quot;}]}。">
+      <Field label="立绘设计师提示词" hint="留空用内置的。可用 {{styleHint}}。输出格式必须是 {&quot;sprites&quot;:[{&quot;key&quot;,&quot;tags&quot;}]}（负面只用画风里带的，写了也不收）。">
         <textarea className="fg-textarea" defaultValue={cfg.director.spritePrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.spritePrompt) p({ spritePrompt: e.target.value }) }} />
       </Field>
       <Field label="动作与表情设计提示词" hint="留空用内置的（画立绘前给每个人设计专属动作和表情）。可用 {{styleHint}} {{max}}。输出格式必须是 {&quot;read&quot;,&quot;poses&quot;:[{&quot;id&quot;,&quot;label&quot;,&quot;desc&quot;,&quot;tags&quot;,&quot;side&quot;,&quot;emotions&quot;}],&quot;faces&quot;:[{&quot;emotion&quot;,&quot;desc&quot;,&quot;tags&quot;}]}。">
