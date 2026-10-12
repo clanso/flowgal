@@ -3,6 +3,7 @@
 // 打字音和音效照 lib/sounds.js 的配方用 WebAudio 现场合成，不需要音频文件；某种音效换成了玩家上传的文件时放那个文件。
 import { assetUrl } from '../api.js'
 import { voiceById, soundFor, slotById, DEFAULT_SOUNDS } from '../../../lib/sounds.js'
+import { FOLEY } from '../../../lib/foley.js'
 
 let preview = null   // { el, id, onEnd }
 let ctx = null
@@ -391,6 +392,13 @@ export function previewVoice(voice, ui = sounds) {
 /** 落字音效：impact / slam / stab / ding / whoosh，按设置里选的版本或上传的文件；音效关了不响。 */
 export function stinger(kind) {
   if (sounds.sfx !== false) playSound(soundFor(sounds, kind), sounds.sfxVolume ?? 1)
+}
+
+/** 拟音：小瞬间（拍照、干杯、烟花……）的合成声音，配方在 lib/foley.js。delay 毫秒后再响。跟落字音效同一个开关和音量。 */
+export function foley(id, delay = 0) {
+  if (sounds.sfx === false || !FOLEY[id]) return
+  const ac = audioCtx()
+  if (ac) playParts(ac, FOLEY[id], { volume: sounds.sfxVolume ?? 1, at: ac.currentTime + delay / 1000 })
 }
 
 /** 界面音：hover / select / page / open（back 当 select）。跟落字音效同一个开关和音量。 */
