@@ -17,7 +17,7 @@ const STATUS = { running: ['进行中', 'is-running'], ok: ['完成', 'is-ok'], 
 const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词', cg: '写插画提示词', acting: '设计动作与表情' }
 const WRITER = { ai: '模型写的', fallback: '按档案拼的', user: '玩家改的' }
 // 宿主在启动后才定（酒馆版换了传输），所以现取
-const sourceLabel = source => ({ tavern: hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern 后台模型', plugin: '插件设置里指定' })[source]
+const sourceLabel = source => ({ tavern: hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern 后台模型', plugin: '插件设置里指定', cg: '插画分镜师单独选的', custom: '插画分镜师的自定义接口' })[source]
 const USAGE_LABEL = { inputTokens: '输入', outputTokens: '输出', reasoningTokens: '思考', cachedInputTokens: '缓存命中', cacheReadTokens: '缓存读', cacheWriteTokens: '缓存写', totalTokens: '合计' }
 const SHAPE_LABEL = { landscape: '横版', portrait: '竖版', square: '方形' }
 /** 段落里一个人当时的样子：「柯萝伊 魔导师长袍 · 无状态 · 外貌另写」。 */
@@ -345,7 +345,7 @@ function LogDetail({ gameId, summary }) {
           {running && <button type="button" className="fg-btn" disabled={stopping} onClick={stop}>{writer ? '停止' : '停止整理'}</button>}
         </div>
         <div className="fg-dlog-facts">
-          <div><i>模型</i>{summary.model || '—'}{summary.provider ? <span className="fg-note"> · {summary.provider}</span> : null}{sourceLabel() ? <span className="fg-note">（{sourceLabel()}）</span> : null}</div>
+          <div><i>模型</i>{summary.model || '—'}{summary.provider ? <span className="fg-note"> · {summary.provider}</span> : null}{sourceLabel(summary.source) ? <span className="fg-note">（{sourceLabel(summary.source)}）</span> : null}</div>
           <div><i>时间</i>{clock(summary.at)} · {secs(elapsed)} · {REASON[summary.reason] || summary.reason}</div>
           <div><i>最大输出</i>{num(summary.maxTokens)} token{entry && entry.temperature != null ? ` · 温度 ${entry.temperature}` : ''}</div>
           <div><i>模型窗口</i>{summary.window ? `${num(summary.window)} token` : '宿主没给窗口大小，按设置原样发'}{entry && entry.outputDefault ? <span className="fg-note"> · 模型默认输出 {num(entry.outputDefault)}</span> : null}</div>
