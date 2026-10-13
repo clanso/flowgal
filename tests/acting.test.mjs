@@ -272,7 +272,7 @@ test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整�
     assert.equal(writer.length, 1)
     const writerUser = writer[0].messages[0].content[0].text
     assert.match(writerUser, /- s1：只换脸——在「赌气」那张「抱着胳膊别过脸」动作底图上只重画脸.*情绪「生气」.*这个人的表情：生气时反而不说话，眼神冷下来（脸 expressionless, narrowed eyes, cold eyes, closed mouth）/)
-    assert.match(writerUser, /- s2：.*情绪「赌气」；这个人的动作「抱着胳膊别过脸」：嘴硬的时候（身体 arms crossed, head turned away）；这个人的表情：鼓着脸不看人.*同一个动作的生气、害羞会在这张上只换脸/)
+    assert.match(writerUser, /- s2：.*情绪「赌气」；这个人的动作「抱着胳膊别过脸」：嘴硬的时候（身体 arms crossed, head turned away）；这个人的表情：鼓着脸不看人.*同一个动作的生气、害羞、脸红会在这张上只换脸/, '没分到的脸红跟着它那一类（羞）的害羞走')
     assert.match(writerUser, /【剧情（到第/)
     assert.match(writer[0].system, /标着「只换脸」的.*跟整张画的一样读完资料和剧情再写，不要照抄设计好的表情/)
     assert.equal(requests.length, 1)

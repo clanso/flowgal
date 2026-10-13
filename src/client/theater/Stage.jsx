@@ -3,9 +3,10 @@
 import React from 'react'
 import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
-import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, HIT_IMPACT_MS, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
+import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, HIT_IMPACT_MS, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL, builtinOf } from './playback.js'
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
+import { resolveEmotion, standIns } from '../../../lib/emotions.js'
 import { heightOf, placeSprite, usualFace, faceCrop, FACE_RATIO } from '../../../lib/stature.js'
 import { aimCamera } from '../../../lib/camera.js'
 import { reactKind, stackLayers } from '../../../lib/blocking.js'
@@ -201,17 +202,18 @@ export function Silhouette({ name, color, appearance, gender }) {
 }
 
 /**
- * 这一拍该用的立绘：按这一轮的样子（外貌、服装、长期状态）找对应情绪的差分，新情绪没画好时先用它的基础情绪。
+ * 这一拍该用的立绘：按这一轮的样子（外貌、服装、长期状态）找对应情绪的差分，没画好时按情绪库依次先用替身
+ * （并进它的情绪以前画的、替身、它那一类的代表情绪、平静，见 standIns）。
  * 段落里导演写了这个人当时的样子（then）就按当时的找；还没画好时先显示剪影，不借现在那套。
  * 这一轮中途才变的样子（pending：后面才缠上发带、才换衣服）还没发生时，按变化之前的样子找。
  */
 function spriteFor(person, turn, emo, emotions, then = null, pending = null) {
   if (!person || !person.timeline) return ''
-  const custom = (emotions || []).find(e => e.id === emo)
+  const lib = emotions || []
   const now = lookAt(person.timeline, turn)
   const over = then || (pending ? undoShifts(now, pending) : null)
   const look = over ? thenLook(now, over, person.timeline.outfits) : now
-  return pickSprite(person.sprites, look, emo, custom ? custom.base : '', { strict: Boolean(then) })
+  return pickSprite(person.sprites, look, resolveEmotion(emo, lib) || emo, standIns(emo, lib), { strict: Boolean(then) })
 }
 
 /** 登场从靠近的那一侧滑进来，退场往同一侧淡出。 */
@@ -298,7 +300,8 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     const el = reactRef.current
     if (!el || typeof el.animate !== 'function' || (!reaction && !move && !symKind)) return
     if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const base = reaction ? (((emotions || []).find(e => e.id === reaction.emo) || {}).base || reaction.emo) : ''
+    // 新情绪按它接近的内置情绪（替身一路往下、它那一类的代表情绪）选怎么动
+    const base = reaction ? builtinOf(reaction.emo, emotions) : ''
     const turning = move && TURN_FRAMES[move.act] ? TURN_FRAMES[move.act]((entry.x ?? 50) < 50 ? -1 : 1) : null
     const kind = symKind || (reaction && (reaction.emo || !move) ? reactKind(base) : STEP_MOVES.has(move.act) ? 'step' : '')
     const frames = turning || REACT_FRAMES[kind]

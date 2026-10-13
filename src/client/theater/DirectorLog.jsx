@@ -6,7 +6,6 @@ import { api, toast, useDirectorLog, hostName } from '../api.js'
 import { Panel } from './Panels.jsx'
 import { formatLook } from '../../../lib/look.js'
 import { MOVE_LABEL, ENTER_HOW_LABEL, EXIT_HOW_LABEL, DELIVERY_LABEL, TEXT_FX_LABEL, HIT_EFFECT_LABEL, ROMANCE_LABEL, SENSE_LABEL, MOMENT_LABEL, PHONE_LABEL, CALL_END_LABEL } from '../../../lib/vocab.js'
-import { emotionEntry } from '../../../lib/emotions.js'
 import { EROS_LABEL, TENTACLE_LABEL, PEAK_LABEL } from '../../../lib/eros.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, RECALL_TONE_LABEL, CARD_LABEL, POS_LABEL, CAMERA_LABEL, SYMBOL_LABEL, TRANSITION_LABEL, VOICE_LABEL, CG_IN_LABEL, CG_OUT_LABEL, CG_MOTION_LABEL } from './playback.js'
 
@@ -247,7 +246,7 @@ function ActingView({ acting }) {
   // 只重写表演笔记的那次：只有笔记
   if (acting && acting.read && !(acting.poses && acting.poses.length)) return <Block label="表演笔记（只重写了这一条，动作和表情没动）"><div>{acting.read}</div></Block>
   if (!acting || !acting.poses || !acting.poses.length) return <div className="fg-note">这次没有设计出能用的动作，先按已有的设计或通用动作组画；看「原始输出」里模型回了什么。</div>
-  const label = e => emotionEntry(e).label
+  const label = e => emotionLabel(e)
   return (
     <>
       {acting.read && <Block label="表演笔记"><div>{acting.read}</div></Block>}
