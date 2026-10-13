@@ -88,6 +88,7 @@ export const api = {
   music: () => call('/music'),
   updateTrack: (id, patch) => call('/music', { action: 'update', id, patch }),
   removeTrack: id => call('/music', { action: 'remove', id }),
+  clearMusic: () => call('/music', { action: 'clear' }),
   /** 上传一首配乐：请求体直接是文件字节（最大 50 MB），不走 JSON。 */
   async uploadTrack(file) {
     return (await uploadFile(`/music/upload?name=${encodeURIComponent(file.name || '')}`, file)).track
