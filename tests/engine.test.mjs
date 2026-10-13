@@ -395,7 +395,7 @@ test('gate: 导演新造的复合情绪进情绪库，按这身衣服和长期�
     // 导演下一轮能在情绪库里看到它。
     await engine.onTurnSettled({ gameId: 'g', turn: 4, textVersion: 'v4', text: '“嗯。”' })
     const next = llm.calls.filter(c => c.system.includes('后台导演')).at(-1).messages[0].content[0].text
-    assert.match(next, /【情绪库】[\s\S]*新加的（直接写原词）：带着烦躁思考/)
+    assert.match(next, /【情绪库】[\s\S]*【思】[^\n]*thinking 思考[^\n]*，带着烦躁思考/, '按类别列：跟着它接近的思考归进「思」')
     assert.doesNotMatch(next, /皱眉撇嘴/)
     engine.dispose()
   } finally {

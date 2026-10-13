@@ -1361,9 +1361,32 @@
 .fg-aa-play.is-big.is-close { width: min(46cqw, 76cqh); height: auto; aspect-ratio: 1; }
 .fg-variant-body { display: grid; gap: .6cqw; align-content: start; min-width: 0; }
 .fg-variant-body b { font-size: 1.15cqw; letter-spacing: .08em; }
-.fg-emotion-row { display: grid; grid-template-columns: 12cqw 9cqw 1fr auto; gap: .8cqw; align-items: center; padding: .6cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .05); }
-.fg-emotion-row b { font-size: 1.15cqw; letter-spacing: .06em; }
-.fg-emotion-row.is-new { grid-template-columns: 1fr 9cqw auto; border-bottom: 0; margin-top: .6cqw; }
+/* 情绪库（EmotionLibrary.jsx）：按类别分组的一行一种情绪 */
+.fg-emo-lib { display: grid; gap: .6cqw; }
+.fg-emo-lib .fg-input, .fg-emo-lib .fg-select { padding: .45cqw .8cqw; font-size: 1cqw; }
+.fg-emo-sticky { position: sticky; top: 0; z-index: 3; display: grid; gap: .5cqw; padding: .6cqw 0; background: rgb(13, 10, 30); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(0, 0, 0, .5); }
+.fg-emo-batch { margin: 0; }
+.fg-emo-add { display: grid; grid-template-columns: 1fr 8cqw 12cqw auto; gap: .8cqw; align-items: center; }
+.fg-emo-group { border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); }
+.fg-emo-group-head { display: flex; align-items: center; gap: .6cqw; padding: .5cqw .9cqw; }
+.fg-emo-group-head > button { flex: 1; display: flex; align-items: baseline; gap: .8cqw; padding: 0; font: inherit; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
+.fg-emo-group-head b { font-family: var(--font-display); font-size: 1.3cqw; letter-spacing: .16em; color: var(--accent); }
+.fg-emo-caret { width: 1em; color: var(--ink-dim); }
+.fg-emo-empty { padding: 0 1cqw .7cqw 3.4cqw; }
+.fg-emo-row { display: grid; grid-template-columns: auto 11cqw 7cqw 12cqw 1fr auto; gap: .7cqw; align-items: center; padding: .45cqw .9cqw; border-top: 1px solid rgba(255, 255, 255, .05); }
+.fg-emo-row.is-off .fg-emo-name input { opacity: .5; text-decoration: line-through; }
+.fg-emo-row.is-picked { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+.fg-emo-name { display: flex; align-items: center; gap: .4cqw; min-width: 0; }
+.fg-emo-name input { font-weight: 600; letter-spacing: .04em; }
+.fg-emo-name small { font-size: .8cqw; opacity: .5; font-family: var(--font-latin); }
+.fg-emo-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.fg-emo-acts { display: flex; gap: .4cqw; flex-wrap: wrap; justify-content: flex-end; }
+.fg-emo-prompts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1cqw; padding: .4cqw 0 .6cqw 2.4cqw; }
+.fg-emo-prompt { display: grid; gap: .4cqw; align-content: start; }
+.fg-emo-prompt b { font-size: 1cqw; }
+.fg-emo-cats { display: grid; gap: .5cqw; }
+.fg-emo-cat { display: grid; grid-template-columns: 9cqw 14cqw 1fr auto; gap: .7cqw; align-items: center; }
+.fg-emo-restore { cursor: pointer; font: inherit; color: inherit; }
 .fg-chip small { margin-left: .3em; opacity: .55; font-size: .85em; }
 
 /* 表单 */
@@ -1524,7 +1547,12 @@
   .fg-fx-items { gap: 1.2cqw; }
   .fg-fx-chip { font-size: 2.8cqw; padding: .9cqw 2cqw .9cqw 1.4cqw; gap: 1cqw; } .fg-fx-chip i { width: 1.8cqw; height: 1.8cqw; }
   .fg-input, .fg-select, .fg-textarea { font-size: 3cqw; }
-  .fg-outfit, .fg-outfit.is-new, .fg-emotion-row, .fg-emotion-row.is-new { grid-template-columns: 1fr; }
+  .fg-outfit, .fg-outfit.is-new { grid-template-columns: 1fr; }
+  .fg-emo-lib .fg-input, .fg-emo-lib .fg-select { font-size: 3cqw; padding: 1cqw 1.6cqw; }
+  .fg-emo-add, .fg-emo-cat, .fg-emo-prompts { grid-template-columns: 1fr; }
+  .fg-emo-row { grid-template-columns: auto 1fr 1fr; } .fg-emo-row > .fg-select, .fg-emo-row > .fg-note:not(.fg-emo-meta) { grid-column: 2 / -1; } .fg-emo-name { grid-column: 2 / -1; }
+  .fg-emo-meta, .fg-emo-acts { grid-column: 1 / -1; } .fg-emo-acts { justify-content: flex-start; }
+  .fg-emo-group-head b { font-size: 3.4cqw; } .fg-emo-name small { font-size: 2.4cqw; } .fg-emo-prompt b { font-size: 3cqw; }
   .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }
   .fg-aa-grid { grid-template-columns: 1fr; } .fg-aa-list { max-height: 50cqw; }
   .fg-aa-vision { font-size: 2.6cqw; } .fg-aa-badge { font-size: 2.2cqw; } .fg-aa-vision progress { height: 1.6cqw; }

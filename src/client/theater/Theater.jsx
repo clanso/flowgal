@@ -1,7 +1,7 @@
 // 剧场：全屏 galgame 播放器。读宿主整理好的场景脚本，逐拍演出；导演没整理完的部分先按原文演。
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
-import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS } from './playback.js'
+import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, showEmotions, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS } from './playback.js'
 import { Backdrop, SceneCover, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, HitImpact, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, StageFlags, useCamera, useHits } from './Stage.jsx'
 import { effectsOff, muteView, muteBeats, offDeliveries, cssOff } from './effects.js'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
@@ -107,6 +107,7 @@ export function TheaterRoot() {
 }
 
 function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel, panelArg }) {
+  showEmotions(view && view.emotions)
   const ui0 = (cfg && cfg.ui) || { skin: 'stellar', textSpeed: 30, autoDelay: 1400, blip: true, bgm: true, bgmVolume: 0.45, fontBase: '' }
   // 特效开关（设置 → 特效，effects.js）：关掉的演出在摊平成节拍前后拿掉，剩下几样在下面按 off 直接不演。
   // 按关掉的那几个的名字记：调音量这类别的设置变了不重新摊平
