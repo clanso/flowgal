@@ -3,7 +3,8 @@ import React from 'react'
 import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, hostName } from '../api.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, RECALL_TONES, RECALL_TONE_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
-import { allEmotions, emotionEntry, personEmotions } from '../../../lib/emotions.js'
+import { allEmotions, emotionEntry, personEmotions, nearestOf } from '../../../lib/emotions.js'
+import { EmotionLibrary } from './EmotionLibrary.jsx'
 import { AaWorkbench, RectEditor } from './AaWorkbench.jsx'
 import { visionApi, frameSprite } from './vision.js'
 import { framedResult } from './faceFramer.js'
@@ -21,7 +22,7 @@ import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../l
 import { SOUND_SIDECAR, readSoundSidecar, soundMatcher, writeSoundSidecar } from '../../../lib/soundlib-sidecar.js'
 import { modelKey, qualityFor, negativeFor, sizeFor, MAX_STYLES } from '../../../lib/image/style.js'
 import { naiModelInfo } from '../../../lib/image/nai-models.js'
-import { CG_MAX_CHARACTERS, EMOTIONS, EMOTION_POSE, POSES } from '../../../lib/vocab.js'
+import { CG_MAX_CHARACTERS, EMOTION_POSE, POSES } from '../../../lib/vocab.js'
 import { POSE_IDS, poseMembers, anchorOf, faceBoxFrom, cleanFaceBox } from '../../../lib/face.js'
 import { heightOf } from '../../../lib/stature.js'
 import { DIRECTOR_LIMITS } from '../../../lib/limits.js'
@@ -675,7 +676,7 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
       {viewing && <SpriteViewer record={record} label={label} onClose={() => setViewing(false)} />}
       <div className="fg-variant-body">
         <div className="fg-row"><b>{label}</b><span className="fg-spacer" /><button type="button" className="fg-btn is-mini" onClick={onClose}>收起</button></div>
-        {!entry.builtin && entry.base && <div className="fg-note">新情绪，接近{emotionLabel(entry.base)}（这张还没画好时先用那张）</div>}
+        {emotion !== 'neutral' && <div className="fg-note">替身「{emotionLabel(nearestOf(emotion, emotions) || 'neutral', emotions)}」：这张还没画好时先用那张（情绪库里能改）{entry.off ? ' · 这种情绪停用了，导演不再用它' : ''}</div>}
         {st && st.error && <div className={`fg-note${st.status === 'face' || st.status === 'writing' ? '' : ' fg-err'}`}>{st.error}</div>}
         <FaceInfo gameId={gameId} person={person} group={group} emotionKey={key} record={record} emotions={emotions} />
         <textarea className="fg-textarea" value={tags} onChange={e => setTags(e.target.value)} onKeyDown={e => e.stopPropagation()} placeholder={record && record.face ? '只换脸：这里只写表情（眉、眼、嘴、脸红、泪、视线）' : '还没有提示词：点「让设计师写」，它会读完资料和剧情来写'} />
@@ -1016,38 +1017,6 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
   )
 }
 
-/** 情绪库：内置情绪 + 导演自创的、你加的。新情绪写一句神情姿态，立绘设计师照着画。 */
-function EmotionLibrary({ emotions }) {
-  const [busy, run] = useBusy()
-  const [draft, setDraft] = React.useState({ id: '', base: '' })
-  const builtin = allEmotions([]).filter(e => e.builtin)
-  const custom = (emotions || [])
-  const baseOptions = [['', '（无）'], ...builtin.map(e => [e.id, e.label])]
-  const save = (id, patch) => run('e' + id, () => api.emotion('save', { id, ...patch }), '已保存')
-  return (
-    <>
-      <div className="fg-note">导演给每句台词标情绪；库里没有贴切的词时，它会自创一个（可以是复合情绪，比如「带着烦躁思考」），加进这里。库里只有这个词本身，不带描述：这种情绪在谁脸上什么样，由表演设计师按那个人的表演笔记设计（人物志 →「动作与表情」）。「接近」是还没画好时先用哪张立绘。导演新造的情绪只挂在用过它的角色下面，谁用到了才给谁画差分；你自己加的大家都能用。所有对局共用。</div>
-      <div className="fg-section">新加的情绪 · {custom.length}</div>
-      {custom.map(e => (
-        <div key={e.id} className="fg-emotion-row">
-          <b>{e.id}</b>
-          <Select value={e.base || ''} options={baseOptions} onChange={v => save(e.id, { base: v })} />
-          <span className="fg-note">{e.source === 'user' ? '你加的 · 大家都能用' : `导演加的${e.turn != null ? ` · 第 ${e.turn} 轮` : ''}${e.who && e.who.length ? ` · 用于 ${e.who.join('、')}` : ''}`}</span>
-          <button type="button" className="fg-btn" disabled={busy === 'x' + e.id} onClick={() => run('x' + e.id, () => api.emotion('delete', { id: e.id }), '已删除（画好的立绘还在）')}>删除</button>
-        </div>
-      ))}
-      {!custom.length && <div className="fg-note">还没有。导演遇到内置情绪表达不了的瞬间时会自己加。</div>}
-      <form className="fg-emotion-row is-new" onSubmit={e => { e.preventDefault(); if (draft.id.trim()) run('add', () => api.emotion('save', draft), '已加进情绪库').then(() => setDraft({ id: '', base: '' })) }}>
-        <input className="fg-input" placeholder="新情绪，比如「苦闷地表白」（词本身要能看懂）" value={draft.id} onChange={e => setDraft({ ...draft, id: e.target.value })} onKeyDown={e => e.stopPropagation()} />
-        <Select value={draft.base} options={baseOptions} onChange={v => setDraft({ ...draft, base: v })} />
-        <button type="submit" className="fg-btn is-primary">加进情绪库</button>
-      </form>
-      <div className="fg-section">内置 · {builtin.length}</div>
-      <div className="fg-row">{builtin.map(e => <span key={e.id} className="fg-chip">{e.label}<small>{e.id}</small></span>)}</div>
-    </>
-  )
-}
-
 export function CastPanel({ view, gameId, onClose }) {
   const [tab, setTab] = React.useState('people')
   const [busy, run] = useBusy()
@@ -1081,7 +1050,7 @@ export function CastPanel({ view, gameId, onClose }) {
       {tab === 'people' && benchPerson && <AaWorkbench key={bench} gameId={gameId} person={benchPerson} onClose={() => setBench('')} />}
       {tab === 'people' && !benchPerson && cast.map(p => <PersonCard key={p.name} gameId={gameId} person={p} emotions={emotions} cast={cast} voice={voices.get(p.name)} used={used.get(p.name) || []} onBench={() => setBench(p.name)} />)}
       {tab === 'people' && !cast.length && <div className="fg-note">有名字的角色第一次出场时，导演会自动给他建档：固定外貌、身上的衣服。之后插画里写 @名字 都会换成这份档案，长相不再漂移；立绘按「服装 × 长期状态 × 情绪」各画一套，同一个种子。</div>}
-      {tab === 'emotions' && <EmotionLibrary emotions={emotions} />}
+      {tab === 'emotions' && <EmotionLibrary emotions={emotions} view={view} gameId={gameId} />}
       {tab === 'log' && log.map(e => (
         <div key={e.index} className="fg-log-item" style={{ gridTemplateColumns: '12cqw 1fr auto', cursor: 'default' }}>
           <div className="fg-log-name">{e.name}</div>
@@ -1570,14 +1539,14 @@ function CgModelFields({ data, providers }) {
 function PoseGroups({ poses, onChange }) {
   const changed = Object.keys(poses).length > 0
   return (
-    <Field label="通用动作组" hint="立绘设计师关着、或者还没给某个人设计出专属动作时用这几组：每组整张画一张底图（标「底图」的情绪），同组其余情绪在它上面只换脸。想让某个情绪换个动作，就把它挪到别的组；导演新造的情绪跟着它最接近的内置情绪走。改了只影响之后画的。">
+    <Field label="通用动作组" hint="立绘设计师关着、或者还没给某个人设计出专属动作时用这几组：每组整张画一张底图（标「底图」的情绪），同组其余情绪在它上面只换脸。想让某个情绪换个动作，就把它挪到别的组；新加的情绪跟着它的替身走（没写替身跟它那一类的代表情绪）。改了只影响之后画的。">
       <div className="fg-pose-grid">
         {POSE_IDS.map(pose => (
           <div key={pose} className="fg-pose-col">
             <b>{POSES[pose].label}</b>
             {poseMembers(pose, [], poses).map(e => (
               <label key={e} className="fg-pose-item">
-                <span>{EMOTIONS[e]}{anchorOf(pose, [], poses) === e ? <i> · 底图</i> : null}</span>
+                <span>{emotionLabel(e)}{anchorOf(pose, [], poses) === e ? <i> · 底图</i> : null}</span>
                 <select value={pose} onChange={ev => onChange({ [e]: ev.target.value === EMOTION_POSE[e] ? null : ev.target.value })}>
                   {POSE_IDS.map(id => <option key={id} value={id}>{POSES[id].label}</option>)}
                 </select>
