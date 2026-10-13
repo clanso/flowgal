@@ -16,8 +16,8 @@ export { emotionLabel } from '../../../lib/emotions.js'
 export const TIME_LABEL = { dawn: '黎明', morning: '清晨', noon: '正午', afternoon: '午后', dusk: '黄昏', evening: '傍晚', night: '夜', midnight: '深夜' }
 export const WEATHER_LABEL = { clear: '晴', rain: '雨', storm: '暴雨', snow: '雪', blizzard: '暴风雪', wind: '狂风', sakura: '樱吹雪', leaves: '落叶', fireflies: '萤火', fog: '雾', embers: '余烬', dust: '浮尘', bokeh: '光斑', stars: '星空', sparkles: '光点', bubbles: '气泡' }
 export const MOOD_LABEL = { daily: '日常', cheerful: '轻快', comic: '滑稽', sweet: '甜蜜', touching: '感动', calm: '静谧', solemn: '庄严', sad: '感伤', despair: '绝望', tense: '紧张', mystery: '悬疑', eerie: '诡异', battle: '激战', heroic: '热血', silence: '寂静' }
-export const LIGHT_LABEL = { normal: '', dim: '昏暗', dark: '熄灯', black: '漆黑', candle: '烛光', spot: '聚光', neon: '霓虹', screen: '屏幕光', alarm: '警报红光', moon: '月光', warm: '暖光', cold: '冷光', glare: '强光', flicker: '灯光闪烁' }
-export const FX_LABEL = { none: '', sway: '摇晃', ride: '颠簸', handheld: '手持', drift: '推近', woozy: '晕眩', heat: '热浪', underwater: '水下', rumble: '震动', speed: '疾驰', heartbeat: '心跳', slowmo: '慢动作', timestop: '时间停止' }
+export const LIGHT_LABEL = { normal: '', dim: '昏暗', dark: '熄灯', black: '漆黑', candle: '烛光', spot: '聚光', neon: '霓虹', screen: '屏幕光', alarm: '警报红光', moon: '月光', warm: '暖光', cold: '冷光', glare: '强光', flicker: '灯光闪烁', sunbeam: '窗光', leak: '漏光', flare: '逆光' }
+export const FX_LABEL = { none: '', sway: '摇晃', ride: '颠簸', handheld: '手持', drift: '推近', woozy: '晕眩', heat: '热浪', underwater: '水下', rumble: '震动', speed: '疾驰', heartbeat: '心跳', slowmo: '慢动作', timestop: '时间停止', fading: '褪成回忆' }
 export const MODE_LABEL = { ...MODE_NAMES, real: '回到现实' }
 export { RECALL_TONES, RECALL_TONE_NAMES as RECALL_TONE_LABEL }
 export const CUT_LABEL = { time: 'Time Skip', date: 'Date', chapter: 'Chapter', meanwhile: 'Meanwhile' }
@@ -27,7 +27,7 @@ export const CG_OUT_LABEL = { dissolve: '溶回场景', slow: '慢慢淡去', bl
 export const CG_MOTION_LABEL = { still: '静止', push: '极慢推近', pan: '横移一遍' }
 export const CARD_LABEL = { sms: '短信', letter: '信', note: '便条', news: '报纸', terminal: '终端', notice: '告示', diary: '日记', scroll: '卷轴' }
 export const POS_LABEL = { farleft: '最左', left: '左', center: '中', right: '右', farright: '最右' }
-export const CAMERA_LABEL = { shake: '震动', zoom: '推近', zoomout: '拉远', flash: '闪白', pan: '平移', blur: '虚焦', fadeblack: '黑场', redflash: '红闪', tilt: '倾斜', closeup: '特写', focus: '背景虚化', whip: '甩镜', sink: '下沉', rise: '升起', lowangle: '仰拍', dolly: '希区柯克变焦', empty: '空镜', slowpush: '缓推' }
+export const CAMERA_LABEL = { shake: '震动', zoom: '推近', zoomout: '拉远', flash: '闪白', pan: '平移', blur: '虚焦', fadeblack: '黑场', redflash: '红闪', tilt: '倾斜', closeup: '特写', focus: '背景虚化', whip: '甩镜', sink: '下沉', rise: '升起', lowangle: '仰拍', dolly: '希区柯克变焦', empty: '空镜', slowpush: '缓推', rackfocus: '移焦' }
 export const SYMBOL_LABEL = { heart: '爱心', anger: '怒筋', sweat: '汗滴', sparkle: '闪光', surprise: '惊叹', gloom: '阴云', note: '音符', zzz: '睡着', bulb: '灵光', heartbreak: '心碎', sigh: '叹气', dizzy: '眩晕', fire: '燃起', blush: '红晕', bloom: '开花', silence: '无语' }
 export const TRANSITION_LABEL = { dissolve: '溶解', fade: '慢慢变化', cinematic: '电影黑边', wipe: '横扫', iris: '圆形收缩', strips: '百叶', black: '黑场', flash: '白闪', blink: '闭眼睁眼', glitch: '画面撕裂', swirl: '旋转入梦', haze: '起雾', none: '直接切' }
 const POS_X = { farleft: 14, left: 28, center: 50, right: 72, farright: 86 }

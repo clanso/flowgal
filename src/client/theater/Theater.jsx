@@ -7,6 +7,7 @@ import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
 import { useFaceFramer } from './faceFramer.js'
+import { useParallax } from './parallax.js'
 import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros } from './audio.js'
 import { ErosPeak, useErosPulse } from './Eros.jsx'
 import { EROS_SFX } from '../../../lib/eros.js'
@@ -250,6 +251,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   React.useEffect(() => { if (beat && beat.cam === 'whip' && !title && sfxOn) stinger('whoosh') }, [beat && beat.key])
   const cameraRef = React.useRef(null)
   const cam = useCamera(title ? null : beat, cameraRef)
+  useParallax(stageRef, cameraRef)
   const atEnd = beat && index === beats.length - 1
 
   React.useEffect(() => { loadSkinFonts(ui0.skin, ui0.fontBase) }, [ui0.skin, ui0.fontBase])
