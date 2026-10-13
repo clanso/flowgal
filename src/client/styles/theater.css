@@ -107,6 +107,7 @@
 /* ── 立绘 ── */
 .fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
 .fg-cast[data-split] { right: 34%; }
+.fg-cast[data-veil] { opacity: 0; } /* 亲密场面里立绘退下（Stage.jsx 的 Cast） */
 /* 分屏：右边斜切的一格，另一头的地点和人；白色斜边，滑进滑出；有插画时让开 */
 .fg-split { position: absolute; top: 0; bottom: 0; right: 0; width: 42%; z-index: 8; pointer-events: none; animation: fg-split-in .7s cubic-bezier(.2, .8, .2, 1) both; transition: opacity .6s ease; }
 .fg-split.is-leaving { animation: fg-split-out .6s cubic-bezier(.6, 0, .8, .3) both; }

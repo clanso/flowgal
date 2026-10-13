@@ -1462,6 +1462,13 @@ function ImagesSection({ data }) {
     <>
       <div className="fg-section">自动配图</div>
       <Field label="自动插画" hint="导演判断值得画的地方自动出 CG，挂在正文对应段落后。"><div className="fg-row"><Toggle value={cfg.images.auto} onChange={v => p({ auto: v })} /><span className="fg-note">每轮最多</span><Text type="number" style={{ width: '6cqw' }} value={cfg.images.maxPerTurn} onCommit={v => p({ maxPerTurn: v })} /><span className="fg-note">张</span></div></Field>
+      <Field label="插画方向" hint="横图铺满舞台；竖图在剧场里镜头从上往下慢慢看一遍。交给 AI 时插画分镜师按构图挑（多人铺开、远景出横图，单人、特写、两人贴近出竖图）。只管自动配的插画，鉴赏里还能单张改。">
+        <select className="fg-select" style={{ width: 'auto' }} value={cfg.images.cgShape || 'auto'} onChange={e => p({ cgShape: e.target.value })}>
+          <option value="auto">AI 自己判断</option>
+          <option value="landscape">都出横图</option>
+          <option value="portrait">都出竖图</option>
+        </select>
+      </Field>
       <Field label="新地点背景"><Toggle value={cfg.images.backgrounds} onChange={v => p({ backgrounds: v })} /></Field>
       <Field label="立绘" hint="角色登场、换装、长期状态变化时，画这一套的平静立绘。"><Toggle value={cfg.images.portraits} onChange={v => p({ portraits: v })} /></Field>
       <Field label="情绪差分" hint="导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。"><div className="fg-row"><Toggle value={cfg.images.expressions} onChange={v => p({ expressions: v })} /><span className="fg-note">每轮最多</span><Text type="number" style={{ width: '6cqw' }} value={cfg.images.expressionsPerTurn} onCommit={v => p({ expressionsPerTurn: v })} /><span className="fg-note">张</span></div></Field>

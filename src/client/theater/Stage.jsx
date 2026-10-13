@@ -438,8 +438,10 @@ export function Cast({ beat, view, talk, max = 5 }) {
   cast = stackLayers(blockLayout(stageLayout(onStage(cast, beat.recent, max)), beat.poses), beat.front).map(entry => ({ ...entry, id: entry.name + '@' + (beat.set || 0), seen: beat }))
   const leaving = useLeaving(cast, beat)
   // 插画全屏盖住舞台：立绘照常在下面，插画收起时直接露出来。
+  // 亲密场面（scene.eros 开着）里立绘退下：有插画演插画，还没有就只留背景，不让两个人站着说话；这段结束再回来。
+  const veiled = Boolean(beat.scene && beat.scene.eros && beat.scene.eros !== 'none')
   return (
-    <div className="fg-cast" data-split={split ? 'on' : undefined}>
+    <div className="fg-cast" data-split={split ? 'on' : undefined} data-veil={veiled ? '' : undefined}>
       {cast.map(entry => (
         <Actor key={entry.id} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={talk} />
       ))}
