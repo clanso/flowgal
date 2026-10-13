@@ -144,8 +144,6 @@ export function buildBeats(view) {
       for (const name of speakers) spoke.set(name, beats.length)
       const front = onStageNames.filter(name => spoke.has(name)).sort((a, b) => spoke.get(b) - spoke.get(a))
       const recall = recalls[ui]
-      // 特写切谁：写 true 是说话的人（旁白没说话的人就不切），短闪回里不切
-      const cutin = recall ? '' : line.cutin === true ? speakers[0] || '' : line.cutin || ''
       // 导演没写基调的闪回：进闪回那一句按闪回里的情绪（自定义情绪看它的基础情绪）和这一刻的场景基调挑
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map(e => ((view.emotions || []).find(x => x.id === e) || {}).base || e), at.scene.mood)
       // 手机：打来、拨出的那一句响起；这一轮里接下来写的是没接通、被拒接，就一直响到那一句，不然下一句起就接通了，右上角挂着「通话中」
@@ -193,7 +191,6 @@ export function buildBeats(view) {
         sym: line.sym || '',
         cam: line.cam || '',
         ...(line.camOn ? { camOn: line.camOn } : {}), // 镜头对准谁（不写是说话的人）
-        ...(cutin ? { cutin } : {}), // 特写：画面中间拉开一道窄窄的宽银幕，里面是这个人的眼睛
         ...(hit ? { hit } : {}), // 一次出手：被打的人一震
         ...(line.moment ? { moment: line.moment } : {}), // 小瞬间：拍照、摸头、干杯、约定……
         ...(calling ? { call: calling } : {}), // 正在打的电话：响着（ringing）还是接通了（live）
@@ -324,8 +321,6 @@ export function cgHoldMs(img, mood) {
 export const TRANSITION_MS = { dissolve: 1100, fade: 2600, cinematic: 1500, wipe: 1000, iris: 1200, strips: 800, black: 1800, flash: 1000, blink: 1500, glitch: 700, swirl: 1900, haze: 2600, wake: 1900, none: 0 }
 /** 导演写的停顿：beat 顿一拍（对话框留着，先不出字），silence 沉默（对话框让开，只剩画面和环境声）。 */
 export const PAUSE_MS = { beat: 900, silence: 2400 }
-/** 特写那道宽银幕先拉开、眼睛看清，字再出来。 */
-export const CUTIN_LEAD_MS = 600
 /** 出手时打中的那一刻（HIT_IMPACT_MS），字等打中之后再出。 */
 export const HIT_IMPACT_MS = 420
 export const HIT_LEAD_MS = 700
@@ -427,7 +422,6 @@ export function beatHold(beat, { cg = '', was = {}, eros = true, opening = false
   const change = changePlan(beat, was, { opening })
   if (change) { ms = Math.max(ms, change.total); away = true }
   if (PAUSE_MS[beat.pause]) { ms = Math.max(ms, PAUSE_MS[beat.pause]); if (beat.pause === 'silence') away = true }
-  if (beat.cutin) ms = Math.max(ms, CUTIN_LEAD_MS)
   if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS)
   if (beat.moment) ms = Math.max(ms, MOMENT_LEAD_MS[beat.moment.kind] || 0)
   if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0)

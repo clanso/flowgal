@@ -2,7 +2,7 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS } from './playback.js'
-import { Backdrop, SceneCover, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, CutIn, HitImpact, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, SceneCover, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, HitImpact, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -477,7 +477,6 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} changed={Boolean(hold.change)} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
         {beat && !title && !skip && !change && beat.peak && ui0.eros !== false && <ErosPeak key={beat.key} beat={beat} cameraRef={cameraRef} volume={ui0.storySfx !== false ? erosVolume : 0} />}
-        {beat && !title && beat.cutin && <CutIn key={beat.key} beat={beat} view={view} />}
         {beat && !title && beat.hit && <HitImpact key={beat.key} beat={beat} sound={sfxOn} fx={hit} />}
         {beat && !title && beat.moment && <MomentLayer key={beat.key} beat={beat} view={view} sound={sfxOn} />}
         {/* 手机：响着的来电 / 拨出、视频通话的小窗、挂断的小卡、通知横幅（「通话中」在右上角） */}

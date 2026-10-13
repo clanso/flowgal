@@ -656,23 +656,6 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }
 @keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }
 @keyframes fg-blur { 0% { filter: blur(0); } 30% { filter: blur(6px); } 100% { filter: blur(0); } }
-/* ── 眼睛的特写（导演 cutin，Stage.jsx 的 CutIn）：画面压暗一点，中间缓缓拉开一道窄窄的宽银幕，里面是这个人此刻的眼睛（慢慢推近），
-   两边淡进黑里，上下各一道细细的说话人颜色的线；停 --hold 之后合上。不出声、不写字。在对话框下面、画面上面 ── */
-.fg-cutin { position: absolute; inset: 0; z-index: 19; pointer-events: none; background: rgba(4, 3, 8, .34); animation: fg-fade-in .5s ease both, fg-fade-out .55s ease var(--hold, 1.8s) forwards; }
-.fg-cutin-band { position: absolute; left: 0; right: 0; top: 28%; height: 19%; overflow: hidden; background: linear-gradient(180deg, #040307, color-mix(in oklab, var(--speaker, #9b7bff) 9%, #07060b) 50%, #040307);
-  box-shadow: 0 1.6cqw 4cqw rgba(0, 0, 0, .6), 0 -1.6cqw 4cqw rgba(0, 0, 0, .6);
-  animation: fg-cutin-open .7s cubic-bezier(.65, 0, .25, 1) both, fg-cutin-close .5s cubic-bezier(.6, 0, .4, 1) var(--hold, 1.8s) forwards; }
-.fg-cutin-band::before, .fg-cutin-band::after { content: ""; position: absolute; left: 0; right: 0; height: 1px; z-index: 1; opacity: .5;
-  background: linear-gradient(90deg, transparent 6%, color-mix(in oklab, var(--speaker, #9b7bff) 40%, #fff) 50%, transparent 94%); }
-.fg-cutin-band::before { top: 0; }
-.fg-cutin-band::after { bottom: 0; }
-.fg-cutin-shot { position: absolute; left: 18%; width: 64%; top: 0; bottom: 0; overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 24%, #000 76%, transparent); mask-image: linear-gradient(90deg, transparent, #000 24%, #000 76%, transparent); }
-.fg-cutin-lens { position: absolute; inset: 0; animation: fg-cutin-push calc(var(--hold, 1.8s) + .5s) cubic-bezier(.3, .1, .3, 1) .15s both; }
-.fg-cutin-lens img { position: absolute; max-width: none; height: auto; filter: contrast(1.06) saturate(.9); }
-@keyframes fg-cutin-open { from { clip-path: inset(50% 0 50% 0); } to { clip-path: inset(0); } }
-@keyframes fg-cutin-close { from { clip-path: inset(0); } to { clip-path: inset(50% 0 50% 0); } }
-@keyframes fg-cutin-push { 0% { opacity: 0; transform: scale(1.1); } 30% { opacity: 1; } 100% { opacity: 1; transform: scale(1); } }
 /* 小瞬间：拍照、触碰、干杯、卡片。都在对话框下面，演完淡出（--hold 之后）。 */
 .fg-moment { position: absolute; inset: 0; z-index: 18; pointer-events: none; animation: fg-fade-out .45s ease var(--hold, 2s) forwards; }
 .fg-touch-ring { position: absolute; left: 50%; top: 44%; width: 26cqw; height: 26cqw; border-radius: 50%; transform: translate(-50%, -50%) scale(.2); opacity: 0;
@@ -1733,7 +1716,6 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-cg.is-leaving { animation: fg-cg-fade-out .6s ease both !important; }
   .fg-cg::before { display: none; }
   .fg-camera[data-cam="whip"] { animation: none !important; }
-  .fg-cutin-band, .fg-cutin-lens { animation: none !important; } /* 特写不拉开、不推近，整块淡入淡出 */
   .fg-photo, .fg-cup, .fg-moment-card { animation: fg-fade-in .2s ease both !important; } /* 小瞬间：不飞、不弹，只淡入 */
   .fg-touch-ring, .fg-clink, .fg-fw-trail, .fg-fw-burst, .fg-steam i { animation: none !important; opacity: 0; }
   .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */
@@ -1742,8 +1724,6 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 }
 @container stage (max-aspect-ratio: 4/5) {
   .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }
-  .fg-cutin-band { top: 30%; height: 13%; }
-  .fg-cutin-shot { left: 4%; width: 92%; }
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
   .fg-recall-face { width: 17cqw; }
@@ -2740,19 +2720,6 @@ function faceCrop(box, size) {
   const pct2 = (v) => round(v / side * 100);
   return { width: pct2(w), left: pct2(-((x0 + x1) / 2 - side / 2)), top: pct2(-((y0 + y1) / 2 - side * 0.52)) };
 }
-var CUTIN_FILL = 1.45;
-var CUTIN_EYES = 0.3;
-var CUTIN_AT = [0.5, 0.5];
-function bandCrop(box, size, aspect) {
-  if (!Array.isArray(size) || !(size[0] > 0) || !(size[1] > 0) || !(aspect > 0)) return null;
-  const [w, h] = size;
-  const ok = Array.isArray(box) && box.length === 4 && box.every(Number.isFinite) && box[2] > box[0] && box[3] > box[1];
-  const [x0, y0, x1, y1] = ok ? box : [w / 2 - FACE_RATIO * h / 2, (FACE_CENTER - FACE_RATIO / 2) * h, w / 2 + FACE_RATIO * h / 2, (FACE_CENTER + FACE_RATIO / 2) * h];
-  const scale = CUTIN_FILL / (y1 - y0);
-  const eyes = y0 + (y1 - y0) * CUTIN_EYES;
-  const r = (v) => Math.round(v * 10) / 10;
-  return { width: r(w * scale / aspect * 100), left: r((CUTIN_AT[0] * aspect - (x0 + x1) / 2 * scale) / aspect * 100), top: r((CUTIN_AT[1] - eyes * scale) * 100) };
-}
 
 // lib/cast.js
 var NAME_COLORS = ["#f2739b", "#7aa2ff", "#ffb35c", "#5fd3b3", "#c58bff", "#ff7a6b", "#59c3ff", "#e5c34f", "#9be36b", "#ff8ad8"];
@@ -3199,7 +3166,6 @@ function buildBeats(view) {
       for (const name2 of speakers) spoke.set(name2, beats.length);
       const front = onStageNames.filter((name2) => spoke.has(name2)).sort((a, b) => spoke.get(b) - spoke.get(a));
       const recall = recalls[ui2];
-      const cutin = recall ? "" : line.cutin === true ? speakers[0] || "" : line.cutin || "";
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map((e) => ((view.emotions || []).find((x) => x.id === e) || {}).base || e), at2.scene.mood);
       const phone = line.phone || null;
       if (call2 && call2.who && steps[ui2].entered.includes(call2.who)) call2 = null;
@@ -3247,8 +3213,6 @@ function buildBeats(view) {
         cam: line.cam || "",
         ...line.camOn ? { camOn: line.camOn } : {},
         // 镜头对准谁（不写是说话的人）
-        ...cutin ? { cutin } : {},
-        // 特写：画面中间拉开一道窄窄的宽银幕，里面是这个人的眼睛
         ...hit ? { hit } : {},
         // 一次出手：被打的人一震
         ...line.moment ? { moment: line.moment } : {},
@@ -3371,7 +3335,6 @@ function cgHoldMs(img, mood) {
 }
 var TRANSITION_MS = { dissolve: 1100, fade: 2600, cinematic: 1500, wipe: 1e3, iris: 1200, strips: 800, black: 1800, flash: 1e3, blink: 1500, glitch: 700, swirl: 1900, haze: 2600, wake: 1900, none: 0 };
 var PAUSE_MS = { beat: 900, silence: 2400 };
-var CUTIN_LEAD_MS = 600;
 var HIT_IMPACT_MS = 420;
 var HIT_LEAD_MS = 700;
 var MOMENT_LEAD_MS = { photo: 650, fireworks: 900, cook: 450, nickname: 600, promise: 600, contact: 450 };
@@ -3435,7 +3398,6 @@ function beatHold(beat, { cg = "", was = {}, eros = true, opening = false } = {}
     ms = Math.max(ms, PAUSE_MS[beat.pause]);
     if (beat.pause === "silence") away = true;
   }
-  if (beat.cutin) ms = Math.max(ms, CUTIN_LEAD_MS);
   if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS);
   if (beat.moment) ms = Math.max(ms, MOMENT_LEAD_MS[beat.moment.kind] || 0);
   if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0);
@@ -6098,42 +6060,6 @@ function RecallFace({ beat, view, tone = "" }) {
   const { src, crop } = useFace(person, beat, view, recall && recall.then && recall.then[name2]);
   if (!src) return null;
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-recall-face", key: name2, "data-tone": tone || recall.tone || "warm", style: { "--speaker": person.color || void 0 }, "aria-hidden": "true" }, crop && /* @__PURE__ */ import_react4.default.createElement("img", { src, alt: "", draggable: "false", style: { width: crop.width + "%", left: crop.left + "%", top: crop.top + "%" } }));
-}
-var CUTIN_HOLD_MS = 1800;
-var CUTIN_MS = CUTIN_HOLD_MS + 600;
-function CutIn({ beat, view }) {
-  const name2 = beat.cutin;
-  const person = (view && view.cast || []).find((p4) => p4.name === name2) || null;
-  const sprite = person ? spriteFor(person, beat.turn, beat.emotions && beat.emotions[name2] || "neutral", view && view.emotions, beat.then && beat.then[name2], beat.ahead && beat.ahead[name2]) : "";
-  const src = sprite ? assetUrl(sprite) : "";
-  const shotRef = import_react4.default.useRef(null);
-  const [size, setSize] = import_react4.default.useState(null);
-  const [aspect, setAspect] = import_react4.default.useState(0);
-  const [gone, setGone] = import_react4.default.useState(false);
-  import_react4.default.useLayoutEffect(() => {
-    const el = shotRef.current;
-    if (el && el.clientHeight) setAspect(el.clientWidth / el.clientHeight);
-  }, []);
-  import_react4.default.useEffect(() => {
-    const t = setTimeout(() => setGone(true), CUTIN_MS);
-    return () => clearTimeout(t);
-  }, []);
-  import_react4.default.useEffect(() => {
-    if (!src) return void 0;
-    let live = true;
-    const img = new Image();
-    img.onload = () => {
-      if (live && img.naturalHeight) setSize([img.naturalWidth, img.naturalHeight]);
-    };
-    img.src = src;
-    return () => {
-      live = false;
-    };
-  }, [src]);
-  if (gone) return null;
-  const record = person && src ? Object.values(person.sprites || {}).find((r) => r && r.assetId === sprite) : null;
-  const crop = size && aspect ? bandCrop(faceBoxOf(record, size), size, aspect) : null;
-  return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin", style: { "--speaker": person && person.color || void 0, "--hold": CUTIN_HOLD_MS + "ms" }, "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-band" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-shot", ref: shotRef }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cutin-lens" }, crop && /* @__PURE__ */ import_react4.default.createElement("img", { src, alt: "", draggable: "false", style: { width: crop.width + "%", left: crop.left + "%", top: crop.top + "%" } })))));
 }
 var HIT_SOUND = { hit: "impact", crit: "slam", miss: "whoosh", block: "impact", down: "slam", heal: "ding" };
 var HIT_SHAKE = { hit: [["shake", 1]], crit: [["shake", 3], ["redflash", 1]], block: [["shake", 1]], down: [["shake", 2]] };
@@ -9099,7 +9025,6 @@ function ScriptView({ script, units }) {
       l.split && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "split", k: "分屏" }, l.split === "off" ? "收起" : l.split.who.join("、") + (l.split.location ? ` @ ${l.split.location}` : "")),
       l.sym && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "sym", k: "符号" }, SYMBOL_LABEL[l.sym] || l.sym),
       l.cam && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cam", k: "镜头" }, CAMERA_LABEL[l.cam] || l.cam, l.camOn ? ` · ${l.camOn}` : ""),
-      l.cutin && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "cutin", k: "特写" }, l.cutin === true ? l.sp || "说话的人" : l.cutin),
       l.moment && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "moment", k: "瞬间" }, [MOMENT_LABEL[l.moment.kind] || l.moment.kind, l.moment.who, l.moment.text && `「${l.moment.text}」`, l.moment.place].filter(Boolean).join(" ")),
       l.phone && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "phone", k: "手机" }, [(l.phone.video ? "视频" : "") + (PHONE_LABEL[l.phone.kind] || l.phone.kind), l.phone.who, l.phone.result && CALL_END_LABEL[l.phone.result], l.phone.text && `「${l.phone.text}」`].filter(Boolean).join(" ")),
       l.hit && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "hit", k: "出手" }, [l.hit.from, l.hit.to && "→ " + l.hit.to, l.hit.move && `「${l.hit.move}」`, HIT_EFFECT_LABEL[l.hit.effect] || l.hit.effect].filter(Boolean).join(" ")),
@@ -9792,7 +9717,6 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     beat && !title && /* @__PURE__ */ import_react12.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking, changed: Boolean(hold.change) }),
     /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),
     beat && !title && !skip && !change && beat.peak && ui0.eros !== false && /* @__PURE__ */ import_react12.default.createElement(ErosPeak, { key: beat.key, beat, cameraRef, volume: ui0.storySfx !== false ? erosVolume : 0 }),
-    beat && !title && beat.cutin && /* @__PURE__ */ import_react12.default.createElement(CutIn, { key: beat.key, beat, view }),
     beat && !title && beat.hit && /* @__PURE__ */ import_react12.default.createElement(HitImpact, { key: beat.key, beat, sound: sfxOn, fx: hit }),
     beat && !title && beat.moment && /* @__PURE__ */ import_react12.default.createElement(MomentLayer, { key: beat.key, beat, view, sound: sfxOn }),
     beat && !title && beat.call && beat.call.state === "ringing" && /* @__PURE__ */ import_react12.default.createElement(PhoneRing, { key: beat.call.id, beat, view, sound: sfxOn }),
