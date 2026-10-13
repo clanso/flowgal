@@ -155,3 +155,29 @@ test('gate: 接口：导入时 meta 跟着 query 走，列表、改、整批删'
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('gate: 打字音也进音效库：带性别和推荐用途导入、导出再读回不丢；不给导演当剧情音效，库里只有打字音时提示词里没有音效一节', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-soundlib-'))
+  try {
+    const lib = createSoundLib({ store: createStore(dir) })
+    const male = await lib.add(OGG, '打字音/男声哔哔.wav', { name: '男声哔哔', kind: 'blip', gender: 'male', category: '逆转裁判/打字音' })
+    const tw = await lib.add(OGG2, '打字音/打字机.wav', { name: '打字机', kind: 'blip', gender: '', use: 'narration' })
+    assert.deepEqual([male.kind, male.gender, male.use, tw.gender, tw.use], ['blip', 'male', '', '', 'narration'])
+    // 认不出的性别、用途不改；空串是去掉
+    assert.deepEqual([(await lib.update(male.id, { gender: 'robot', use: 'nope' })).gender, (await lib.update(tw.id, { use: '' })).use], ['male', ''])
+    assert.equal((await lib.update(tw.id, { use: 'slam' })).use, 'slam')
+    const back = readSoundSidecar(writeSoundSidecar(await lib.list()))
+    assert.deepEqual([back.get('打字音/男声哔哔.wav').gender, back.get('打字音/打字机.wav').use], ['male', 'slam'])
+    // 候选、导演都不碰打字音
+    const sounds = await lib.list()
+    assert.deepEqual(soundCandidates(sounds, '男声哔哔 打字机'), { ambience: [], sfx: [] })
+    const units = segmentTurn('「异议！」男声哔哔。')
+    const prompts = []
+    const llm = { stream(request) { prompts.push(request); return (async function* () { yield { type: 'text-delta', text: `{"lines":[{"u":"${units[0].id}","sfx":"${male.id}"}]}` }; yield { type: 'finish', reason: { kind: 'stop' } } })() } }
+    const out = await direct({ llm, provider: 'fake', model: 'fake-1', units, previous: null, castList: [], context: {}, config: DEFAULT_CONFIG, backend: 'novelai', sounds })
+    assert.doesNotMatch(JSON.stringify(prompts[0]), /音效库候选/)
+    assert.equal(out.script.lines[units[0].id]?.sfx, undefined, '打字音的编号不能当剧情音效')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
