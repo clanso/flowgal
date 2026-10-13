@@ -1361,6 +1361,7 @@ function DirectorSection({ data, onDirectorLog }) {
       </Field>
       <Field label="最大输出 / 温度" hint="默认 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。"><div className="fg-row"><Text type="number" style={{ width: '9cqw' }} value={cfg.director.maxTokens} onCommit={v => p({ maxTokens: v })} /><Text type="number" style={{ width: '7cqw' }} value={cfg.director.temperature} onCommit={v => p({ temperature: v })} /></div></Field>
       <Field label="资料长度" hint="给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认 1000000，等于不截断；超出模型窗口时自动缩短。"><Text type="number" value={cfg.director.contextChars} onCommit={v => p({ contextChars: v })} /></Field>
+      <CgModelFields data={data} providers={llm.providers} />
       <Field label="自定义提示词" hint="留空用内置导演提示词。可用 {{maxImages}} {{styleHint}}。情绪库、配乐曲库附在用户消息里，自定义时也生效。">
         <textarea className="fg-textarea" defaultValue={cfg.director.systemPrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.systemPrompt) p({ systemPrompt: e.target.value }) }} />
       </Field>
@@ -1373,6 +1374,49 @@ function DirectorSection({ data, onDirectorLog }) {
       <Field label="插画分镜师提示词" hint="留空用内置的（Base + 每人一个角色块的写法）。可用 {{styleHint}}。输出格式必须是 {&quot;images&quot;:[{&quot;key&quot;,&quot;tag&quot;,&quot;nl&quot;,&quot;characters&quot;:[{&quot;name&quot;,&quot;tag&quot;,&quot;nl&quot;}],&quot;size&quot;}]}。">
         <textarea className="fg-textarea" defaultValue={cfg.director.cgPrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.cgPrompt) p({ cgPrompt: e.target.value }) }} />
       </Field>
+    </>
+  )
+}
+
+/** 插画分镜师单独用的模型：跟导演一样 / 宿主里另选一个 / 自己接一个 OpenAI 兼容接口（Key 存在宿主）。 */
+function CgModelFields({ data, providers }) {
+  const own = data.config.director.cgLlm
+  const [busy, run] = useBusy()
+  const [hostModels, setHostModels] = React.useState([])
+  const [list, setList] = React.useState(null)
+  const p = patch => patchConfig({ director: { cgLlm: patch } }).catch(e => toast(e.message, 'error'))
+  React.useEffect(() => {
+    if (own.source !== 'host' || !own.provider) return setHostModels([])
+    api.llm(own.provider).then(r => setHostModels(r.models || [])).catch(() => setHostModels([]))
+  }, [own.source, own.provider])
+  const loadList = () => run('m', async () => setList(await api.cgModels()))
+  // 地址或 Key 换了就重新读模型列表
+  React.useEffect(() => { setList(null); if (own.source === 'custom' && own.baseURL) loadList() }, [own.source, own.baseURL, data.keys.cgllm])
+  const sources = [['', '跟导演一样'], ['host', hostName() === 'st' ? '另选一套酒馆连接配置' : '另选一个 Tavern 里的模型'], ['custom', '自定义接口（OpenAI 兼容）']]
+  return (
+    <>
+      <Field label="插画分镜师的模型" hint="写 CG 提示词的模型可以和导演分开。有的模型不肯把露骨的画面写具体，就给分镜师单独换一个；自定义接口填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行。">
+        <div className="fg-row">
+          <Select value={own.source} style={INLINE} onChange={v => p({ source: v, provider: '', model: '' })} options={sources} />
+          {own.source === 'host' && <Select value={own.provider} style={INLINE} onChange={v => p({ provider: v, model: '' })} options={[['', '（选一个）'], ...providers.map(x => [x.id, x.name])]} />}
+          {own.source === 'host' && own.provider && (hostModels.length
+            ? <Select value={own.model} style={INLINE} onChange={v => p({ model: v })} options={[['', '（请选择）'], ...hostModels.map(m => [m.id, m.name])]} />
+            : <Text value={own.model} placeholder="模型 ID" onCommit={v => p({ model: v })} />)}
+        </div>
+      </Field>
+      {own.source === 'custom' && (
+        <>
+          <Field label="接口地址"><Text value={own.baseURL} placeholder="https://api.deepseek.com/v1" style={{ flex: 1, width: '100%' }} onCommit={v => p({ baseURL: String(v).trim() })} /></Field>
+          <Field label="Key" hint={`存在宿主（${data.secretStorage || '插件目录'}），不会发到浏览器。本机的接口不要 Key 就空着。`}><KeyInput backend="cgllm" has={data.keys.cgllm} /></Field>
+          <Field label="模型" hint={list ? list.note : own.baseURL ? '正在读取模型列表…' : '先填接口地址'}>
+            <div className="fg-row">
+              <ModelField value={own.model} options={(list && list.models) || []} placeholder="模型 ID" onCommit={v => p({ model: v, ...((list?.models || []).find(m => m.id === v)?.window ? { contextWindow: list.models.find(m => m.id === v).window } : {}) })} />
+              <button type="button" className="fg-btn" disabled={busy === 'm' || !own.baseURL} onClick={loadList}>{busy === 'm' ? '读取中…' : '刷新列表'}</button>
+            </div>
+          </Field>
+          <Field label="上下文窗口" hint="这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收；最大输出、温度、资料长度跟导演用同一套设置。接口报出更小的输出上限时自动按它重试。"><Text type="number" style={{ width: '9cqw' }} value={own.contextWindow} onCommit={v => p({ contextWindow: v })} /></Field>
+        </>
+      )}
     </>
   )
 }
