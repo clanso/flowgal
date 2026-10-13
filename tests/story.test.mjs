@@ -8,7 +8,7 @@ import { cleanTurnText } from '../lib/clean.js'
 import { segmentTurn, joinUnits, pairUnits } from '../lib/segment.js'
 import { normalizeScript, rawSection, scriptScenes, sceneAfter, playingAfter, previousBrief } from '../lib/director.js'
 import { playedUnits, castAtEnd, stageWalk } from '../lib/staging.js'
-import { buildBeats, onStage, hintedSpeaker, cgEntrance, cgExit, cgStay, cgHoldMs, CG_IN_MS, beatHold, PAUSE_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS } from '../src/client/theater/playback.js'
+import { buildBeats, onStage, hintedSpeaker, cgEntrance, cgExit, cgStay, cgHoldMs, CG_IN_MS, beatHold, PAUSE_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, SCENE_CLEAR_MS, SCENE_CAST_MS } from '../src/client/theater/playback.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 
@@ -644,7 +644,7 @@ test('gate: 场景逐句变：换地方、天色变化、天气光线基调、�
     ['U3', '走廊', 'afternoon', 'normal', 'drift', 'daily', true, 'dissolve'],
     ['U4', '走廊', 'dusk', 'normal', 'drift', 'daily', false, 'fade'],
     ['U5', '走廊', 'dusk', 'dark', 'drift', 'eerie', false, ''],
-    ['U6', '教室', 'night', 'normal', 'none', 'eerie', true, 'dissolve'],
+    ['U6', '教室', 'night', 'normal', 'none', 'eerie', true, 'black'], // 换了地方、时段也变了（三小时后）：默认黑场
     ['U7', '教室', 'night', 'normal', 'none', 'eerie', false, ''],
     ['U8', '教室', 'night', 'normal', 'none', 'eerie', false, ''],
   ])
@@ -752,16 +752,19 @@ test('「間」：插画这一句才出现、换了地方时对话框先让开�
   assert.deepEqual(beatHold({ ...base, cg: img }, { cg: 'cg1', was: { cg: '', place: '教室', mode: '' } }), { ms: cgHoldMs(img, 'daily'), away: true })
   // 插画已经在画面上（往回翻）：不停
   assert.deepEqual(beatHold({ ...base, cg: img }, { cg: 'cg1', was: { cg: 'cg1', place: '教室', mode: '' } }), { ms: 0, away: false })
-  // 有过场字卡：字卡就是停顿
-  assert.equal(beatHold({ ...base, cg: img, cut: { kind: 'time' } }, { cg: 'cg1', was: { cg: '', place: '教室' } }).ms, 0)
-  // 换了地方
+  // 有过场字卡：字卡在换场里演，插画不另停
+  const cutHold = beatHold({ ...base, cg: img, cut: { kind: 'time' } }, { cg: 'cg1', was: { cg: '', place: '教室' } })
+  assert.equal(cutHold.ms, cutHold.change.total)
+  assert.equal(cutHold.change.cut, true)
+  // 换了地方：整段换场演完再出字
   const moved = { ...base, scene: { location: '天台', mood: 'daily' }, sceneEnter: true, transition: 'dissolve' }
   const sceneHold = beatHold(moved, { was: { place: '教室', mode: '' } })
   assert.equal(sceneHold.away, true)
-  assert.ok(sceneHold.ms > TRANSITION_MS.dissolve && sceneHold.ms <= TRANSITION_MS.dissolve + 500, '转场演完再停一小拍')
+  assert.equal(sceneHold.ms, sceneHold.change.total)
+  assert.ok(sceneHold.ms > TRANSITION_MS.dissolve + SCENE_CLEAR_MS + SCENE_CAST_MS, '清场、过渡、人上来、再停一小拍')
   assert.equal(beatHold({ ...moved, transition: 'none' }, { was: { place: '教室', mode: '' } }).ms, 0, '直接切不等')
   assert.equal(beatHold(moved, { was: { place: '天台', mode: '' } }).ms, 0, '往回翻到换场那一句，画面没变就不等')
-  assert.equal(beatHold({ ...moved, mode: 'memory' }, { was: { place: '教室', mode: '' } }).ms, 0, '进回忆的转场另算')
+  assert.equal(beatHold({ ...moved, mode: 'memory', transition: 'haze' }, { was: { place: '教室', mode: '' } }).ms, 0, '进回忆的起雾另算')
   // 导演写的停顿
   assert.deepEqual(beatHold({ ...base, pause: 'silence' }, { was: { place: '教室' } }), { ms: PAUSE_MS.silence, away: true })
   assert.deepEqual(beatHold({ ...base, pause: 'beat' }, { was: { place: '教室' } }), { ms: PAUSE_MS.beat, away: false })

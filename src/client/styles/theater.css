@@ -44,10 +44,12 @@
 .fg-camera { position: absolute; inset: 0; transform-origin: 50% 50%; }
 
 /* ── 背景层 ── */
-.fg-bg { position: absolute; inset: -3%; background-size: cover; background-position: center 42%; will-change: transform, opacity; }
-.fg-bg.is-image { animation: fg-kenburns 38s ease-in-out infinite alternate; }
-.fg-bg.is-enter { animation: var(--enter-anim, fg-dissolve) var(--enter-dur, 1.1s) cubic-bezier(.6, .05, .3, 1) both, fg-kenburns 38s ease-in-out infinite alternate; }
-.fg-bg.is-leave { animation: fg-fade-out .9s ease both; }
+/* 外层管进出场的转场，里层（.fg-bg-art）画图、慢慢推拉；新层盖在旧层上面演转场，旧层不动，演完才移除（不先淡出，中途不会露出底下的黑） */
+.fg-bg { position: absolute; inset: -3%; will-change: transform, opacity; }
+.fg-bg-art { position: absolute; inset: 0; background-size: cover; background-position: center 42%; }
+.fg-bg.is-image > .fg-bg-art { animation: fg-kenburns 38s ease-in-out infinite alternate; }
+.fg-bg.is-enter { animation: var(--enter-anim, fg-dissolve) var(--enter-dur, 1.1s) cubic-bezier(.45, 0, .55, 1) both; }
+.fg-bg.is-leave { animation: none; }
 @keyframes fg-kenburns { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.1) translate(-1.6%, -1.2%); } }
 @keyframes fg-dissolve { from { opacity: 0; filter: blur(8px) brightness(1.3); } to { opacity: 1; filter: none; } }
 @keyframes fg-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
@@ -548,6 +550,43 @@
 .fg-hitflash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .25), rgba(160, 0, 20, .8)); }
 @keyframes fg-black { 0% { opacity: 0; } 35%, 60% { opacity: 1; } 100% { opacity: 0; } }
 
+/* ── 换场（playback.js 的 changePlan，Theater 按时间线切 data-change）──
+   清场：台上的人先退下去，对话框、左上角的地点也让开；盖住画面的那一层盖满时下面才换成新地方，揭开后人再上来、出地点标题 */
+.fg-stage[data-change] .fg-cast { transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .45s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
+.fg-stage[data-clearing] .fg-cast { opacity: 0; transition-duration: .65s, .35s, 2.6s; }
+.fg-stage[data-change] .fg-hud { opacity: 0; transition: opacity .35s ease; }
+.fg-cover { position: absolute; inset: 0; z-index: 19; pointer-events: none; opacity: 0; transition: opacity .25s ease; }
+.fg-cover[data-cover="black"] { background: #000; }
+.fg-cover[data-cover="white"] { background: #fff; }
+.fg-cover[data-cover="swirl"] { background: radial-gradient(120% 100% at 50% 50%, rgba(255, 250, 255, .98), rgba(226, 206, 255, .96) 55%, rgba(120, 96, 200, .94)); }
+.fg-cover[data-cover="glitch"] { background: #05040c; }
+.fg-cover[data-state="up"] { animation: fg-cover-up var(--ms) cubic-bezier(.4, 0, .6, 1) both; }
+.fg-cover[data-state="full"] { opacity: 1; transition: none; }
+.fg-cover[data-state="down"] { animation: fg-cover-down var(--ms) cubic-bezier(.35, 0, .4, 1) both; }
+@keyframes fg-cover-up { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fg-cover-down { from { opacity: 1; } to { opacity: 0; } }
+/* 白闪：一下子白透，再慢慢退回来 */
+.fg-cover[data-cover="white"][data-state="up"] { animation-timing-function: ease-out; }
+/* 闭眼睁眼：眼睛的形状（中间宽、两头尖）先四角暗下去、再收成一条缝合上，停一下，再睁开（先睁一条缝、又眯一下）。--eye 是眼睛张开的高度，95% 就是全睁开 */
+@property --eye { syntax: '<percentage>'; inherits: false; initial-value: 95%; }
+.fg-cover[data-cover="lids"] { opacity: 1; background: none; }
+.fg-cover[data-cover="lids"][data-state] { animation: none; }
+.fg-cover[data-cover="lids"][data-state="idle"], .fg-cover[data-cover="lids"][data-state="off"] { opacity: 0; }
+.fg-cover[data-cover="lids"]::before { content: ""; position: absolute; inset: 0; --eye: 95%; background: radial-gradient(ellipse 70% var(--eye) at 50% 50%, transparent 78%, #000 100%); }
+.fg-cover[data-cover="lids"][data-state="up"]::before { animation: fg-eye-shut var(--ms) cubic-bezier(.45, 0, .55, 1) both; }
+.fg-cover[data-cover="lids"][data-state="full"]::before { --eye: 0%; background: #000; }
+.fg-cover[data-cover="lids"][data-state="down"]::before { animation: fg-eye-open var(--ms) cubic-bezier(.3, 0, .3, 1) both; }
+@keyframes fg-eye-shut { from { --eye: 95%; } to { --eye: 0%; } }
+@keyframes fg-eye-open { 0% { --eye: 0%; } 30% { --eye: 24%; } 45% { --eye: 10%; } 100% { --eye: 95%; } }
+/* 画面撕裂：几道色带闪过去，中间一下全黑换画面 */
+.fg-cover[data-cover="glitch"][data-state="up"] { animation: fg-cover-glitch var(--ms) steps(4) both; }
+.fg-cover[data-cover="glitch"][data-state="down"] { animation: fg-cover-glitch var(--ms) steps(4) reverse both; }
+@keyframes fg-cover-glitch {
+  0% { opacity: 0; background: linear-gradient(transparent 0 22%, rgba(255, 0, 90, .6) 22% 25%, transparent 25% 51%, rgba(0, 255, 220, .5) 51% 53%, transparent 53%); }
+  50% { opacity: .85; background: linear-gradient(#05040c 0 40%, rgba(255, 255, 255, .7) 40% 42%, #05040c 42%); }
+  100% { opacity: 1; background: #05040c; }
+}
+
 /* ───────────── 气氛：逐句可变 ─────────────
    层次（都在 .fg-world-in 里）：背景 → 时段调色 → 立绘 → 基调色调 .fg-tone → 光线 .fg-light → 亲密氛围 .fg-romance → 插画 → 天气粒子
    → 画面效果叠层 .fg-fxlayer → 暗角；感官 .fg-sense、特殊段落滤镜 .fg-mode 在镜头外面（推镜头时不跟着放大）。每层由 FadeLayer 换值时淡入淡出（--fade）。 */
@@ -778,10 +817,8 @@
 @keyframes fg-glitch-in { 0% { opacity: 0; transform: translateX(3%); filter: hue-rotate(90deg) contrast(2); } 20% { opacity: 1; transform: translateX(-2%); } 40% { transform: translateX(1.5%) skewX(4deg); filter: hue-rotate(-60deg) contrast(1.6); } 60% { transform: translateX(-.8%); } 80% { transform: none; filter: hue-rotate(20deg); } 100% { filter: none; } }
 @keyframes fg-swirl-in { from { opacity: 0; transform: rotate(-14deg) scale(1.45); filter: blur(16px) brightness(1.4); } to { opacity: 1; transform: none; filter: none; } }
 .fg-flash.is-blink { background: none; animation: none; }
-.fg-flash.is-blink::before, .fg-flash.is-blink::after { content: ""; position: absolute; left: -5%; right: -5%; height: 56%; background: #000; animation: fg-lid 1.5s cubic-bezier(.6, 0, .3, 1) both; }
-.fg-flash.is-blink::before { top: 0; border-radius: 0 0 50% 50% / 0 0 30% 30%; transform-origin: top; }
-.fg-flash.is-blink::after { bottom: 0; border-radius: 50% 50% 0 0 / 30% 30% 0 0; transform-origin: bottom; }
-@keyframes fg-lid { 0% { transform: scaleY(0); } 35%, 55% { transform: scaleY(1); } 100% { transform: scaleY(0); } }
+.fg-flash.is-blink::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 70% var(--eye) at 50% 50%, transparent 78%, #000 100%); animation: fg-eye-blink 1.5s cubic-bezier(.5, 0, .4, 1) both; }
+@keyframes fg-eye-blink { 0% { --eye: 95%; } 35%, 55% { --eye: 0%; } 100% { --eye: 95%; } }
 .fg-flash.is-glitch { background: linear-gradient(transparent 0 22%, rgba(255, 0, 90, .5) 22% 25%, transparent 25% 51%, rgba(0, 255, 220, .45) 51% 53%, transparent 53% 78%, rgba(255, 255, 255, .6) 78% 79.5%, transparent 79.5%); mix-blend-mode: screen; animation: fg-glitch .7s steps(6) both; }
 @keyframes fg-glitch { 0% { opacity: 1; transform: translate(0, 0); } 30% { transform: translate(-4%, 8%); } 60% { transform: translate(5%, -12%); opacity: .8; } 100% { opacity: 0; transform: translate(0, 20%); } }
 
@@ -1318,7 +1355,14 @@
 @keyframes fg-pop { from { opacity: 0; transform: translateY(-.4cqw); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .fg-bg, .fg-cg-img, .fg-cg-art, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-down-mist i { animation: none !important; }
+  .fg-bg-art, .fg-cg-img, .fg-cg-art, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-down-mist i { animation: none !important; }
+  /* 换背景还是淡入淡出（只是不推拉、不模糊、不旋转），不会一下子跳过去 */
+  .fg-bg.is-enter { animation: fg-fade-slow var(--enter-dur, 1.1s) ease both !important; }
+  .fg-cover[data-cover="lids"]::before { display: none; }
+  .fg-cover[data-cover="lids"] { background: #000; }
+  .fg-cover[data-cover="lids"][data-state="up"] { animation: fg-cover-up var(--ms) ease both; }
+  .fg-cover[data-cover="lids"][data-state="down"] { animation: fg-cover-down var(--ms) ease both; }
+  .fg-cover[data-cover="lids"][data-state="off"], .fg-cover[data-cover="lids"][data-state="idle"] { opacity: 0; }
   .fg-recall::after, .fg-recall-face { animation: none !important; } /* 闪回里的光斑漂移、心跳脉动、小头像错位 */
   .fg-romance::before, .fg-romance::after, .fg-sense::after, .fg-world-in[data-sense] .fg-cast { animation: none !important; } /* 光斑漂移、心跳暗角、耳边的呼吸、触碰的涟漪、失神的晃 */
   .fg-sense[data-v="heat"]::before, .fg-sense[data-v="touch"]::before, .fg-sense[data-v="scent"]::before { animation: none !important; }

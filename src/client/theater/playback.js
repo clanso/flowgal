@@ -337,7 +337,7 @@ export const HUSH_BEATS = 5
 export const HUSH_LEAD_MS = 700
 /** 高潮那一下（lib/eros.js 的 PEAKS）：白光先起来、射精的第一下脉动过去，字再出。 */
 export const PEAK_LEAD_MS = { climax: 650, cum: 420, both: 650 }
-/** 换了地方：转场演完再停这么久才出字。 */
+/** 换场演完（新画面里的人上来之后）再停这么久才出字。 */
 const SCENE_BEAT_MS = 300
 /**
  * 从回忆里醒过来（上一拍还在回忆里，这一拍回到了别处）：回忆的画面先慢慢褪白、配乐停下，
@@ -348,21 +348,80 @@ export const WAKE_MS = 3600
 // 导演挑了别的出法（直接切断、白闪、画面撕裂、闭眼……）的照导演的，只有慢慢化开的这几种换成醒过来
 const WAKE_FROM = new Set(['haze', 'dissolve', 'fade'])
 
+// ───────────── 换场：像 galgame 那样一步一步换过去 ─────────────
+/** 换场时台上的人先退下去、新画面出来后再上来（毫秒）。 */
+export const SCENE_CLEAR_MS = 350
+export const SCENE_CAST_MS = 450
+/**
+ * 会把画面整个盖住的转场：盖上去（up）、盖满停一下（hold）、揭开（down）。换场在盖满的那一刻才换，旧画面上不会先冒出新地方的人和标题。
+ * clear：盖之前先清场（台上的人退下去）。白闪、闭眼、撕裂是一下子的事，人跟着画面一起换，不先退。
+ */
+export const COVERS = {
+  black: { cover: 'black', clear: true, up: 700, hold: 400, down: 900 },
+  flash: { cover: 'white', clear: false, up: 120, hold: 150, down: 650 },
+  blink: { cover: 'lids', clear: false, up: 550, hold: 250, down: 700 },
+  glitch: { cover: 'glitch', clear: false, up: 300, hold: 0, down: 400 },
+  swirl: { cover: 'swirl', clear: true, up: 900, hold: 200, down: 900 },
+}
+/** 过场字卡（三小时后、第二天……）：暗下去，字卡在黑里出来、停一会儿收起，再亮起新的画面。 */
+const CUT_COVER = { cover: 'black', clear: true, up: 700, hold: 2300, down: 1000 }
+/** 剧场刚打开（或从标题画面进来）：从黑里亮起来。 */
+const OPEN_COVER = { cover: 'black', clear: true, up: 0, hold: 300, down: 1000 }
+// 进出回忆的起雾、醒过来另有演法（beatHold 的 wake、Theater 的 HAZE_MS）
+const OWN_WAY = new Set(['haze', 'wake'])
+
+/**
+ * 这一拍要不要演一次换场、怎么演：换了地方、进出特殊段落、有过场字卡、剧场刚打开。没有换场时为 null。
+ * 时间线（毫秒，从这一拍开始算）：clear 清场 → up 盖上 → swap 换成新画面 → hold 盖满停一下 → down 揭开（没有盖的转场是新背景在旧背景上过渡）
+ * → cast 新画面里的人上来、出地点标题 → 停一小拍 → 出字。整段对话框让开，点一下直接跳到换好的样子。
+ * 没有盖的转场（溶解、慢慢变化、横扫……）也先清场：旧背景上的人退下去，新背景过渡完，人再上来。
+ * was：上一拍画面上的 { place, mode }；opening：剧场刚打开、这是画面上的第一拍。
+ * 返回 { tr, cover, clear, up, hold, down, steps: [[阶段, 开始的毫秒]...], swap 换画面的时刻, total, cut, opening }。
+ */
+export function changePlan(beat, was = {}, { opening = false } = {}) {
+  if (!beat || !beat.scene) return null
+  const moved = !opening && beat.sceneEnter && (beat.scene.location !== was.place || (beat.mode || '') !== (was.mode || ''))
+  const tr = beat.transition || ''
+  if (!opening && !beat.cut && (!moved || tr === 'none' || OWN_WAY.has(tr))) return null
+  if (!opening && !beat.cut && was.mode === 'memory' && (beat.mode || '') !== 'memory' && WAKE_FROM.has(tr)) return null // 从回忆里醒过来
+  if (opening && tr === 'none' && !beat.cut) return null
+  // 开场就是过场字卡（第一章……）：从黑里直接出字卡，字卡照样停够
+  const shape = opening ? (beat.cut ? { ...CUT_COVER, up: 0 } : OPEN_COVER) : beat.cut ? CUT_COVER : COVERS[tr] || { cover: '', clear: true, up: 0, hold: 0, down: TRANSITION_MS[tr] || TRANSITION_MS.dissolve }
+  const steps = []
+  let t = 0
+  const step = (name, ms) => { if (ms > 0) { steps.push([name, t]); t += ms } }
+  if (!opening) step('clear', shape.clear ? SCENE_CLEAR_MS : 0)
+  step('up', shape.up)
+  const swap = t
+  step('hold', shape.hold)
+  step('down', shape.down)
+  step('cast', shape.clear ? SCENE_CAST_MS : 0)
+  step('settle', SCENE_BEAT_MS)
+  return { tr: opening && !COVERS[tr] ? 'black' : tr, cover: shape.cover, clear: shape.clear, up: shape.up, hold: shape.hold, down: shape.down, steps, swap, total: t, ...(beat.cut ? { cut: true } : {}), ...(opening ? { opening: true } : {}) }
+}
+
+/** 换场演到第 ms 毫秒时在哪一段（'' 是还没开始或已经演完）。 */
+export function changePhase(plan, ms) {
+  if (!plan || ms >= plan.total) return ''
+  let phase = ''
+  for (const [name, at] of plan.steps) if (ms >= at) phase = name
+  return phase
+}
+
 /**
  * 这一拍的字出来之前停多久、对话框要不要先让开：{ ms, away }。
  * - 插画这一句才出现：对话框让开，出现的过程 + 一拍（cgHoldMs）；
- * - 换了地方（转场不是直接切）：对话框让开，转场 + 一拍。进出回忆这类特殊段落不在这里算；
+ * - 换场（changePlan：换了地方、进出段落、过场字卡、剧场刚打开）：对话框让开，整段换场演完再出字，这时多一个 change。进出回忆的起雾、醒过来另算；
  * - 导演写了 pause：beat 顿一拍，silence 让开对话框沉默一会儿；
  * - 从回忆里醒过来（导演没挑别的出法时）：对话框让开，等回忆褪白、现在的画面清晰过来（WAKE_MS），这时多一个 wake: true。
- * 几样同时有取最长的。有过场字卡的那一句字卡本身就是停顿，插画、换场和醒过来都不再另停。
- * cg：这一拍画面上的插画（还没画好为空）；was：上一拍画面上的 { cg, place, mode }（刚打开剧场时为空）；eros：亲密场面的演出开着（关了高潮那一下不等）。
+ * 几样同时有取最长的。有过场字卡的那一句字卡在换场里演（暗下去、字卡、亮起来），插画和醒过来都不再另停。
+ * cg：这一拍画面上的插画（还没画好为空）；was：上一拍画面上的 { cg, place, mode }；opening：剧场刚打开、画面上还没有上一拍；eros：亲密场面的演出开着（关了高潮那一下不等）。
  */
-export function beatHold(beat, { cg = '', was = {}, eros = true } = {}) {
+export function beatHold(beat, { cg = '', was = {}, eros = true, opening = false } = {}) {
   let ms = 0, away = false
   if (cg && cg !== was.cg && !beat.cut) { ms = Math.max(ms, cgHoldMs(beat.cg, beat.scene.mood)); away = true }
-  const sameLayer = (beat.mode || '') === (was.mode || '')
-  const moved = beat.sceneEnter && beat.scene.location !== was.place && sameLayer
-  if (moved && !beat.cut && TRANSITION_MS[beat.transition]) { ms = Math.max(ms, TRANSITION_MS[beat.transition] + SCENE_BEAT_MS); away = true }
+  const change = changePlan(beat, was, { opening })
+  if (change) { ms = Math.max(ms, change.total); away = true }
   if (PAUSE_MS[beat.pause]) { ms = Math.max(ms, PAUSE_MS[beat.pause]); if (beat.pause === 'silence') away = true }
   if (beat.cutin) ms = Math.max(ms, CUTIN_LEAD_MS)
   if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS)
@@ -370,9 +429,9 @@ export function beatHold(beat, { cg = '', was = {}, eros = true } = {}) {
   if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0)
   if (beat.hush === 'start') ms = Math.max(ms, HUSH_LEAD_MS)
   if (eros && beat.peak) ms = Math.max(ms, PEAK_LEAD_MS[beat.peak] || 0)
-  const wake = was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
+  const wake = !opening && was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
   if (wake) { ms = Math.max(ms, WAKE_MS); away = true }
-  return { ms, away, ...(wake ? { wake } : {}) }
+  return { ms, away, ...(wake ? { wake } : {}), ...(change ? { change } : {}) }
 }
 
 // ───────────── 我的配乐 ─────────────
