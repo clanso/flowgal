@@ -3301,7 +3301,7 @@ var WAKE_FROM = /* @__PURE__ */ new Set(["haze", "dissolve", "fade"]);
 var SCENE_CLEAR_MS = 350;
 var SCENE_CAST_MS = 450;
 var COVERS = {
-  black: { cover: "black", clear: true, up: 800, hold: 500, down: 1e3 },
+  black: { cover: "black", clear: true, up: 700, hold: 400, down: 900 },
   flash: { cover: "white", clear: false, up: 120, hold: 150, down: 650 },
   blink: { cover: "lids", clear: false, up: 550, hold: 250, down: 700 },
   glitch: { cover: "glitch", clear: false, up: 300, hold: 0, down: 400 },
