@@ -154,7 +154,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   // 跟上一拍画面上的比：往回翻到插画已经在画面上的那句、读到一半插画才画好，都不等。几样同时有取最长的。
   const cgOn = beat && !title && beat.cg && cgSrc(beat.cg, assetUrl) ? beat.cg.id : ''
   const shownRef = React.useRef({ key: '', beat: null, was: null, cg: '', place: '', mode: '', hold: { ms: 0, away: false } })
-  // 从 log 跳过去的那一句：进场照故事里的上一句算（睁眼、换场、插画出现照样演），画面上原来是别的地方时先很快地经一下黑
+  // 从 log 跳过去的那一句：进场照故事里的上一句算（睁眼、换场、插画出现照样演）
   const jumpRef = React.useRef('')
   if (beat && shownRef.current.key !== beat.key) {
     const was = shownRef.current
@@ -162,7 +162,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     const prev = jumped ? beats[index - 1] : null
     const from = !jumped ? was : prev ? { key: prev.key, cg: prev.cg && cgSrc(prev.cg, assetUrl) ? prev.cg.id : '', place: prev.scene.location, mode: prev.mode } : { key: was.key }
     jumpRef.current = ''
-    shownRef.current = { key: beat.key, visit: (was.visit || 0) + 1, beat, was: was.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was: from, eros: ui0.eros !== false, opening: !was.key, shown: jumped ? was : null }) }
+    shownRef.current = { key: beat.key, visit: (was.visit || 0) + 1, beat, was: was.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was: from, eros: ui0.eros !== false, opening: !was.key }) }
   } else if (shownRef.current.cg !== cgOn) shownRef.current = { ...shownRef.current, cg: cgOn }
   const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false }
   // 这一次读到这一拍（往回翻、再读到同一拍算新的一次）：停顿、换场、醒过来演没演完按它记，回滚后再到同一处照样演
@@ -421,8 +421,6 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const hud = waking || before ? stageBeat : beat // 左上角的地点跟着画面走：回忆还没褪完、换场还没换过去时还是原来的地方
   // 醒过来那一下换画面时已经白透了：回忆的背景、人和滤镜直接撤掉，不在白雾散开时又露出来（theater.css 的 data-tr="wake"）
   // 换场时盖满才换背景，盖着看不见，直接换；旋涡揭开时新画面跟着旋进来；没有盖的（溶解、慢慢变化、横扫……）新背景在旧背景上演它的转场
-  // 盖满的时候换的画面（背景、光线、滤镜这些层）直接换，揭开时已经是换好的样子
-  const covered = Boolean(change && change.cover && change.cover !== 'swirl' && phase === 'hold')
   const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? 'wake' : change && change.cover && change.cover !== 'swirl' ? 'none' : stageBeat && stageBeat.transition
   const stageScene = stageBeat ? stageBeat.scene : { location: '', time: 'night', weather: 'stars', mood: 'calm', light: 'normal', fx: 'none' }
   const stageMode = (stageBeat && stageBeat.mode) || ''
@@ -463,26 +461,26 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
               {beat && !title && beat.moment && beat.moment.kind === 'fireworks' && <Fireworks key={beat.key} sound={sfxOn} />}
               {/* 短闪回时说话的是闪回里的人：现在台上的人不高亮、不对口型 */}
               {stageBeat && <Cast beat={title || stageBeat.recall || waking ? { ...stageBeat, speaker: '', speakers: null, sym: '' } : stageBeat} view={view} talk={title || stageBeat.recall || waking ? null : talk} max={ui0.maxOnStage ?? 5} />}
-              <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} cut={covered} />
-              <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} cut={covered} />
-              <FadeLayer name="romance" value={atmosphere ? romance : ''} ms={1600} cut={covered} />
-              <FadeLayer name="eros" value={atmosphere && ui0.eros !== false && stageScene.eros !== 'none' ? stageScene.eros || '' : ''} ms={1400} cut={covered} />
-              <FadeLayer name="tentacle" value={atmosphere && ui0.eros !== false && stageScene.tentacle !== 'none' ? stageScene.tentacle || '' : ''} ms={1800} cut={covered} />
+              <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} />
+              <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} />
+              <FadeLayer name="romance" value={atmosphere ? romance : ''} ms={1600} />
+              <FadeLayer name="eros" value={atmosphere && ui0.eros !== false && stageScene.eros !== 'none' ? stageScene.eros || '' : ''} ms={1400} />
+              <FadeLayer name="tentacle" value={atmosphere && ui0.eros !== false && stageScene.tentacle !== 'none' ? stageScene.tentacle || '' : ''} ms={1800} />
               {stageBeat && !title && <CgLayer beat={stageBeat} sound={sfxOn} />}
               <Particles weather={stageScene.weather} enabled={ui0.particles !== false} speed={atmosphere ? (TIME_FLOW[stageScene.fx] ?? 1) * (SENSE_FLOW[sense] ?? 1) : 1} />
               {stageBeat && !title && <SplitPanel beat={stageBeat} view={view} talk={talk} />}
               {stageBeat && !title && <RecallLayer beat={stageBeat} view={view} talk={talk} light={recallStyle !== 'ghost'} tone={recallTone} />}
-              <FadeLayer name="fxlayer" value={atmosphere && stageScene.fx !== 'none' ? stageScene.fx : ''} ms={900} cut={covered} />
+              <FadeLayer name="fxlayer" value={atmosphere && stageScene.fx !== 'none' ? stageScene.fx : ''} ms={900} />
               <div className="fg-vignette" />
             </div>
           </div>
         </div>
         {/* 感官那一层也在镜头外面：特写时蒙眼的黑、耳边的光不跟着放大出画 */}
-        <FadeLayer name="sense" value={atmosphere ? senseLayer(stageBeat, stageScene) : ''} ms={sense === 'blind' ? 1400 : 900} cut={covered} />
+        <FadeLayer name="sense" value={atmosphere ? senseLayer(stageBeat, stageScene) : ''} ms={sense === 'blind' ? 1400 : 900} />
         {/* 特殊段落的滤镜放在镜头外面：推镜头时录像框、REC 这些不跟着放大，对话框和标题卡也不被滤到 */}
         {/* 电影黑边：严肃的一段一直挂着，也在镜头外面 */}
         <div className="fg-bars" data-on={atmosphere && stageScene.bars === 'on' ? '' : undefined} aria-hidden="true" />
-        <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} cut={covered} />
+        <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} />
         {beat && !title && <SceneCover key={beat.key} plan={hold.change} state={coverState} />}
         {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} changed={Boolean(hold.change)} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
