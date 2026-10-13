@@ -1146,6 +1146,7 @@
 .fg-pill.is-link { cursor: pointer; transition: border-color .2s, opacity 1.2s; }
 /* 配乐留白：曲名暗下去，回来时再亮 */
 .fg-pill.is-hushed { opacity: .35; transition-duration: .5s; }
+.fg-pill.is-nsfw { color: #ff8fb1; border-color: rgba(255, 110, 160, .55); font-weight: 600; }
 .fg-pill.is-link:hover { border-color: var(--accent); }
 
 .fg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20cqw, 1fr)); gap: 1.4cqw; }

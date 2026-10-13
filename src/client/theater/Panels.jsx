@@ -124,7 +124,7 @@ const blankCharacter = () => ({ name: '', tag: '', nl: '' })
 
 /** 改词：Base（画面）+ 每人一个角色块（柏宝绘的 NovelAI V4.5 分人写法）。名字只是标签，出图前换成档案外貌并删掉。 */
 function ImageEditor({ gameId, image, units = [], onClose }) {
-  const pick = img => ({ tags: img.tags || '', desc: img.desc || '', characters: (img.characters || []).map(c => ({ ...c })), negativeExtra: img.negativeExtra || '', shape: img.shape || 'landscape', seed: '', style: img.style || '' })
+  const pick = img => ({ tags: img.tags || '', desc: img.desc || '', characters: (img.characters || []).map(c => ({ ...c })), negativeExtra: img.negativeExtra || '', shape: img.shape || 'landscape', seed: '', style: img.style || '', nsfw: Boolean(img.nsfw) })
   const data = useConfig()
   const styles = data ? data.config.style.presets : []
   const currentName = (styles.find(x => x.id === (data && data.config.style.current)) || {}).name || ''
@@ -158,6 +158,9 @@ function ImageEditor({ gameId, image, units = [], onClose }) {
           <small className="fg-note" style={{ flex: 1 }}>名字只用来对上档案，不会发出去：tag 和描述里的人名出图前会被删掉。NovelAI V4 以上每人一块分开发；其他渠道合并成一段。旧写法 @名字 也还能用。</small>
         </div>
       </div>
+      <div className="fg-field"><label>NSFW</label>
+        <div className="fg-row"><Toggle value={draft.nsfw} onChange={v => set({ nsfw: v })} /><span className="fg-note">露骨的画面。标上后 Base 里一定带 nsfw（分镜师漏写也补上），鉴赏里显示标记。</span></div>
+      </div>
       <div className="fg-field"><label>额外负面</label><input className="fg-input" value={draft.negativeExtra} onChange={e => set({ negativeExtra: e.target.value })} /></div>
       {units.length > 0 && <CgSpan gameId={gameId} image={image} units={units} />}
       <div className="fg-field"><label>画幅 / 种子</label>
@@ -183,7 +186,7 @@ function ImageEditor({ gameId, image, units = [], onClose }) {
           <input className="fg-input" style={{ flex: 1, width: 'auto' }} placeholder="例如：改成雨夜、她在哭、镜头拉远……留空则让分镜师重读正文" value={instruction} onChange={e => setInstruction(e.target.value)} />
           <button type="button" className="fg-btn" disabled={busy === 'rw'} onClick={() => run('rw', async () => {
             const { draft: d } = await api.rewrite(gameId, image.id, instruction)
-            set({ tags: d.tags || '', desc: d.desc || '', characters: (d.characters || []).map(c => ({ ...c })), shape: d.shape || draft.shape })
+            set({ tags: d.tags || '', desc: d.desc || '', characters: (d.characters || []).map(c => ({ ...c })), shape: d.shape || draft.shape, nsfw: Boolean(d.nsfw || draft.nsfw) })
           }, '已改写，确认后点「按此重画」')}>{busy === 'rw' ? '分镜师在写…' : '改写'}</button>
         </div>
       </div>
@@ -201,7 +204,7 @@ function ImageEditor({ gameId, image, units = [], onClose }) {
       <div className="fg-row" style={{ justifyContent: 'flex-end' }}>
         <button type="button" className="fg-btn" onClick={onClose}>取消</button>
         <button type="button" className="fg-btn is-primary" onClick={() => run('go', async () => {
-          await api.render(gameId, image.id, { tags: draft.tags, desc: draft.desc, characters: draft.characters, negativeExtra: draft.negativeExtra, shape: draft.shape, style: styles.some(x => x.id === draft.style) ? draft.style : '', ...(draft.seed ? { seed: Number(draft.seed) } : {}) })
+          await api.render(gameId, image.id, { tags: draft.tags, desc: draft.desc, characters: draft.characters, negativeExtra: draft.negativeExtra, shape: draft.shape, nsfw: draft.nsfw, style: styles.some(x => x.id === draft.style) ? draft.style : '', ...(draft.seed ? { seed: Number(draft.seed) } : {}) })
           onClose()
         }, '已加入出图队列')}>按此重画</button>
       </div>
@@ -255,6 +258,7 @@ function CgTile({ gameId, image, onOpen, onEdit }) {
       <div className={`fg-thumb${src ? '' : ' is-locked'}`} onClick={() => src && onOpen(image)}>
         {src ? <img src={src} alt={image.title} loading="lazy" /> : <span>{pending ? (image.status === 'writing' ? '✍ ' : '🎨 ') + STATUS_LABEL[image.status] : image.status === 'failed' ? '⚠ ' + (image.error || '失败') : '未生成'}</span>}
         {pending && src && <span className="fg-pill is-busy" style={{ position: 'absolute', right: '.6cqw', top: '.6cqw' }}>{image.status === 'writing' ? '分镜中' : '重画中'}</span>}
+        {image.nsfw && <span className="fg-pill is-nsfw" style={{ position: 'absolute', left: '.6cqw', top: '.6cqw' }}>NSFW</span>}
         <div className="fg-thumb-cap">{image.title || '第 ' + image.turn + ' 轮插画'}{image.versions.length > 1 ? ` · ${image.current + 1}/${image.versions.length}` : ''}{image.retired ? ' · 重新整理前的' : ''}</div>
       </div>
       <div className="fg-row" style={{ marginTop: '.6cqw' }}>
