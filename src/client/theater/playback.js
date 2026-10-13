@@ -5,7 +5,7 @@
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
 import { placeKey, speakersOf, MODE_NAMES, RECALL_TONES, RECALL_TONE_NAMES, cgIn, cgOut, cgMotion } from '../../../lib/vocab.js'
 import { stageWalk, playedUnits } from '../../../lib/staging.js'
-import { walkScenes, recallRuns, markRecalls, autoRecallTone, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
+import { walkScenes, recallRuns, markRecalls, autoRecallTone, intimateRuns, holdIntimateCgs, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
 import { shiftsAhead } from '../../../lib/look.js'
 import { reactsOf, poseTracker, blockLayout } from '../../../lib/blocking.js'
@@ -92,9 +92,11 @@ export function buildBeats(view) {
       .map(img => {
         const at = img.after && all.some(u => u.id === img.after) ? Math.max(0, indexOf(img.after)) : units.length - 1
         const end = img.until && all.some(u => u.id === img.until) ? Math.max(at, indexOf(img.until)) : units.length - 1
-        return { img, at, end }
+        return { img, at, end, pinned: Boolean(img.untilByUser) }
       })
       .sort((a, b) => a.at - b.at)
+    // 亲密场面由插画来演：这段里出来的插画一直显示到这段结束（导演整理时已经这样改了，这里让老脚本也一样；玩家在改词里定了显示到哪一句的照他的）
+    holdIntimateCgs(turnImages, intimateRuns(scenes))
     let lastSpeaker = ''
     let hush = 0 // 配乐留白还剩几拍：写了换歌（写回原来的曲子也算）、换了地方、进出段落、过场字卡就提前回来；不跨轮
     let split = null // 分屏：电话另一头的人在画面一侧，写 off 或这一轮结束时收起
