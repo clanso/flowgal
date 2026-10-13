@@ -1,5 +1,5 @@
 // 浏览器里跑认脸模型（逆转式立绘工作台的「自动框」）。模型和运行库都从宿主下好的地方读，不连外网：
-// DSH 从宿主的 /vision-files/…（见 lib/dsh/vision.js）；酒馆版从浏览器缓存（宿主给一个 loader，见 st/vision.js）。小模型（脸、头、眼睛）用 onnxruntime 直接跑；精细模式的 Florence-2 用 transformers.js 跑（它自带一份 onnxruntime）。
+// DSH 从宿主的 /vision-files/…（见 lib/dsh/vision.js）；酒馆版从浏览器缓存（宿主给一个 loader，见 st/vision.js）。小模型（脸、头、眼睛）用 onnxruntime 直接跑；大模型 Florence-2 用 transformers.js 跑（它自带一份 onnxruntime）。
 // 怎么认、框怎么推都在 lib/detect.js，这里只负责把图变成像素、把模型跑起来。
 import { call, visionFiles, visionLoader } from '../api.js'
 import { autoFrame, followFrame, imageTensor, parseYolo } from '../../../lib/detect.js'
@@ -127,16 +127,19 @@ function grounder(status, img) {
   }
 }
 
+/** 认脸大模型（Florence-2）下好没有。下好了所有认脸的地方都用它，没下时退回小模型。 */
+export const bigReady = status => Boolean(status && status.packs && status.packs.fine && status.packs.fine.ready)
+
 /**
- * 自动框一张差分。status 是 visionApi.status() 的结果；big 为真且精细模式大模型下好了就带上它（fine 是每张都用）。
- * 回 lib/detect.js autoFrame 的结果（找不到脸是 null）。
+ * 自动框一张差分。status 是 visionApi.status() 的结果；大模型下好了就每张都用它找眼睛和嘴（小模型只用来先找到脸在哪），
+ * 没下好时只用小模型。回 lib/detect.js autoFrame 的结果（找不到脸是 null；r.big 说用没用上大模型）。
  */
-export async function frameSprite(status, src, { big = true, fine = false } = {}) {
+export async function frameSprite(status, src) {
   const img = await pixelsOf(src)
-  const ground = big && status.packs.fine && status.packs.fine.ready ? grounder(status, img) : null
+  const ground = bigReady(status) ? grounder(status, img) : null
   if (!ground) return autoFrame(img, runner(status, img))
   try {
-    return await autoFrame(img, runner(status, img), { ground, fine })
+    return await autoFrame(img, runner(status, img), { ground, fine: true })
   } catch (error) {
     // 大模型没跑起来（内存不够、文件坏了）：退回只用小模型，并说一声
     const r = await autoFrame(img, runner(status, img))

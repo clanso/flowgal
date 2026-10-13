@@ -156,9 +156,9 @@ const AUTO_BADGE = { high: ['准', 'is-ok'], mid: ['看一眼', 'is-warn'], low:
 
 /**
  * 认脸模型：下没下好、下载进度、下载来源。小模型（约 46 MB）是自动框必需的；
- * 精细模式的大模型（约 300 MB）可选，下好后小模型没把握的图自动请它补认，勾上精细模式则每张都用它找嘴。
+ * 大模型（约 300 MB）下好后，所有认脸的地方（这里、换脸前认底图、剧场量脸框、人物志里的自动框）每张都用它找眼睛和嘴。
  */
-function VisionBar({ status, setStatus, fine, setFine }) {
+function VisionBar({ status, setStatus }) {
   const act = promise => promise.then(setStatus, e => toast(e.message, 'error'))
   if (!status) return <div className="fg-note">正在看认脸模型下好没有…</div>
   const { basic, fine: big } = status.packs
@@ -171,8 +171,8 @@ function VisionBar({ status, setStatus, fine, setFine }) {
         <b>自动框</b>
         {basic.ready ? <span className="fg-pill">✓ 认脸小模型</span> : !busy && <button type="button" className="fg-btn is-mini is-primary" onClick={() => act(visionApi.download('basic'))}>下载认脸小模型（{mb(basic.missing)}）</button>}
         {big.ready
-          ? <label className="fg-check" title={big.note}><input type="checkbox" checked={fine} onChange={e => setFine(e.target.checked)} />精细模式（每张都让大模型找嘴，多 7~15 秒）</label>
-          : basic.ready && !busy && <button type="button" className="fg-btn is-mini" title={big.note} onClick={() => act(visionApi.download('fine'))}>下载精细模式大模型（{mb(big.missing)}）</button>}
+          ? <span className="fg-pill" title={big.note}>✓ 认脸大模型（每张都用，一张多 7~15 秒）</span>
+          : basic.ready && !busy && <button type="button" className="fg-btn is-mini is-primary" title={big.note} onClick={() => act(visionApi.download('fine'))}>下载认脸大模型（更准，{mb(big.missing)}）</button>}
         <span className="fg-spacer" />
         <label className="fg-note">下载来源 <select value={status.source} onChange={e => api.patchConfig({ vision: { source: e.target.value } }).then(() => act(visionApi.status()), err => toast(err.message, 'error'))}>{SOURCES.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label>
         {big.ready && <button type="button" className="fg-btn is-mini" title="删掉大模型的文件，腾出约 300 MB" onClick={() => act(visionApi.remove('fine'))}>删掉大模型</button>}
@@ -227,14 +227,12 @@ export function AaWorkbench({ gameId, person, onClose }) {
   const [tab, setTab] = React.useState('frame')
   const [viewing, setViewing] = React.useState(null) // 放大看的那张差分
   const [vision, setVision] = React.useState(null) // 认脸模型下没下好（visionApi.status）
-  const [fine, setFineState] = React.useState(() => { try { return localStorage.getItem('flowgal.aa.fine') === '1' } catch { return false } })
   const [lite, setLiteState] = React.useState(() => { try { return localStorage.getItem('flowgal.aa.lite') === '1' } catch { return false } })
   const [auto, setAuto] = React.useState({}) // key → 自动框的结果 { confidence, notes }
   const [framing, setFraming] = React.useState('') // 正在自动框的那张
   const touched = React.useRef(new Set()) // 手动调过框的差分（自动框认不出时照着它找）
   const stop = React.useRef(false)
   const job = (key, patch) => setJobs(j => ({ ...j, [key]: { ...(j[key] || {}), ...patch } }))
-  const setFine = on => { setFineState(on); try { localStorage.setItem('flowgal.aa.fine', on ? '1' : '0') } catch {} }
   const setLite = on => { setLiteState(on); try { localStorage.setItem('flowgal.aa.lite', on ? '1' : '0') } catch {} }
   const steps = lite ? AA_STEPS_LITE : AA_STEPS
 
@@ -302,7 +300,7 @@ export function AaWorkbench({ gameId, person, onClose }) {
       const src = assetUrl(v.record.assetId)
       let info
       try {
-        let r = await frameSprite(vision, src, { fine })
+        let r = await frameSprite(vision, src)
         const ref = !r && refFor(v) // 完全没认出脸才照别的差分找（认出脸、只是没把握的，比粗找准）
         if (ref) {
           const f = await followSprite(assetUrl(ref.record.assetId), ref.rects, src)
@@ -402,7 +400,7 @@ export function AaWorkbench({ gameId, person, onClose }) {
         重画的结果会洗干净（颜色对齐原图、刘海用原图），眨眼时不闪色、头发不跳。路人可以勾「精简版」：只做闭眼和一个张嘴，每张 2 次。
         同一个角色的差分姿势相同，框一次可以「套用到所选」。嘴框尽量扁：框多高，嘴最多张多大。生成要用 NovelAI 的额度（试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。
       </div>
-      {variants.length > 0 && <VisionBar status={vision} setStatus={setVision} fine={fine} setFine={setFine} />}
+      {variants.length > 0 && <VisionBar status={vision} setStatus={setVision} />}
       {!variants.length && <div className="fg-note" style={{ marginTop: '1cqw' }}>这个角色还没有画好的差分。先在人物志里画几张。</div>}
       {variants.length > 0 && (
         <div className="fg-aa-grid">

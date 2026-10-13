@@ -2,7 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { deflateRawSync } from 'node:zlib'
 import { segmentTurn, unitsForPrompt, anchorFor } from '../lib/segment.js'
-import { extractJson, normalizeScript, direct, retryMaxTokens, castBrief } from '../lib/director.js'
+import { extractJson, normalizeScript, direct, retryMaxTokens, castBrief, wantedOutput, wantedContext, imagePhrases } from '../lib/director.js'
+import { DIRECTOR_LIMITS, directorCaps, limitPhrases } from '../lib/limits.js'
 import { applyPeople, effectivePerson, expandMentions, rollback, allNames, editPerson, editLook } from '../lib/cast.js'
 import { variantKey, lookAt, pickSprite, nameSeed, cleanLookFields, joinLook, lookTags, formatLook } from '../lib/look.js'
 import { emotionId } from '../lib/emotions.js'
@@ -16,6 +17,7 @@ import { resolveCgPrompt, girlify, fallbackCg } from '../lib/illustrator.js'
 import { stageSteps, castAtEnd } from '../lib/staging.js'
 import { buildBeats } from '../src/client/theater/playback.js'
 import { resolveConfig, applyPatch } from '../lib/config.js'
+import { DIRECTOR_SYSTEM, fill } from '../lib/prompts.js'
 import { imageFromChat, openaiModels } from '../lib/image/openai.js'
 
 const TEXT = `夕阳把天台染成了橘红色。林岚靠在栏杆上，风吹乱了她的长发。
@@ -78,13 +80,44 @@ function scriptedLlm(replies, info) {
   }
 }
 
-test('gate: 导演最大输出与资料长度默认拉满（128000 / 1000000），超出范围收回上限', () => {
+test('gate: 导演最大输出默认自动（模型报了更大的上限就用它的，不然 128000）、资料默认不限；填了数照填的，没有上限', () => {
   const cfg = resolveConfig({})
-  assert.equal(cfg.director.maxTokens, 128000)
-  assert.equal(cfg.director.contextChars, 1000000)
+  assert.equal(cfg.director.maxTokens, null)
+  assert.equal(cfg.director.contextChars, null)
+  assert.equal(wantedOutput(cfg, null), 128000)
+  assert.equal(wantedOutput(cfg, { maxOutputTokens: 300000 }), 300000)
+  assert.equal(wantedOutput(cfg, { defaultMaxTokens: 8192 }), 128000, '模型默认的小输出不当上限')
+  assert.equal(wantedContext(cfg, 5e6), 5e6)
   const over = resolveConfig({ director: { maxTokens: 999999, contextChars: 5e6 } })
-  assert.equal(over.director.maxTokens, 128000)
-  assert.equal(over.director.contextChars, 1000000)
+  assert.equal(over.director.maxTokens, 999999)
+  assert.equal(over.director.contextChars, 5e6)
+  assert.equal(wantedOutput(over, { maxOutputTokens: 300000 }), 999999, '填了数就用填的（模型拒绝时再往下收）')
+  assert.equal(wantedContext(resolveConfig({ director: { contextChars: 2000 } }), 5e6), 2000)
+  assert.equal(resolveConfig({ director: { maxTokens: 10 } }).director.maxTokens, 1000, '太小的收到 1000')
+  assert.equal(resolveConfig({ director: { maxTokens: 'x' } }).director.maxTokens, null, '填坏了回到自动')
+})
+
+test('gate: 每轮上限默认都不限；设置里限了数，提示词里写这个数，脚本里按正文顺序只留前面的', () => {
+  const cfg = resolveConfig({})
+  assert.ok(DIRECTOR_LIMITS.every(l => cfg.director.limits[l.key] === null))
+  assert.equal(cfg.images.maxPerTurn, null)
+  assert.equal(cfg.images.expressionsPerTurn, null)
+  assert.deepEqual([resolveConfig({ images: { maxPerTurn: 8, expressionsPerTurn: 40 } }).images.maxPerTurn, resolveConfig({ images: { expressionsPerTurn: 40 } }).images.expressionsPerTurn], [8, 40], '以前被夹回 4、12 的数照存')
+  assert.equal(resolveConfig({ images: { maxPerTurn: 0 } }).images.maxPerTurn, 0, '0 是这一轮不要插画')
+  assert.deepEqual(resolveConfig({ director: { limits: { cams: '5', hush: -3, bogus: 1 } } }).director.limits.cams, 5)
+  assert.equal(resolveConfig({ director: { limits: { hush: -3 } } }).director.limits.hush, 0)
+  assert.ok(!('bogus' in resolveConfig({ director: { limits: { bogus: 1 } } }).director.limits))
+  const open = fill(DIRECTOR_SYSTEM, { ...limitPhrases(cfg.director.limits), ...imagePhrases(Infinity) })
+  assert.doesNotMatch(open, /一轮最多|\{\{/)
+  assert.match(open, /张数不设上限/)
+  assert.match(open, /平常的句子不写（大约十几句一次）/)
+  assert.match(open, /只给情绪真正需要的地方/, '「只给真正需要的地方」那几句一直在')
+  const capped = fill(DIRECTOR_SYSTEM, { ...limitPhrases({ cams: 14, textFxPerLine: 2, textFx: 16, newEmotions: 3 }), ...imagePhrases(4) })
+  assert.match(capped, /平常的句子不写（一轮最多 14 次，大约十几句一次）/)
+  assert.match(capped, /同一句里的几处不重叠；一句最多 2 处，一轮最多 16 处，只给情绪真正需要的地方/)
+  assert.match(capped, /一轮最多新造 3 个；插件会把它加进情绪库/)
+  assert.match(capped, /最多 4 张（有露骨的性场面时照上面标 nsfw 那一条，可以到 4 张）/)
+  assert.ok(Object.values(directorCaps({})).every(n => n === Infinity))
 })
 
 test('gate: 导演按模型窗口收紧资料和最大输出，不知道窗口时按设置原样发', async () => {

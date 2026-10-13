@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normalizeScript, previousBrief, callAtEnd } from '../lib/director.js'
-import { MAX_PHONE_PER_TURN } from '../lib/vocab.js'
+const MAX_PHONE_PER_TURN = 8 // 设置里限了数时（默认不限）
 import { FOLEY, PHONE_FOLEY } from '../lib/foley.js'
 import { buildBeats, beatHold, PHONE_LEAD_MS } from '../src/client/theater/playback.js'
 
@@ -39,7 +39,9 @@ test('gate: 导演写的手机：认得的种类才收，video 当视频来电�
 
 test('gate: 一轮最多几个手机上的事；标在不演的单元上的挪到下一句；上一幕没挂的电话导演看得到', () => {
   const units = unitsOf(MAX_PHONE_PER_TURN + 2)
-  const crowded = normalizeScript({ scene: {}, cast: [], lines: units.map(u => ({ u: u.id, sp: '林岚', phone: { kind: 'notify', who: '群聊', text: '新消息' } })) }, units)
+  const raw = { scene: {}, cast: [], lines: units.map(u => ({ u: u.id, sp: '林岚', phone: { kind: 'notify', who: '群聊', text: '新消息' } })) }
+  assert.equal(Object.values(normalizeScript(raw, units).lines).filter(l => l.phone).length, units.length, '默认不限')
+  const crowded = normalizeScript(raw, units, { limits: { phone: MAX_PHONE_PER_TURN } })
   assert.equal(Object.values(crowded.lines).filter(l => l.phone).length, MAX_PHONE_PER_TURN)
 
   const three = unitsOf(3)

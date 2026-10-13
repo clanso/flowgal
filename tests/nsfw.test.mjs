@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { normalizeScript, fitImages } from '../lib/director.js'
+import { normalizeScript, fitImages, imagePhrases } from '../lib/director.js'
 import { resolveCgPrompt, fallbackCg } from '../lib/illustrator.js'
 import { DIRECTOR_SYSTEM, fill } from '../lib/prompts.js'
 import { createStore } from '../lib/dsh/store.js'
@@ -44,10 +44,18 @@ test('露骨的已经有两张就不补；张数设得高时不露骨的照留�
   assert.deepEqual(fitImages([{ after: 'U9', moment: 'x', nsfw: true }], 1, units.map(u => u.id)).map(i => i.after), ['U9', 'U9'])
 })
 
-test('导演提示词写明露骨的标 nsfw、至少两张；每轮 1 张时可以到 2 张', () => {
-  const system = fill(DIRECTOR_SYSTEM, { maxImages: '1', nsfwMin: '2', nsfwMax: '2' })
+test('导演提示词写明露骨的标 nsfw、至少两张；每轮 1 张时可以到 2 张；不限时不写张数', () => {
+  const system = fill(DIRECTOR_SYSTEM, imagePhrases(1))
   assert.match(system, /这样的瞬间写 nsfw: true。这一轮正文有露骨的性场面时，这段场面至少画 2 张/)
+  assert.match(system, /这时这一轮一共可以到 2 张，名额不够时先让给露骨的这几张/)
   assert.match(system, /最多 1 张（有露骨的性场面时照上面标 nsfw 那一条，可以到 2 张）/)
+  const open = fill(DIRECTOR_SYSTEM, imagePhrases(Infinity))
+  assert.match(open, /这段场面至少画 2 张/)
+  assert.doesNotMatch(open, /一共可以到|最多 \d+ 张/)
+  // 不限时导演挑多少张都留着；露骨的不够两张照样补
+  const units = Array.from({ length: 9 }, (_, i) => 'U' + (i + 1))
+  assert.equal(fitImages(Array.from({ length: 7 }, (_, i) => ({ after: units[i], moment: 'x' })), Infinity, units).length, 7)
+  assert.equal(fitImages([{ after: 'U2', moment: 'x', nsfw: true }], Infinity, units).filter(i => i.nsfw).length, 2)
 })
 
 test('标了露骨的：Base 一定带 nsfw，保底的也带', () => {

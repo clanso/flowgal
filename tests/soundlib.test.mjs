@@ -5,7 +5,8 @@ import { mkdtemp, rm, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createStore } from '../lib/dsh/store.js'
-import { createSoundLib, soundCandidates, MAX_SFX_PER_TURN } from '../lib/soundlib.js'
+import { createSoundLib, soundCandidates } from '../lib/soundlib.js'
+const MAX_SFX_PER_TURN = 6 // 设置里限了数时（默认不限）
 import { readSoundSidecar, writeSoundSidecar, soundMatcher, SOUND_SIDECAR } from '../lib/soundlib-sidecar.js'
 import { createApi } from '../lib/api.js'
 import { normalizeScript, ambienceAfter, direct } from '../lib/director.js'
@@ -83,7 +84,7 @@ test('gate: 导演配环境音和音效：编号 / none / keep 规整，中途�
     lines: [{ u: 'U2', sfx: 'door' }, { u: 'U3', sfx: 'ghost', amb: 'rain' }, { u: 'U4', sfx: 'phone', amb: 'storm' }, { u: 'U5', sfx: 'thunder', amb: 'rain' },
       { u: 'U6', sfx: 'glass' }, { u: 'U7', sfx: 'door' }, { u: 'U8', sfx: 'knock' }, { u: 'U9', sfx: 'wind' }],
   }
-  const s = normalizeScript(raw, units, { ambienceIds: ['rain', 'storm'], sfxIds })
+  const s = normalizeScript(raw, units, { ambienceIds: ['rain', 'storm'], sfxIds, limits: { sfx: MAX_SFX_PER_TURN } })
   assert.equal(s.scene.amb, 'rain')
   assert.equal(s.lines.U3.sfx, undefined, '库里没有的音效丢掉')
   assert.equal(s.lines.U3.amb, undefined, '换成同一个不算换')

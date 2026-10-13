@@ -726,7 +726,7 @@ test('插画像 galgame 那样出现：默认溶入、静止，快慢跟着基�
   assert.equal(cgHoldMs({ enter: 'cut' }, 'daily'), extra, '直接切入只停那一小点')
 })
 
-test('gate: 「間」——导演写的停顿只收 beat / silence，写在不演的舞台指示上挪到下一句，一轮最多 6 处', () => {
+test('gate: 「間」——导演写的停顿只收 beat / silence，写在不演的舞台指示上挪到下一句，设置里限了数就只留那么多', () => {
   const units = segmentTurn(['【沉默】', '“……我知道了。”', '她笑了一下。', ...Array.from({ length: 8 }, (_, i) => `第${i + 1}句。`)].join('\n'))
   const raw = {
     skip: ['U1'],
@@ -736,10 +736,11 @@ test('gate: 「間」——导演写的停顿只收 beat / silence，写在不�
       ...units.slice(3).map(u => ({ u: u.id, pause: 'beat' })),
     ],
   }
-  const s = normalizeScript(raw, units)
+  const s = normalizeScript(raw, units, { limits: { pauses: 6 } })
   assert.equal(s.lines.U2.pause, 'silence', '舞台指示上的停顿挪到下一句要演的')
   assert.equal(s.lines.U3.pause, undefined, '不认得的停顿不收')
   assert.equal(Object.values(s.lines).filter(l => l.pause).length, 6)
+  assert.equal(Object.values(normalizeScript(raw, units).lines).filter(l => l.pause).length, 9, '默认不限')
   const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script: s }], images: [] })
   assert.equal(beats[0].pause, 'silence')
   assert.equal(beats[1].pause, undefined)

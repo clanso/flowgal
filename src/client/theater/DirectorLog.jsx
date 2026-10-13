@@ -242,17 +242,19 @@ function SpritesView({ sprites }) {
   )
 }
 
-/** 动作与表情设计：这个人怎么流露情绪、每个动作（身体 tag、承载哪些情绪）、每种情绪的表情。 */
+/** 动作与表情设计：表演笔记（这个人怎么流露情绪）、每个动作（身体 tag、承载哪些情绪）、每种情绪的表情。 */
 function ActingView({ acting }) {
+  // 只重写表演笔记的那次：只有笔记
+  if (acting && acting.read && !(acting.poses && acting.poses.length)) return <Block label="表演笔记（只重写了这一条，动作和表情没动）"><div>{acting.read}</div></Block>
   if (!acting || !acting.poses || !acting.poses.length) return <div className="fg-note">这次没有设计出能用的动作，先按已有的设计或通用动作组画；看「原始输出」里模型回了什么。</div>
   const label = e => emotionEntry(e).label
   return (
     <>
-      {acting.read && <Block label="怎么流露情绪"><div>{acting.read}</div></Block>}
+      {acting.read && <Block label="表演笔记"><div>{acting.read}</div></Block>}
       <Block label={`动作 · ${acting.poses.length}`}>
         {acting.poses.map(p => (
           <div key={p.id} className="fg-dlog-card">
-            <div className="fg-dlog-chips"><Chip k={p.id}>{p.label}</Chip>{p.side && <Chip k="构图">侧身</Chip>}<Chip k="底图">{label(p.emotions[0])}</Chip></div>
+            <div className="fg-dlog-chips"><Chip k={p.id}>{p.label}</Chip><Chip k="底图">{label(p.emotions[0])}</Chip></div>
             {p.desc && <div>{p.desc}</div>}
             <div className="fg-dlog-mono">{p.tags || '—'}</div>
             <div className="fg-note">情绪：{p.emotions.map(label).join('、')}</div>

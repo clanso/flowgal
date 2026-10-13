@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normalizeScript } from '../lib/director.js'
 import { DIRECTOR_SYSTEM } from '../lib/prompts.js'
-import { MAX_SFX_PER_TURN } from '../lib/soundlib.js'
+const MAX_SFX_PER_TURN = 6 // 设置里限了数时（默认不限）
 import { FOLEY, ONOMATOPOEIA, onomatopoeia } from '../lib/foley.js'
 import { buildBeats } from '../src/client/theater/playback.js'
 
@@ -17,7 +17,7 @@ test('gate: 拟声词认得常见的别的写法、标点和连写；认不出�
 test('gate: 导演写的音效：库里的编号照收，库里没有的认成内置拟声词，认不出的丢掉；跟库里的一起算一轮的上限', () => {
   const units = unitsOf(MAX_SFX_PER_TURN + 3)
   const sfx = ['door', '砰！', '咚咚咚', '啊——', 'ghost', '叮', '哗啦', '轰', '嗖', '咔嚓', '啪']
-  const script = normalizeScript({ scene: {}, cast: [], lines: units.map((u, i) => ({ u: u.id, sfx: sfx[i] })) }, units, { sfxIds: ['door'] })
+  const script = normalizeScript({ scene: {}, cast: [], lines: units.map((u, i) => ({ u: u.id, sfx: sfx[i] })) }, units, { sfxIds: ['door'], limits: { sfx: MAX_SFX_PER_TURN } })
   const kept = units.map(u => script.lines[u.id] && script.lines[u.id].sfx)
   assert.deepEqual(kept.slice(0, 6), ['door', '砰', '咚咚', undefined, undefined, '叮'])
   assert.equal(kept.filter(Boolean).length, MAX_SFX_PER_TURN)

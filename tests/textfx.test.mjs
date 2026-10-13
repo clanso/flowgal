@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normalizeScript } from '../lib/director.js'
 import { planLine, textFxSpans } from '../lib/typing.js'
-import { MAX_TEXT_FX_PER_TURN } from '../lib/vocab.js'
+const MAX_TEXT_FX_PER_TURN = 16 // 设置里限了数时（默认不限）
 import { buildBeats } from '../src/client/theater/playback.js'
 
 const chars = s => Array.from(s)
@@ -11,7 +11,7 @@ const plan = (text, opts = {}) => planLine(chars(text), 30, { seed: 'k', ...opts
 const gaps = p => p.times.slice(1).map((t, i) => t - p.times[i])
 const kinds = p => p.fx.map(f => f.kind + (f.sound ? ':' + f.sound : ''))
 
-test('gate: 导演写的文字效果：原文里有的字才收下，一句最多两处、一轮有上限，不认得的样子丢掉', () => {
+test('gate: 导演写的文字效果：原文里有的字才收下，设置里限了一句几处、一轮几处就照限，不认得的样子丢掉', () => {
   const units = [
     { id: 'U1', type: 'dialogue', text: '别、别过来……求你了' },
     { id: 'U2', type: 'narration', text: '远处隐约传来钟声。' },
@@ -23,12 +23,15 @@ test('gate: 导演写的文字效果：原文里有的字才收下，一句最�
       { u: 'U2', textfx: { text: '钟声', style: 'faint' } },
     ],
   }
-  const script = normalizeScript(raw, units)
+  const script = normalizeScript(raw, units, { limits: { textFxPerLine: 2 } })
   assert.deepEqual(script.lines.U1.textfx, [{ text: '别、别过来', style: 'shake' }, { text: '求你了', style: 'dwindle' }])
+  assert.deepEqual(normalizeScript(raw, units).lines.U1.textfx.map(f => f.text), ['别、别过来', '求你了', '……'], '默认一句里不限')
   assert.deepEqual(script.lines.U2.textfx, [{ text: '钟声', style: 'faint' }], '旁白也可以写，写成一个对象也认')
 
   const many = Array.from({ length: MAX_TEXT_FX_PER_TURN + 4 }, (_, i) => ({ id: 'U' + (i + 1), type: 'dialogue', text: '好开心呀～' + i }))
-  const crowded = normalizeScript({ scene: {}, cast: [], lines: many.map(u => ({ u: u.id, sp: '苏晴', textfx: [{ text: '好开心呀～', style: 'wave' }] })) }, many)
+  const crowdRaw = { scene: {}, cast: [], lines: many.map(u => ({ u: u.id, sp: '苏晴', textfx: [{ text: '好开心呀～', style: 'wave' }] })) }
+  assert.equal(Object.values(normalizeScript(crowdRaw, many).lines).filter(l => l.textfx).length, many.length, '默认不限')
+  const crowded = normalizeScript(crowdRaw, many, { limits: { textFx: MAX_TEXT_FX_PER_TURN } })
   assert.equal(Object.values(crowded.lines).filter(l => l.textfx).length, MAX_TEXT_FX_PER_TURN, '一轮里按正文顺序只留前面的')
 })
 

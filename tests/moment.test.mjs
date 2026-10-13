@@ -2,7 +2,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normalizeScript } from '../lib/director.js'
-import { MOMENTS, CHEERS, MAX_MOMENTS_PER_TURN } from '../lib/vocab.js'
+import { MOMENTS, CHEERS } from '../lib/vocab.js'
+const MAX_MOMENTS_PER_TURN = 4 // 设置里限了数时（默认不限）
 import { FOLEY, MOMENT_FOLEY } from '../lib/foley.js'
 import { buildBeats, beatHold, MOMENT_LEAD_MS } from '../src/client/theater/playback.js'
 
@@ -30,7 +31,9 @@ test('gate: 导演写的小瞬间：认得的种类才收；新称呼、约定�
 
 test('gate: 一轮最多几个小瞬间；新称呼、约定、交换联系方式一轮只留第一次', () => {
   const units = unitsOf(MAX_MOMENTS_PER_TURN + 3)
-  const crowded = normalizeScript({ scene: {}, cast: [], lines: units.map(u => ({ u: u.id, sp: '林岚', moment: { kind: 'pat', who: '苏晴' } })) }, units)
+  const raw = { scene: {}, cast: [], lines: units.map(u => ({ u: u.id, sp: '林岚', moment: { kind: 'pat', who: '苏晴' } })) }
+  assert.equal(Object.values(normalizeScript(raw, units).lines).filter(l => l.moment).length, units.length, '默认不限')
+  const crowded = normalizeScript(raw, units, { limits: { moments: MAX_MOMENTS_PER_TURN } })
   assert.equal(Object.values(crowded.lines).filter(l => l.moment).length, MAX_MOMENTS_PER_TURN)
 
   const three = unitsOf(3)

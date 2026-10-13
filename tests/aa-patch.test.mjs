@@ -2,7 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { cleanPatch, rgbToLab, labToRgb } from '../lib/aa-patch.js'
 import { composePrompt } from '../lib/image/style.js'
-import { poseOf, anchorOf } from '../lib/face.js'
+import { poseOf } from '../lib/face.js'
+import { POSES } from '../lib/vocab.js'
 import { createActor, fitBlink, fitTalk, blinkSteps } from '../lib/aa-motion.js'
 
 /** 造一张图：皮肤底，一块浅灰蓝的虹膜，左上一缕偏黄的刘海。 */
@@ -70,21 +71,17 @@ test('gate: 腮红跟头发同色时，闭眼不留原来的下睫毛；青绿�
   assert.ok(Math.hypot(oa - ba, ob - bb) < Math.hypot(ga - ba, gb - bb), '比重画的更接近原图的青绿：' + px)
 })
 
-test('gate: 侧身动作组：底图整张按侧身构图画，同组表情在它上面换脸；正面的照旧', () => {
-  assert.equal(poseOf('pout'), 'side')
-  assert.equal(anchorOf('side'), 'pout')
+test('gate: 侧身动作组去掉了：赌气归抱臂那组，立绘都按正面构图画（以前标着侧身的也一样）', () => {
+  assert.equal(poseOf('pout'), 'arms')
   assert.equal(poseOf('cold'), 'arms', '别的情绪不动')
+  assert.ok(!('side' in POSES))
+  assert.equal(poseOf('pout', [], { pout: 'side' }), 'arms', '设置里存过的「侧身」不认，回到默认分组')
   const person = { gender: 'female', appearance: '1girl, long black hair, blue eyes', appearanceFields: {}, outfitTags: 'school uniform', states: [] }
   const config = { images: { backend: 'novelai', transparentSprites: true }, novelai: { model: 'nai-diffusion-5-full' }, style: {} }
-  const side = composePrompt({ kind: 'sprite', tags: 'pout, puffed cheeks, looking at viewer', person, emotion: 'pout', backend: 'novelai', config, pose: 'side' })
-  assert.match(side.positive, /from side, profile, looking to the side/)
-  assert.doesNotMatch(side.positive, /facing viewer|looking at viewer|straight-on/)
-  assert.match(side.characters[0], /from side, profile, looking to the side/)
-  assert.doesNotMatch(side.characters[0], /looking at viewer|facing forward/)
-  assert.doesNotMatch(side.negative, /\bfrom side\b|\bprofile\b|side view/)
-  assert.equal(side.characterNegatives[0], '', '负面只用画风里带的，插件不自己加')
-  const front = composePrompt({ kind: 'sprite', tags: 'smile', person, emotion: 'smile', backend: 'novelai', config })
-  assert.match(front.positive, /facing viewer, looking at viewer, straight-on/)
+  const pout = composePrompt({ kind: 'sprite', tags: 'pout, puffed cheeks, looking at viewer', person, emotion: 'pout', backend: 'novelai', config, pose: 'side' })
+  assert.doesNotMatch(pout.positive + pout.characters[0], /from side|profile/)
+  assert.match(pout.positive, /facing viewer, looking at viewer, straight-on/)
+  assert.equal(pout.characterNegatives[0], '', '负面只用画风里带的，插件不自己加')
 })
 
 test('gate: 精简版（只有闭眼和一个张嘴）：眨眼是睁 → 闭 → 睁，连眨中间整个睁开；嘴在闭和开之间来回', () => {

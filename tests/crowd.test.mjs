@@ -32,12 +32,13 @@ test('gate: 站位：一个人照导演写的站；两个人以上按站位从�
   assert.ok(xs.every((x, i) => i === 0 || x > xs[i - 1]) && xs[0] >= 10 && xs[7] <= 90)
 })
 
-test('gate: 设置里的同屏人数：2~8 或 0（不限），填坏了用 5', () => {
-  assert.equal(resolveConfig({}).ui.maxOnStage, 5)
+test('gate: 设置里的同屏人数：2~12 或 0（不限），默认 8，填坏了用 8', () => {
+  assert.equal(resolveConfig({}).ui.maxOnStage, 8)
   assert.equal(resolveConfig({ ui: { maxOnStage: 3 } }).ui.maxOnStage, 3)
   assert.equal(resolveConfig({ ui: { maxOnStage: 0 } }).ui.maxOnStage, 0)
-  assert.equal(resolveConfig({ ui: { maxOnStage: 12 } }).ui.maxOnStage, 5)
-  assert.equal(resolveConfig({ ui: { maxOnStage: '4' } }).ui.maxOnStage, 5)
+  assert.equal(resolveConfig({ ui: { maxOnStage: 12 } }).ui.maxOnStage, 12)
+  assert.equal(resolveConfig({ ui: { maxOnStage: 13 } }).ui.maxOnStage, 8)
+  assert.equal(resolveConfig({ ui: { maxOnStage: '4' } }).ui.maxOnStage, 8)
 })
 
 test('gate: 设置里的短闪回演法：只换对话框（默认）、压暗画面、带小头像三选一，填坏了和早先存下的 face 都回到只换对话框', () => {
