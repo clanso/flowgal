@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine, KIND_SCENE, KIND_CG } from '../lib/engine.js'
 import { variantKey, nameSeed } from '../lib/look.js'
+import { roleText, rulesText, userText, ownText } from './roles.mjs'
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
 
@@ -69,13 +70,13 @@ export function cgReply(request) {
     })),
   })
 }
-const isCgWriter = request => request.system.includes('你是视觉小说的插画分镜师')
-export const isActingWriter = request => request.system.includes('你是视觉小说的角色表演设计师')
+const isCgWriter = request => roleText(request).includes('你是视觉小说的插画分镜师')
+export const isActingWriter = request => roleText(request).includes('你是视觉小说的角色表演设计师')
 /**
  * 导演、立绘设计师和插画分镜师共用一个假模型：按系统提示词分流。
  * 动作与表情设计默认回空（设计不出来，按通用动作组画）：这里测的是没有设计时的老路，设计的整条流程在 tests/acting.test.mjs。
  */
-export const routedReply = (director, acting = () => '{}') => request => (request.system.includes('立绘设计师') ? spriteReply(request) : isActingWriter(request) ? acting(request) : isCgWriter(request) ? cgReply(request) : typeof director === 'function' ? director(request) : director)
+export const routedReply = (director, acting = () => '{}') => request => (roleText(request).includes('立绘设计师') ? spriteReply(request) : isActingWriter(request) ? acting(request) : isCgWriter(request) ? cgReply(request) : typeof director === 'function' ? director(request) : director)
 
 test('gate: 一整轮的后台整理与出图', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
@@ -127,7 +128,7 @@ test('gate: 一整轮的后台整理与出图', async () => {
     assert.ok(person.sprites[neutralKey].assetId, '首次登场生成这身衣服的平静立绘')
     assert.ok(person.sprites[smileKey].assetId, '情绪差分')
     // 立绘设计师一次写完这个人的一批差分，读了资料、之前的剧情和衣橱。
-    const writer = llm.calls.filter(c => c.system.includes('立绘设计师'))
+    const writer = llm.calls.filter(c => roleText(c).includes('立绘设计师'))
     assert.equal(writer.length, 1)
     const writerUser = writer[0].messages[0].content[0].text
     assert.match(writerUser, /黑长直，蓝眼睛的学姐/)
@@ -290,7 +291,7 @@ test('gate: 导演日志：整理中能看到实时输出和思考，整理完�
     assert.deepEqual(log.entries[0].usage, { inputTokens: 900, outputTokens: 300 })
     assert.equal(log.entries[0].summary, '林岚在天台等我。')
     const { entry } = await engine.directorEntry('g', log.entries[0].id)
-    assert.match(entry.system, /后台导演/)
+    assert.match(entry.system + entry.user, /后台导演/)
     assert.match(entry.user, /你终于来了/)
     assert.equal(entry.maxTokens, 128000)
     assert.equal(entry.attempts[0].output, DIRECTOR_REPLY)
@@ -389,12 +390,12 @@ test('gate: 导演新造的复合情绪进情绪库，按这身衣服和长期�
     assert.equal(view.turns[0].script.lines.U1.emo, '带着烦躁思考')
     assert.equal(view.turns[0].script.lines.U2.emo, undefined, '没声明的英文乱词丢掉')
     assert.deepEqual(view.cast[0].states, [{ name: '怀孕', tags: 'pregnant, round belly' }])
-    const writer = llm.calls.find(c => c.system.includes('立绘设计师')).messages[0].content[0].text
+    const writer = ownText(llm.calls.find(c => roleText(c).includes('立绘设计师')))
     assert.match(writer, /睡衣」（pajamas）；长期状态 怀孕（pregnant, round belly）；情绪「带着烦躁思考」；接近 思考/)
     assert.doesNotMatch(writer, /皱眉撇嘴/)
     // 导演下一轮能在情绪库里看到它。
     await engine.onTurnSettled({ gameId: 'g', turn: 4, textVersion: 'v4', text: '“嗯。”' })
-    const next = llm.calls.filter(c => c.system.includes('后台导演')).at(-1).messages[0].content[0].text
+    const next = ownText(llm.calls.filter(c => roleText(c).includes('后台导演')).at(-1))
     assert.match(next, /【情绪库】[\s\S]*【思】[^\n]*thinking 思考[^\n]*，带着烦躁思考/, '按类别列：跟着它接近的思考归进「思」')
     assert.doesNotMatch(next, /皱眉撇嘴/)
     engine.dispose()

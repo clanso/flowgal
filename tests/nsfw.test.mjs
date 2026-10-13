@@ -9,6 +9,7 @@ import { resolveCgPrompt, fallbackCg } from '../lib/illustrator.js'
 import { DIRECTOR_SYSTEM, fill } from '../lib/prompts.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
+import { roleText, rulesText, userText } from './roles.mjs'
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
 const units = Array.from({ length: 9 }, (_, i) => ({ id: 'U' + (i + 1), text: `第 ${i + 1} 句。`, type: 'narration' }))
@@ -113,7 +114,7 @@ test('gate: 一轮里只挑了一张露骨的，出两张都标 NSFW；分镜师
     const llm = {
       stream(request) {
         calls.push(request)
-        const text = request.system.includes('你是视觉小说的插画分镜师') ? writer(request) : director
+        const text = roleText(request).includes('你是视觉小说的插画分镜师') ? writer(request) : director
         return (async function* () { yield { type: 'text-delta', text }; yield { type: 'finish', reason: { kind: 'stop' } } })()
       },
     }
@@ -126,7 +127,7 @@ test('gate: 一轮里只挑了一张露骨的，出两张都标 NSFW；分镜师
     const view = await settle(engine, 'g', v => v.images.length === 2 && v.images.every(i => i.status === 'ready'))
     assert.deepEqual(view.images.map(i => i.nsfw), [true, true])
     assert.deepEqual(view.images.map(i => i.after).sort(), ['U2', 'U3'])
-    const writerUser = calls.find(c => c.system.includes('你是视觉小说的插画分镜师')).messages[0].content[0].text
+    const writerUser = calls.find(c => roleText(c).includes('你是视觉小说的插画分镜师')).messages[0].content[0].text
     assert.equal(writerUser.match(/露骨（nsfw）：照第七节如实画/g).length, 2)
     const bases = requests.filter(r => r?.parameters?.v4_prompt).map(r => r.parameters.v4_prompt.caption.base_caption)
     assert.equal(bases.length, 2)

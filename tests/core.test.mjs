@@ -132,7 +132,7 @@ test('gate: 导演按模型窗口收紧资料和最大输出，不知道窗口�
   await direct({ llm: small, provider: 'p', model: 'm', units, previous: null, castList: [], context, config, backend: 'novelai', trace })
   const sent = small.calls[0]
   assert.ok(sent.maxTokens >= 4096 && sent.maxTokens < 18000, String(sent.maxTokens))
-  assert.ok(sent.messages[0].content[0].text.length < 20000)
+  assert.ok(!sent.messages[0].content[0].text.includes(lore))
   assert.ok(trace.contextChars < trace.contextLength)
   assert.equal(trace.notes.length, 2)
   assert.equal(trace.attempts[0].maxTokens, sent.maxTokens)

@@ -1426,6 +1426,51 @@ button.fg-pm-name:hover { color: var(--accent); }
 .fg-emo-cat { display: grid; grid-template-columns: 9cqw 14cqw 1fr auto; gap: .7cqw; align-items: center; }
 .fg-emo-restore { cursor: pointer; font: inherit; color: inherit; }
 .fg-chip small { margin-left: .3em; opacity: .55; font-size: .85em; }
+.fg-dlog-chip small { margin-left: .3em; opacity: .6; font-size: .85em; }
+
+/* 设置 →「提示词」（PromptBook.jsx）：按导演、几位设计师、共用、出图固定词、过滤规则分组，每段全文、变量、对照 */
+.fg-pb { display: grid; gap: .8cqw; }
+.fg-pb .fg-note .fg-btn.is-mini { margin: 0 .4cqw; }
+.fg-pb-flow { display: grid; grid-template-columns: 13cqw 1fr; gap: .6cqw 1.2cqw; align-items: center; padding: .8cqw 1cqw; border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); }
+.fg-pb-flow label { display: flex; align-items: center; gap: .7cqw; font-size: 1.05cqw; }
+.fg-pb-sticky { position: sticky; top: 0; z-index: 3; display: grid; gap: .5cqw; padding: .6cqw 0; background: rgb(13, 10, 30); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(0, 0, 0, .5); }
+.fg-pb-sticky .fg-row { flex-wrap: nowrap; }
+.fg-pb-sticky .fg-input { flex: 1; }
+.fg-pb-sticky .fg-select { width: auto; }
+.fg-pb-alert { font-size: .95cqw; color: #ffd27a; display: flex; align-items: center; gap: .6cqw; }
+.fg-pb-group { border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); padding-bottom: .4cqw; }
+.fg-pb-gdesc { padding: 0 1cqw .4cqw 3.2cqw; }
+.fg-pb-section { padding: .2cqw 1cqw .6cqw; }
+.fg-pb-stitle { margin: .6cqw 0 .4cqw; font-size: 1.05cqw; letter-spacing: .12em; color: var(--accent3); }
+.fg-pb-item { display: grid; gap: .45cqw; padding: .8cqw 1cqw; margin: .5cqw 0; border-radius: .7cqw; border: 1px solid rgba(255, 255, 255, .07); background: rgba(255, 255, 255, .02); }
+.fg-pb-item.is-edited { border-color: color-mix(in oklab, var(--accent) 45%, transparent); }
+.fg-pb-item.is-stale { border-color: rgba(255, 196, 92, .6); }
+.fg-pb-head { display: flex; align-items: center; flex-wrap: wrap; gap: .6cqw; font-size: 1.05cqw; }
+.fg-pb-head code { font-size: .8cqw; opacity: .5; font-family: var(--font-latin); }
+.fg-pb-badge { padding: .1cqw .7cqw; border-radius: 99px; font-size: .8cqw; background: color-mix(in oklab, var(--accent) 30%, transparent); color: #fff; }
+.fg-pb-badge.is-new { background: rgba(255, 196, 92, .32); color: #ffe2a8; }
+.fg-pb-badge.is-old { background: rgba(255, 255, 255, .1); color: var(--ink-dim); }
+.fg-pb-badge.is-dirty { background: rgba(94, 231, 255, .2); color: #bff6ff; }
+.fg-pb-text { min-height: 3cqw; max-height: 60cqw; tab-size: 2; }
+.fg-pb-foot { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .6cqw; }
+.fg-pb-vars { display: flex; flex-wrap: wrap; gap: .4cqw; flex-basis: 100%; }
+.fg-pb-var { display: inline-flex; align-items: baseline; gap: .4cqw; padding: .2cqw .7cqw; border-radius: .5cqw; font-size: .85cqw; color: var(--ink-dim); background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .06); }
+.fg-pb-var code { color: var(--accent3); font-size: .85cqw; }
+.fg-pb-var small { opacity: .6; }
+.fg-pb-var.is-unused { opacity: .55; }
+.fg-pb-var.is-unknown { border-color: #ff6b6b; color: #ffb3b3; }
+.fg-pb-last, .fg-pb-diff, .fg-pb-out { display: grid; gap: .4cqw; }
+.fg-pb-last summary { cursor: pointer; font-size: .9cqw; color: var(--ink-dim); }
+.fg-pb-last pre, .fg-pb-diff pre, .fg-pb-out pre { margin: 0; max-height: 36cqw; overflow: auto; padding: .7cqw 1cqw; border-radius: .6cqw; background: rgba(0, 0, 0, .35); font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.fg-pb-del { color: #ff9c9c; background: rgba(255, 90, 90, .08); }
+.fg-pb-add { color: #9df0b4; background: rgba(90, 220, 140, .08); }
+.fg-pb-diff pre > div { display: grid; grid-template-columns: 1.6cqw 1fr; }
+.fg-pb-diff pre i { font-style: normal; opacity: .8; user-select: none; }
+.fg-pb-diff mark { color: inherit; background: color-mix(in oklab, currentColor 30%, transparent); border-radius: .2cqw; }
+.fg-pb-skip { color: var(--ink-dim); font-style: italic; }
+.fg-pb-stale { display: grid; gap: .6cqw; padding: .7cqw 1cqw; border-radius: .6cqw; background: rgba(255, 196, 92, .07); font-size: .95cqw; }
+.fg-pb-preview { display: grid; gap: .6cqw; padding: .8cqw 1cqw; border: 1px dashed var(--box-border); border-radius: .8cqw; }
+.fg-pb-preview .fg-select { width: auto; }
 
 /* 表单 */
 .fg-field { display: grid; grid-template-columns: 14cqw 1fr; gap: 1.2cqw; align-items: center; margin: .9cqw 0; font-size: 1.1cqw; }
@@ -1592,6 +1637,17 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-emo-row { grid-template-columns: auto 1fr 1fr; } .fg-emo-row > .fg-select, .fg-emo-row > .fg-note:not(.fg-emo-meta) { grid-column: 2 / -1; } .fg-emo-name { grid-column: 2 / -1; }
   .fg-emo-meta, .fg-emo-acts { grid-column: 1 / -1; } .fg-emo-acts { justify-content: flex-start; }
   .fg-emo-group-head b { font-size: 3.4cqw; } .fg-emo-name small { font-size: 2.4cqw; } .fg-emo-prompt b { font-size: 3cqw; }
+  .fg-pb-flow { grid-template-columns: 1fr; padding: 2cqw; border-radius: 2cqw; } .fg-pb-flow label { font-size: 3.2cqw; gap: 2cqw; }
+  .fg-pb-sticky .fg-row { flex-wrap: wrap; } .fg-pb-sticky .fg-input { flex-basis: 100%; }
+  .fg-pb-alert, .fg-pb-stale { font-size: 2.8cqw; }
+  .fg-pb-gdesc { padding: 0 2cqw 1cqw 6cqw; } .fg-pb-section { padding: .4cqw 2cqw 1.2cqw; }
+  .fg-pb-stitle, .fg-pb-head { font-size: 3.2cqw; } .fg-pb-head code, .fg-pb-badge { font-size: 2.4cqw; }
+  .fg-pb-item { padding: 2cqw; gap: 1.2cqw; border-radius: 2cqw; } .fg-pb-badge { padding: .3cqw 1.6cqw; }
+  .fg-pb-var, .fg-pb-var code, .fg-pb-last summary { font-size: 2.6cqw; } .fg-pb-var { padding: .5cqw 1.6cqw; border-radius: 1.2cqw; }
+  .fg-pb-last pre, .fg-pb-diff pre, .fg-pb-out pre { font-size: 2.6cqw; max-height: 100cqw; padding: 1.6cqw 2cqw; }
+  .fg-pb-diff pre > div { grid-template-columns: 4cqw 1fr; } .fg-pb-text { max-height: 150cqw; }
+  .fg-pb-preview { padding: 2cqw; border-radius: 2cqw; } .fg-pb-preview .fg-row { flex-wrap: wrap; }
+  .fg-dlog-chip small { font-size: 2.4cqw; }
   .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }
   .fg-aa-grid { grid-template-columns: 1fr; } .fg-aa-list { max-height: 50cqw; }
   .fg-aa-vision { font-size: 2.6cqw; } .fg-aa-badge { font-size: 2.2cqw; } .fg-aa-vision progress { height: 1.6cqw; }

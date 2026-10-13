@@ -6,6 +6,7 @@ import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions, nearestOf, emotionLevel } from '../../../lib/emotions.js'
 import { EmotionLibrary } from './EmotionLibrary.jsx'
 import { PoseMatrix } from './PoseMatrix.jsx'
+import { PromptBook } from './PromptBook.jsx'
 import { settleNeutral, slotKey, tokenFor, parseToken, cleanPoseGroups, sheetOf, homePose, poseFor } from '../../../lib/poses.js'
 import { AaWorkbench, RectEditor } from './AaWorkbench.jsx'
 import { visionApi, frameSprite } from './vision.js'
@@ -1514,7 +1515,7 @@ function StyleSection({ data }) {
   )
 }
 
-function DirectorSection({ data, onDirectorLog }) {
+function DirectorSection({ data, onDirectorLog, onTab = null }) {
   const cfg = data.config
   const [llm, setLlm] = React.useState({ providers: [], models: [] })
   React.useEffect(() => { api.llm(cfg.director.provider).then(setLlm).catch(() => {}) }, [cfg.director.provider])
@@ -1542,19 +1543,10 @@ function DirectorSection({ data, onDirectorLog }) {
           <Field key={l.key} label={l.label}><Limit value={cfg.director.limits?.[l.key] ?? null} fallback={l.was} unit={l.unit} onCommit={v => p({ limits: { [l.key]: v } })} /></Field>
         ))}
       </div>
-      <div className="fg-section">提示词</div>
-      <Field label="自定义提示词" hint={`留空用内置导演提示词。可用 {{styleHint}}，插画张数 {{imageLimit}} {{nsfwRoom}}，每轮上限 ${DIRECTOR_LIMITS.map(l => `{{${l.key}Limit}}`).join(' ')}（限了数是「一轮最多 N 次，」这半句，不限时是空的）。情绪库、配乐曲库附在用户消息里，自定义时也生效。`}>
-        <textarea className="fg-textarea" defaultValue={cfg.director.systemPrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.systemPrompt) p({ systemPrompt: e.target.value }) }} />
-      </Field>
-      <Field label="立绘设计师提示词" hint="留空用内置的。可用 {{styleHint}}。输出格式必须是 {&quot;sprites&quot;:[{&quot;key&quot;,&quot;tags&quot;}]}（负面只用画风里带的，写了也不收）。">
-        <textarea className="fg-textarea" defaultValue={cfg.director.spritePrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.spritePrompt) p({ spritePrompt: e.target.value }) }} />
-      </Field>
-      <Field label="动作与表情设计提示词" hint="留空用内置的（画立绘前给每个人设计专属动作和表情，read 是人物志里的「表演笔记」）。可用 {{styleHint}}。输出格式必须是 {&quot;read&quot;,&quot;poses&quot;:[{&quot;id&quot;,&quot;label&quot;,&quot;desc&quot;,&quot;tags&quot;,&quot;emotions&quot;}],&quot;faces&quot;:[{&quot;emotion&quot;,&quot;desc&quot;,&quot;tags&quot;}]}。">
-        <textarea className="fg-textarea" defaultValue={cfg.director.actingPrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.actingPrompt) p({ actingPrompt: e.target.value }) }} />
-      </Field>
-      <Field label="插画分镜师提示词" hint="留空用内置的（Base + 每人一个角色块的写法）。可用 {{styleHint}}。输出格式必须是 {&quot;images&quot;:[{&quot;key&quot;,&quot;tag&quot;,&quot;nl&quot;,&quot;characters&quot;:[{&quot;name&quot;,&quot;tag&quot;,&quot;nl&quot;}],&quot;size&quot;}]}。">
-        <textarea className="fg-textarea" defaultValue={cfg.director.cgPrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.cgPrompt) p({ cgPrompt: e.target.value }) }} />
-      </Field>
+      <div className="fg-section">提示词{onTab && <button type="button" className="fg-btn" onClick={() => onTab('prompts')}>打开提示词页</button>}</div>
+      <div className="fg-note">导演、表演设计师、立绘设计师、插画分镜师的每一段提示词，连出图固定词和过滤规则，都在「提示词」页全文显示、能改、能单段恢复默认，还能照这一局预览完整的提示词。</div>
+      <Field label="共用开头" hint="导演和几位设计师的系统提示词都换成同一句，各自的规矩放进用户消息的【你的工作】一节，资料和剧情放在最前面一字不差：会自动缓存的模型接口（DeepSeek 等）第二次读就便宜、快。关掉就照以前，规矩放在系统提示词里。"><Toggle value={cfg.director.sharedPrefix} onChange={v => p({ sharedPrefix: v })} /></Field>
+      <Field label="补设计合进写词" hint="已经设计过的人要画还没设计的情绪（或重新设计表情）时，补设计和写立绘提示词一次请求做完，资料和剧情只读一遍。关掉就先单独补设计、再写词。第一次整套设计一直是单独一次。"><Toggle value={cfg.director.combineDesign} onChange={v => p({ combineDesign: v })} /></Field>
     </>
   )
 }
@@ -2390,7 +2382,7 @@ export function Settings({ onClose, onDirectorLog = null, initialTab = 'look' })
   const data = useConfig()
   const [tab, setTab] = React.useState(initialTab)
   return (
-    <Panel title="设置" en="Config" onClose={onClose} tabs={[{ id: 'look', label: '外观与演出' }, { id: 'effects', label: '特效' }, { id: 'sound', label: '声音' }, { id: 'music', label: '配乐' }, { id: 'soundlib', label: '音效库' }, { id: 'ambience', label: '环境音库' }, { id: 'director', label: '导演' }, { id: 'images', label: '生图渠道' }, { id: 'style', label: '画风与配图' }, { id: 'about', label: '版本与更新' }]} tab={tab} onTab={setTab}
+    <Panel title="设置" en="Config" onClose={onClose} tabs={[{ id: 'look', label: '外观与演出' }, { id: 'effects', label: '特效' }, { id: 'sound', label: '声音' }, { id: 'music', label: '配乐' }, { id: 'soundlib', label: '音效库' }, { id: 'ambience', label: '环境音库' }, { id: 'director', label: '导演' }, { id: 'prompts', label: '提示词' }, { id: 'images', label: '生图渠道' }, { id: 'style', label: '画风与配图' }, { id: 'about', label: '版本与更新' }]} tab={tab} onTab={setTab}
       actions={data && <span className={`fg-pill${data.ready ? '' : ' fg-err'}`}>{data.ready ? '生图已就绪' : data.readyReason}</span>}>
       {!data && <div className="fg-note">读取设置中…</div>}
       {data && tab === 'look' && <LookSection data={data} />}
@@ -2399,7 +2391,8 @@ export function Settings({ onClose, onDirectorLog = null, initialTab = 'look' })
       {data && tab === 'music' && <MusicSection data={data} />}
       {data && tab === 'soundlib' && <SoundLibSection data={data} kind="sfx" />}
       {data && tab === 'ambience' && <SoundLibSection data={data} kind="ambience" />}
-      {data && tab === 'director' && <DirectorSection data={data} onDirectorLog={onDirectorLog} />}
+      {data && tab === 'director' && <DirectorSection data={data} onDirectorLog={onDirectorLog} onTab={setTab} />}
+      {data && tab === 'prompts' && <PromptBook onTab={setTab} />}
       {data && tab === 'images' && <BackendSection data={data} />}
       {data && tab === 'style' && <><StyleSection data={data} /><ImagesSection data={data} /></>}
       {data && tab === 'about' && <UpdateSection data={data} />}

@@ -35,6 +35,8 @@ function spriteWriterReply(prompt) {
     const face = EXPRESSIONS[id] || EMOTION_TAGS[id] || EMOTION_TAGS[base] || EMOTION_TAGS.neutral
     sprites.push({ key: m[1], tags: [appearance, outfit, ...states, face].filter(Boolean).join(', ') })
   }
+  // 补设计合进写词：先补设计（同假的表演设计师），两份一起回
+  if (prompt.includes('【先补设计】')) return JSON.stringify({ acting: JSON.parse(actingWriterReply(prompt)), sprites }, null, 1)
   return JSON.stringify({ sprites }, null, 1)
 }
 
@@ -77,7 +79,8 @@ function actingWriterReply(prompt) {
   const plan = ACTING[name] || { read: '', poses: [{ label: '站着', desc: '', tags: 'hands at sides', emotions: ['neutral'] }], faces: {} }
   // 只重写表演笔记（人物志里「让设计师重写」）：换一种说法，看得出是新写的
   if (prompt.includes('这次只重写这个人的表演笔记')) return JSON.stringify({ read: plan.read ? '（重读资料后）' + plan.read : '情绪都写在脸上，来得快去得快。' })
-  const list = prompt.slice(prompt.indexOf('【要设计的情绪】\n')).split('\n').map(line => (line.match(/^- ([^（：]+)（/) || [])[1]).filter(Boolean)
+  const head = prompt.includes('【要先设计的情绪】\n') ? '【要先设计的情绪】\n' : '【要设计的情绪】\n'
+  const list = prompt.slice(prompt.indexOf(head)).split('\n').map(line => (line.match(/^- ([^（：]+)（/) || [])[1]).filter(Boolean)
   const adding = prompt.includes('【已有的动作与表情设计】')
   const faces = list.map(e => ({ emotion: e, ...(plan.faces[e] || { desc: '', tags: EXPRESSIONS[e] || EMOTION_TAGS[e] || 'calm, closed mouth' }) }))
   if (adding) return JSON.stringify({ poses: [{ id: 'p1', emotions: list }], faces }, null, 1)
@@ -104,7 +107,14 @@ export const THINKING = '先看这一轮的地点和时段，沿用上一幕的�
  * 假模型的一次回答：system 是系统提示词，prompt 是用户那段。回 { reasoning, text, turn }；认不出是哪一轮的导演请求回 text '{}'。
  * decorate(turn, units, reply) 可以改导演的整理结果（预览拿它配上示例曲）。
  */
-export function fakeLlmReply({ system = '', prompt = '', decorate = (turn, units, reply) => reply }) {
+/** 这次是谁：共用开头开着时（默认）在用户消息的【你的工作】开头那句，关着时在系统提示词里。 */
+export function roleOf(system = '', prompt = '') {
+  const i = prompt.indexOf('【你的工作】\n')
+  return i < 0 ? system : prompt.slice(i + 7, i + 87)
+}
+
+export function fakeLlmReply({ system: raw = '', prompt = '', decorate = (turn, units, reply) => reply }) {
+  const system = roleOf(raw, prompt)
   if (system.includes('立绘设计师')) return { reasoning: '', text: spriteWriterReply(prompt) }
   if (system.includes('你是视觉小说的角色表演设计师')) return { reasoning: '', text: actingWriterReply(prompt) }
   if (system.includes('你是视觉小说的插画分镜师')) return { reasoning: CG_THINKING, text: cgWriterReply(prompt) }

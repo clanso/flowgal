@@ -9,6 +9,7 @@ import { variantKey } from '../lib/look.js'
 import { encodePng } from '../lib/image/png.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
+import { roleText, rulesText, userText } from './roles.mjs'
 
 const W = 256, H = 384
 const LOOK = { appearance: '1girl, long black hair, blue eyes', outfit: '', states: [] }
@@ -45,8 +46,8 @@ function fakeLlm(hold = null) {
     calls,
     stream(request) {
       calls.push(request)
-      const text = request.system.includes('你是视觉小说的角色表演设计师') ? JSON.stringify(SHEET)
-        : request.system.includes('立绘设计师') ? JSON.stringify({ sprites: [...request.messages[0].content[0].text.matchAll(/^- (s\d+)：/gm)].map(([, id]) => ({ key: id, tags: `1girl, long black hair, written-${id}` })) })
+      const text = roleText(request).includes('你是视觉小说的角色表演设计师') ? JSON.stringify(SHEET)
+        : roleText(request).includes('立绘设计师') ? JSON.stringify({ sprites: [...request.messages[0].content[0].text.matchAll(/^- (s\d+)：/gm)].map(([, id]) => ({ key: id, tags: `1girl, long black hair, written-${id}` })) })
           : '{}'
       return (async function* () { if (hold) await hold.wait(); yield { type: 'text-delta', text }; yield { type: 'finish', reason: { kind: 'stop' } } })()
     },
@@ -168,10 +169,10 @@ test('gate: 正在画的时候清空：停下来，晚到的图不写回、文�
     assert.equal(await assets(), 0, '晚到的图没留下')
 
     // 清完马上重新画：先重新设计，再写词、画
-    const designs = llm.calls.filter(c => c.system.includes('你是视觉小说的角色表演设计师')).length
+    const designs = llm.calls.filter(c => roleText(c).includes('你是视觉小说的角色表演设计师')).length
     await engine.castAction('g', 'sprite', { name: '林岚', emotion: 'neutral' })
     const redrawn = await until(async () => { const p = await lin(); return p.sprites[variantKey(LOOK, 'neutral')]?.assetId && p }, '重新画')
-    assert.ok(llm.calls.filter(c => c.system.includes('你是视觉小说的角色表演设计师')).length > designs, '设计清掉了：重新设计')
+    assert.ok(llm.calls.filter(c => roleText(c).includes('你是视觉小说的角色表演设计师')).length > designs, '设计清掉了：重新设计')
     assert.equal(redrawn.acting.poses[0].label, '背手站着')
     assert.deepEqual(redrawn.spriteStatus, {})
     assert.equal(await assets(), 1)

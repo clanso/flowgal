@@ -9,6 +9,7 @@ import { callModel, retryMaxTokens } from '../lib/director.js'
 import { resolveConfig } from '../lib/config.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine, KIND_CG } from '../lib/engine.js'
+import { roleText, rulesText, userText } from './roles.mjs'
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
 
@@ -151,13 +152,13 @@ test('gate: 导演用宿主的模型，插画分镜师走自己接的接口；Ke
     const view = await settle(engine, 'g', v => v.images[0]?.status === 'ready')
     // 导演走宿主；宿主一次插画分镜都没被叫到
     assert.equal(hostCalls.length, 1)
-    assert.equal(hostCalls.some(c => c.system.includes('你是视觉小说的插画分镜师')), false)
+    assert.equal(hostCalls.some(c => roleText(c).includes('你是视觉小说的插画分镜师')), false)
     // 分镜师走自定义接口：带着 Key、选的模型，最大输出按填的窗口收过
     assert.equal(chats.length, 1)
     assert.equal(chats[0].url, 'https://cg.example.com/v1/chat/completions')
     assert.equal(chats[0].auth, 'Bearer sk-cg-secret')
     assert.equal(chats[0].body.model, 'cg-model')
-    assert.match(chats[0].body.messages[0].content, /你是视觉小说的插画分镜师/)
+    assert.match(chats[0].body.messages.map(m => m.content).join('\n'), /你是视觉小说的插画分镜师/)
     assert.ok(chats[0].body.max_tokens < 32000, '最大输出按填的窗口收过')
     assert.equal(view.images[0].writer, 'ai')
     const caption = images.find(r => r.body?.parameters?.v4_prompt)?.body.parameters.v4_prompt.caption
@@ -184,7 +185,7 @@ test('gate: 导演用宿主的模型，插画分镜师走自己接的接口；Ke
     // 在宿主的模型里另选一个：分镜师走宿主，但用的是单独选的那个
     await engine.patchConfig({ director: { cgLlm: { source: 'host', provider: 'other', model: 'o-1' } } })
     await engine.rewritePrompt('g', view.images[0].id, '改成雨夜').catch(() => {})
-    const cgCall = hostCalls.find(c => c.system.includes('你是视觉小说的插画分镜师'))
+    const cgCall = hostCalls.find(c => roleText(c).includes('你是视觉小说的插画分镜师'))
     assert.deepEqual([cgCall.provider, cgCall.model], ['other', 'o-1'])
     assert.deepEqual([hostCalls[0].provider, hostCalls[0].model], ['host', 'host-1'], '导演还是跟着 Tavern')
   } finally {
