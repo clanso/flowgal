@@ -12,9 +12,9 @@ const GUST = { rain: [2.2, -1], storm: [4, -1], snow: [1.4, 0], blizzard: [3.5, 
 const WRAP = new Set(['snow', 'embers', 'sparkles', 'bubbles', 'dust', 'fireflies', 'bokeh'])
 const rand = (a, b) => a + Math.random() * (b - a)
 
-/** 定远近：大小、速度、透明度都按 z 缩放。新生成的虚焦粒子从画面外进来，不在边上突然出现。 */
-function deepen(kind, p, initial) {
-  if (!(kind in NEAR)) return p
+/** 定远近：大小、速度、透明度都按 z 缩放。新生成的虚焦粒子从画面外进来，不在边上突然出现。flat（特效开关关掉了「粒子分远近」）时都一样远。 */
+function deepen(kind, p, initial, flat) {
+  if (flat || !(kind in NEAR)) return p
   const soft = Math.random() < NEAR[kind]
   const z = soft ? rand(1.8, 2.8) : 0.6 + Math.random() ** 1.3 * 0.9
   p.z = z; p.soft = soft
@@ -27,31 +27,31 @@ function deepen(kind, p, initial) {
   return p
 }
 
-function spawn(kind, w, h, initial) {
+function spawn(kind, w, h, initial, flat = false) {
   const p = { x: rand(0, w), y: initial ? rand(0, h) : rand(-h * 0.2, -10), life: 0 }
   switch (kind) {
     case 'rain': case 'storm':
-      return deepen(kind, { ...p, vx: kind === 'storm' ? -7 : -2.4, vy: rand(16, 26) * (kind === 'storm' ? 1.25 : 1), len: rand(12, 26), a: rand(0.18, 0.45) }, initial)
+      return deepen(kind, { ...p, vx: kind === 'storm' ? -7 : -2.4, vy: rand(16, 26) * (kind === 'storm' ? 1.25 : 1), len: rand(12, 26), a: rand(0.18, 0.45) }, initial, flat)
     case 'snow':
-      return deepen(kind, { ...p, vx: rand(-0.4, 0.4), vy: rand(0.5, 1.6), r: rand(1, 3.6), a: rand(0.5, 0.95), ph: rand(0, 6.28) }, initial)
+      return deepen(kind, { ...p, vx: rand(-0.4, 0.4), vy: rand(0.5, 1.6), r: rand(1, 3.6), a: rand(0.5, 0.95), ph: rand(0, 6.28) }, initial, flat)
     case 'blizzard':
-      return deepen(kind, { ...p, x: initial ? rand(0, w) : rand(-w * 0.1, w * 1.2), vx: -rand(5, 11), vy: rand(2.2, 4.5), r: rand(0.8, 2.8), a: rand(0.45, 0.95), ph: rand(0, 6.28) }, initial)
+      return deepen(kind, { ...p, x: initial ? rand(0, w) : rand(-w * 0.1, w * 1.2), vx: -rand(5, 11), vy: rand(2.2, 4.5), r: rand(0.8, 2.8), a: rand(0.45, 0.95), ph: rand(0, 6.28) }, initial, flat)
     case 'wind': {
       const len = rand(60, 180)
       return { ...p, x: initial ? rand(0, w) : -len - rand(0, w * 0.5), y: rand(0, h), vx: rand(16, 30), vy: rand(0.6, 2), len, a: rand(0.05, 0.16) }
     }
     case 'sparkles':
-      return deepen(kind, { ...p, y: initial ? rand(0, h) : h + 10, vx: rand(-0.2, 0.2), vy: -rand(0.15, 0.6), r: rand(1.5, 4.2), ph: rand(0, 6.28), sp: rand(0.03, 0.08), hue: Math.random() < 0.6 ? rand(40, 55) : rand(180, 220) }, initial)
+      return deepen(kind, { ...p, y: initial ? rand(0, h) : h + 10, vx: rand(-0.2, 0.2), vy: -rand(0.15, 0.6), r: rand(1.5, 4.2), ph: rand(0, 6.28), sp: rand(0.03, 0.08), hue: Math.random() < 0.6 ? rand(40, 55) : rand(180, 220) }, initial, flat)
     case 'bubbles':
-      return deepen(kind, { ...p, y: initial ? rand(0, h) : h + 12, vx: rand(-0.2, 0.2), vy: -rand(0.5, 1.8), r: rand(1.6, 8), ph: rand(0, 6.28) }, initial)
+      return deepen(kind, { ...p, y: initial ? rand(0, h) : h + 12, vx: rand(-0.2, 0.2), vy: -rand(0.5, 1.8), r: rand(1.6, 8), ph: rand(0, 6.28) }, initial, flat)
     case 'sakura': case 'leaves':
-      return deepen(kind, { ...p, x: rand(-w * 0.2, w), vx: rand(0.6, 1.8), vy: rand(0.7, 1.7), r: rand(5, 10) * (kind === 'leaves' ? 1.3 : 1), rot: rand(0, 6.28), vr: rand(-0.05, 0.05), ph: rand(0, 6.28), hue: kind === 'leaves' ? rand(18, 44) : rand(330, 352) }, initial)
+      return deepen(kind, { ...p, x: rand(-w * 0.2, w), vx: rand(0.6, 1.8), vy: rand(0.7, 1.7), r: rand(5, 10) * (kind === 'leaves' ? 1.3 : 1), rot: rand(0, 6.28), vr: rand(-0.05, 0.05), ph: rand(0, 6.28), hue: kind === 'leaves' ? rand(18, 44) : rand(330, 352) }, initial, flat)
     case 'fireflies':
-      return deepen(kind, { ...p, y: initial ? rand(h * 0.3, h) : rand(h * 0.4, h), vx: rand(-0.3, 0.3), vy: rand(-0.3, 0.2), r: rand(1.2, 2.6), ph: rand(0, 6.28) }, initial)
+      return deepen(kind, { ...p, y: initial ? rand(h * 0.3, h) : rand(h * 0.4, h), vx: rand(-0.3, 0.3), vy: rand(-0.3, 0.2), r: rand(1.2, 2.6), ph: rand(0, 6.28) }, initial, flat)
     case 'embers':
-      return deepen(kind, { ...p, y: initial ? rand(0, h) : h + 10, vx: rand(-0.4, 0.6), vy: -rand(0.6, 2.2), r: rand(0.8, 2.2), ph: rand(0, 6.28) }, initial)
+      return deepen(kind, { ...p, y: initial ? rand(0, h) : h + 10, vx: rand(-0.4, 0.6), vy: -rand(0.6, 2.2), r: rand(0.8, 2.2), ph: rand(0, 6.28) }, initial, flat)
     case 'dust':
-      return deepen(kind, { ...p, y: rand(0, h), vx: rand(-0.15, 0.15), vy: rand(-0.12, 0.12), r: rand(0.6, 1.6), ph: rand(0, 6.28) }, initial)
+      return deepen(kind, { ...p, y: rand(0, h), vx: rand(-0.15, 0.15), vy: rand(-0.12, 0.12), r: rand(0.6, 1.6), ph: rand(0, 6.28) }, initial, flat)
     case 'bokeh':
       return { ...p, y: rand(0, h), vx: rand(-0.12, 0.12), vy: rand(-0.18, -0.04), r: rand(14, 46), hue: rand(0, 360), ph: rand(0, 6.28) }
     case 'stars':
@@ -203,9 +203,9 @@ function hslRgb(hue, s, l) {
   return `${f(0)}, ${f(8)}, ${f(4)}`
 }
 
-/** 阵风：隔几秒换一个目标，一半时候是风停，平滑地吹起来、停下去。 */
-function gusts(kind) {
-  const [max, lean0] = GUST[kind] || [0, 0]
+/** 阵风：隔几秒换一个目标，一半时候是风停，平滑地吹起来、停下去。calm 时（特效开关关掉了阵风）一直没风。 */
+function gusts(kind, calm = false) {
+  const [max, lean0] = calm ? [0, 0] : GUST[kind] || [0, 0]
   const lean = lean0 || (Math.random() < 0.5 ? 1 : -1)
   let now = 0, to = 0, at = 0
   return (t, k) => {
@@ -218,8 +218,8 @@ function gusts(kind) {
   }
 }
 
-/** speed：时间流速（慢动作、时间停止时变小），换了以后不重新开始，慢慢过渡过去。 */
-export function Particles({ weather, enabled = true, speed = 1 }) {
+/** speed：时间流速（慢动作、时间停止时变小），换了以后不重新开始，慢慢过渡过去。depth、gust：分远近、一阵一阵的风（特效开关）。 */
+export function Particles({ weather, enabled = true, speed = 1, depth = true, gust: windy = true }) {
   const ref = React.useRef(null)
   const want = React.useRef(speed)
   want.current = speed
@@ -240,11 +240,12 @@ export function Particles({ weather, enabled = true, speed = 1 }) {
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(resize) : null
     ro && ro.observe(canvas)
     const target = Math.round(COUNTS[kind] * Math.min(1.4, Math.max(0.5, w / 1200)))
-    let list = Array.from({ length: target }, () => spawn(kind, w, h, true))
+    const make = initial => spawn(kind, w, h, initial, !depth)
+    let list = Array.from({ length: target }, () => make(true))
     // 近的后画，盖在远的上面
     const order = (a, b) => (a.z || 1) - (b.z || 1)
     list.sort(order)
-    const gust = gusts(kind)
+    const gust = gusts(kind, !windy)
     const env = { w, h, k, wind: 0, blur: 'filter' in ctx }
     const wrap = WRAP.has(kind)
     const frame = t => {
@@ -268,12 +269,12 @@ export function Particles({ weather, enabled = true, speed = 1 }) {
         if (step(kind, p, ctx, env)) next.push(p)
       }
       let added = false
-      while (next.length < target) { next.push(spawn(kind, w, h, false)); added = true }
+      while (next.length < target) { next.push(make(false)); added = true }
       if (added) next.sort(order)
       list = next
     }
     raf = requestAnimationFrame(frame)
     return () => { cancelAnimationFrame(raf); ro && ro.disconnect(); ctx.clearRect(0, 0, w, h) }
-  }, [weather, enabled])
+  }, [weather, enabled, depth, windy])
   return React.createElement('canvas', { ref, className: 'fg-particles', 'aria-hidden': true })
 }

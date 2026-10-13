@@ -12,6 +12,7 @@ import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn, LOOK_FIELDS, LOOK
 import { Silhouette } from './Stage.jsx'
 import { stateSpans } from '../../../lib/cast.js'
 import { SKINS } from './skins.js'
+import { EFFECT_GROUPS, EFFECT_IDS } from './effects.js'
 import { previewTrack, stopPreview, previewVoice, previewSound, erosFoley, previewEros, erosPeak } from './audio.js'
 import { EROS_SFX, EROS_PACES, EROS_LABEL, TENTACLE, TENTACLE_LABEL, PEAKS, PEAK_LABEL } from '../../../lib/eros.js'
 import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, voiceById, castVoices } from '../../../lib/sounds.js'
@@ -1549,7 +1550,6 @@ export function LookSection({ data }) {
       </Field>
       <Field label="文字速度" hint="每字毫秒，0 为瞬间显示。"><input type="range" min="0" max="80" value={cfg.ui.textSpeed} onChange={e => p({ textSpeed: Number(e.target.value) })} style={{ width: '100%' }} /></Field>
       <Field label="自动播放间隔"><input type="range" min="400" max="4000" step="100" value={cfg.ui.autoDelay} onChange={e => p({ autoDelay: Number(e.target.value) })} style={{ width: '100%' }} /></Field>
-      <Field label="天气粒子"><Toggle value={cfg.ui.particles} onChange={v => p({ particles: v })} /></Field>
       <Field label="写完自动打开剧场"><Toggle value={cfg.ui.autoOpen} onChange={v => p({ autoOpen: v })} /></Field>
       <Field label="字体地址" hint="皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。立绘工作台的认脸模型也从这里下它的运行库。"><Text value={cfg.ui.fontBase} onCommit={v => p({ fontBase: v })} /></Field>
       <div className="fg-section">认脸模型（立绘工作台的自动框）</div>
@@ -1561,6 +1561,49 @@ export function LookSection({ data }) {
         </select>
       </Field>
       <Field label="镜像地址" hint="HuggingFace 的镜像站，默认 hf-mirror.com；路径规则要跟官网一样（…/仓库/resolve/版本/文件）。"><Text value={cfg.vision.mirror} onCommit={v => patchConfig({ vision: { mirror: v } }).catch(err => toast(err.message, 'error'))} /></Field>
+    </>
+  )
+}
+
+// ───────────────────────── 特效 ─────────────────────────
+/**
+ * 特效开关：按种类分组（effects.js 的 EFFECT_GROUPS），每一个单独开关，每组一个总开关（全开时关掉整组，不然整组打开）。
+ * 存进 ui.effects，打开的写 true、关掉的写 false（老设置「天气粒子」关着时，没单独打开过的天气算关着，见 lib/config.js）。
+ */
+function EffectsSection({ data }) {
+  const saved = data.config.ui.effects || {}
+  const isOn = id => saved[id] !== false
+  const p = effects => patchConfig({ ui: { effects } }).catch(e => toast(e.message, 'error'))
+  const setAll = (ids, value) => p(Object.fromEntries(ids.map(id => [id, value])))
+  const offCount = EFFECT_IDS.filter(id => !isOn(id)).length
+  return (
+    <>
+      <div className="fg-fx-top">
+        <div className="fg-note">关掉的那一下剧场不演，别的照常；再打开马上回来，以前的轮次也一样。导演照常写，不用重新整理。</div>
+        <span className="fg-pill">{offCount ? `关着 ${offCount} 个` : '全都开着'}</span>
+        <button type="button" className="fg-btn" disabled={!offCount} onClick={() => setAll(EFFECT_IDS, true)}>全部打开</button>
+      </div>
+      {EFFECT_GROUPS.map(g => {
+        const ids = g.items.map(i => i.id)
+        const count = ids.filter(isOn).length
+        return (
+          <div key={g.id} className="fg-fx-group">
+            <div className="fg-fx-head">
+              <b>{g.label}</b>
+              <span className={`fg-fx-count${count < ids.length ? ' is-part' : ''}`}>{count === ids.length ? '全开' : count ? `开着 ${count} / ${ids.length}` : '全关'}</span>
+              <div className="fg-spacer" />
+              <Toggle value={count === ids.length} onChange={() => setAll(ids, count !== ids.length)} />
+            </div>
+            <div className="fg-note">{g.hint}</div>
+            <div className="fg-fx-items">
+              {g.items.map(item => {
+                const on = isOn(item.id)
+                return <button key={item.id} type="button" className={`fg-fx-chip${on ? ' is-on' : ''}`} aria-pressed={on} title={on ? '点一下关掉' : '点一下打开'} onClick={() => p({ [item.id]: !on })}><i />{item.label}</button>
+              })}
+            </div>
+          </div>
+        )
+      })}
     </>
   )
 }
@@ -1968,10 +2011,11 @@ export function Settings({ onClose, onDirectorLog = null, initialTab = 'look' })
   const data = useConfig()
   const [tab, setTab] = React.useState(initialTab)
   return (
-    <Panel title="设置" en="Config" onClose={onClose} tabs={[{ id: 'look', label: '外观与演出' }, { id: 'sound', label: '声音' }, { id: 'music', label: '配乐' }, { id: 'soundlib', label: '音效库' }, { id: 'director', label: '导演' }, { id: 'images', label: '生图渠道' }, { id: 'style', label: '画风与配图' }, { id: 'about', label: '版本与更新' }]} tab={tab} onTab={setTab}
+    <Panel title="设置" en="Config" onClose={onClose} tabs={[{ id: 'look', label: '外观与演出' }, { id: 'effects', label: '特效' }, { id: 'sound', label: '声音' }, { id: 'music', label: '配乐' }, { id: 'soundlib', label: '音效库' }, { id: 'director', label: '导演' }, { id: 'images', label: '生图渠道' }, { id: 'style', label: '画风与配图' }, { id: 'about', label: '版本与更新' }]} tab={tab} onTab={setTab}
       actions={data && <span className={`fg-pill${data.ready ? '' : ' fg-err'}`}>{data.ready ? '生图已就绪' : data.readyReason}</span>}>
       {!data && <div className="fg-note">读取设置中…</div>}
       {data && tab === 'look' && <LookSection data={data} />}
+      {data && tab === 'effects' && <EffectsSection data={data} />}
       {data && tab === 'sound' && <SoundSection data={data} />}
       {data && tab === 'music' && <MusicSection data={data} />}
       {data && tab === 'soundlib' && <SoundLibSection data={data} />}

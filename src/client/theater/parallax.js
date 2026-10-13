@@ -2,12 +2,12 @@
 // 鼠标离开舞台就慢慢回中。只认鼠标（触屏、手写笔不动），系统设了减少动态效果时不动。
 import React from 'react'
 
-/** stageRef 听鼠标，targetRef 写 --px / --py（镜头那一层，只让它下面的东西重算样式）。 */
-export function useParallax(stageRef, targetRef) {
+/** stageRef 听鼠标，targetRef 写 --px / --py（镜头那一层，只让它下面的东西重算样式）。enabled 为假（特效开关关掉了）时不动。 */
+export function useParallax(stageRef, targetRef, enabled = true) {
   React.useEffect(() => {
     const stage = stageRef.current
     const target = targetRef.current
-    if (!stage || !target || typeof matchMedia !== 'function') return undefined
+    if (!enabled || !stage || !target || typeof matchMedia !== 'function') return undefined
     if (!matchMedia('(hover: hover) and (pointer: fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
     let tx = 0, ty = 0, x = 0, y = 0, raf = 0
     const write = () => { target.style.setProperty('--px', x.toFixed(4)); target.style.setProperty('--py', y.toFixed(4)) }
@@ -34,5 +34,5 @@ export function useParallax(stageRef, targetRef) {
       stage.removeEventListener('pointerleave', leave)
       target.style.removeProperty('--px'); target.style.removeProperty('--py')
     }
-  }, [])
+  }, [enabled])
 }

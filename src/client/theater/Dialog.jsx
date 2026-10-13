@@ -12,8 +12,9 @@ const CARD_HEAD = { sms: '新消息', letter: '', note: '', news: '号外', term
  * 怎么说出来由 lib/typing.js 的 planLine 定（演法、重音、标点停顿），打字音和落字特效（onFx）都按它的时间点走。
  * voice 是这句用谁的声音念（lib/sounds.js 的 lineVoice；null 不出声）。
  * 开始时刻是 performance.now()，还没开始时是 NaN（逆转式立绘的口型按它对齐）。
+ * offStyles 是设置里关掉的演法（effects.js 的 offDeliveries），这几种按平常的念。
  */
-export function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null } = {}) {
+export function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null } = {}) {
   const key = beat ? beat.key : ''
   const chars = React.useMemo(() => Array.from((beat && beat.text) || ''), [key, beat && beat.text])
   const emo = beat && beat.speaker ? (beat.emotions && beat.emotions[beat.speaker]) || beat.emo : ''
@@ -21,7 +22,7 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
   const stress = beat ? beat.stress : ''
   const type = beat ? beat.type : 'narration'
   const textfx = beat ? beat.textfx : null
-  const plan = React.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx }), [chars, speed, say, stress, emo, type, key, textfx])
+  const plan = React.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles }), [chars, speed, say, stress, emo, type, key, textfx, offStyles])
   const [shown, setShown] = React.useState({ key, done: false })
   const [start, setStart] = React.useState({ key: '', at: NaN })
   if (shown.key !== key) setShown({ key, done: false })

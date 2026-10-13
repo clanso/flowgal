@@ -393,6 +393,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-bg { position: absolute; inset: -3%; will-change: transform, opacity; }
 .fg-bg-art { position: absolute; inset: 0; background-size: cover; background-position: center 42%; }
 .fg-bg.is-image > .fg-bg-art { animation: fg-kenburns 38s ease-in-out infinite alternate; }
+.fg-theater[data-off~="kenburns"] .fg-bg.is-image > .fg-bg-art { animation: none; }
 .fg-bg.is-enter { animation: var(--enter-anim, fg-dissolve) var(--enter-dur, 1.1s) cubic-bezier(.45, 0, .55, 1) both; }
 .fg-bg.is-leave { animation: none; }
 @keyframes fg-kenburns { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.1) translate(-1.6%, -1.2%); } }
@@ -537,6 +538,12 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 /* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */
 .fg-actor.is-aa .fg-actor-body { animation: none; }
 .fg-actor.is-aa.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }
+/* 特效开关（Theater 在 .fg-theater 上写 data-off）：关掉呼吸只留开口时的轻跳，关掉轻跳只留呼吸 */
+.fg-theater[data-off~="breathe"] .fg-actor .fg-actor-body { animation: none; }
+.fg-theater[data-off~="breathe"] .fg-actor.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }
+.fg-theater[data-off~="hop"] .fg-actor.is-speaking .fg-actor-body { animation: fg-breathe 4.8s ease-in-out infinite; }
+.fg-theater[data-off~="hop"] .fg-actor.is-aa.is-speaking .fg-actor-body,
+.fg-theater[data-off~="hop"][data-off~="breathe"] .fg-actor.is-speaking .fg-actor-body { animation: none; }
 /* 浅景深：有人在说话时，旁边没说话也没反应的人微微虚一点，退后一步的更虚（Stage.jsx 的 Cast 写 data-talk；旁白时谁都不虚） */
 .fg-actor-body { transition: filter .8s ease; }
 .fg-cast[data-talk] .fg-actor:not(.is-speaking, .is-reacting, .is-leaving) .fg-actor-body { filter: blur(.1cqw); }
@@ -1717,6 +1724,23 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-ok { color: #6ef0a8; } .fg-err { color: #ff8a8a; }
 .fg-section { margin: 1.6cqw 0 .6cqw; font-family: var(--font-display); font-size: 1.4cqw; letter-spacing: .2em; display: flex; align-items: center; gap: .8cqw; }
 .fg-section::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--box-border), transparent); }
+/* 设置 → 特效：每组一个标题行（名字、开着几个、总开关），下面一排排小开关 */
+.fg-fx-top { display: flex; align-items: center; gap: 1cqw; margin: .4cqw 0 .6cqw; }
+.fg-fx-top .fg-note { flex: 1; }
+.fg-fx-group { margin: 1.4cqw 0 0; padding: 1cqw 1.2cqw 1.2cqw; border-radius: 1cqw; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .03); }
+.fg-fx-head { display: flex; align-items: center; gap: .8cqw; margin-bottom: .3cqw; }
+.fg-fx-head > .fg-spacer { flex: 1; }
+.fg-fx-head b { font-family: var(--font-display); font-size: 1.3cqw; letter-spacing: .16em; }
+.fg-fx-count { font-size: .9cqw; letter-spacing: .08em; color: var(--ink-dim); }
+.fg-fx-count.is-part { color: var(--accent); }
+.fg-fx-items { display: flex; flex-wrap: wrap; gap: .5cqw; margin-top: .8cqw; }
+.fg-fx-chip { display: inline-flex; align-items: center; gap: .5cqw; padding: .4cqw 1cqw .4cqw .7cqw; border-radius: 99px; font-size: 1cqw; letter-spacing: .06em; color: var(--ink-dim);
+  border: 1px solid var(--box-border); background: rgba(0, 0, 0, .25); transition: color .2s, border-color .2s, background .2s; }
+.fg-fx-chip i { width: .8cqw; height: .8cqw; border-radius: 50%; border: 1px solid currentColor; opacity: .6; transition: background .2s, box-shadow .2s, opacity .2s; }
+.fg-fx-chip:hover { border-color: var(--accent); }
+.fg-fx-chip.is-on { color: var(--ink); border-color: color-mix(in oklab, var(--accent) 55%, transparent); background: color-mix(in oklab, var(--accent) 14%, transparent); }
+.fg-fx-chip.is-on i { opacity: 1; border-color: transparent; background: linear-gradient(100deg, var(--accent), var(--accent2)); box-shadow: 0 0 .5cqw var(--accent); }
+.fg-fx-chip:not(.is-on) { text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, .3); }
 .fg-skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(15cqw, 1fr)); gap: 1cqw; }
 .fg-skin { padding: 1cqw; border-radius: 1cqw; border: 1px solid var(--box-border); text-align: left; transition: transform .2s; }
 .fg-skin:hover { transform: translateY(-.3cqw); }
@@ -1830,6 +1854,12 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   .fg-btn, .fg-look, .fg-state { font-size: 3cqw; padding: 1cqw 2.4cqw; }
   .fg-emo { width: 15cqw; height: 18cqw; font-size: 2.4cqw; }
   .fg-field, .fg-person-form .fg-field { grid-template-columns: 1fr; font-size: 3cqw; }
+  .fg-fx-top { flex-wrap: wrap; } .fg-fx-top .fg-note { flex-basis: 100%; }
+  .fg-fx-group { padding: 2cqw 2.4cqw 2.4cqw; border-radius: 2cqw; }
+  .fg-fx-head b { font-size: 3.4cqw; } .fg-fx-count { font-size: 2.6cqw; }
+  .fg-fx-head .fg-switch { width: 8.4cqw; height: 4.6cqw; } .fg-fx-head .fg-switch::after { left: .6cqw; top: .6cqw; width: 3.4cqw; height: 3.4cqw; } .fg-fx-head .fg-switch.is-on::after { transform: translateX(3.8cqw); }
+  .fg-fx-items { gap: 1.2cqw; }
+  .fg-fx-chip { font-size: 2.8cqw; padding: .9cqw 2cqw .9cqw 1.4cqw; gap: 1cqw; } .fg-fx-chip i { width: 1.8cqw; height: 1.8cqw; }
   .fg-input, .fg-select, .fg-textarea { font-size: 3cqw; }
   .fg-outfit, .fg-outfit.is-new, .fg-emotion-row, .fg-emotion-row.is-new { grid-template-columns: 1fr; }
   .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }
@@ -2067,33 +2097,53 @@ var EMOTION_POSE = {
   confused: "chin",
   teasing: "chin"
 };
+var CAMERAS = ["shake", "zoom", "zoomout", "flash", "pan", "blur", "fadeblack", "redflash", "tilt", "closeup", "focus", "whip", "sink", "rise", "lowangle", "dolly", "empty", "slowpush", "rackfocus"];
+var HIT_EFFECTS = ["hit", "crit", "miss", "block", "down", "heal"];
 var HIT_EFFECT_LABEL = { hit: "命中", crit: "暴击", miss: "闪避", block: "格挡", down: "击倒", heal: "治疗" };
+var MOMENTS = ["photo", "touch", "pat", "poke", "cheers", "fireworks", "cook", "nickname", "promise", "contact"];
 var MOMENT_LABEL = { photo: "拍照", touch: "触碰", pat: "摸头", poke: "戳脸", cheers: "干杯", fireworks: "烟花", cook: "做好一道菜", nickname: "新称呼", promise: "约定", contact: "交换联系方式" };
+var PHONE_KINDS = ["call", "dial", "end", "notify", "voicemail"];
 var PHONE_LABEL = { call: "来电", dial: "拨出", end: "挂断", notify: "通知", voicemail: "语音留言" };
 var CALL_END_LABEL = { missed: "没接通", declined: "拒接", hungup: "对方挂断" };
+var PAUSES = ["beat", "silence"];
+var MOVES = ["approach", "apart", "forward", "back", "turn", "face", "lookback", "hide", "reset"];
 var MOVE_LABEL = { approach: "靠近", apart: "拉开", forward: "上前", back: "后退", turn: "背过身", face: "转身面对", lookback: "回眸", hide: "躲到身后", reset: "复位" };
+var ENTER_HOWS = ["run", "peek", "slow"];
+var EXIT_HOWS = ["storm", "run", "slow"];
 var ENTER_HOW_LABEL = { run: "跑进来", peek: "探头", slow: "慢慢走进来" };
 var EXIT_HOW_LABEL = { storm: "甩头离开", run: "跑开", slow: "慢慢走远" };
+var DELIVERIES = ["menace", "excited", "shout", "hesitant", "whisper", "breakdown"];
 var DELIVERY_LABEL = { menace: "威压", excited: "激动", shout: "怒吼", hesitant: "迟疑", whisper: "低语", breakdown: "崩溃" };
+var TEXT_FX = ["shake", "wave", "big", "roar", "grow", "dwindle", "small", "faint", "glow"];
 var TEXT_FX_LABEL = { shake: "发抖", wave: "波浪", big: "放大", roar: "吼", grow: "越说越大", dwindle: "越说越小", small: "小声", faint: "轻淡", glow: "发光强调" };
+var WEATHER = ["clear", "rain", "storm", "snow", "blizzard", "wind", "sakura", "leaves", "fireflies", "fog", "embers", "dust", "bokeh", "stars", "sparkles", "bubbles"];
+var TRANSITIONS = ["dissolve", "fade", "cinematic", "wipe", "iris", "strips", "black", "flash", "blink", "glitch", "swirl", "haze", "none"];
+var LIGHTS = ["normal", "dim", "dark", "black", "candle", "spot", "neon", "screen", "alarm", "moon", "warm", "cold", "glare", "flicker", "sunbeam", "leak", "flare"];
+var FX = ["none", "sway", "ride", "handheld", "drift", "woozy", "heat", "underwater", "rumble", "speed", "heartbeat", "slowmo", "timestop", "fading"];
+var ROMANCE = ["none", "ambiguous", "intimate"];
 var ROMANCE_LABEL = { none: "", ambiguous: "暧昧", intimate: "亲密" };
+var SENSES = ["none", "blind", "ear", "touch", "heat", "cold", "scent", "breath", "daze"];
 var SENSE_LABEL = { none: "", blind: "蒙眼", ear: "耳边", touch: "触碰", heat: "发烫", cold: "发凉", scent: "香气", breath: "屏息", daze: "失神" };
+var VOICES = ["phone", "radio", "telepathy", "chorus", "offscreen", "echo", "memory", "machine"];
 var CG_INS = ["dissolve", "slow", "black", "flash", "focus", "cut", "impact"];
 var CG_OUTS = ["dissolve", "slow", "black", "flash", "cut"];
 var CG_MOTIONS = ["still", "push", "pan"];
 var CG_IN_OLD = { sweep: "dissolve", zoom: "dissolve", iris: "dissolve", bloom: "slow", photo: "slow", slide: "cut", glitch: "cut" };
 var CG_OUT_OLD = { fade: "dissolve", blur: "slow", pull: "slow", slide: "cut", glitch: "cut", shatter: "flash" };
 var CG_MOTION_OLD = { drift: "still", breathe: "still", pull: "still", shake: "still" };
-var cgWord = (value, list2, old) => {
+var cgWord = (value, list3, old) => {
   const text = String(value ?? "").trim().toLowerCase();
-  return list2.includes(text) ? text : old[text] || "";
+  return list3.includes(text) ? text : old[text] || "";
 };
 var cgIn = (value) => cgWord(value, CG_INS, CG_IN_OLD);
 var cgOut = (value) => cgWord(value, CG_OUTS, CG_OUT_OLD);
 var cgMotion = (value) => cgWord(value, CG_MOTIONS, CG_MOTION_OLD);
+var MODES = ["memory", "dream", "illusion", "imagine", "pov", "inner", "screen", "tale", "vision", "digital"];
 var MODE_NAMES = { memory: "回忆", dream: "梦境", illusion: "幻觉", imagine: "想象", pov: "主观视角", inner: "内心世界", screen: "画面中", tale: "故事中", vision: "预见", digital: "虚拟世界" };
 var RECALL_TONES = ["warm", "sweet", "sad", "dread", "flash", "haze"];
 var RECALL_TONE_NAMES = { warm: "温暖怀念", sweet: "甜蜜心动", sad: "伤感", dread: "不安", flash: "猛然想起", haze: "朦胧如梦" };
+var CUTS = ["time", "date", "chapter", "meanwhile"];
+var CARDS = ["sms", "letter", "note", "news", "terminal", "notice", "diary", "scroll"];
 var CG_MAX_CHARACTERS = 6;
 var DAYPART = { dawn: "day", morning: "day", noon: "day", afternoon: "day", dusk: "dusk", evening: "night", night: "night", midnight: "night" };
 var daypart = (time) => DAYPART[time] || "day";
@@ -2252,9 +2302,9 @@ function applyDelta(scene, delta, known) {
   if (next.bg && next.location) known.set(next.location, next.bg);
   return next;
 }
-function addThen(map, list2) {
-  if (!list2?.length) return map || null;
-  return { ...map || {}, ...Object.fromEntries(list2.map((e) => [e.name, e])) };
+function addThen(map, list3) {
+  if (!list3?.length) return map || null;
+  return { ...map || {}, ...Object.fromEntries(list3.map((e) => [e.name, e])) };
 }
 function walkScenes(start, lines) {
   let real = { scene: { ...SCENE_DEFAULTS, ...start.scene || {} }, bgm: start.bgm || "", amb: start.amb || "" };
@@ -2368,7 +2418,7 @@ function recallRuns(script, units) {
 var TONE_BY_EMOTION = [["dread", ["scared", "angry"]], ["sad", ["sad", "cry", "tired", "worried"]], ["sweet", ["love", "blush", "shy", "teasing"]]];
 var TONE_BY_MOOD = { tense: "dread", eerie: "dread", mystery: "dread", battle: "dread", sad: "sad", despair: "sad", solemn: "sad", sweet: "sweet" };
 function autoRecallTone(emos, mood) {
-  for (const [tone, list2] of TONE_BY_EMOTION) if ((emos || []).some((e) => list2.includes(e))) return tone;
+  for (const [tone, list3] of TONE_BY_EMOTION) if ((emos || []).some((e) => list3.includes(e))) return tone;
   return TONE_BY_MOOD[mood] || "warm";
 }
 
@@ -2449,10 +2499,10 @@ function shiftsAhead(lines) {
   let ahead = null;
   for (let i = lines.length - 1; i >= 0; i--) {
     out[i] = ahead;
-    const list2 = lines[i]?.look;
-    if (!Array.isArray(list2) || !list2.length) continue;
+    const list3 = lines[i]?.look;
+    if (!Array.isArray(list3) || !list3.length) continue;
     ahead = { ...ahead || {} };
-    for (const s of list2) if (s?.name) ahead[s.name] = [s, ...ahead[s.name] || []];
+    for (const s of list3) if (s?.name) ahead[s.name] = [s, ...ahead[s.name] || []];
   }
   return out;
 }
@@ -2467,7 +2517,7 @@ function undoShifts(base, pending) {
   const entry = { name: pending[0].name, shift: true };
   const wear = pending.find((s) => s.outfit);
   if (wear?.from && wear.from !== base.outfit) entry.outfit = wear.from;
-  const names = (list2) => list2.map((x) => x.name).sort().join("+");
+  const names = (list3) => list3.map((x) => x.name).sort().join("+");
   if (names(states) !== names(base.states || [])) entry.states = states;
   return entry.outfit || entry.states ? entry : null;
 }
@@ -2492,7 +2542,7 @@ function pickSprite(sprites, look, emotion, base = "", { strict = false } = {}) 
 }
 function findLookTurn(timeline, key) {
   const turns = /* @__PURE__ */ new Set([0]);
-  for (const list2 of [timeline?.appearance, timeline?.wear, timeline?.states]) for (const e of list2 || []) turns.add(Number(e.fromTurn) || 0);
+  for (const list3 of [timeline?.appearance, timeline?.wear, timeline?.states]) for (const e of list3 || []) turns.add(Number(e.fromTurn) || 0);
   let found = null;
   for (const t of [...turns].sort((a, b) => a - b)) if (lookKey(lookAt(timeline, t)) === key) found = t;
   return found;
@@ -2500,7 +2550,7 @@ function findLookTurn(timeline, key) {
 
 // lib/sounds.js
 var p = (wave, f, dur, gain, more = {}) => ({ wave, f, dur, gain, ...more });
-var VOICES = Object.freeze([
+var VOICES2 = Object.freeze([
   { id: "classic", label: "经典哔哔", desc: "逆转裁判式的三角波哔哔声", gender: "", parts: [p("triangle", 420, 0.05, 0.045, { attack: 4e-3 })] },
   { id: "bell", label: "清亮铃音", desc: "干净透亮，带一点泛音", gender: "female", parts: [p("sine", 660, 0.07, 0.05, { attack: 3e-3 }), p("sine", 1320, 0.04, 0.015, { attack: 3e-3 })] },
   { id: "chirp", label: "少女啾啾", desc: "每个字往上一挑，活泼", gender: "female", parts: [p("triangle", 520, 0.05, 0.045, { to: 640, attack: 4e-3 })] },
@@ -2518,8 +2568,8 @@ var VOICES = Object.freeze([
   { id: "typewriter", label: "打字机", desc: "咔嗒咔嗒，适合旁白", gender: "", parts: [p("noise", 3200, 0.025, 0.09, { q: 2 }), p("square", 1800, 0.012, 0.01, { attack: 1e-3 })] },
   { id: "whisper", label: "耳语", desc: "只有气声，像凑在耳边", gender: "", parts: [p("noise", 1800, 0.06, 0.05, { q: 3, attack: 0.01 })] }
 ]);
-var VOICE_IDS = new Set(VOICES.map((v) => v.id));
-var voiceById = (id) => VOICES.find((v) => v.id === id) || null;
+var VOICE_IDS = new Set(VOICES2.map((v) => v.id));
+var voiceById = (id) => VOICES2.find((v) => v.id === id) || null;
 var VOICE_POOLS = { female: ["bell", "chirp", "soft", "cool", "bubble"], male: ["boy", "deep", "gruff", "elder"], other: ["classic", "kid", "wood", "robot"], "": ["classic"] };
 var VOICE_PITCH_LIMIT = 6;
 var SOUND_SLOTS = Object.freeze([
@@ -2684,10 +2734,10 @@ function resolveVoice(person, name2, ui2) {
   return autoVoice(pool[nameHash(name2) % pool.length], name2, pitch);
 }
 function castVoices(people, ui2) {
-  const list2 = [...people || []].sort((a, b) => (a.createdTurn ?? -1) - (b.createdTurn ?? -1) || String(a.name).localeCompare(String(b.name)));
-  const voices = new Map(list2.map((p4) => [p4.name, resolveVoice(p4, p4.name, ui2)]));
+  const list3 = [...people || []].sort((a, b) => (a.createdTurn ?? -1) - (b.createdTurn ?? -1) || String(a.name).localeCompare(String(b.name)));
+  const voices = new Map(list3.map((p4) => [p4.name, resolveVoice(p4, p4.name, ui2)]));
   const taken = new Set([...voices.values()].filter((v) => v && !v.auto).map((v) => v.id));
-  for (const p4 of list2) {
+  for (const p4 of list3) {
     const voice = voices.get(p4.name);
     if (!voice || !voice.auto) continue;
     const pool = poolOf(p4, ui2);
@@ -3434,12 +3484,12 @@ var COVERS = {
 var CUT_COVER = { cover: "black", clear: true, up: 700, hold: 2300, down: 1e3 };
 var OPEN_COVER = { cover: "black", clear: true, up: 0, hold: 300, down: 1e3 };
 var OWN_WAY = /* @__PURE__ */ new Set(["haze", "wake"]);
-function changePlan(beat, was = {}, { opening = false } = {}) {
+function changePlan(beat, was = {}, { opening = false, wake = true } = {}) {
   if (!beat || !beat.scene) return null;
   const moved = !opening && beat.sceneEnter && (beat.scene.location !== was.place || (beat.mode || "") !== (was.mode || ""));
   const tr = beat.transition || "";
   if (!opening && !beat.cut && (!moved || tr === "none" || OWN_WAY.has(tr))) return null;
-  if (!opening && !beat.cut && was.mode === "memory" && (beat.mode || "") !== "memory" && WAKE_FROM.has(tr)) return null;
+  if (wake && !opening && !beat.cut && was.mode === "memory" && (beat.mode || "") !== "memory" && WAKE_FROM.has(tr)) return null;
   if (opening && tr === "none" && !beat.cut) return null;
   const shape = opening ? beat.cut ? { ...CUT_COVER, up: 0 } : OPEN_COVER : beat.cut ? CUT_COVER : COVERS[tr] || { cover: "", clear: true, up: 0, hold: 0, down: TRANSITION_MS[tr] || TRANSITION_MS.dissolve };
   const steps = [];
@@ -3459,13 +3509,13 @@ function changePlan(beat, was = {}, { opening = false } = {}) {
   step2("settle", SCENE_BEAT_MS);
   return { tr: opening && !COVERS[tr] ? "black" : tr, cover: shape.cover, clear: shape.clear, up: shape.up, hold: shape.hold, down: shape.down, steps, swap, total: t, ...beat.cut ? { cut: true } : {}, ...opening ? { opening: true } : {} };
 }
-function beatHold(beat, { cg = "", was = {}, eros = true, opening = false } = {}) {
+function beatHold(beat, { cg = "", was = {}, eros = true, opening = false, wake: waking = true } = {}) {
   let ms = 0, away = false;
   if (cg && cg !== was.cg && !beat.cut) {
     ms = Math.max(ms, cgHoldMs(beat.cg, beat.scene.mood));
     away = true;
   }
-  const change = changePlan(beat, was, { opening });
+  const change = changePlan(beat, was, { opening, wake: waking });
   if (change) {
     ms = Math.max(ms, change.total);
     away = true;
@@ -3479,7 +3529,7 @@ function beatHold(beat, { cg = "", was = {}, eros = true, opening = false } = {}
   if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0);
   if (beat.hush === "start") ms = Math.max(ms, HUSH_LEAD_MS);
   if (eros && beat.peak) ms = Math.max(ms, PEAK_LEAD_MS[beat.peak] || 0);
-  const wake = !opening && was.mode === "memory" && (beat.mode || "") !== "memory" && !beat.cut && WAKE_FROM.has(beat.transition);
+  const wake = waking && !opening && was.mode === "memory" && (beat.mode || "") !== "memory" && !beat.cut && WAKE_FROM.has(beat.transition);
   if (wake) {
     ms = Math.max(ms, WAKE_MS);
     away = true;
@@ -3526,8 +3576,8 @@ var NEAR = { rain: 0.025, storm: 0.025, snow: 0.06, blizzard: 0.03, sakura: 0.06
 var GUST = { rain: [2.2, -1], storm: [4, -1], snow: [1.4, 0], blizzard: [3.5, -1], wind: [9, 1], sakura: [2.4, 1], leaves: [2.8, 1], fireflies: [0.35, 0], embers: [1.2, 0], dust: [0.5, 0], bokeh: [0.12, 0], fog: [0.6, 1], sparkles: [0.3, 0], bubbles: [0.25, 0] };
 var WRAP = /* @__PURE__ */ new Set(["snow", "embers", "sparkles", "bubbles", "dust", "fireflies", "bokeh"]);
 var rand = (a, b) => a + Math.random() * (b - a);
-function deepen(kind, p4, initial) {
-  if (!(kind in NEAR)) return p4;
+function deepen(kind, p4, initial, flat) {
+  if (flat || !(kind in NEAR)) return p4;
   const soft = Math.random() < NEAR[kind];
   const z = soft ? rand(1.8, 2.8) : 0.6 + Math.random() ** 1.3 * 0.9;
   p4.z = z;
@@ -3540,33 +3590,33 @@ function deepen(kind, p4, initial) {
   if (soft && !initial) p4.y += (p4.vy < 0 ? 1 : -1) * (p4.r || 4) * 3;
   return p4;
 }
-function spawn(kind, w, h, initial) {
+function spawn(kind, w, h, initial, flat = false) {
   const p4 = { x: rand(0, w), y: initial ? rand(0, h) : rand(-h * 0.2, -10), life: 0 };
   switch (kind) {
     case "rain":
     case "storm":
-      return deepen(kind, { ...p4, vx: kind === "storm" ? -7 : -2.4, vy: rand(16, 26) * (kind === "storm" ? 1.25 : 1), len: rand(12, 26), a: rand(0.18, 0.45) }, initial);
+      return deepen(kind, { ...p4, vx: kind === "storm" ? -7 : -2.4, vy: rand(16, 26) * (kind === "storm" ? 1.25 : 1), len: rand(12, 26), a: rand(0.18, 0.45) }, initial, flat);
     case "snow":
-      return deepen(kind, { ...p4, vx: rand(-0.4, 0.4), vy: rand(0.5, 1.6), r: rand(1, 3.6), a: rand(0.5, 0.95), ph: rand(0, 6.28) }, initial);
+      return deepen(kind, { ...p4, vx: rand(-0.4, 0.4), vy: rand(0.5, 1.6), r: rand(1, 3.6), a: rand(0.5, 0.95), ph: rand(0, 6.28) }, initial, flat);
     case "blizzard":
-      return deepen(kind, { ...p4, x: initial ? rand(0, w) : rand(-w * 0.1, w * 1.2), vx: -rand(5, 11), vy: rand(2.2, 4.5), r: rand(0.8, 2.8), a: rand(0.45, 0.95), ph: rand(0, 6.28) }, initial);
+      return deepen(kind, { ...p4, x: initial ? rand(0, w) : rand(-w * 0.1, w * 1.2), vx: -rand(5, 11), vy: rand(2.2, 4.5), r: rand(0.8, 2.8), a: rand(0.45, 0.95), ph: rand(0, 6.28) }, initial, flat);
     case "wind": {
       const len = rand(60, 180);
       return { ...p4, x: initial ? rand(0, w) : -len - rand(0, w * 0.5), y: rand(0, h), vx: rand(16, 30), vy: rand(0.6, 2), len, a: rand(0.05, 0.16) };
     }
     case "sparkles":
-      return deepen(kind, { ...p4, y: initial ? rand(0, h) : h + 10, vx: rand(-0.2, 0.2), vy: -rand(0.15, 0.6), r: rand(1.5, 4.2), ph: rand(0, 6.28), sp: rand(0.03, 0.08), hue: Math.random() < 0.6 ? rand(40, 55) : rand(180, 220) }, initial);
+      return deepen(kind, { ...p4, y: initial ? rand(0, h) : h + 10, vx: rand(-0.2, 0.2), vy: -rand(0.15, 0.6), r: rand(1.5, 4.2), ph: rand(0, 6.28), sp: rand(0.03, 0.08), hue: Math.random() < 0.6 ? rand(40, 55) : rand(180, 220) }, initial, flat);
     case "bubbles":
-      return deepen(kind, { ...p4, y: initial ? rand(0, h) : h + 12, vx: rand(-0.2, 0.2), vy: -rand(0.5, 1.8), r: rand(1.6, 8), ph: rand(0, 6.28) }, initial);
+      return deepen(kind, { ...p4, y: initial ? rand(0, h) : h + 12, vx: rand(-0.2, 0.2), vy: -rand(0.5, 1.8), r: rand(1.6, 8), ph: rand(0, 6.28) }, initial, flat);
     case "sakura":
     case "leaves":
-      return deepen(kind, { ...p4, x: rand(-w * 0.2, w), vx: rand(0.6, 1.8), vy: rand(0.7, 1.7), r: rand(5, 10) * (kind === "leaves" ? 1.3 : 1), rot: rand(0, 6.28), vr: rand(-0.05, 0.05), ph: rand(0, 6.28), hue: kind === "leaves" ? rand(18, 44) : rand(330, 352) }, initial);
+      return deepen(kind, { ...p4, x: rand(-w * 0.2, w), vx: rand(0.6, 1.8), vy: rand(0.7, 1.7), r: rand(5, 10) * (kind === "leaves" ? 1.3 : 1), rot: rand(0, 6.28), vr: rand(-0.05, 0.05), ph: rand(0, 6.28), hue: kind === "leaves" ? rand(18, 44) : rand(330, 352) }, initial, flat);
     case "fireflies":
-      return deepen(kind, { ...p4, y: initial ? rand(h * 0.3, h) : rand(h * 0.4, h), vx: rand(-0.3, 0.3), vy: rand(-0.3, 0.2), r: rand(1.2, 2.6), ph: rand(0, 6.28) }, initial);
+      return deepen(kind, { ...p4, y: initial ? rand(h * 0.3, h) : rand(h * 0.4, h), vx: rand(-0.3, 0.3), vy: rand(-0.3, 0.2), r: rand(1.2, 2.6), ph: rand(0, 6.28) }, initial, flat);
     case "embers":
-      return deepen(kind, { ...p4, y: initial ? rand(0, h) : h + 10, vx: rand(-0.4, 0.6), vy: -rand(0.6, 2.2), r: rand(0.8, 2.2), ph: rand(0, 6.28) }, initial);
+      return deepen(kind, { ...p4, y: initial ? rand(0, h) : h + 10, vx: rand(-0.4, 0.6), vy: -rand(0.6, 2.2), r: rand(0.8, 2.2), ph: rand(0, 6.28) }, initial, flat);
     case "dust":
-      return deepen(kind, { ...p4, y: rand(0, h), vx: rand(-0.15, 0.15), vy: rand(-0.12, 0.12), r: rand(0.6, 1.6), ph: rand(0, 6.28) }, initial);
+      return deepen(kind, { ...p4, y: rand(0, h), vx: rand(-0.15, 0.15), vy: rand(-0.12, 0.12), r: rand(0.6, 1.6), ph: rand(0, 6.28) }, initial, flat);
     case "bokeh":
       return { ...p4, y: rand(0, h), vx: rand(-0.12, 0.12), vy: rand(-0.18, -0.04), r: rand(14, 46), hue: rand(0, 360), ph: rand(0, 6.28) };
     case "stars":
@@ -3811,8 +3861,8 @@ function hslRgb(hue, s, l) {
   };
   return `${f(0)}, ${f(8)}, ${f(4)}`;
 }
-function gusts(kind) {
-  const [max, lean0] = GUST[kind] || [0, 0];
+function gusts(kind, calm = false) {
+  const [max, lean0] = calm ? [0, 0] : GUST[kind] || [0, 0];
   const lean = lean0 || (Math.random() < 0.5 ? 1 : -1);
   let now = 0, to = 0, at2 = 0;
   return (t, k) => {
@@ -3824,7 +3874,7 @@ function gusts(kind) {
     return now * max;
   };
 }
-function Particles({ weather, enabled = true, speed = 1 }) {
+function Particles({ weather, enabled = true, speed = 1, depth = true, gust: windy = true }) {
   const ref = import_react2.default.useRef(null);
   const want = import_react2.default.useRef(speed);
   want.current = speed;
@@ -3847,10 +3897,11 @@ function Particles({ weather, enabled = true, speed = 1 }) {
     const ro = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
     ro && ro.observe(canvas);
     const target = Math.round(COUNTS[kind] * Math.min(1.4, Math.max(0.5, w / 1200)));
-    let list2 = Array.from({ length: target }, () => spawn(kind, w, h, true));
+    const make = (initial) => spawn(kind, w, h, initial, !depth);
+    let list3 = Array.from({ length: target }, () => make(true));
     const order = (a, b) => (a.z || 1) - (b.z || 1);
-    list2.sort(order);
-    const gust = gusts(kind);
+    list3.sort(order);
+    const gust = gusts(kind, !windy);
     const env = { w, h, k, wind: 0, blur: "filter" in ctx2 };
     const wrap = WRAP.has(kind);
     const frame = (t) => {
@@ -3872,7 +3923,7 @@ function Particles({ weather, enabled = true, speed = 1 }) {
       env.k = k;
       env.wind = gust(t, k);
       const next = [];
-      for (const p4 of list2) {
+      for (const p4 of list3) {
         if (wrap) {
           const m = 40 + (p4.r || 0) * 3;
           if (p4.x < -m) p4.x += w + m * 2;
@@ -3882,11 +3933,11 @@ function Particles({ weather, enabled = true, speed = 1 }) {
       }
       let added = false;
       while (next.length < target) {
-        next.push(spawn(kind, w, h, false));
+        next.push(make(false));
         added = true;
       }
       if (added) next.sort(order);
-      list2 = next;
+      list3 = next;
     };
     raf = requestAnimationFrame(frame);
     return () => {
@@ -3894,7 +3945,7 @@ function Particles({ weather, enabled = true, speed = 1 }) {
       ro && ro.disconnect();
       ctx2.clearRect(0, 0, w, h);
     };
-  }, [weather, enabled]);
+  }, [weather, enabled, depth, windy]);
   return import_react2.default.createElement("canvas", { ref, className: "fg-particles", "aria-hidden": true });
 }
 
@@ -4204,11 +4255,12 @@ function inferDelivery(text, emo = "", type = "dialogue") {
   if (stammer || dots >= 4 || dots >= 2 && HESITANT_EMO.has(emo)) return "hesitant";
   return "";
 }
-function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialogue", seed = "", textfx = null } = {}) {
+function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialogue", seed = "", textfx = null, offStyles = null } = {}) {
   const n = chars.length;
   const text = chars.join("");
   const spoken = type === "dialogue" || type === "thought";
-  const style = !spoken ? "" : say && STYLES[say] ? say : inferDelivery(text, emo, type);
+  const wanted = !spoken ? "" : say && STYLES[say] ? say : inferDelivery(text, emo, type);
+  const style = offStyles && offStyles.has(wanted) ? "" : wanted;
   const S = STYLES[style];
   const base = Math.max(speed * S.gap, S.min || 0);
   const plan = { times: [], marks: new Array(n).fill(""), say: style, gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: S.blip, fx: [], tx: new Array(n).fill(""), txk: new Array(n).fill(0), txi: new Array(n).fill(0), blips: null };
@@ -4270,8 +4322,8 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
     plan.times.push(Math.round(t));
   }
   const fx = plan.fx;
-  const push = (time, list2) => {
-    for (const [kind, v] of list2) fx.push(kind === "sound" ? { at: time, kind, sound: v } : { at: time, kind, power: v });
+  const push = (time, list3) => {
+    for (const [kind, v] of list3) fx.push(kind === "sound" ? { at: time, kind, sound: v } : { at: time, kind, power: v });
   };
   if (s0 >= 0) push(plan.times[s1], IMPACT[style]);
   else if (style === "shout" && !spans.some((sp) => (TEXT_STYLES[sp.style].land || []).some(([k]) => k === "shake"))) push(0, IMPACT.shout);
@@ -4442,7 +4494,7 @@ function fitTalk(talk, has) {
   return {
     ...t,
     shapes: mapObj(t.shapes, (level2) => mapObj(level2, peak)),
-    accent: mapObj(t.accent, (list2) => [...new Set(list2.map(peak))]),
+    accent: mapObj(t.accent, (list3) => [...new Set(list3.map(peak))]),
     release: Object.fromEntries([...avail, "closed"].map((s) => [s, has.has(t.release?.[s]) ? t.release[s] : shrink(s)])),
     bump: mapObj(t.bump, peak)
   };
@@ -4796,17 +4848,17 @@ var AA_PARTS = {
 var AA_STEPS = [["eyes", "half"], ["eyes", "closed"], ["mouth", "narrow"], ["mouth", "half"], ["mouth", "open"], ["mouth", "round"]];
 var AA_STEPS_LITE = [["eyes", "closed"], ["mouth", "half"]];
 function stateRects(rects, part, state2, height = Infinity) {
-  const list2 = rects[part] || [];
-  if (part !== "mouth" || state2 !== "round") return list2;
-  return list2.map(([x0, y0, x1, y1]) => [x0, y0, x1, Math.min(height, y1 + Math.max(8, snap82((y1 - y0) / 2)))]);
+  const list3 = rects[part] || [];
+  if (part !== "mouth" || state2 !== "round") return list3;
+  return list3.map(([x0, y0, x1, y1]) => [x0, y0, x1, Math.min(height, y1 + Math.max(8, snap82((y1 - y0) / 2)))]);
 }
 var snap82 = (v) => Math.round(v / 8) * 8;
 function cleanRects(rects, width, height) {
   const out = {};
   let area2 = 0;
   for (const [part, max] of [["eyes", 2], ["mouth", 1]]) {
-    const list2 = Array.isArray(rects?.[part]) ? rects[part].slice(0, max) : [];
-    out[part] = list2.map((r) => {
+    const list3 = Array.isArray(rects?.[part]) ? rects[part].slice(0, max) : [];
+    out[part] = list3.map((r) => {
       const [x0, y0, x1, y1] = (Array.isArray(r) ? r : []).map(Number);
       if (![x0, y0, x1, y1].every(Number.isFinite)) throw new Error(`${AA_PARTS[part].label}的框不对`);
       const a = [Math.max(0, snap82(Math.min(x0, x1))), Math.max(0, snap82(Math.min(y0, y1))), Math.min(width, snap82(Math.max(x0, x1))), Math.min(height, snap82(Math.max(y0, y1)))];
@@ -4819,8 +4871,8 @@ function cleanRects(rects, width, height) {
   if (area2 > width * height / 8) throw new Error("框太大了：只框眼睛和嘴就够，重画范围越小越不容易走样");
   return out;
 }
-function rectsBox(list2) {
-  return [Math.min(...list2.map((r) => r[0])), Math.min(...list2.map((r) => r[1])), Math.max(...list2.map((r) => r[2])), Math.max(...list2.map((r) => r[3]))];
+function rectsBox(list3) {
+  return [Math.min(...list3.map((r) => r[0])), Math.min(...list3.map((r) => r[1])), Math.max(...list3.map((r) => r[2])), Math.max(...list3.map((r) => r[3]))];
 }
 function defaultRects(width, height) {
   const at2 = (fx0, fy0, fx1, fy1) => [snap82(width * fx0), snap82(height * fy0), snap82(width * fx1), snap82(height * fy1)];
@@ -5883,15 +5935,15 @@ function Backdrop({ scene, view, transition = "dissolve" }) {
   const id = bg.src || "sky:" + scene.time + ":" + scene.location;
   const [layers, setLayers] = import_react4.default.useState(() => [{ id, bg, scene, enter: false }]);
   import_react4.default.useEffect(() => {
-    setLayers((list2) => {
-      if (list2[list2.length - 1].id === id) return list2.map((l, i) => i === list2.length - 1 ? { ...l, scene } : l);
-      return [...list2.slice(-1).map((l) => ({ ...l, leaving: true, out: transition })), { id, bg, scene, enter: true, tr: transition }];
+    setLayers((list3) => {
+      if (list3[list3.length - 1].id === id) return list3.map((l, i) => i === list3.length - 1 ? { ...l, scene } : l);
+      return [...list3.slice(-1).map((l) => ({ ...l, leaving: true, out: transition })), { id, bg, scene, enter: true, tr: transition }];
     });
   }, [id, scene.time]);
   import_react4.default.useEffect(() => {
     if (layers.length < 2) return void 0;
     const top = layers[layers.length - 1];
-    const t = setTimeout(() => setLayers((list2) => list2.filter((l) => !l.leaving)), (TRANSITION_MS[top.tr] ?? TRANSITION_MS.dissolve) + 300);
+    const t = setTimeout(() => setLayers((list3) => list3.filter((l) => !l.leaving)), (TRANSITION_MS[top.tr] ?? TRANSITION_MS.dissolve) + 300);
     return () => clearTimeout(t);
   }, [layers]);
   return /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, layers.map((layer) => {
@@ -6004,7 +6056,9 @@ var HIDING = [0.95, "1.5%"];
 var EXIT_MS = { storm: 650, run: 420, slow: 1300 };
 var SWAP_MS = 280;
 var SIZES = /* @__PURE__ */ new Map();
+var StageFlags = import_react4.default.createContext({ aa: true });
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
+  const flags = import_react4.default.useContext(StageFlags);
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name);
   const reaction = !leaving && !speaking && beat.reacts ? beat.reacts.find((r) => r.name === entry.name) : null;
   const move = !leaving && beat.moves ? beat.moves.find((m) => m.name === entry.name) : null;
@@ -6086,7 +6140,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   }, [pics.prev]);
   const records = Object.values(person && person.sprites || {});
   const uploaded = records.some((r) => r && r.assetId === sprite && r.uploaded);
-  const aa = records.find((r) => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest))?.aa || null;
+  const aa = (flags.aa && records.find((r) => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null;
   const cm = heightOf(person).cm;
   const faces = records.filter((r) => r && r.faceBox && !r.uploaded).map((r) => r.faceBox);
   const placeOf = (pic) => {
@@ -6144,7 +6198,7 @@ function useLeaving(cast, beat) {
   });
   return [...leaving.current.values()].map((l) => l.entry);
 }
-function Cast({ beat, view, talk, max = 5 }) {
+function Cast({ beat, view, talk, max = 5, dof = true }) {
   const people = new Map((view && view.cast || []).map((p4) => [p4.name, p4]));
   let cast = beat.cast || [];
   if (!beat.directed && !cast.length && beat.speaker && beat.speaker !== "我" && people.has(beat.speaker)) cast = [{ name: beat.speaker, pos: "center" }];
@@ -6153,7 +6207,7 @@ function Cast({ beat, view, talk, max = 5 }) {
   cast = stackLayers(blockLayout(stageLayout(onStage(cast, beat.recent, max)), beat.poses), beat.front).map((entry) => ({ ...entry, id: entry.name + "@" + (beat.set || 0), seen: beat }));
   const leaving = useLeaving(cast, beat);
   const veiled = Boolean(beat.scene && beat.scene.eros && beat.scene.eros !== "none");
-  const talking = cast.length > 1 && cast.some((c) => beat.speakers ? beat.speakers.includes(c.name) : beat.speaker === c.name);
+  const talking = dof && cast.length > 1 && cast.some((c) => beat.speakers ? beat.speakers.includes(c.name) : beat.speaker === c.name);
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cast", "data-split": split ? "on" : void 0, "data-veil": veiled ? "" : void 0, "data-talk": talking ? "" : void 0 }, cast.map((entry) => /* @__PURE__ */ import_react4.default.createElement(Actor, { key: entry.id, entry, person: people.get(entry.name), beat, emo: beat.emotions[entry.name] || "neutral", emotions: view && view.emotions, talk })), leaving.map((entry) => /* @__PURE__ */ import_react4.default.createElement(Actor, { key: entry.id, entry, person: people.get(entry.name), beat: entry.seen, emo: entry.seen.emotions[entry.name] || "neutral", emotions: view && view.emotions, leaving: true })));
 }
 function splitBackground(location2, time, view) {
@@ -6487,15 +6541,15 @@ function CutCard({ beat, out }) {
 function FadeLayer({ name: name2, value, ms = 1200 }) {
   const [layers, setLayers] = import_react4.default.useState(() => [{ id: 0, value }]);
   import_react4.default.useEffect(() => {
-    setLayers((list2) => {
-      const top = list2[list2.length - 1];
-      if (top.value === value) return list2;
-      return [...list2.filter((l) => !l.leaving).map((l) => ({ ...l, leaving: true })), { id: top.id + 1, value }];
+    setLayers((list3) => {
+      const top = list3[list3.length - 1];
+      if (top.value === value) return list3;
+      return [...list3.filter((l) => !l.leaving).map((l) => ({ ...l, leaving: true })), { id: top.id + 1, value }];
     });
   }, [value]);
   import_react4.default.useEffect(() => {
     if (!layers.some((l) => l.leaving)) return void 0;
-    const t = setTimeout(() => setLayers((list2) => list2.filter((l) => !l.leaving)), ms);
+    const t = setTimeout(() => setLayers((list3) => list3.filter((l) => !l.leaving)), ms);
     return () => clearTimeout(t);
   }, [layers]);
   return layers.filter((l) => l.value).map((l) => /* @__PURE__ */ import_react4.default.createElement("div", { key: l.id, className: `fg-${name2}${l.leaving ? " is-leave" : ""}`, "data-v": l.value, style: { "--fade": ms + "ms" }, "aria-hidden": "true" }));
@@ -6558,21 +6612,268 @@ function useCamera(beat, cameraRef) {
 }
 var TRANSITION_OVERLAY = { flash: "", black: "is-black", blink: "is-blink", glitch: "is-glitch", haze: "is-haze" };
 var RECALL_ENTRY = { sweet: "is-bloom", dread: "is-dread", flash: "is-snap", haze: "is-mist" };
-function Flash({ beat, recallStyle = "text", tone = "", wake = false, rising = false, changed = false }) {
+function Flash({ beat, recallStyle = "text", tone = "", wake = false, rising = false, changed = false, recallFx = true }) {
   if (!beat) return null;
   if (wake) return /* @__PURE__ */ import_react4.default.createElement("div", { key: beat.key, className: `fg-flash is-wake${rising ? " is-rising" : ""}`, style: { "--rise": WAKE_SWAP_MS + "ms", "--clear": WAKE_MS - WAKE_SWAP_MS + "ms" } });
   const kind = beat.cam === "flash" ? "" : beat.cam === "redflash" ? "is-red" : beat.cam === "fadeblack" ? "is-black" : null;
   const tr = changed ? null : TRANSITION_OVERLAY[beat.transition] ?? null;
-  const entry = beat.recallEdge === "in" ? RECALL_ENTRY[tone || beat.recall && beat.recall.tone] : null;
-  const cls = kind ?? tr ?? entry ?? (beat.recallEdge && recallStyle === "ghost" ? "is-mist" : null);
+  const entry = recallFx && beat.recallEdge === "in" ? RECALL_ENTRY[tone || beat.recall && beat.recall.tone] : null;
+  const cls = kind ?? tr ?? entry ?? (recallFx && beat.recallEdge && recallStyle === "ghost" ? "is-mist" : null);
   if (cls === null) return null;
   return /* @__PURE__ */ import_react4.default.createElement("div", { key: beat.key, className: `fg-flash ${cls}` });
+}
+
+// src/client/theater/effects.js
+var list2 = (prefix, values, labels, skip = []) => values.filter((v) => !skip.includes(v)).map((v) => ({ id: `${prefix}.${v}`, label: labels[v] || v }));
+var TR_NAME = { cinematic: "黑边收放", none: "直接切" };
+var FX_NAME = { sway: "摇晃（船上）", ride: "颠簸（车里）", handheld: "手持镜头", drift: "缓缓推近", rumble: "持续震动", speed: "速度线" };
+var CUT_NAME = { time: "时间跳跃", date: "日期", chapter: "章节", meanwhile: "与此同时" };
+var PAUSE_NAME = { beat: "顿一拍", silence: "沉默（对话框让开）" };
+var PHONE_NAME = { call: "来电响铃", dial: "拨出等接通", end: "挂断小卡", notify: "通知横幅", voicemail: "语音留言横幅" };
+var RESTORING = /* @__PURE__ */ new Set(["face", "lookback"]);
+var EFFECT_GROUPS = [
+  { id: "cam", label: "镜头", hint: "导演给某一句写的运镜。关掉的那一下画面不动。", items: list2("cam", CAMERAS, CAMERA_LABEL) },
+  {
+    id: "tr",
+    label: "换场转场",
+    hint: "换地方、进出回忆时怎么转过去。关掉的换成溶解；溶解也关了就直接切。",
+    items: [...list2("tr", TRANSITIONS, { ...TRANSITION_LABEL, ...TR_NAME }, ["none"]), { id: "tr.wake", label: "从回忆里醒来（褪白）" }, { id: "tr.open", label: "打开剧场时从黑里亮起" }]
+  },
+  {
+    id: "title",
+    label: "地点标题与过场字卡",
+    hint: "换了地方时的地点标题，「三小时后」「第二天」这类全屏字卡。",
+    items: [{ id: "title.place", label: "地点标题" }, ...list2("title", CUTS, CUT_NAME)]
+  },
+  {
+    id: "weather",
+    label: "天气粒子",
+    hint: "雨雪、花瓣、萤火这些飘在画面上的东西。",
+    items: [...list2("weather", WEATHER, WEATHER_LABEL, ["clear"]), { id: "weather.depth", label: "粒子分远近" }, { id: "weather.gust", label: "一阵一阵的风" }]
+  },
+  { id: "light", label: "光线", hint: "关灯、烛光、霓虹、窗光、漏光……关掉的照常亮着。", items: list2("light", LIGHTS, LIGHT_LABEL, ["normal"]) },
+  { id: "fx", label: "画面效果", hint: "一整段挂着的晃动、热浪、水下、心跳、慢动作……", items: list2("fx", FX, { ...FX_LABEL, ...FX_NAME }, ["none"]) },
+  {
+    id: "look",
+    label: "画面色调与质感",
+    hint: "不是导演写的，一直在的那几层。",
+    items: [
+      { id: "look.tone", label: "按基调调色" },
+      { id: "look.time", label: "按时段调色" },
+      { id: "look.vignette", label: "四角暗角" },
+      { id: "look.kenburns", label: "背景缓缓推拉" },
+      { id: "look.parallax", label: "鼠标视差" },
+      { id: "look.bars", label: "电影黑边（整段挂着）" }
+    ]
+  },
+  {
+    id: "mode",
+    label: "回忆与梦境",
+    hint: "特殊段落的画面滤镜。关掉后照样换到段落里演，只是画面不加滤镜。",
+    items: [...list2("mode", MODES, MODE_NAMES), { id: "mode.recall", label: "短闪回的画面" }]
+  },
+  {
+    id: "mood",
+    label: "亲密氛围与感官",
+    hint: "暧昧的柔光、亲密时的心跳暗角，蒙眼、耳边、发烫这些感官主导的一段。",
+    items: [...list2("romance", ROMANCE, ROMANCE_LABEL, ["none"]), ...list2("sense", SENSES, SENSE_LABEL, ["none"])]
+  },
+  {
+    id: "actor",
+    label: "立绘",
+    hint: "台上的人自己的小动作和登场、退场的样子。关掉的登场退场换成平常的滑进滑出。",
+    items: [
+      { id: "actor.breathe", label: "呼吸起伏" },
+      { id: "actor.hop", label: "开口时轻轻一跳" },
+      { id: "actor.dof", label: "没说话的人微微虚化" },
+      { id: "actor.react", label: "旁人跟着一动" },
+      { id: "actor.sym", label: "情绪符号的小动作" },
+      { id: "actor.aa", label: "逆转式立绘眨眼、对口型" },
+      ...list2("enter", ENTER_HOWS, ENTER_HOW_LABEL),
+      ...list2("exit", EXIT_HOWS, EXIT_HOW_LABEL)
+    ]
+  },
+  { id: "move", label: "走位", hint: "靠近、拉开、背过身、躲到身后……关掉的那一下人站着不动；转身面对、回眸关掉了照样转回来，只是不演那一下。", items: list2("move", MOVES, MOVE_LABEL, ["reset"]) },
+  { id: "hit", label: "打斗", hint: "出手时被打的人一震、震屏、泛红。关掉击倒就不倒下去；关掉治疗，倒下的人照样站起来，只是不泛绿光。", items: list2("hit", HIT_EFFECTS, HIT_EFFECT_LABEL) },
+  { id: "moment", label: "小瞬间", hint: "拍照、牵手、干杯、烟花、约定这些一下就过去的小演出。", items: list2("moment", MOMENTS, MOMENT_LABEL) },
+  {
+    id: "phone",
+    label: "手机与分屏",
+    hint: "手机在画面上的样子和电话另一头的分屏。关掉响铃时电话照样接通，电话里的声音照常。",
+    items: [...list2("phone", PHONE_KINDS, { ...PHONE_LABEL, ...PHONE_NAME }), { id: "phone.live", label: "通话中计时、视频小窗" }, { id: "phone.split", label: "分屏" }]
+  },
+  {
+    id: "say",
+    label: "台词演法",
+    hint: "一句话怎么说出来：语速、停顿、成块砸出来……关掉的按平常的速度念。",
+    items: [...list2("say", DELIVERIES, DELIVERY_LABEL), { id: "say.stress", label: "重音一字一顿" }, { id: "say.impact", label: "落字时震屏、闪光" }]
+  },
+  { id: "textfx", label: "文字效果", hint: "句子里某几个字发抖、放大、越说越小……关掉的那几个字照常显示。", items: list2("textfx", TEXT_FX, TEXT_FX_LABEL) },
+  { id: "voice", label: "声音的样子", hint: "电话里、广播、心灵感应这些：对话框和打字音跟着变。关掉的按当面说话演。", items: list2("voice", VOICES, VOICE_LABEL) },
+  { id: "card", label: "情境卡片", hint: "短信、信、报纸这类单独一张的卡片。关掉的放回对话框里显示。", items: list2("card", CARDS, CARD_LABEL) },
+  {
+    id: "cg",
+    label: "插画进出",
+    hint: "插画怎么出现、停留、收起。关掉的出现、收起换成溶入溶出，停留换成静止。",
+    items: [
+      ...CG_INS.filter((v) => v !== "dissolve").map((v) => ({ id: `cgin.${v}`, label: `出现：${CG_IN_LABEL[v] || v}` })),
+      ...CG_OUTS.filter((v) => v !== "dissolve").map((v) => ({ id: `cgout.${v}`, label: `收起：${CG_OUT_LABEL[v] || v}` })),
+      ...CG_MOTIONS.filter((v) => v !== "still").map((v) => ({ id: `cgmove.${v}`, label: `停留：${CG_MOTION_LABEL[v] || v}` }))
+    ]
+  },
+  {
+    id: "pace",
+    label: "停顿与留白",
+    hint: "字出来之前先停一下，屏住呼吸时配乐停下。",
+    items: [...list2("pace", PAUSES, PAUSE_NAME), { id: "pace.hush", label: "配乐留白" }]
+  }
+];
+var EFFECT_IDS = EFFECT_GROUPS.flatMap((g) => g.items.map((i) => i.id));
+function effectsOff(ui2) {
+  const saved = ui2 && ui2.effects;
+  return new Set(saved && typeof saved === "object" ? Object.keys(saved).filter((id) => saved[id] === false) : []);
+}
+function muteLine(line, off) {
+  if (!line || typeof line !== "object") return line;
+  let out = line;
+  const own = () => {
+    if (out === line) out = { ...line };
+  };
+  const drop = (key) => {
+    own();
+    delete out[key];
+  };
+  if (line.hit && line.hit.effect === "down" && off.has("hit.down")) drop("hit");
+  if (line.split && off.has("phone.split")) drop("split");
+  if (line.cut && off.has("title." + line.cut.kind)) drop("cut");
+  if (line.pause && off.has("pace." + line.pause)) drop("pause");
+  if (line.bgm === "hush" && off.has("pace.hush")) drop("bgm");
+  const still2 = (m) => m && off.has("move." + m.act) && !RESTORING.has(m.act);
+  if (Array.isArray(line.move) && line.move.some(still2)) {
+    own();
+    out.move = line.move.filter((m) => !still2(m));
+  }
+  if (Array.isArray(line.enter) && line.enter.some((e) => e && e.how && off.has("enter." + e.how))) {
+    own();
+    out.enter = line.enter.map((e) => {
+      if (!(e && e.how && off.has("enter." + e.how))) return e;
+      const { how, ...rest } = e;
+      return rest;
+    });
+  }
+  if (line.exitHow && Object.values(line.exitHow).some((how) => off.has("exit." + how))) {
+    const kept = Object.fromEntries(Object.entries(line.exitHow).filter(([, how]) => !off.has("exit." + how)));
+    if (Object.keys(kept).length) {
+      own();
+      out.exitHow = kept;
+    } else drop("exitHow");
+  }
+  return out;
+}
+function muteScript(script, off) {
+  if (!script || !script.lines) return script;
+  let changed = false;
+  const lines = {};
+  for (const [id, line] of Object.entries(script.lines)) {
+    lines[id] = muteLine(line, off);
+    if (lines[id] !== line) changed = true;
+  }
+  return changed ? { ...script, lines } : script;
+}
+function muteImage(img, off) {
+  if (!img) return img;
+  const enter = cgIn(img.enter), leave = cgOut(img.leave), motion = cgMotion(img.motion);
+  const patch = {
+    ...enter && off.has("cgin." + enter) ? { enter: "dissolve" } : {},
+    ...leave && off.has("cgout." + leave) ? { leave: "dissolve" } : {},
+    ...motion && off.has("cgmove." + motion) ? { motion: "still" } : {}
+  };
+  return Object.keys(patch).length ? { ...img, ...patch } : img;
+}
+function muteView(view, off) {
+  if (!view || !off || !off.size) return view;
+  return {
+    ...view,
+    turns: (view.turns || []).map((t) => {
+      const script = muteScript(t.script, off);
+      return script === t.script ? t : { ...t, script };
+    }),
+    images: (view.images || []).map((img) => muteImage(img, off))
+  };
+}
+function muteTransition(tr, off) {
+  if (!tr || tr === "none" || !off.has("tr." + tr)) return tr;
+  return off.has("tr.dissolve") ? "none" : "dissolve";
+}
+var SCENE_FIELDS = [["weather", "clear"], ["light", "normal"], ["fx", "none"], ["romance", "none"], ["sense", "none"]];
+function muteScene(scene, off) {
+  if (!scene) return scene;
+  let out = scene;
+  for (const [field, none] of SCENE_FIELDS) {
+    if (scene[field] && scene[field] !== none && off.has(field + "." + scene[field])) {
+      if (out === scene) out = { ...scene };
+      out[field] = none;
+    }
+  }
+  if (scene.bars === "on" && off.has("look.bars")) {
+    if (out === scene) out = { ...scene };
+    out.bars = "none";
+  }
+  return out;
+}
+function muteBeats(beats, off) {
+  if (!off || !off.size) return beats;
+  const scenes = /* @__PURE__ */ new Map();
+  const sceneOf = (scene) => {
+    if (!scenes.has(scene)) scenes.set(scene, muteScene(scene, off));
+    return scenes.get(scene);
+  };
+  return beats.map((b) => {
+    const out = { ...b, scene: sceneOf(b.scene), transition: muteTransition(b.transition, off) };
+    if (b.cam && off.has("cam." + b.cam)) {
+      out.cam = "";
+      delete out.camOn;
+    }
+    if (off.has("actor.sym")) {
+      out.sym = "";
+      if (out.reacts) out.reacts = out.reacts.filter((r) => r.emo).map((r) => r.sym ? { ...r, sym: "" } : r);
+    }
+    if (out.reacts && !out.reacts.length) delete out.reacts;
+    if (out.reacts && off.has("actor.react")) delete out.reacts;
+    if (b.moves && b.moves.some((m) => off.has("move." + m.act))) {
+      const kept = b.moves.filter((m) => !off.has("move." + m.act));
+      if (kept.length) out.moves = kept;
+      else delete out.moves;
+    }
+    if (b.hit && off.has("hit." + b.hit.effect)) delete out.hit;
+    if (b.call && off.has(b.call.state === "live" ? "phone.live" : b.call.dir === "out" ? "phone.dial" : "phone.call")) delete out.call;
+    if (b.phone && off.has("phone." + b.phone.kind)) delete out.phone;
+    if (b.stress && off.has("say.stress")) out.stress = "";
+    if (b.textfx) {
+      const kept = b.textfx.filter((t) => !off.has("textfx." + t.style));
+      if (kept.length !== b.textfx.length) {
+        if (kept.length) out.textfx = kept;
+        else delete out.textfx;
+      }
+    }
+    if (b.voice && off.has("voice." + b.voice)) delete out.voice;
+    if (b.card && off.has("card." + b.card)) out.card = "";
+    if (b.moment && off.has("moment." + b.moment.kind)) delete out.moment;
+    return out;
+  });
+}
+function offDeliveries(off) {
+  return new Set(DELIVERIES.filter((d) => off.has("say." + d)));
+}
+var CSS_OFF = { "look.kenburns": "kenburns", "actor.breathe": "breathe", "actor.hop": "hop" };
+function cssOff(off) {
+  return Object.entries(CSS_OFF).filter(([id]) => off.has(id)).map(([, word]) => word).join(" ");
 }
 
 // src/client/theater/Dialog.jsx
 var import_react5 = __toESM(require("react"), 1);
 var CARD_HEAD = { sms: "新消息", letter: "", note: "", news: "号外", terminal: "> SYSTEM", notice: "告示", diary: "", scroll: "" };
-function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null } = {}) {
+function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null } = {}) {
   const key = beat ? beat.key : "";
   const chars = import_react5.default.useMemo(() => Array.from(beat && beat.text || ""), [key, beat && beat.text]);
   const emo = beat && beat.speaker ? beat.emotions && beat.emotions[beat.speaker] || beat.emo : "";
@@ -6580,7 +6881,7 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
   const stress = beat ? beat.stress : "";
   const type = beat ? beat.type : "narration";
   const textfx = beat ? beat.textfx : null;
-  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx }), [chars, speed, say, stress, emo, type, key, textfx]);
+  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles }), [chars, speed, say, stress, emo, type, key, textfx, offStyles]);
   const [shown, setShown] = import_react5.default.useState({ key, done: false });
   const [start, setStart] = import_react5.default.useState({ key: "", at: NaN });
   if (shown.key !== key) setShown({ key, done: false });
@@ -6629,9 +6930,9 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
   return [done, chars, () => setShown({ key, done: true }), start.key === key ? start.at : NaN, plan];
 }
 function origChars(orig, times, count, speed) {
-  const list2 = Array.from(orig);
+  const list3 = Array.from(orig);
   const at2 = (i) => times && times.length ? times[Math.min(times.length - 1, i)] : i * speed;
-  return list2.map((ch, j) => [ch, count ? at2(Math.floor(j / list2.length * count)) : 0]);
+  return list3.map((ch, j) => [ch, count ? at2(Math.floor(j / list3.length * count)) : 0]);
 }
 function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quick, progress, status, hiddenText, recall = null, face = null }) {
   const speaker = beat.alias || beat.speaker;
@@ -6654,17 +6955,17 @@ function SceneCard({ beat }) {
 }
 function Choices({ choices, onChoose, onBack, waiting }) {
   const [free, setFree] = import_react5.default.useState("");
-  const list2 = choices || [];
-  return /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-choices", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-choices-title" }, list2.length ? "CHOICE" : waiting ? "TO BE CONTINUED" : "YOUR TURN"), list2.map((text, i) => /* @__PURE__ */ import_react5.default.createElement("button", { key: text, type: "button", className: "fg-choice", "data-n": String(i + 1).padStart(2, "0"), style: { "--i": i }, onMouseEnter: () => sfx("hover"), onClick: () => {
+  const list3 = choices || [];
+  return /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-choices", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-choices-title" }, list3.length ? "CHOICE" : waiting ? "TO BE CONTINUED" : "YOUR TURN"), list3.map((text, i) => /* @__PURE__ */ import_react5.default.createElement("button", { key: text, type: "button", className: "fg-choice", "data-n": String(i + 1).padStart(2, "0"), style: { "--i": i }, onMouseEnter: () => sfx("hover"), onClick: () => {
     sfx("select");
     onChoose(text);
-  } }, text)), /* @__PURE__ */ import_react5.default.createElement("form", { className: "fg-free", style: { "--i": list2.length }, onSubmit: (e) => {
+  } }, text)), /* @__PURE__ */ import_react5.default.createElement("form", { className: "fg-free", style: { "--i": list3.length }, onSubmit: (e) => {
     e.preventDefault();
     if (free.trim()) {
       sfx("select");
       onChoose(free.trim());
     }
-  } }, /* @__PURE__ */ import_react5.default.createElement("input", { value: free, onChange: (e) => setFree(e.target.value), placeholder: list2.length ? "或者，自己写下一步……" : "写下你的下一步……", onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react5.default.createElement("button", { type: "submit" }, "GO")), /* @__PURE__ */ import_react5.default.createElement("button", { type: "button", className: "fg-btn", style: { marginTop: "1cqw" }, onClick: onBack }, "回到聊天"));
+  } }, /* @__PURE__ */ import_react5.default.createElement("input", { value: free, onChange: (e) => setFree(e.target.value), placeholder: list3.length ? "或者，自己写下一步……" : "写下你的下一步……", onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react5.default.createElement("button", { type: "submit" }, "GO")), /* @__PURE__ */ import_react5.default.createElement("button", { type: "button", className: "fg-btn", style: { marginTop: "1cqw" }, onClick: onBack }, "回到聊天"));
 }
 
 // src/client/theater/Panels.jsx
@@ -6777,23 +7078,23 @@ function iou(a, b) {
   const inter = w * h;
   return inter / ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter);
 }
-function nms(list2, limit = 0.7) {
+function nms(list3, limit = 0.7) {
   const kept = [];
-  for (const d of [...list2].sort((a, b) => b.score - a.score)) if (kept.every((k) => iou(k.box, d.box) <= limit)) kept.push(d);
+  for (const d of [...list3].sort((a, b) => b.score - a.score)) if (kept.every((k) => iou(k.box, d.box) <= limit)) kept.push(d);
   return kept;
 }
 function parseYolo(data, dims, { threshold = 0.25, box, size, iouLimit = 0.7 }) {
   const n = dims[2], classes = dims[1] - 4;
   const kx = (box[2] - box[0]) / size.w, ky = (box[3] - box[1]) / size.h;
-  const list2 = [];
+  const list3 = [];
   for (let i = 0; i < n; i++) {
     let score = 0;
     for (let c = 0; c < classes; c++) score = Math.max(score, data[(4 + c) * n + i]);
     if (score < threshold) continue;
     const cx = data[i], cy = data[n + i], w = data[2 * n + i], h = data[3 * n + i];
-    list2.push({ score, box: [box[0] + (cx - w / 2) * kx, box[1] + (cy - h / 2) * ky, box[0] + (cx + w / 2) * kx, box[1] + (cy + h / 2) * ky] });
+    list3.push({ score, box: [box[0] + (cx - w / 2) * kx, box[1] + (cy - h / 2) * ky, box[0] + (cx + w / 2) * kx, box[1] + (cy + h / 2) * ky] });
   }
-  return nms(list2, iouLimit);
+  return nms(list3, iouLimit);
 }
 var center = (b) => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
 var area = (b) => Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
@@ -6963,11 +7264,11 @@ function framesFrom({ eyes, mouth, d }, width, height) {
   return { eyes: eyeBoxes, mouth: [clampBox(mouthBox, width, height)] };
 }
 var squareAround = (b, k) => at(center(b), Math.max(b[2] - b[0], b[3] - b[1]) * k, Math.max(b[2] - b[0], b[3] - b[1]) * k);
-function readGrounding(list2, view) {
+function readGrounding(list3, view) {
   const vw = view[2] - view[0], vh = view[3] - view[1];
   const whole = (b) => b[2] - b[0] > vw * 0.97 && b[3] - b[1] > vh * 0.97;
   const small = (b) => area(b) < vw * vh * 0.5;
-  const of = (re) => list2.filter((g) => re.test(g.label) && !whole(g.box)).map((g) => g.box);
+  const of = (re) => list3.filter((g) => re.test(g.label) && !whole(g.box)).map((g) => g.box);
   const faces = of(/face|head/i);
   const eyeBoxes = of(/eye/i).filter(small);
   const singles = eyeBoxes.filter((b) => !eyeBoxes.some((o) => o !== b && o[0] >= b[0] - 2 && o[2] <= b[2] + 2 && o[1] >= b[1] - 2 && o[3] <= b[3] + 2));
@@ -7774,16 +8075,16 @@ function AaWorkbench({ gameId, person, onClose }) {
     const done = variants.filter((o) => o.key !== v.key && o.record.aa && o.record.aa.rects).sort((a, b) => (b.record.at || 0) - (a.record.at || 0))[0];
     return done ? { ...done, rects: done.record.aa.rects } : null;
   };
-  const autoFrameList = async (list2) => {
+  const autoFrameList = async (list3) => {
     if (!visionReady) {
       toast("先下载认脸小模型", "error");
       return {};
     }
-    if (framing || running || !list2.length) return {};
+    if (framing || running || !list3.length) return {};
     stop.current = false;
     const out = {};
     let weak = 0;
-    for (const v of list2) {
+    for (const v of list3) {
       if (stop.current) break;
       setFraming(v.key);
       const src = assetUrl(v.record.assetId);
@@ -7810,12 +8111,12 @@ function AaWorkbench({ gameId, person, onClose }) {
     }
     setFraming("");
     const done = Object.keys(out).length;
-    toast(`自动框好 ${done} / ${list2.length} 张${weak ? `，其中 ${weak} 张没认准，标红的点开看一眼` : ""}`, weak ? "error" : void 0);
+    toast(`自动框好 ${done} / ${list3.length} 张${weak ? `，其中 ${weak} 张没认准，标红的点开看一眼` : ""}`, weak ? "error" : void 0);
     return out;
   };
   const autoAndMake = async () => {
-    const list2 = pickedList.filter((v) => !touched.current.has(v.key));
-    const results = await autoFrameList(list2);
+    const list3 = pickedList.filter((v) => !touched.current.has(v.key));
+    const results = await autoFrameList(list3);
     const ok = pickedList.filter((v) => touched.current.has(v.key) || results[v.key] && results[v.key].confidence !== "low");
     if (stop.current || !ok.length) return;
     const skipped = pickedList.length - ok.length;
@@ -7844,12 +8145,12 @@ function AaWorkbench({ gameId, person, onClose }) {
     });
     job(v.key, { status: "done", error: "" });
   };
-  const run = async (list2, only = null, given = {}) => {
-    if (running || !list2.length) return;
+  const run = async (list3, only = null, given = {}) => {
+    if (running || !list3.length) return;
     setRunning(true);
     stop.current = false;
     let ok = 0;
-    for (const v of list2) {
+    for (const v of list3) {
       if (stop.current) break;
       try {
         await make(v, only, given[v.key] || null);
@@ -7859,9 +8160,9 @@ function AaWorkbench({ gameId, person, onClose }) {
       }
     }
     setRunning(false);
-    toast(stop.current ? `已停止：做好了 ${ok} 张` : `做好了 ${ok} / ${list2.length} 张`, ok === list2.length ? void 0 : "error");
+    toast(stop.current ? `已停止：做好了 ${ok} 张` : `做好了 ${ok} / ${list3.length} 张`, ok === list3.length ? void 0 : "error");
   };
-  const removeAa = (list2) => list2.length && api.cast(gameId, "aa-remove", { name: person.name, keys: list2.map((v) => v.key) }).then(() => toast(`已取消 ${list2.length} 张的动态，图留着`), (e) => toast(e.message, "error"));
+  const removeAa = (list3) => list3.length && api.cast(gameId, "aa-remove", { name: person.name, keys: list3.map((v) => v.key) }).then(() => toast(`已取消 ${list3.length} 张的动态，图留着`), (e) => toast(e.message, "error"));
   const pickedList = variants.filter((v) => picked.has(v.key));
   const talk = useDemoTalk(tab === "play");
   const statusText = (v) => {
@@ -8069,10 +8370,10 @@ function readSoundSidecar(text) {
   return out;
 }
 function soundMatcher(sidecars) {
-  const list2 = (sidecars || []).map((s) => ({ dir: dirOf(s.path), map: s.map })).sort((a, b) => b.dir.length - a.dir.length);
+  const list3 = (sidecars || []).map((s) => ({ dir: dirOf(s.path), map: s.map })).sort((a, b) => b.dir.length - a.dir.length);
   return (path) => {
     const p4 = slash(path);
-    for (const { dir, map } of list2) {
+    for (const { dir, map } of list3) {
       if (!p4.startsWith(dir)) continue;
       const rel = p4.slice(dir.length);
       if (map.has(rel)) return { file: rel, meta: map.get(rel) };
@@ -8313,7 +8614,7 @@ function ProfileEditor({ gameId, person, cast }) {
   const voiceNow = castVoices([...others, draft], ui2).get(person.name);
   const guess = heightOf({ ...person, gender: form.gender, height: null });
   const autoVoice2 = castVoices([...others, { ...draft, voice: "" }], ui2).get(person.name);
-  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "固定外貌"), /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-look-grid" }, LOOK_FIELDS.map((f) => /* @__PURE__ */ import_react9.default.createElement("label", { key: f, className: `fg-look-field${f === "other" ? " is-wide" : ""}` }, /* @__PURE__ */ import_react9.default.createElement("span", null, LOOK_FIELD_LABELS[f]), f === "other" ? /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] }) : /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] })))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: ".5cqw" } }, "出图时用：", lookTags(form.look, person.appearance) || "（空）", person.appearance && lookTags(form.look, person.appearance) === person.appearance ? "（tag 没变，已画好的立绘照用）" : "", "　衣服不写在这里，走「衣橱与状态」。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "性别 / 种子"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.gender, onChange: set("gender") }, GENDERS.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.seed, placeholder: `默认 ${person.seed}`, onChange: (e) => setForm({ ...form, seed: e.target.value.replace(/\D/g, "") }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", title: "换一个随机种子", onClick: () => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) }) }, "🎲"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "所有立绘差分共用这个种子"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "身高"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.height, placeholder: `约 ${guess.cm}`, onChange: (e) => setForm({ ...form, height: e.target.value.replace(/\D/g, "").slice(0, 3) }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "厘米。剧场里大家的头缩放到一样大，高的人站得高、矮的站得低。留空用", guess.from === "acting" ? "设计师读资料估的" : "按性别和外貌估的", "（", guess.cm, "）。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "声音"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voice, onChange: set("voice"), "aria-label": "打字音音色" }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "" }, "自动（", voiceText(autoVoice2), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "off" }, "不出声"), VOICE_GROUPS.map(([g, label]) => /* @__PURE__ */ import_react9.default.createElement("optgroup", { key: g, label }, VOICES.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v.id, value: v.id }, v.label))))), /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voicePitch, onChange: set("voicePitch"), "aria-label": "音高", title: "升降几个半音" }, PITCHES.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !voiceNow, onClick: () => previewVoice(voiceNow, ui2 || void 0) }, "▶ 试听"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "这个角色说话时的打字音"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "立绘备注"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.note, onChange: set("note"), onKeyDown: (e) => e.stopPropagation(), placeholder: "写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "不要出现"), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.negative, onChange: set("negative"), onKeyDown: (e) => e.stopPropagation(), placeholder: "glasses, ponytail（每张立绘都加进负面词）" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存档案")));
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "固定外貌"), /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-look-grid" }, LOOK_FIELDS.map((f) => /* @__PURE__ */ import_react9.default.createElement("label", { key: f, className: `fg-look-field${f === "other" ? " is-wide" : ""}` }, /* @__PURE__ */ import_react9.default.createElement("span", null, LOOK_FIELD_LABELS[f]), f === "other" ? /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] }) : /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] })))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: ".5cqw" } }, "出图时用：", lookTags(form.look, person.appearance) || "（空）", person.appearance && lookTags(form.look, person.appearance) === person.appearance ? "（tag 没变，已画好的立绘照用）" : "", "　衣服不写在这里，走「衣橱与状态」。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "性别 / 种子"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.gender, onChange: set("gender") }, GENDERS.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.seed, placeholder: `默认 ${person.seed}`, onChange: (e) => setForm({ ...form, seed: e.target.value.replace(/\D/g, "") }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", title: "换一个随机种子", onClick: () => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) }) }, "🎲"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "所有立绘差分共用这个种子"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "身高"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.height, placeholder: `约 ${guess.cm}`, onChange: (e) => setForm({ ...form, height: e.target.value.replace(/\D/g, "").slice(0, 3) }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "厘米。剧场里大家的头缩放到一样大，高的人站得高、矮的站得低。留空用", guess.from === "acting" ? "设计师读资料估的" : "按性别和外貌估的", "（", guess.cm, "）。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "声音"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voice, onChange: set("voice"), "aria-label": "打字音音色" }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "" }, "自动（", voiceText(autoVoice2), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "off" }, "不出声"), VOICE_GROUPS.map(([g, label]) => /* @__PURE__ */ import_react9.default.createElement("optgroup", { key: g, label }, VOICES2.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v.id, value: v.id }, v.label))))), /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voicePitch, onChange: set("voicePitch"), "aria-label": "音高", title: "升降几个半音" }, PITCHES.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !voiceNow, onClick: () => previewVoice(voiceNow, ui2 || void 0) }, "▶ 试听"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "这个角色说话时的打字音"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "立绘备注"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.note, onChange: set("note"), onKeyDown: (e) => e.stopPropagation(), placeholder: "写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "不要出现"), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.negative, onChange: set("negative"), onKeyDown: (e) => e.stopPropagation(), placeholder: "glasses, ponytail（每张立绘都加进负面词）" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存档案")));
 }
 function WardrobeEditor({ gameId, person }) {
   const [, run] = useBusy();
@@ -8340,7 +8641,7 @@ function LookTimeline({ gameId, person }) {
     const t = String(v).trim();
     return t === "" || !Number.isFinite(Number(t)) ? null : Math.max(0, Math.round(Number(t)));
   };
-  const setSpans = (name2, list2) => run("sp" + name2, () => look({ stateSpans: { name: name2, spans: list2.map((sp) => [sp.from, sp.to]) } }), "已改，用到的立绘会按新样子补画");
+  const setSpans = (name2, list3) => run("sp" + name2, () => look({ stateSpans: { name: name2, spans: list3.map((sp) => [sp.from, sp.to]) } }), "已改，用到的立绘会按新样子补画");
   const edit = (name2, i, change) => setSpans(name2, spans[name2].map((sp, j) => j === i ? { ...sp, ...change } : sp));
   const wear = timeline.wear || [];
   return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "状态哪几轮有"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-spans" }, names.map((name2) => spans[name2].map((sp, i) => /* @__PURE__ */ import_react9.default.createElement("div", { key: name2 + i, className: "fg-span" }, /* @__PURE__ */ import_react9.default.createElement("b", { title: sp.tags }, name2), /* @__PURE__ */ import_react9.default.createElement("span", null, "第"), /* @__PURE__ */ import_react9.default.createElement(Text, { value: sp.from, style: { width: "5cqw" }, onCommit: (v) => {
@@ -8636,9 +8937,9 @@ function ModelField({ value, options, onCommit, placeholder, emptyLabel }) {
   ];
   return /* @__PURE__ */ import_react9.default.createElement(Select, { value, options: opts, onChange: (v) => v === "__manual" ? setManual(true) : onCommit(v) });
 }
-function listOptions(list2, value, emptyLabel) {
-  const opts = (list2 || []).map((v) => [v, v]);
-  if (value && !(list2 || []).includes(value)) opts.unshift([value, value + "（当前）"]);
+function listOptions(list3, value, emptyLabel) {
+  const opts = (list3 || []).map((v) => [v, v]);
+  if (value && !(list3 || []).includes(value)) opts.unshift([value, value + "（当前）"]);
   if (emptyLabel) opts.unshift(["", emptyLabel]);
   return opts;
 }
@@ -8655,7 +8956,7 @@ function BackendSection({ data }) {
   const backend = cfg.images.backend;
   const [busy, run] = useBusy();
   const [test, setTest] = import_react9.default.useState(null);
-  const [list2, setList] = import_react9.default.useState(null);
+  const [list3, setList] = import_react9.default.useState(null);
   const [relay, setRelay] = import_react9.default.useState({ name: "", baseURL: "" });
   const p4 = (section, patch) => patchConfig({ [section]: patch }).catch((e) => toast(e.message, "error"));
   const source = backend === "novelai" ? "" : [cfg[backend].baseURL, cfg[backend].authType, data.keys[backend]].join("|");
@@ -8664,10 +8965,10 @@ function BackendSection({ data }) {
     setList(null);
     loadList();
   }, [backend, source]);
-  const models = list2 && list2.backend === backend && list2.models || [];
-  const samplers = list2 && list2.backend === backend && list2.samplers || [];
-  const schedulers = list2 && list2.backend === backend && list2.schedulers || [];
-  const modelHint = list2 ? list2.note : "正在读取模型列表…";
+  const models = list3 && list3.backend === backend && list3.models || [];
+  const samplers = list3 && list3.backend === backend && list3.samplers || [];
+  const schedulers = list3 && list3.backend === backend && list3.schedulers || [];
+  const modelHint = list3 ? list3.note : "正在读取模型列表…";
   const refresh = /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "m", onClick: loadList }, busy === "m" ? "读取中…" : "刷新列表");
   const doTest = () => run("t", async () => {
     setTest(await api.test());
@@ -8701,8 +9002,8 @@ function parseStyles(text) {
   if (!raw) return [];
   try {
     const data = JSON.parse(raw);
-    const list2 = Array.isArray(data) ? data : Array.isArray(data?.styles) ? data.styles : [data];
-    return list2.filter((x) => x && typeof x === "object").map((x) => ({ ...exportStyle(x), artist: String(x.artist ?? x.text ?? ""), name: String(x.name || "导入的画风") }));
+    const list3 = Array.isArray(data) ? data : Array.isArray(data?.styles) ? data.styles : [data];
+    return list3.filter((x) => x && typeof x === "object").map((x) => ({ ...exportStyle(x), artist: String(x.artist ?? x.text ?? ""), name: String(x.name || "导入的画风") }));
   } catch {
     return [{ name: "导入的画风", artist: raw, positive: null, negative: null, cfg: null, cfgRescale: null }];
   }
@@ -8748,8 +9049,8 @@ function StyleSection({ data }) {
   }, []);
   const id = st.id;
   const edit = (patch) => saveStyle((s) => ({ presets: s.presets.map((x) => x.id === id ? { ...x, ...patch } : x) }));
-  const add = (list2, msg) => saveStyle((s) => {
-    const fresh = list2.slice(0, MAX_STYLES - s.presets.length).map((x) => ({ ...x, id: newStyleId() }));
+  const add = (list3, msg) => saveStyle((s) => {
+    const fresh = list3.slice(0, MAX_STYLES - s.presets.length).map((x) => ({ ...x, id: newStyleId() }));
     if (!fresh.length) {
       toast(`画风最多存 ${MAX_STYLES} 套`, "error");
       return null;
@@ -8777,9 +9078,9 @@ function StyleSection({ data }) {
   const artistPreview = st.artist ? st.artist : "（不加画师串）";
   const positive = qualityFor(cfg.style, key);
   return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "画风"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skins fg-styles" }, styles.map((x) => /* @__PURE__ */ import_react9.default.createElement("button", { key: x.id, type: "button", className: `fg-skin fg-style${x.id === st.id ? " is-on" : ""}`, onClick: () => x.id !== st.id && saveStyle(() => ({ current: x.id })), title: x.artist || "不加画师串" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-style-cover", style: x.cover ? { backgroundImage: `url(${assetUrl(x.cover)})` } : void 0 }, !x.cover && /* @__PURE__ */ import_react9.default.createElement("span", null, "还没试画")), /* @__PURE__ */ import_react9.default.createElement("b", null, x.name), /* @__PURE__ */ import_react9.default.createElement("span", null, x.artist || "不加画师串"))), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-skin fg-style is-new", onClick: () => add([{ name: "新画风", artist: "", positive: null, negative: null, cfg: null, cfgRescale: null }], "已新建，下面填画师串") }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-style-cover" }, /* @__PURE__ */ import_react9.default.createElement("span", null, "＋")), /* @__PURE__ */ import_react9.default.createElement("b", null, "新建画风"), /* @__PURE__ */ import_react9.default.createElement("span", null, "从空白开始"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "编辑「", st.name, "」"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "名字" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: st.name, style: { width: "18cqw" }, onCommit: (v) => edit({ name: v }) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => add([{ ...exportStyle(st), name: st.name.slice(0, 36) + " 副本" }], "已复制一份") }, "复制一份"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: styles.length <= 1, onClick: remove }, "删除"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "画师串", hint: "放在提示词最前面。NovelAI 写 artist:xxx，权重写 1.2::artist:xxx::（发给 SD 时自动换成括号写法）。" }, /* @__PURE__ */ import_react9.default.createElement(Area, { value: st.artist, placeholder: "artist:xxx, artist:yyy, 1.2::artist:zzz::, …", onCommit: (v) => edit({ artist: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "正面词", hint: st.positive === null ? `跟着当前模型（${key}）用默认质量词，放在提示词最后。` : "放在提示词最后。留空就是不加。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { marginBottom: ".5cqw" } }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: st.positive === null, onChange: (v) => edit({ positive: v ? null : positive }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "用模型默认的质量词")), /* @__PURE__ */ import_react9.default.createElement(Area, { short: true, value: positive, disabled: st.positive === null, onCommit: (v) => edit({ positive: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "负面词", hint: st.negative === null ? `跟着当前模型（${key}）用默认负面词。` : "每张图都带上。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { marginBottom: ".5cqw" } }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: st.negative === null, onChange: (v) => edit({ negative: v ? null : negativeFor(cfg.style, key) }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "用模型默认的负面词")), /* @__PURE__ */ import_react9.default.createElement(Area, { short: true, value: negativeFor(cfg.style, key), disabled: st.negative === null, onCommit: (v) => edit({ negative: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "CFG", hint: "留空就用「生图渠道」里的设置。CFG Rescale 只有 NovelAI 用（0～1）；OpenAI 渠道两个都不用。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Text, { style: { width: "11cqw" }, value: st.cfg ?? "", placeholder: own.cfg != null ? `跟随渠道（${own.cfg}）` : "跟随渠道", onCommit: (v) => edit({ cfg: blankNumber(v) }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "CFG Rescale"), /* @__PURE__ */ import_react9.default.createElement(Text, { style: { width: "11cqw" }, value: st.cfgRescale ?? "", placeholder: own.rescale != null ? `跟随渠道（${own.rescale}）` : "跟随渠道", onCommit: (v) => edit({ cfgRescale: blankNumber(v) }) }), (st.cfg !== null || st.cfgRescale !== null) && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => edit({ cfg: null, cfgRescale: null }) }, "都跟随渠道"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "发出去的样子", hint: "插画、背景、立绘都按这个顺序拼。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-sent fg-note" }, /* @__PURE__ */ import_react9.default.createElement("div", null, "＋ ", artistPreview, ", ", /* @__PURE__ */ import_react9.default.createElement("i", null, "画面内容……"), positive ? ", " + positive : ""), /* @__PURE__ */ import_react9.default.createElement("div", null, "－ ", negativeFor(cfg.style, key) || "（无）"), /* @__PURE__ */ import_react9.default.createElement("div", null, "CFG ", st.cfg ?? own.cfg ?? "—", cfg.images.backend === "novelai" ? ` · CFG Rescale ${st.cfgRescale ?? own.rescale ?? 0}` : ""))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "试画", hint: "用下面的「试画内容」和固定种子画一张竖版样图，当这套画风卡片的封面。几套都试画过，放在一起就好比较。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: busy === "sample:" + id || !data.ready, onClick: () => run("sample:" + id, () => api.sampleStyle(id).then(() => loadConfig(true)), "样图画好了") }, busy === "sample:" + id ? "正在画…" : st.cover ? "重新试画" : "试画一张"), !data.ready && /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, data.readyReason))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "试画内容" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.style.sample, onCommit: (v) => saveStyle(() => ({ sample: v })) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "分享" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => copy2(JSON.stringify(exportStyle(st), null, 1)) }, "导出这套"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => copy2(JSON.stringify({ styles: styles.map(exportStyle) }, null, 1)) }, "导出全部"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setImportText(importText === null ? "" : null) }, "导入"), missing.length > 0 && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => saveStyle((s) => ({ presets: [...s.presets, ...builtins.filter((b) => !s.presets.some((x) => x.id === b.id))] }), "已加回内置画风") }, "加回内置画风（", missing.length, "）"))), importText !== null && /* @__PURE__ */ import_react9.default.createElement(Field, { label: "", hint: "粘贴导出的画风（一套或几套），也可以直接粘贴一串画师串。" }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", value: importText, placeholder: '{"name": "…", "artist": "artist:xxx, …"}', onChange: (e) => setImportText(e.target.value), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end", marginTop: ".5cqw" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setImportText(null) }, "取消"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !importText.trim(), onClick: () => {
-    const list2 = parseStyles(importText);
-    if (list2.length) {
-      add(list2, `已导入 ${list2.length} 套`);
+    const list3 = parseStyles(importText);
+    if (list3.length) {
+      add(list3, `已导入 ${list3.length} 套`);
       setImportText(null);
     }
   } }, "导入并使用"))));
@@ -8806,7 +9107,7 @@ function CgModelFields({ data, providers }) {
   const own = data.config.director.cgLlm;
   const [busy, run] = useBusy();
   const [hostModels, setHostModels] = import_react9.default.useState([]);
-  const [list2, setList] = import_react9.default.useState(null);
+  const [list3, setList] = import_react9.default.useState(null);
   const p4 = (patch) => patchConfig({ director: { cgLlm: patch } }).catch((e) => toast(e.message, "error"));
   import_react9.default.useEffect(() => {
     if (own.source !== "host" || !own.provider) return setHostModels([]);
@@ -8818,7 +9119,7 @@ function CgModelFields({ data, providers }) {
     if (own.source === "custom" && own.baseURL) loadList();
   }, [own.source, own.baseURL, data.keys.cgllm]);
   const sources = [["", "跟导演一样"], ["host", hostName() === "st" ? "另选一套酒馆连接配置" : "另选一个 Tavern 里的模型"], ["custom", "自定义接口（OpenAI 兼容）"]];
-  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement(Field, { label: "插画分镜师的模型", hint: "写 CG 提示词的模型可以和导演分开。有的模型不肯把露骨的画面写具体，就给分镜师单独换一个；自定义接口填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: own.source, style: INLINE, onChange: (v) => p4({ source: v, provider: "", model: "" }), options: sources }), own.source === "host" && /* @__PURE__ */ import_react9.default.createElement(Select, { value: own.provider, style: INLINE, onChange: (v) => p4({ provider: v, model: "" }), options: [["", "（选一个）"], ...providers.map((x) => [x.id, x.name])] }), own.source === "host" && own.provider && (hostModels.length ? /* @__PURE__ */ import_react9.default.createElement(Select, { value: own.model, style: INLINE, onChange: (v) => p4({ model: v }), options: [["", "（请选择）"], ...hostModels.map((m) => [m.id, m.name])] }) : /* @__PURE__ */ import_react9.default.createElement(Text, { value: own.model, placeholder: "模型 ID", onCommit: (v) => p4({ model: v }) })))), own.source === "custom" && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement(Field, { label: "接口地址" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: own.baseURL, placeholder: "https://api.deepseek.com/v1", style: { flex: 1, width: "100%" }, onCommit: (v) => p4({ baseURL: String(v).trim() }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "Key", hint: `存在宿主（${data.secretStorage || "插件目录"}），不会发到浏览器。本机的接口不要 Key 就空着。` }, /* @__PURE__ */ import_react9.default.createElement(KeyInput, { backend: "cgllm", has: data.keys.cgllm })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "模型", hint: list2 ? list2.note : own.baseURL ? "正在读取模型列表…" : "先填接口地址" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(ModelField, { value: own.model, options: list2 && list2.models || [], placeholder: "模型 ID", onCommit: (v) => p4({ model: v, ...(list2?.models || []).find((m) => m.id === v)?.window ? { contextWindow: list2.models.find((m) => m.id === v).window } : {} }) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "m" || !own.baseURL, onClick: loadList }, busy === "m" ? "读取中…" : "刷新列表"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "上下文窗口", hint: "这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收；最大输出、温度、资料长度跟导演用同一套设置。接口报出更小的输出上限时自动按它重试。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "9cqw" }, value: own.contextWindow, onCommit: (v) => p4({ contextWindow: v }) }))));
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement(Field, { label: "插画分镜师的模型", hint: "写 CG 提示词的模型可以和导演分开。有的模型不肯把露骨的画面写具体，就给分镜师单独换一个；自定义接口填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: own.source, style: INLINE, onChange: (v) => p4({ source: v, provider: "", model: "" }), options: sources }), own.source === "host" && /* @__PURE__ */ import_react9.default.createElement(Select, { value: own.provider, style: INLINE, onChange: (v) => p4({ provider: v, model: "" }), options: [["", "（选一个）"], ...providers.map((x) => [x.id, x.name])] }), own.source === "host" && own.provider && (hostModels.length ? /* @__PURE__ */ import_react9.default.createElement(Select, { value: own.model, style: INLINE, onChange: (v) => p4({ model: v }), options: [["", "（请选择）"], ...hostModels.map((m) => [m.id, m.name])] }) : /* @__PURE__ */ import_react9.default.createElement(Text, { value: own.model, placeholder: "模型 ID", onCommit: (v) => p4({ model: v }) })))), own.source === "custom" && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement(Field, { label: "接口地址" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: own.baseURL, placeholder: "https://api.deepseek.com/v1", style: { flex: 1, width: "100%" }, onCommit: (v) => p4({ baseURL: String(v).trim() }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "Key", hint: `存在宿主（${data.secretStorage || "插件目录"}），不会发到浏览器。本机的接口不要 Key 就空着。` }, /* @__PURE__ */ import_react9.default.createElement(KeyInput, { backend: "cgllm", has: data.keys.cgllm })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "模型", hint: list3 ? list3.note : own.baseURL ? "正在读取模型列表…" : "先填接口地址" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(ModelField, { value: own.model, options: list3 && list3.models || [], placeholder: "模型 ID", onCommit: (v) => p4({ model: v, ...(list3?.models || []).find((m) => m.id === v)?.window ? { contextWindow: list3.models.find((m) => m.id === v).window } : {} }) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "m" || !own.baseURL, onClick: loadList }, busy === "m" ? "读取中…" : "刷新列表"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "上下文窗口", hint: "这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收；最大输出、温度、资料长度跟导演用同一套设置。接口报出更小的输出上限时自动按它重试。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "9cqw" }, value: own.contextWindow, onCommit: (v) => p4({ contextWindow: v }) }))));
 }
 function PoseGroups({ poses, onChange }) {
   const changed = Object.keys(poses).length > 0;
@@ -8845,7 +9146,22 @@ var landscapeSize = (cfg) => {
 function LookSection({ data }) {
   const cfg = data.config;
   const p4 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
-  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "界面皮肤"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skins" }, SKINS.map((s) => /* @__PURE__ */ import_react9.default.createElement("button", { key: s.id, type: "button", className: `fg-skin${cfg.ui.skin === s.id ? " is-on" : ""}`, onClick: () => p4({ skin: s.id }) }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skin-swatch", style: { background: s.swatch } }), /* @__PURE__ */ import_react9.default.createElement("b", null, s.name), /* @__PURE__ */ import_react9.default.createElement("span", null, s.desc)))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "画面"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "画面比例", hint: "跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.ratio, onChange: (e) => p4({ ratio: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "cg" }, "跟横版插画一样（", landscapeSize(data.config), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "wide" }, "16:9 宽屏"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "同屏最多几人", hint: "台上的人多于这个数时，最久没说话、没登场的先下场，轮到他说话再回来。人越多立绘越小，按站位从左到右排开。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: String(cfg.ui.maxOnStage ?? 5), onChange: (e) => p4({ maxOnStage: Number(e.target.value) }) }, [2, 3, 4, 5, 6, 7, 8].map((n) => /* @__PURE__ */ import_react9.default.createElement("option", { key: n, value: String(n) }, n, " 人")), /* @__PURE__ */ import_react9.default.createElement("option", { value: "0" }, "不限"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "演出"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回", hint: "正文里一两句的回忆（「她说过：……」）怎么演。要换到当时的地方慢慢演的长回忆，导演会换成整段回忆场景，不受这里影响。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recall || "text", onChange: (e) => p4({ recall: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "text" }, "画面不动，对话框换成回忆的样子"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "ghost" }, "画面压暗，回忆里的人浮到台前"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "portrait" }, "对话框换样子，旁边再出说话人的小头像"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回的名牌", hint: "回忆里说话的人的名字。模糊压暗时认得出是谁，又像隔着一层看不清。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallName || "blur", onChange: (e) => p4({ recallName: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "blur" }, "模糊、压暗"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "hide" }, "不显示"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "show" }, "照常显示"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回的基调", hint: "切进闪回的方式和色调，对话框和回忆里的声音也跟着变：温暖怀念慢慢泛黄，甜蜜泛起粉光，伤感褪成冷灰，不安画面撕裂泛红、像心跳一样一暗一暗，猛然想起白闪一下，朦胧如梦起雾。自动时导演按剧情选，没选的按闪回里的情绪和当时的氛围挑。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallTone || "auto", onChange: (e) => p4({ recallTone: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "auto" }, "自动（按剧情和氛围）"), RECALL_TONES.map((t) => /* @__PURE__ */ import_react9.default.createElement("option", { key: t, value: t }, "都用「", RECALL_TONE_NAMES[t], "」")))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "文字速度", hint: "每字毫秒，0 为瞬间显示。" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "80", value: cfg.ui.textSpeed, onChange: (e) => p4({ textSpeed: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自动播放间隔" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "400", max: "4000", step: "100", value: cfg.ui.autoDelay, onChange: (e) => p4({ autoDelay: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "天气粒子" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.particles, onChange: (v) => p4({ particles: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "写完自动打开剧场" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.autoOpen, onChange: (v) => p4({ autoOpen: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "字体地址", hint: "皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。立绘工作台的认脸模型也从这里下它的运行库。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.ui.fontBase, onCommit: (v) => p4({ fontBase: v }) })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "认脸模型（立绘工作台的自动框）"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "下载来源", hint: "模型在 HuggingFace：自动是先连官网、连不上换镜像；只下一次，存在数据目录的 models 文件夹。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.vision.source, onChange: (e) => patchConfig({ vision: { source: e.target.value } }).catch((err) => toast(err.message, "error")) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "auto" }, "自动（先官网，连不上换镜像）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "official" }, "只用官网"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "mirror" }, "先用镜像"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "镜像地址", hint: "HuggingFace 的镜像站，默认 hf-mirror.com；路径规则要跟官网一样（…/仓库/resolve/版本/文件）。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.vision.mirror, onCommit: (v) => patchConfig({ vision: { mirror: v } }).catch((err) => toast(err.message, "error")) })));
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "界面皮肤"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skins" }, SKINS.map((s) => /* @__PURE__ */ import_react9.default.createElement("button", { key: s.id, type: "button", className: `fg-skin${cfg.ui.skin === s.id ? " is-on" : ""}`, onClick: () => p4({ skin: s.id }) }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skin-swatch", style: { background: s.swatch } }), /* @__PURE__ */ import_react9.default.createElement("b", null, s.name), /* @__PURE__ */ import_react9.default.createElement("span", null, s.desc)))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "画面"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "画面比例", hint: "跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.ratio, onChange: (e) => p4({ ratio: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "cg" }, "跟横版插画一样（", landscapeSize(data.config), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "wide" }, "16:9 宽屏"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "同屏最多几人", hint: "台上的人多于这个数时，最久没说话、没登场的先下场，轮到他说话再回来。人越多立绘越小，按站位从左到右排开。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: String(cfg.ui.maxOnStage ?? 5), onChange: (e) => p4({ maxOnStage: Number(e.target.value) }) }, [2, 3, 4, 5, 6, 7, 8].map((n) => /* @__PURE__ */ import_react9.default.createElement("option", { key: n, value: String(n) }, n, " 人")), /* @__PURE__ */ import_react9.default.createElement("option", { value: "0" }, "不限"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "演出"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回", hint: "正文里一两句的回忆（「她说过：……」）怎么演。要换到当时的地方慢慢演的长回忆，导演会换成整段回忆场景，不受这里影响。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recall || "text", onChange: (e) => p4({ recall: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "text" }, "画面不动，对话框换成回忆的样子"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "ghost" }, "画面压暗，回忆里的人浮到台前"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "portrait" }, "对话框换样子，旁边再出说话人的小头像"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回的名牌", hint: "回忆里说话的人的名字。模糊压暗时认得出是谁，又像隔着一层看不清。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallName || "blur", onChange: (e) => p4({ recallName: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "blur" }, "模糊、压暗"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "hide" }, "不显示"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "show" }, "照常显示"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回的基调", hint: "切进闪回的方式和色调，对话框和回忆里的声音也跟着变：温暖怀念慢慢泛黄，甜蜜泛起粉光，伤感褪成冷灰，不安画面撕裂泛红、像心跳一样一暗一暗，猛然想起白闪一下，朦胧如梦起雾。自动时导演按剧情选，没选的按闪回里的情绪和当时的氛围挑。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallTone || "auto", onChange: (e) => p4({ recallTone: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "auto" }, "自动（按剧情和氛围）"), RECALL_TONES.map((t) => /* @__PURE__ */ import_react9.default.createElement("option", { key: t, value: t }, "都用「", RECALL_TONE_NAMES[t], "」")))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "文字速度", hint: "每字毫秒，0 为瞬间显示。" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "80", value: cfg.ui.textSpeed, onChange: (e) => p4({ textSpeed: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自动播放间隔" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "400", max: "4000", step: "100", value: cfg.ui.autoDelay, onChange: (e) => p4({ autoDelay: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "写完自动打开剧场" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.autoOpen, onChange: (v) => p4({ autoOpen: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "字体地址", hint: "皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。立绘工作台的认脸模型也从这里下它的运行库。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.ui.fontBase, onCommit: (v) => p4({ fontBase: v }) })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "认脸模型（立绘工作台的自动框）"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "下载来源", hint: "模型在 HuggingFace：自动是先连官网、连不上换镜像；只下一次，存在数据目录的 models 文件夹。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.vision.source, onChange: (e) => patchConfig({ vision: { source: e.target.value } }).catch((err) => toast(err.message, "error")) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "auto" }, "自动（先官网，连不上换镜像）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "official" }, "只用官网"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "mirror" }, "先用镜像"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "镜像地址", hint: "HuggingFace 的镜像站，默认 hf-mirror.com；路径规则要跟官网一样（…/仓库/resolve/版本/文件）。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.vision.mirror, onCommit: (v) => patchConfig({ vision: { mirror: v } }).catch((err) => toast(err.message, "error")) })));
+}
+function EffectsSection({ data }) {
+  const saved = data.config.ui.effects || {};
+  const isOn = (id) => saved[id] !== false;
+  const p4 = (effects) => patchConfig({ ui: { effects } }).catch((e) => toast(e.message, "error"));
+  const setAll = (ids, value) => p4(Object.fromEntries(ids.map((id) => [id, value])));
+  const offCount = EFFECT_IDS.filter((id) => !isOn(id)).length;
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-fx-top" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "关掉的那一下剧场不演，别的照常；再打开马上回来，以前的轮次也一样。导演照常写，不用重新整理。"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-pill" }, offCount ? `关着 ${offCount} 个` : "全都开着"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !offCount, onClick: () => setAll(EFFECT_IDS, true) }, "全部打开")), EFFECT_GROUPS.map((g) => {
+    const ids = g.items.map((i) => i.id);
+    const count = ids.filter(isOn).length;
+    return /* @__PURE__ */ import_react9.default.createElement("div", { key: g.id, className: "fg-fx-group" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-fx-head" }, /* @__PURE__ */ import_react9.default.createElement("b", null, g.label), /* @__PURE__ */ import_react9.default.createElement("span", { className: `fg-fx-count${count < ids.length ? " is-part" : ""}` }, count === ids.length ? "全开" : count ? `开着 ${count} / ${ids.length}` : "全关"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-spacer" }), /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: count === ids.length, onChange: () => setAll(ids, count !== ids.length) })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, g.hint), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-fx-items" }, g.items.map((item) => {
+      const on = isOn(item.id);
+      return /* @__PURE__ */ import_react9.default.createElement("button", { key: item.id, type: "button", className: `fg-fx-chip${on ? " is-on" : ""}`, "aria-pressed": on, title: on ? "点一下关掉" : "点一下打开", onClick: () => p4({ [item.id]: !on }) }, /* @__PURE__ */ import_react9.default.createElement("i", null), item.label);
+    })));
+  }));
 }
 var VOICE_GENDER = { female: "女声", male: "男声", "": "不分男女" };
 var SOUND_GROUPS = [["stage", "落字音效", "台词演出里的重音、怒吼、崩溃，打斗的出手"], ["ui", "界面音", "按钮、选项、翻页"]];
@@ -8869,7 +9185,7 @@ function SoundSection({ data }) {
     setConfig(await api.removeSound(slot));
   }, "已删掉，退回默认的那个");
   const narration = ui2.narrationVoice === "off" ? null : { id: ui2.narrationVoice, pitch: ui2.narrationPitch };
-  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: ui2.voiceDefault, options: [["auto", "自动（按性别分）"], ...VOICES.map((v) => [v.id, `都用「${v.label}」`])], onChange: (v) => p4({ voiceDefault: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES.map((v) => [v.id, v.label]), ["off", "不出声"]], style: INLINE, onChange: (v) => p4({ narrationVoice: v }) }), /* @__PURE__ */ import_react9.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES.length, " 个（点一下试听）"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES.map((v) => /* @__PURE__ */ import_react9.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react9.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react9.default.createElement("span", null, VOICE_GENDER[v.gender], " · ", v.desc)))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, { key: group }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: ui2.voiceDefault, options: [["auto", "自动（按性别分）"], ...VOICES2.map((v) => [v.id, `都用「${v.label}」`])], onChange: (v) => p4({ voiceDefault: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), ["off", "不出声"]], style: INLINE, onChange: (v) => p4({ narrationVoice: v }) }), /* @__PURE__ */ import_react9.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length, " 个（点一下试听）"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.map((v) => /* @__PURE__ */ import_react9.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react9.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react9.default.createElement("span", null, VOICE_GENDER[v.gender], " · ", v.desc)))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, { key: group }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
     const mine = ui2.customSounds[slot.id];
     const options = [...slot.presets.map((x, i) => [x.id, i ? x.label : `${x.label}（默认）`]), ...mine ? [["custom", `我的：${mine.name || "上传的文件"}`]] : [], ["off", "关掉"]];
     return /* @__PURE__ */ import_react9.default.createElement(Field, { key: slot.id, label: slot.label, hint: slot.hint }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: ui2.sounds[slot.id], options, style: INLINE, onChange: (v) => {
@@ -8922,8 +9238,8 @@ function MusicSection({ data }) {
     previewTrack({ id: track.id, url: assetUrl(track.assetId) }, () => setPlaying((id) => id === track.id ? "" : id));
     setPlaying(track.id);
   };
-  const importFiles = async (list2) => {
-    const files2 = [...list2 || []];
+  const importFiles = async (list3) => {
+    const files2 = [...list3 || []];
     if (!files2.length) return;
     const meta = /* @__PURE__ */ new Map();
     for (const sidecar of files2.filter((f) => f.name === MUSIC_SIDECAR)) {
@@ -9017,8 +9333,8 @@ function SoundLibSection({ data }) {
     previewTrack({ id: s.id, url: assetUrl(s.assetId), volume: Math.min(1, 0.7 * (s.volume ?? 1)) }, () => setPlaying((id) => id === s.id ? "" : id));
     setPlaying(s.id);
   };
-  const importFiles = async (list2) => {
-    const files2 = [...list2 || []];
+  const importFiles = async (list3) => {
+    const files2 = [...list3 || []];
     if (!files2.length) return;
     const pathOf = (f) => f.webkitRelativePath || f.name;
     const sidecars = [];
@@ -9076,7 +9392,7 @@ function SoundLibSection({ data }) {
     const text = `${s.name} ${s.category} ${(s.tags || []).join(" ")} ${s.description}`;
     return words.every((w) => text.includes(w));
   }) : null;
-  const cards = (list2) => list2.slice(0, LIB_SHOWN).map((s) => /* @__PURE__ */ import_react9.default.createElement(LibSoundCard, { key: s.id, sound: s, playing: playing === s.id, onPlay: () => play(s) }));
+  const cards = (list3) => list3.slice(0, LIB_SHOWN).map((s) => /* @__PURE__ */ import_react9.default.createElement(LibSoundCard, { key: s.id, sound: s, playing: playing === s.id, onPlay: () => play(s) }));
   const removeGroup = (g) => {
     if (!window.confirm(`把「${KIND_LABEL[g.kind]} · ${g.name}」这一类 ${g.items.length} 个都从音效库删掉？电脑上的原文件不受影响。`)) return;
     run("g" + g.key, async () => {
@@ -9106,13 +9422,14 @@ function Settings({ onClose, onDirectorLog = null, initialTab = "look" }) {
       title: "设置",
       en: "Config",
       onClose,
-      tabs: [{ id: "look", label: "外观与演出" }, { id: "sound", label: "声音" }, { id: "music", label: "配乐" }, { id: "soundlib", label: "音效库" }, { id: "director", label: "导演" }, { id: "images", label: "生图渠道" }, { id: "style", label: "画风与配图" }, { id: "about", label: "版本与更新" }],
+      tabs: [{ id: "look", label: "外观与演出" }, { id: "effects", label: "特效" }, { id: "sound", label: "声音" }, { id: "music", label: "配乐" }, { id: "soundlib", label: "音效库" }, { id: "director", label: "导演" }, { id: "images", label: "生图渠道" }, { id: "style", label: "画风与配图" }, { id: "about", label: "版本与更新" }],
       tab,
       onTab: setTab,
       actions: data && /* @__PURE__ */ import_react9.default.createElement("span", { className: `fg-pill${data.ready ? "" : " fg-err"}` }, data.ready ? "生图已就绪" : data.readyReason)
     },
     !data && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "读取设置中…"),
     data && tab === "look" && /* @__PURE__ */ import_react9.default.createElement(LookSection, { data }),
+    data && tab === "effects" && /* @__PURE__ */ import_react9.default.createElement(EffectsSection, { data }),
     data && tab === "sound" && /* @__PURE__ */ import_react9.default.createElement(SoundSection, { data }),
     data && tab === "music" && /* @__PURE__ */ import_react9.default.createElement(MusicSection, { data }),
     data && tab === "soundlib" && /* @__PURE__ */ import_react9.default.createElement(SoundLibSection, { data }),
@@ -9318,11 +9635,11 @@ function DirectorLog({ gameId, onClose, focusTurn = null }) {
 
 // src/client/theater/parallax.js
 var import_react11 = __toESM(require("react"), 1);
-function useParallax(stageRef, targetRef) {
+function useParallax(stageRef, targetRef, enabled = true) {
   import_react11.default.useEffect(() => {
     const stage = stageRef.current;
     const target = targetRef.current;
-    if (!stage || !target || typeof matchMedia !== "function") return void 0;
+    if (!enabled || !stage || !target || typeof matchMedia !== "function") return void 0;
     if (!matchMedia("(hover: hover) and (pointer: fine)").matches || matchMedia("(prefers-reduced-motion: reduce)").matches) return void 0;
     let tx = 0, ty = 0, x = 0, y = 0, raf = 0;
     const write = () => {
@@ -9364,7 +9681,7 @@ function useParallax(stageRef, targetRef) {
       target.style.removeProperty("--px");
       target.style.removeProperty("--py");
     };
-  }, []);
+  }, [enabled]);
 }
 
 // src/client/theater/Eros.jsx
@@ -9464,9 +9781,9 @@ var BG_WAIT_MS = 1500;
 var BG_AHEAD = 60;
 var GLYPH_AHEAD = 12;
 var GLYPH_WAIT = 1200;
-var glyphsOf = (list2) => ({
-  body: list2.map((b) => b.text).join(""),
-  display: list2.map((b) => (b.alias || b.speaker) + b.scene.location + (b.card ? b.text : "") + (b.cut ? b.cut.text : "")).join("")
+var glyphsOf = (list3) => ({
+  body: list3.map((b) => b.text).join(""),
+  display: list3.map((b) => (b.alias || b.speaker) + b.scene.location + (b.card ? b.text : "") + (b.cut ? b.cut.text : "")).join("")
 });
 function fillComposer(text) {
   try {
@@ -9529,8 +9846,13 @@ function TheaterRoot() {
   return /* @__PURE__ */ import_react13.default.createElement(Theater, { key: s.gameId, gameId: s.gameId, view, viewError: error, cfg, startTurn: s.startTurn, panel: s.panel, panelArg: s.panelArg });
 }
 function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel, panelArg }) {
-  const ui0 = cfg && cfg.ui || { skin: "stellar", textSpeed: 30, autoDelay: 1400, blip: true, bgm: true, bgmVolume: 0.45, particles: true, fontBase: "" };
-  const { beats, byKey } = import_react13.default.useMemo(() => buildBeats(view), [view]);
+  const ui0 = cfg && cfg.ui || { skin: "stellar", textSpeed: 30, autoDelay: 1400, blip: true, bgm: true, bgmVolume: 0.45, fontBase: "" };
+  const offKey = [...effectsOff(ui0)].sort().join(",");
+  const off = import_react13.default.useMemo(() => new Set(offKey ? offKey.split(",") : []), [offKey]);
+  const { beats, byKey } = import_react13.default.useMemo(() => {
+    const built = buildBeats(muteView(view, off));
+    return { beats: muteBeats(built.beats, off), byKey: built.byKey };
+  }, [view, off]);
   const [index, setIndex] = import_react13.default.useState(-1);
   const [title, setTitle] = import_react13.default.useState(startTurn == null && !initialPanel);
   const [panel, setPanel] = import_react13.default.useState(initialPanel || "");
@@ -9576,15 +9898,17 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     const was2 = shownRef.current;
     const jumped = Boolean(was2.key) && jumpRef.current === beat.key;
     const prev = jumped ? beats[index - 1] : null;
-    const from = !jumped ? was2 : prev ? { key: prev.key, cg: prev.cg && cgSrc(prev.cg, assetUrl) ? prev.cg.id : "", place: prev.scene.location, mode: prev.mode } : { key: was2.key };
+    const quiet = !was2.key && off.has("tr.open");
+    const from = quiet ? { key: "", cg: cgOn, place: beat.scene.location, mode: beat.mode } : !jumped ? was2 : prev ? { key: prev.key, cg: prev.cg && cgSrc(prev.cg, assetUrl) ? prev.cg.id : "", place: prev.scene.location, mode: prev.mode } : { key: was2.key };
     jumpRef.current = "";
-    shownRef.current = { key: beat.key, visit: (was2.visit || 0) + 1, beat, was: was2.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was: from, eros: ui0.eros !== false, opening: !was2.key }) };
+    shownRef.current = { key: beat.key, visit: (was2.visit || 0) + 1, beat, was: was2.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was: from, eros: ui0.eros !== false, opening: !was2.key && !quiet, wake: !off.has("tr.wake") }) };
   } else if (shownRef.current.cg !== cgOn) shownRef.current = { ...shownRef.current, cg: cgOn };
   const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false };
   const visit = beat ? `${beat.key}#${shownRef.current.visit}` : "";
   const recallStyle = ui0.recall || "text";
   const recallTone = ui0.recallTone && ui0.recallTone !== "auto" ? ui0.recallTone : "";
-  const edgeMs = !beat || title ? 0 : beat.cut && !hold.change ? CUT_MS : beat.transition === "haze" ? HAZE_MS : recallStyle === "ghost" ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0;
+  const recallFx = !off.has("mode.recall");
+  const edgeMs = !beat || title ? 0 : beat.cut && !hold.change ? CUT_MS : beat.transition === "haze" ? HAZE_MS : recallStyle === "ghost" && recallFx ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0;
   const pauseMs = speed > 0 ? Math.max(edgeMs, hold.ms) : 0;
   const [pauseSeen, setPauseSeen] = import_react13.default.useState("");
   const pausing = pauseMs > 0 && pauseSeen !== visit;
@@ -9651,6 +9975,11 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const stageRef = import_react13.default.useRef(null);
   const flashRef = import_react13.default.useRef(null);
   const hit = useHits(stageRef, flashRef, sfxOn);
+  const impactOn = !off.has("say.impact");
+  const typeFx = import_react13.default.useCallback((f) => {
+    if (f.kind === "sound" || impactOn) hit(f);
+  }, [hit, impactOn]);
+  const sayOff = import_react13.default.useMemo(() => offDeliveries(off), [off]);
   const people = import_react13.default.useMemo(() => new Map((view && view.cast || []).map((p4) => [p4.name, p4])), [view]);
   const voices = import_react13.default.useMemo(() => castVoices(view && view.cast || [], ui0), [view, ui0]);
   const voice = import_react13.default.useMemo(() => {
@@ -9662,7 +9991,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     const tone = beat.recall ? recallTone || beat.recall.tone : "";
     return { ...main, style: beat.voice, ...also.length ? { also } : {}, ...tone ? { tone } : {} };
   }, [beat && beat.type, beat && beat.speaker, beat && beat.voice, beat && beat.recall, recallTone, voices, ui0]);
-  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : hit });
+  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff });
   import_react13.default.useEffect(() => {
     if (panel && !done) finish();
   }, [panel, done]);
@@ -9672,7 +10001,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }, [beat && beat.key]);
   const cameraRef = import_react13.default.useRef(null);
   const cam = useCamera(title ? null : beat, cameraRef);
-  useParallax(stageRef, cameraRef);
+  useParallax(stageRef, cameraRef, !off.has("look.parallax"));
   const atEnd = beat && index === beats.length - 1;
   import_react13.default.useEffect(() => {
     loadSkinFonts(ui0.skin, ui0.fontBase);
@@ -9873,6 +10202,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? "wake" : change && change.cover && change.cover !== "swirl" ? "none" : stageBeat && stageBeat.transition;
   const stageScene = stageBeat ? stageBeat.scene : { location: "", time: "night", weather: "stars", mood: "calm", light: "normal", fx: "none" };
   const stageMode = stageBeat && stageBeat.mode || "";
+  const modeLook = stageMode && !off.has("mode." + stageMode) ? stageMode : "";
+  const stageFlags = import_react13.default.useMemo(() => ({ aa: !off.has("actor.aa") }), [off]);
   const romance = stageScene.romance && stageScene.romance !== "none" ? stageScene.romance : "";
   const sense = stageScene.sense && stageScene.sense !== "none" ? stageScene.sense : "";
   const atmosphere = Boolean(stageBeat) && !title;
@@ -9911,7 +10242,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     } },
     { id: "quit", label: "回到聊天", en: "Return", run: close }
   ].filter(Boolean);
-  return /* @__PURE__ */ import_react13.default.createElement("div", { ref: rootRef, className: `fg-theater${closing ? " is-closing" : ""}${hidden ? " fg-ui-hidden" : ""}`, "data-skin": ui0.skin, style: { "--stage-ar": stageRatio(cfg) }, role: "dialog", "aria-label": "FlowGal 剧场" }, /* @__PURE__ */ import_react13.default.createElement(
+  return /* @__PURE__ */ import_react13.default.createElement("div", { ref: rootRef, className: `fg-theater${closing ? " is-closing" : ""}${hidden ? " fg-ui-hidden" : ""}`, "data-skin": ui0.skin, "data-off": cssOff(off) || void 0, style: { "--stage-ar": stageRatio(cfg) }, role: "dialog", "aria-label": "FlowGal 剧场" }, /* @__PURE__ */ import_react13.default.createElement(StageFlags.Provider, { value: stageFlags }, /* @__PURE__ */ import_react13.default.createElement(
     "div",
     {
       className: "fg-stage",
@@ -9933,32 +10264,32 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       "div",
       {
         className: "fg-world-in",
-        "data-mode": atmosphere ? stageMode : "",
+        "data-mode": atmosphere ? modeLook : "",
         "data-tr": stageTr === "haze" || stageTr === "wake" ? stageTr : void 0,
         "data-romance": atmosphere && romance ? romance : void 0,
         "data-sense": atmosphere && sense ? sense : void 0
       },
       /* @__PURE__ */ import_react13.default.createElement(Backdrop, { scene: stageScene, view, transition: stageTr || "dissolve" }),
-      /* @__PURE__ */ import_react13.default.createElement("div", { className: `fg-grade${backgroundFor(stageScene, view).src ? " is-drawn" : ""}`, "data-time": stageScene.time }),
+      !off.has("look.time") && /* @__PURE__ */ import_react13.default.createElement("div", { className: `fg-grade${backgroundFor(stageScene, view).src ? " is-drawn" : ""}`, "data-time": stageScene.time }),
       beat && !title && beat.moment && beat.moment.kind === "fireworks" && /* @__PURE__ */ import_react13.default.createElement(Fireworks, { key: beat.key, sound: sfxOn }),
-      stageBeat && /* @__PURE__ */ import_react13.default.createElement(Cast, { beat: title || stageBeat.recall || waking ? { ...stageBeat, speaker: "", speakers: null, sym: "" } : stageBeat, view, talk: title || stageBeat.recall || waking ? null : talk, max: ui0.maxOnStage ?? 5 }),
-      /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "tone", value: atmosphere && stageScene.mood !== "daily" ? stageScene.mood : "", ms: 1600 }),
+      stageBeat && /* @__PURE__ */ import_react13.default.createElement(Cast, { beat: title || stageBeat.recall || waking ? { ...stageBeat, speaker: "", speakers: null, sym: "" } : stageBeat, view, talk: title || stageBeat.recall || waking ? null : talk, max: ui0.maxOnStage ?? 5, dof: !off.has("actor.dof") }),
+      /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "tone", value: atmosphere && stageScene.mood !== "daily" && !off.has("look.tone") ? stageScene.mood : "", ms: 1600 }),
       /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "light", value: atmosphere && stageScene.light !== "normal" ? stageScene.light : "", ms: 700 }),
       /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "romance", value: atmosphere ? romance : "", ms: 1600 }),
       /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "eros", value: atmosphere && ui0.eros !== false && stageScene.eros !== "none" ? stageScene.eros || "" : "", ms: 1400 }),
       /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "tentacle", value: atmosphere && ui0.eros !== false && stageScene.tentacle !== "none" ? stageScene.tentacle || "" : "", ms: 1800 }),
       stageBeat && !title && /* @__PURE__ */ import_react13.default.createElement(CgLayer, { beat: stageBeat, sound: sfxOn }),
-      /* @__PURE__ */ import_react13.default.createElement(Particles, { weather: stageScene.weather, enabled: ui0.particles !== false, speed: atmosphere ? (TIME_FLOW[stageScene.fx] ?? 1) * (SENSE_FLOW[sense] ?? 1) : 1 }),
+      /* @__PURE__ */ import_react13.default.createElement(Particles, { weather: stageScene.weather, speed: atmosphere ? (TIME_FLOW[stageScene.fx] ?? 1) * (SENSE_FLOW[sense] ?? 1) : 1, depth: !off.has("weather.depth"), gust: !off.has("weather.gust") }),
       stageBeat && !title && /* @__PURE__ */ import_react13.default.createElement(SplitPanel, { beat: stageBeat, view, talk }),
-      stageBeat && !title && /* @__PURE__ */ import_react13.default.createElement(RecallLayer, { beat: stageBeat, view, talk, light: recallStyle !== "ghost", tone: recallTone }),
+      stageBeat && !title && recallFx && /* @__PURE__ */ import_react13.default.createElement(RecallLayer, { beat: stageBeat, view, talk, light: recallStyle !== "ghost", tone: recallTone }),
       /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "fxlayer", value: atmosphere && stageScene.fx !== "none" ? stageScene.fx : "", ms: 900 }),
-      /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-vignette" })
+      !off.has("look.vignette") && /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-vignette" })
     ))),
     /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "sense", value: atmosphere ? senseLayer(stageBeat, stageScene) : "", ms: sense === "blind" ? 1400 : 900 }),
     /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-bars", "data-on": atmosphere && stageScene.bars === "on" ? "" : void 0, "aria-hidden": "true" }),
-    /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "mode", value: atmosphere ? stageMode : "", ms: stageTr === "wake" ? 200 : stageTr === "haze" ? 2400 : 1200 }),
+    /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "mode", value: atmosphere ? modeLook : "", ms: stageTr === "wake" ? 200 : stageTr === "haze" ? 2400 : 1200 }),
     beat && !title && /* @__PURE__ */ import_react13.default.createElement(SceneCover, { key: beat.key, plan: hold.change, state: coverState }),
-    beat && !title && /* @__PURE__ */ import_react13.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking, changed: Boolean(hold.change) }),
+    beat && !title && /* @__PURE__ */ import_react13.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking, changed: Boolean(hold.change), recallFx }),
     /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),
     beat && !title && !skip && !change && beat.peak && ui0.eros !== false && /* @__PURE__ */ import_react13.default.createElement(ErosPeak, { key: beat.key, beat, cameraRef, volume: ui0.storySfx !== false ? erosVolume : 0 }),
     beat && !title && beat.hit && /* @__PURE__ */ import_react13.default.createElement(HitImpact, { key: beat.key, beat, sound: sfxOn, fx: hit }),
@@ -9968,7 +10299,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     beat && !title && beat.phone && beat.phone.kind === "end" && /* @__PURE__ */ import_react13.default.createElement(PhoneEnd, { key: beat.key, beat, view, sound: sfxOn }),
     beat && !title && beat.phone && (beat.phone.kind === "notify" || beat.phone.kind === "voicemail") && /* @__PURE__ */ import_react13.default.createElement(PhoneBanner, { key: beat.key, beat, view, sound: sfxOn }),
     !panel && /* @__PURE__ */ import_react13.default.createElement(RestartNotice, { floating: true }),
-    beat && !title && (!change || phase === "cast" || phase === "settle") && /* @__PURE__ */ import_react13.default.createElement(TitleCard, { beat, delay: speed > 0 ? beat.cut && !hold.change ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0 : 0 }),
+    beat && !title && !off.has("title.place") && (!change || phase === "cast" || phase === "settle") && /* @__PURE__ */ import_react13.default.createElement(TitleCard, { beat, delay: speed > 0 ? beat.cut && !hold.change ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0 : 0 }),
     beat && !title && beat.cut && speed > 0 && cutShown.current === visit && /* @__PURE__ */ import_react13.default.createElement(CutCard, { beat, out: !cutOn }),
     !title && beat && /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react13.default.createElement("div", null, /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-hud-place" }, hud.scene.location || `第 ${hud.turn} 轮`), /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-hud-meta" }, hud.mode && /* @__PURE__ */ import_react13.default.createElement("span", { className: "fg-hud-mode" }, MODE_LABEL[hud.mode]), /* @__PURE__ */ import_react13.default.createElement("span", null, TIME_LABEL[hud.scene.time] || ""), hud.scene.weather && hud.scene.weather !== "clear" && /* @__PURE__ */ import_react13.default.createElement("span", null, WEATHER_LABEL[hud.scene.weather]), LIGHT_LABEL[hud.scene.light] && /* @__PURE__ */ import_react13.default.createElement("span", null, LIGHT_LABEL[hud.scene.light]), FX_LABEL[hud.scene.fx] && /* @__PURE__ */ import_react13.default.createElement("span", null, FX_LABEL[hud.scene.fx]), ROMANCE_LABEL[hud.scene.romance] && /* @__PURE__ */ import_react13.default.createElement("span", { className: "fg-hud-romance" }, "♡ ", ROMANCE_LABEL[hud.scene.romance]), SENSE_LABEL[hud.scene.sense] && /* @__PURE__ */ import_react13.default.createElement("span", { className: "fg-hud-sense" }, SENSE_LABEL[hud.scene.sense]), hud.scene.mood && /* @__PURE__ */ import_react13.default.createElement("span", null, "♪ ", MOOD_LABEL[hud.scene.mood])))),
     !title && /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, directing && /* @__PURE__ */ import_react13.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), drawing > 0 && /* @__PURE__ */ import_react13.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), beat && beat.call && beat.call.state === "live" && /* @__PURE__ */ import_react13.default.createElement(CallChip, { key: beat.call.id, call: beat.call, sound: sfxOn }), track && /* @__PURE__ */ import_react13.default.createElement("span", { className: "fg-pill" + (hushed ? " is-hushed" : ""), title: hushed ? `${track.name}（留白，一会儿回来）` : track.name }, "♪ ", track.name), viewError && /* @__PURE__ */ import_react13.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react13.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
@@ -10009,7 +10340,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     panel === "cast" && /* @__PURE__ */ import_react13.default.createElement(CastPanel, { view, gameId, onClose: () => setPanel("") }),
     panel === "director" && /* @__PURE__ */ import_react13.default.createElement(DirectorLog, { gameId, focusTurn: panelArg, onClose: () => setPanel("") }),
     panel === "settings" && /* @__PURE__ */ import_react13.default.createElement(Settings, { initialTab: settingsTab, onClose: () => setPanel(""), onDirectorLog: gameId ? () => setPanel("director") : null })
-  ));
+  )));
 }
 function Toast() {
   const s = useUi();
