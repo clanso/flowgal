@@ -55,13 +55,15 @@ const SHEET = {
   ],
 }
 
-test('gate: 整理设计：动作不设上限、每个情绪只在一个动作里、平静在第一个动作的第一个；动作只留身体，表情只留脸；侧身标记去掉', () => {
+test('gate: 整理设计：动作不设上限、一个情绪能放进好几个动作、平静在第一个动作的第一个；动作只留身体，表情只留脸；侧身标记去掉', () => {
   const sheet = cleanActing(SHEET, { allowed: ['neutral', 'smile', 'happy', 'sad', 'pout', 'angry', 'shy', 'worried'] })
   assert.deepEqual(sheet.poses.map(p => [p.id, p.label, p.emotions]), [
     ['p1', '背手站着', ['neutral', 'smile', 'happy', 'sad']],
     ['p2', '抱着胳膊别过脸', ['pout', 'angry', 'shy']],
-    ['p3', '按着胸口', ['worried']],
-  ], '编号按顺序重编；平静挪到第一个；第二次出现的平静、清单外的情绪丢掉')
+    ['p3', '按着胸口', ['worried', 'neutral']],
+  ], '编号按顺序重编；平静挪到第一个；别的动作里的平静留着（那个动作上的平静脸）；清单外的情绪丢掉')
+  assert.deepEqual(cleanActing({ poses: [{ label: 'A', emotions: ['neutral', 'smile', 'smile'] }] }).poses[0].emotions, ['neutral', 'smile'], '一个动作里只留一次')
+  assert.deepEqual(cleanActing({ poses: [{ label: 'A', emotions: ['neutral'] }, { label: '空的', emotions: [] }] }, { keepEmpty: true }).poses.map(p => p.label), ['A', '空的'], '玩家刚加的空动作留着')
   assert.ok(sheet.poses.every(p => !('side' in p)), '立绘都按正面画')
   assert.equal(sheet.poses[0].tags, 'hands behind back, straight posture', '动作里的表情、外貌、构图去掉')
   assert.equal(sheet.faces.angry.tags, 'expressionless, narrowed eyes, cold eyes, closed mouth', '表情里的手、外貌去掉')

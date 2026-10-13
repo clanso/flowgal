@@ -11,6 +11,7 @@ import { emotionLabel } from './playback.js'
 import { visionApi, frameSprite, followSprite, holdVision, releaseVisionLater } from './vision.js'
 import { AA_PARTS, AA_STEPS, AA_STEPS_LITE, defaultRects, rectsBox, stateRects, motionPack, packLevel, cleanRects } from '../../../lib/aa-sprite.js'
 import { cleanPatch } from '../../../lib/aa-patch.js'
+import { keyEmotion, keyPose } from '../../../lib/look.js'
 
 const BOX_NAMES = { eyes: ['左眼', '右眼'], mouth: ['嘴'] }
 
@@ -81,7 +82,7 @@ async function savePack(gameId, person, key, record, size, rects, patches, steps
     parts[part] = { ...(parts[part] || {}), [state]: { file, x: p.x, y: p.y } }
     files[file] = p.dataUrl
   }
-  const manifest = motionPack({ name: `${person.name}·${emotionLabel(record.emotion || key.split('|').pop())}`, width: size.w, height: size.h, still: 'still.png', patches: parts })
+  const manifest = motionPack({ name: `${person.name}·${emotionLabel(record.emotion || keyEmotion(key))}`, width: size.w, height: size.h, still: 'still.png', patches: parts })
   await api.cast(gameId, 'aa-pack', { name: person.name, key, keepImage: true, manifest, files, rects })
 }
 
@@ -214,7 +215,7 @@ export function AaWorkbench({ gameId, person, onClose }) {
   // 这个角色画好的差分：现在这身样子排前面
   const variants = React.useMemo(() => Object.entries(person.sprites || {})
     .filter(([, r]) => r && r.assetId)
-    .map(([key, r]) => ({ key, record: r, label: emotionLabel(r.emotion || key.split('|').pop()), look: [r.outfit, ...(r.states || [])].filter(Boolean).join(' · ') }))
+    .map(([key, r]) => ({ key, record: r, label: emotionLabel(r.emotion || keyEmotion(key)) + (keyPose(key) ? ` · ${r.poseLabel || keyPose(key)}` : ''), look: [r.outfit, ...(r.states || [])].filter(Boolean).join(' · ') }))
     .sort((a, b) => Number(b.look === person.outfit) - Number(a.look === person.outfit) || a.label.localeCompare(b.label, 'zh-CN')), [person])
   const [picked, setPicked] = React.useState(() => new Set())
   const [focus, setFocus] = React.useState(variants[0] ? variants[0].key : '')

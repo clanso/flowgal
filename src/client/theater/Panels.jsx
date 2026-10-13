@@ -1,15 +1,17 @@
 // 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含声音、「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
 import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, hostName } from '../api.js'
-import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, RECALL_TONES, RECALL_TONE_LABEL, cgSrc } from './playback.js'
+import { emotionLabel, shownLib, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, RECALL_TONES, RECALL_TONE_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions, nearestOf } from '../../../lib/emotions.js'
 import { EmotionLibrary } from './EmotionLibrary.jsx'
+import { PoseMatrix } from './PoseMatrix.jsx'
+import { settleNeutral, slotKey, tokenFor, parseToken, cleanPoseGroups, sheetOf, homePose, poseFor } from '../../../lib/poses.js'
 import { AaWorkbench, RectEditor } from './AaWorkbench.jsx'
 import { visionApi, frameSprite } from './vision.js'
 import { framedResult } from './faceFramer.js'
 import { SpriteArt, SpriteViewer } from './AaPreview.jsx'
-import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn, LOOK_FIELDS, LOOK_FIELD_LABELS, lookTags } from '../../../lib/look.js'
+import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn, LOOK_FIELDS, LOOK_FIELD_LABELS, lookTags, keyEmotion } from '../../../lib/look.js'
 import { Silhouette } from './Stage.jsx'
 import { stateSpans } from '../../../lib/cast.js'
 import { SKINS } from './skins.js'
@@ -22,8 +24,8 @@ import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../l
 import { SOUND_SIDECAR, readSoundSidecar, soundMatcher, writeSoundSidecar } from '../../../lib/soundlib-sidecar.js'
 import { modelKey, qualityFor, negativeFor, sizeFor, MAX_STYLES } from '../../../lib/image/style.js'
 import { naiModelInfo } from '../../../lib/image/nai-models.js'
-import { CG_MAX_CHARACTERS, EMOTION_POSE, POSES } from '../../../lib/vocab.js'
-import { POSE_IDS, poseMembers, anchorOf, faceBoxFrom, cleanFaceBox } from '../../../lib/face.js'
+import { CG_MAX_CHARACTERS, POSES } from '../../../lib/vocab.js'
+import { faceBoxFrom, cleanFaceBox } from '../../../lib/face.js'
 import { heightOf } from '../../../lib/stature.js'
 import { DIRECTOR_LIMITS } from '../../../lib/limits.js'
 import { STAGE_SIZES, imageConcurrency } from '../../../lib/config.js'
@@ -630,7 +632,7 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
   const sprites = person.sprites || {}
   if (record && record.face) {
     const body = sprites[record.face.from]
-    const bodyLabel = body ? emotionEntry(body.emotion || record.face.from.split('|').pop(), emotions).label : record.face.from.split('|').pop()
+    const bodyLabel = emotionEntry((body && body.emotion) || keyEmotion(record.face.from), emotions).label
     return (
       <div className="fg-row fg-face-info">
         <span className="fg-note">只换脸：在「{bodyLabel}」这张「{record.poseLabel || (POSES[record.face.pose] || {}).label || '动作'}」底图上重画脸，身体衣服跟底图一样{Number.isInteger(record.face.seed) ? ` · 脸的种子 ${record.face.seed}` : ''}</span>
@@ -653,10 +655,17 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
   )
 }
 
-/** 选中的一张差分：看 / 改提示词，让立绘设计师重写，按自己的词画，上传，删除。 */
-function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose }) {
-  const key = `${group.key}|${emotion}`
+/**
+ * 选中的一张差分：看 / 改提示词，让立绘设计师重写，按自己的词画，上传，删除。
+ * token 是「情绪」（在它的主动作上）或「情绪@动作」（动作与表情的表里点开的那一格，lib/poses.js）；sheet 是这个人的那套动作（不分动作为 null）。
+ */
+function VariantEditor({ gameId, person, group, emotion: token, emotions, sheet = null, turn, onClose }) {
+  const { emotion, pose: ref } = parseToken(token)
+  const pose = sheet ? poseFor(sheet, emotion, ref, emotions) : null
+  const key = slotKey(person.sprites || {}, group.key, sheet, pose ? pose.id : '', emotion, emotions)
   const record = (person.sprites || {})[key] || null
+  const boxRef = React.useRef(null)
+  React.useEffect(() => { if (boxRef.current && boxRef.current.scrollIntoView) boxRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) }, [token])
   const st = (person.spriteStatus || {})[key]
   const [tags, setTags] = React.useState(record ? record.tags || '' : '')
   const [busy, run] = useBusy()
@@ -667,10 +676,10 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
   // 段落里当时的那套不在时间线上：按那套立绘记着的样子画（look 是这套的差分前缀）
   const reachable = group.current || turn != null || Boolean(group.era)
   const at = group.current ? {} : group.era ? { look: group.key } : { turn }
-  const label = `${person.name} · ${lookLabel(group.look)} · ${entry.label}`
+  const label = `${person.name} · ${lookLabel(group.look)} · ${entry.label}${pose && sheet && sheet.poses.length > 1 ? ` · ${pose.label}` : ''}`
   const [viewing, setViewing] = React.useState(false)
   return (
-    <div className="fg-variant">
+    <div className="fg-variant" ref={boxRef}>
       {/* 做过逆转式动态的直接动起来；点一下放大看 */}
       <div className="fg-variant-art">{record && record.assetId ? <SpriteArt record={record} label={label} onOpen={() => setViewing(true)} /> : <span>{st ? SPRITE_STATUS[st.status] : '还没画'}</span>}</div>
       {viewing && <SpriteViewer record={record} label={label} onClose={() => setViewing(false)} />}
@@ -682,8 +691,8 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
         <textarea className="fg-textarea" value={tags} onChange={e => setTags(e.target.value)} onKeyDown={e => e.stopPropagation()} placeholder={record && record.face ? '只换脸：这里只写表情（眉、眼、嘴、脸红、泪、视线）' : '还没有提示词：点「让设计师写」，它会读完资料和剧情来写'} />
         <div className="fg-note">{record && record.writer ? WRITER_LABEL[record.writer] || record.writer : ''}{record && record.seed != null ? ` · 种子 ${record.seed}` : ''}{!reachable ? ' · 这套样子在剧情里已经不会再出现（外貌改过），只能删除或上传' : ''}</div>
         <div className="fg-row">
-          <button type="button" className="fg-btn is-primary" disabled={!reachable || busy === 'w'} onClick={() => run('w', () => api.cast(gameId, 'sprite', { name: person.name, emotion, rewrite: true, ...at }), '已交给立绘设计师：写好词就画')}>{record && record.assetId ? '让设计师重写并重画' : '让设计师写并画'}</button>
-          <button type="button" className="fg-btn" disabled={!reachable || !tags.trim() || busy === 'u'} onClick={() => run('u', () => api.cast(gameId, 'sprite', { name: person.name, emotion, tags, ...at }), '已排队：按这些词画')}>按这些词画</button>
+          <button type="button" className="fg-btn is-primary" disabled={!reachable || busy === 'w'} onClick={() => run('w', () => api.cast(gameId, 'sprite', { name: person.name, emotion: token, rewrite: true, ...at }), '已交给立绘设计师：写好词就画')}>{record && record.assetId ? '让设计师重写并重画' : '让设计师写并画'}</button>
+          <button type="button" className="fg-btn" disabled={!reachable || !tags.trim() || busy === 'u'} onClick={() => run('u', () => api.cast(gameId, 'sprite', { name: person.name, emotion: token, tags, ...at }), '已排队：按这些词画')}>按这些词画</button>
           <button type="button" className="fg-btn" disabled={!reachable} onClick={() => fileRef.current && fileRef.current.click()}>上传到这张</button>
           {record && <button type="button" className="fg-btn" onClick={() => run('d', () => api.cast(gameId, 'sprite-delete', { name: person.name, key }), '已删除').then(onClose)}>删除</button>}
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={async e => {
@@ -691,7 +700,7 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
             e.target.value = ''
             if (!file) return
             const dataUrl = await readFile(file)
-            run('up', () => api.cast(gameId, 'upload', { name: person.name, emotion, dataUrl, ...at }), '立绘已上传')
+            run('up', () => api.cast(gameId, 'upload', { name: person.name, emotion: token, dataUrl, ...at }), '立绘已上传')
           }} />
         </div>
         <div className="fg-row">
@@ -701,7 +710,7 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
           <input ref={aaRef} type="file" webkitdirectory="" multiple hidden onChange={e => {
             const files = [...(e.target.files || [])]
             e.target.value = ''
-            if (files.length) run('aa', async () => { const { manifest, files: images } = await readAaFolder(files); await api.cast(gameId, 'aa-pack', { name: person.name, emotion, manifest, files: images, ...at }) }, '素材包已导入：这张立绘会呼吸、眨眼、动嘴了')
+            if (files.length) run('aa', async () => { const { manifest, files: images } = await readAaFolder(files); await api.cast(gameId, 'aa-pack', { name: person.name, emotion: token, key, manifest, files: images, ...at }) }, '素材包已导入：这张立绘会呼吸、眨眼、动嘴了')
           }} />
         </div>
       </div>
@@ -783,11 +792,12 @@ function ActingNote({ gameId, person, group, turn }) {
 
 /**
  * 动作与表情设计：表演设计师读完资料和剧情给这个人设计的专属动作（每个动作整张画一张底图），和每种情绪在他脸上的样子。
- * 能看、能改（改动作的名字、描述、身体 tag，把情绪挪到别的动作、设为底图，改表情），改了自动存；能让设计师重新设计，能按这套设计把这一身重画。
+ * 一张「动作 × 情绪」的表（PoseMatrix.jsx）：加删动作、改名字描述身体 tag，一个情绪勾进好几个动作、设底图，展开一行改表情；改了自动存。
+ * 能让设计师重新设计，能按这套设计把这一身重画，能把勾上了还没画的组合一键补足；点格子里的小图打开那张差分。
  * 表演笔记（怎么流露情绪）在档案里改。
  * 边改边存：后台的设计变了时，是自己刚存的那版就不管；设计师新写的、这边也没有没存的修改就换上；有没存的修改就提示，不冲掉。
  */
-function ActingEditor({ gameId, person, emotions, group, turn }) {
+function ActingEditor({ gameId, person, emotions, group, turn, used, onOpen }) {
   const [busy, run] = useBusy()
   const acting = person.acting
   const copy = a => (a ? JSON.parse(JSON.stringify({ ...(a.height ? { height: a.height } : {}), poses: a.poses || [], faces: a.faces || {} })) : null)
@@ -839,10 +849,8 @@ function ActingEditor({ gameId, person, emotions, group, turn }) {
       </div>
     )
   }
-  const setPose = (id, patch) => setDraft(d => ({ ...d, poses: d.poses.map(p => (p.id === id ? { ...p, ...patch } : p)) }))
-  // 挪到别的动作：排在那个动作的最后（底图不变）；设为底图：排到这个动作的第一个
-  const move = (e, id) => setDraft(d => ({ ...d, poses: d.poses.map(p => (p.id === id ? { ...p, emotions: [...p.emotions.filter(x => x !== e), e] } : { ...p, emotions: p.emotions.filter(x => x !== e) })) }))
-  const toFront = e => setDraft(d => ({ ...d, poses: d.poses.map(p => (p.emotions.includes(e) ? { ...p, emotions: [e, ...p.emotions.filter(x => x !== e)] } : p)) }))
+  // 表里改的：平静总在第一个动作的底图上（跟存的时候规整的一样，免得删了第一个动作以后表上看不出来）
+  const setPoses = poses => setDraft(d => ({ ...d, poses: settleNeutral(poses.map(p => ({ ...p, emotions: [...p.emotions] }))) }))
   const setFace = (e, patch) => setDraft(d => ({ ...d, faces: { ...d.faces, [e]: { desc: '', tags: '', ...(d.faces[e] || {}), ...patch } } }))
   const { drawn, reachable, at } = drawnIn(person, group, turn)
   const pending = unsaved(draft) || saving === 'saving'
@@ -850,7 +858,41 @@ function ActingEditor({ gameId, person, emotions, group, turn }) {
     if (!window.confirm(`按这套设计重画${person.name}「${lookLabel(group.look)}」的 ${drawn.length} 张差分？每个动作的底图整张重画，其余表情在新底图上换脸。`)) return
     run('redraw', () => api.cast(gameId, 'sprite', { name: person.name, emotions: drawn, rewrite: true, keepFaces: true, ...at }), '已排队：照这套设计重画')
   }
-  const input = (value, onChange, placeholder, style) => <input className="fg-input" style={style} value={value || ''} placeholder={placeholder} onChange={e => onChange(e.target.value)} onKeyDown={e => e.stopPropagation()} />
+  // 这一身里每一格存在哪张差分（lib/poses.js 的 slotKey）：勾上了还没画的，「一键补足」一起画
+  const sprites = person.sprites || {}
+  const sheet = { poses: draft.poses, designed: true }
+  const slot = (pose, e) => slotKey(sprites, group.key, sheet, pose.id, e, emotions)
+  const BUSY = ['writing', 'queued', 'running']
+  const missing = draft.poses.flatMap(p => p.emotions.map(e => ({ p, e, key: slot(p, e) })))
+    .filter(c => !(sprites[c.key] && sprites[c.key].assetId) && !BUSY.includes(((person.spriteStatus || {})[c.key] || {}).status))
+  const fillAll = () => {
+    if (!window.confirm(`把${person.name}「${lookLabel(group.look)}」勾上了还没画的 ${missing.length} 个「动作 × 表情」都画出来？每个动作没有底图的先整张画底图，其余在底图上只换脸。`)) return
+    run('fill', () => api.cast(gameId, 'sprite', { name: person.name, emotions: [...new Set(missing.map(c => tokenFor(sheet, c.e, c.p.id, emotions)))], rewrite: false, ...at }), `已排队：${missing.length} 张`)
+  }
+  const cell = (pose, e) => {
+    const key = slot(pose, e)
+    const record = sprites[key]
+    const st = (person.spriteStatus || {})[key]
+    const title = `${lookLabel(group.look)} · ${pose.label} · ${emotionEntry(e, emotions).label}${st && st.error ? '：' + st.error : record && record.assetId ? '（点开看、改、重画）' : '：还没画，点开能单独画'}`
+    return (
+      <button type="button" className={`fg-pm-thumb${st && BUSY.includes(st.status) ? ' is-busy' : ''}${st && st.status === 'failed' ? ' is-failed' : ''}`} title={title} onClick={() => onOpen && onOpen(tokenFor(sheet, e, pose.id, emotions))}>
+        {record && record.assetId ? <img src={assetUrl(record.assetId)} alt="" loading="lazy" /> : <span>{st ? (st.status === 'face' ? '…' : st.status === 'failed' ? '⚠' : '·') : '＋'}</span>}
+      </button>
+    )
+  }
+  const faceRow = e => {
+    const face = draft.faces[e] || {}
+    return (
+      <div className="fg-pm-face">
+        <b>{emotionEntry(e, emotions).label}：他的这种情绪什么样</b>
+        <input className="fg-input" value={face.desc || ''} placeholder="他的这种情绪什么样（中文一句）" onChange={ev => setFace(e, { desc: ev.target.value })} onKeyDown={ev => ev.stopPropagation()} />
+        <input className="fg-input" value={face.tags || ''} placeholder="脸上的英文 tag（没写就用情绪库里的）" onChange={ev => setFace(e, { tags: ev.target.value })} onKeyDown={ev => ev.stopPropagation()} />
+      </div>
+    )
+  }
+  // 表里列：设计里有的情绪，加上这个人在人物志里列的那些（还没放进动作的可以在这里勾进去）
+  const listed = new Set([...draft.poses.flatMap(p => p.emotions), ...personEmotions(person.name, emotions, { used, drawn: Object.keys(sprites).map(keyEmotion) }).map(x => x.id)])
+  const rows = [...allEmotions(emotions).map(x => x.id).filter(e => listed.has(e)), ...[...listed].filter(e => !allEmotions(emotions).some(x => x.id === e))]
   const status = pending ? '正在存…' : saving === 'saved' ? '✓ 已自动保存' : saving ? `⚠ 没存上：${saving}` : ''
   return (
     <div className="fg-person-form fg-acting">
@@ -859,6 +901,7 @@ function ActingEditor({ gameId, person, emotions, group, turn }) {
         <span className="fg-spacer" />
         <button type="button" className="fg-btn is-mini" disabled={designing} onClick={design}>{designing ? '设计中…' : '重新设计'}</button>
         <button type="button" className="fg-btn is-mini" disabled={!reachable || pending || !drawn.length || busy === 'redraw'} title={pending ? '等修改存好' : ''} onClick={redraw}>按这套设计重画「{lookLabel(group.look)}」{drawn.length ? `（${drawn.length} 张）` : ''}</button>
+        <button type="button" className="fg-btn is-mini is-primary" disabled={!reachable || pending || !missing.length || busy === 'fill'} title={pending ? '等修改存好' : '平时用到了才画；这里把勾上了还没画的组合全部画出来'} onClick={fillAll}>一键补足所有表情{missing.length ? `（${missing.length} 张）` : ''}</button>
       </div>
       {incoming && (
         <div className="fg-row fg-note">
@@ -866,29 +909,8 @@ function ActingEditor({ gameId, person, emotions, group, turn }) {
           <button type="button" className="fg-btn is-mini" onClick={() => { const next = copy(acting); setDraft(next); sent.current = JSON.stringify(next); setIncoming(false) }}>换成设计师的新版</button>
         </div>
       )}
-      <div className="fg-note">表演笔记（这个人怎么流露情绪）在「档案」里看和改。</div>
-      {draft.poses.map(p => (
-        <div key={p.id} className="fg-acting-pose">
-          <div className="fg-acting-head">
-            {input(p.label, v => setPose(p.id, { label: v }), '动作名', { width: '13cqw', fontWeight: 600 })}
-            {input(p.desc, v => setPose(p.id, { desc: v }), '这个动作什么样、为什么是他', { flex: 1 })}
-          </div>
-          {input(p.tags, v => setPose(p.id, { tags: v }), '身体的英文 tag：hands behind back, weight on one leg', { width: '100%' })}
-          {p.emotions.map((e, i) => {
-            const face = draft.faces[e] || {}
-            return (
-              <div key={e} className="fg-acting-emo">
-                <b>{label(e)}{i === 0 ? <i>底图</i> : null}</b>
-                <select className="fg-select" value={p.id} onChange={ev => move(e, ev.target.value)} title="挪到别的动作">{draft.poses.map(q => <option key={q.id} value={q.id}>{q.label || q.id}</option>)}</select>
-                {input(face.desc, v => setFace(e, { desc: v }), '他的这种情绪什么样')}
-                {input(face.tags, v => setFace(e, { tags: v }), '脸上的英文 tag（没写就用内置的）')}
-                {i > 0 && !p.emotions.includes('neutral') ? <button type="button" className="fg-btn is-mini" onClick={() => toFront(e)} title="这个动作的底图整张画这个情绪">设为底图</button> : <span />}
-              </div>
-            )
-          })}
-          {!p.emotions.length && <div className="fg-note">（空着：存的时候去掉这个动作）</div>}
-        </div>
-      ))}
+      <div className="fg-note">一个情绪可以放进好几个动作：剧场里身子不动只换脸，这句的情绪在当前动作里有就留在当前动作，没有才换到它的第一个动作；导演会在情绪转折的那句点名换动作。勾上的组合用到了才画，小图是「{lookLabel(group.look)}」这一身画好的；点情绪名改他的这种表情。表演笔记在「档案」里。</div>
+      <PoseMatrix poses={draft.poses} rows={rows} lib={emotions} onChange={setPoses} prefix="p" lockLast keepOne cell={cell} rowOpen={faceRow} />
       <div className="fg-row" style={{ justifyContent: 'flex-end' }}>
         <span className="fg-note">改了自动存，只影响之后画的；平静总在第一个动作的底图上（登场立绘就是它）。</span>
         {status && <span className="fg-note">{status}</span>}
@@ -897,7 +919,7 @@ function ActingEditor({ gameId, person, emotions, group, turn }) {
   )
 }
 
-function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
+function PersonCard({ gameId, person, emotions, poseGroups = [], cast, voice, used, onBench }) {
   const [busy, run] = useBusy()
   const groups = React.useMemo(() => lookGroups(person), [person])
   const [groupKey, setGroupKey] = React.useState('')
@@ -912,8 +934,11 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
   const now = lookAt(person.timeline, Infinity)
   const main = pickSprite(person.sprites, now, 'neutral')
   // 情绪格子：内置的、这个人用过或画过的新情绪（别人的新情绪不挂过来）；这套样子已经有图的排前面。
-  const drawnEmotions = Object.keys(person.sprites || {}).map(k => k.split('|').pop())
-  const tiles = personEmotions(person.name, emotions, { used, drawn: drawnEmotions }).map(e => ({ ...e, key: `${group.key}|${e.id}`, record: (person.sprites || {})[`${group.key}|${e.id}`], st: (person.spriteStatus || {})[`${group.key}|${e.id}`] }))
+  // 分动作的人每格是这个情绪在它主动作上的那张（别的动作上的在「动作与表情」的表里）
+  const drawnEmotions = Object.keys(person.sprites || {}).map(keyEmotion)
+  const sheet = sheetOf(person, poseGroups)
+  const homeKey = e => slotKey(person.sprites || {}, group.key, sheet, sheet ? (homePose(sheet, e, emotions) || {}).id : '', e, emotions)
+  const tiles = personEmotions(person.name, emotions, { used, drawn: drawnEmotions }).map(e => { const key = homeKey(e.id); return { ...e, key, record: (person.sprites || {})[key], st: (person.spriteStatus || {})[key] } })
   tiles.sort((a, b) => Number(Boolean(b.record && b.record.assetId)) - Number(Boolean(a.record && a.record.assetId)))
   const drawn = tiles.filter(t => t.record && t.record.assetId).length
   const deletable = tiles.filter(t => t.record)
@@ -958,7 +983,7 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
         </div>
         {fold === 'profile' && <ProfileEditor gameId={gameId} person={person} cast={cast} group={group} turn={turn} />}
         {fold === 'wardrobe' && <WardrobeEditor gameId={gameId} person={person} />}
-        {fold === 'acting' && <ActingEditor gameId={gameId} person={person} emotions={emotions} group={group} turn={turn} />}
+        {fold === 'acting' && <ActingEditor gameId={gameId} person={person} emotions={emotions} group={group} turn={turn} used={used} onOpen={token => { setManage(false); setEmotion(token) }} />}
         <div className="fg-looks">
           {groups.map(g => (
             <button key={g.key} type="button" className={`fg-look${g.key === group.key ? ' is-on' : ''}`} onClick={() => { setGroupKey(g.key); setEmotion(''); setPicked(new Set()) }}>
@@ -998,7 +1023,7 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
             </button>
           ))}
         </div>
-        {emotion && !manage && <VariantEditor key={group.key + emotion} gameId={gameId} person={person} group={group} emotion={emotion} emotions={emotions} turn={turn} onClose={() => setEmotion('')} />}
+        {emotion && !manage && <VariantEditor key={group.key + emotion} gameId={gameId} person={person} group={group} emotion={emotion} emotions={emotions} sheet={sheet} turn={turn} onClose={() => setEmotion('')} />}
         <div className="fg-row">
           <button type="button" className="fg-btn" disabled={busy === 'fill'} onClick={() => run('fill', () => api.cast(gameId, 'fill', { name: person.name }).then(r => toast(fillText(r))))}>补齐剧情里用到的差分</button>
           <button type="button" className="fg-btn" disabled={!drawn && !Object.values(person.sprites || {}).some(r => r && r.assetId)} onClick={onBench}>逆转式工作台（眨眼、口型）</button>
@@ -1048,7 +1073,7 @@ export function CastPanel({ view, gameId, onClose }) {
         </div>
       )}>
       {tab === 'people' && benchPerson && <AaWorkbench key={bench} gameId={gameId} person={benchPerson} onClose={() => setBench('')} />}
-      {tab === 'people' && !benchPerson && cast.map(p => <PersonCard key={p.name} gameId={gameId} person={p} emotions={emotions} cast={cast} voice={voices.get(p.name)} used={used.get(p.name) || []} onBench={() => setBench(p.name)} />)}
+      {tab === 'people' && !benchPerson && cast.map(p => <PersonCard key={p.name} gameId={gameId} person={p} emotions={emotions} poseGroups={view.poseGroups || []} cast={cast} voice={voices.get(p.name)} used={used.get(p.name) || []} onBench={() => setBench(p.name)} />)}
       {tab === 'people' && !cast.length && <div className="fg-note">有名字的角色第一次出场时，导演会自动给他建档：固定外貌、身上的衣服。之后插画里写 @名字 都会换成这份档案，长相不再漂移；立绘按「服装 × 长期状态 × 情绪」各画一套，同一个种子。</div>}
       {tab === 'emotions' && <EmotionLibrary emotions={emotions} view={view} gameId={gameId} />}
       {tab === 'log' && log.map(e => (
@@ -1536,27 +1561,41 @@ function CgModelFields({ data, providers }) {
 }
 
 /** 动作组：每个内置情绪归哪组。改回默认组时写 null（设置里删掉这条改动）。 */
-function PoseGroups({ poses, onChange }) {
-  const changed = Object.keys(poses).length > 0
+/**
+ * 设置里的通用动作组：没有专属设计的人（没开立绘设计师、或者还没设计出来）用这一张「动作 × 情绪」的表。
+ * 跟人物志里的一样能加删动作、一个情绪勾进好几组、设底图（PoseMatrix.jsx）；全删了就不分动作，每个情绪整张画。
+ * 改了直接存（patch 整张表）；恢复默认连老设置里挪过的情绪（images.poses）一起清掉。
+ */
+function PoseGroups({ cfg, onPatch }) {
+  const lib = shownLib()
+  const groups = cfg.images.poseGroups || []
+  const [draft, setDraft] = React.useState(groups)
+  const text = JSON.stringify(groups)
+  const edited = Object.keys(cfg.images.poses || {}).length > 0 || text !== JSON.stringify(cleanPoseGroups(null))
+  React.useEffect(() => { setDraft(groups) }, [text])
+  // 打字时先改在表上，停手 0.8 秒再存（不然每个字都往回写一次设置）
+  React.useEffect(() => {
+    if (JSON.stringify(draft) === text) return undefined
+    const timer = setTimeout(() => onPatch({ poseGroups: draft }), 800)
+    return () => clearTimeout(timer)
+  }, [draft])
+  const listed = new Set([...draft.flatMap(g => g.emotions), ...allEmotions(lib).filter(e => !e.off).map(e => e.id)])
+  const rows = [...allEmotions(lib).map(e => e.id).filter(e => listed.has(e)), ...[...listed].filter(e => !allEmotions(lib).some(x => x.id === e))]
+  const reset = () => {
+    if (!window.confirm('通用动作组恢复成默认的四组（日常、抱臂、手在胸前、托腮）？你加的组、改的分法都会去掉。')) return
+    onPatch({ poseGroups: null, poses: Object.fromEntries(Object.keys(cfg.images.poses || {}).map(k => [k, null])) })
+  }
   return (
-    <Field label="通用动作组" hint="立绘设计师关着、或者还没给某个人设计出专属动作时用这几组：每组整张画一张底图（标「底图」的情绪），同组其余情绪在它上面只换脸。想让某个情绪换个动作，就把它挪到别的组；新加的情绪跟着它的替身走（没写替身跟它那一类的代表情绪）。改了只影响之后画的。">
-      <div className="fg-pose-grid">
-        {POSE_IDS.map(pose => (
-          <div key={pose} className="fg-pose-col">
-            <b>{POSES[pose].label}</b>
-            {poseMembers(pose, [], poses).map(e => (
-              <label key={e} className="fg-pose-item">
-                <span>{emotionLabel(e)}{anchorOf(pose, [], poses) === e ? <i> · 底图</i> : null}</span>
-                <select value={pose} onChange={ev => onChange({ [e]: ev.target.value === EMOTION_POSE[e] ? null : ev.target.value })}>
-                  {POSE_IDS.map(id => <option key={id} value={id}>{POSES[id].label}</option>)}
-                </select>
-              </label>
-            ))}
-            {!poseMembers(pose, [], poses).length && <span className="fg-note">（空着：这组不画）</span>}
-          </div>
-        ))}
+    <Field label="通用动作组">
+      <div className="fg-pose-groups">
+        <div className="fg-note">没开立绘设计师、或者还没给某个人设计出专属动作时用这张表：每组整张画一张底图（★ 那个情绪），同组其余情绪在它上面只换脸。一个情绪可以勾进好几组：剧场里身子不动只换脸，这句的情绪在当前这组里有就不换组。不在任何一组里的情绪跟着替身走。组能加能删，全删了就不分组、每个情绪整张画。改了只影响之后画的。</div>
+        <PoseMatrix poses={draft} rows={rows} lib={lib} onChange={next => setDraft(settleNeutral(next.map(g => ({ ...g, emotions: [...g.emotions] }))))} prefix="g" word="组" newLabel="新动作组" />
+        <div className="fg-row">
+          {!draft.length && <span className="fg-note">一组都没有：每个情绪整张画，不分动作</span>}
+          <span className="fg-spacer" />
+          <button type="button" className="fg-btn is-mini" disabled={!edited} onClick={reset}>恢复默认分组</button>
+        </div>
       </div>
-      {changed && <button type="button" className="fg-btn is-mini" onClick={() => onChange(Object.fromEntries(Object.keys(poses).map(k => [k, null])))}>恢复默认分组</button>}
     </Field>
   )
 }
@@ -1583,7 +1622,7 @@ function ImagesSection({ data }) {
       <Field label="立绘" hint="角色登场、换装、长期状态变化时，画这一套的平静立绘。"><Toggle value={cfg.images.portraits} onChange={v => p({ portraits: v })} /></Field>
       <Field label="情绪差分" hint="导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。"><div className="fg-row"><Toggle value={cfg.images.expressions} onChange={v => p({ expressions: v })} /><span className="fg-note">每轮最多</span><Limit value={cfg.images.expressionsPerTurn} fallback={12} unit="张" onCommit={v => p({ expressionsPerTurn: v })} /></div></Field>
       <Field label="表情只换脸" hint="galgame 的「一个动作 + 一套表情」：同一套衣服每个动作整张画一张底图，同一个动作的其余情绪用 NovelAI 局部重绘只重画脸（眉、眼、两颊、嘴），身体和衣服一个像素都不动。每个人有哪些动作、哪种情绪归哪个动作、脸上什么样，是立绘设计师读完资料和剧情给他设计的（人物志 →「动作与表情」）。底图画好后要认一次脸：剧场开着、认脸模型下好时自动认（下了认脸大模型就一律用大模型），认不准的在人物志里点开底图框一下。只对 NovelAI 有效；关掉就像以前一样每个情绪整张画。已经画好的立绘不会自动重画。"><Toggle value={cfg.images.faceSwap} onChange={v => p({ faceSwap: v })} /></Field>
-      {cfg.images.faceSwap && <PoseGroups poses={cfg.images.poses || {}} onChange={poses => p({ poses })} />}
+      {cfg.images.faceSwap && <PoseGroups cfg={cfg} onPatch={p} />}
       <Field label="立绘设计师" hint="给一个人画第一张立绘之前，先读完人物卡、世界书和到这一轮为止的全部剧情，按他的人设和经历设计专属的几个动作和每种情绪的表情（人物志 →「动作与表情」里能看能改）；之后每张差分的提示词也由它读完资料来写，照设计画，只换脸的表情直接用设计好的。一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼、用通用动作组。"><Toggle value={cfg.images.spriteWriter} onChange={v => p({ spriteWriter: v })} /></Field>
       {cfg.images.backend === 'novelai' && (cfg.novelai?.endpoint || 'official') === 'official'
         ? <Field label="并发"><span className="fg-note">一次画 1 张：NovelAI 官方接口一个账号同时只能画一张（多发的会被它拒绝）。换成自建接入点、ComfyUI、WebUI、OpenAI 兼容时这里能调。</span></Field>

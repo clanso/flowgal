@@ -5,6 +5,7 @@
 import React from 'react'
 import { api, toast } from '../api.js'
 import { speakersOf } from '../../../lib/vocab.js'
+import { keyEmotion } from '../../../lib/look.js'
 import { allEmotions, emotionEntry, emotionTags, emotionFace, emotionAct, groupEmotions, libOf, mergedFrom, nearestOf, personEmotions, resolveEmotion, standIns } from '../../../lib/emotions.js'
 
 function useBusy() {
@@ -59,7 +60,7 @@ function usageOf(view, lib) {
   for (const p of (view && view.cast) || []) {
     for (const [key, r] of Object.entries(p.sprites || {})) {
       if (!r || !r.assetId) continue
-      const id = resolveEmotion(key.split('|').pop(), lib)
+      const id = resolveEmotion(keyEmotion(key), lib)
       bump(drawn, id)
       person(p.name).drawn.push(id)
     }
