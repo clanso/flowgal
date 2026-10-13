@@ -191,7 +191,7 @@ function ScriptView({ script, units }) {
       <Block label={`插画分镜 · ${script.images.length}`}>
         {script.images.map((img, i) => (
           <div key={i} className="fg-dlog-card">
-            <div className="fg-dlog-chips"><Chip k="标题">{img.title || '—'}</Chip><Chip k="显示">{img.after}{img.until && img.until !== img.after ? ` → ${img.until}` : img.until ? '' : ' → 本轮结束'}</Chip>{img.who && img.who.length ? <Chip k="入画">{img.who.join('、')}</Chip> : null}{img.shape && <Chip k="画幅">{SHAPE_LABEL[img.shape] || img.shape}</Chip>}{img.enter && <Chip k="出现">{CG_IN_LABEL[img.enter] || img.enter}</Chip>}{img.motion && <Chip k="停留">{CG_MOTION_LABEL[img.motion] || img.motion}</Chip>}{img.leave && <Chip k="消失">{CG_OUT_LABEL[img.leave] || img.leave}</Chip>}</div>
+            <div className="fg-dlog-chips"><Chip k="标题">{img.title || '—'}</Chip><Chip k="显示">{img.after}{img.until && img.until !== img.after ? ` → ${img.until}` : img.until ? '' : ' → 本轮结束'}</Chip>{img.who && img.who.length ? <Chip k="入画">{img.who.join('、')}</Chip> : null}{img.nsfw ? <Chip k="露骨">NSFW</Chip> : null}{img.shape && <Chip k="画幅">{SHAPE_LABEL[img.shape] || img.shape}</Chip>}{img.enter && <Chip k="出现">{CG_IN_LABEL[img.enter] || img.enter}</Chip>}{img.motion && <Chip k="停留">{CG_MOTION_LABEL[img.motion] || img.motion}</Chip>}{img.leave && <Chip k="消失">{CG_OUT_LABEL[img.leave] || img.leave}</Chip>}</div>
             {img.moment && <div>{img.moment}</div>}
             {img.tags && <div className="fg-dlog-mono">{img.tags}</div>}
             {img.desc && <div className="fg-note">{img.desc}</div>}
@@ -279,7 +279,7 @@ function CgsView({ cgs }) {
     <Block label={`插画提示词 · ${cgs.length}`}>
       {cgs.map(cg => (
         <div key={cg.key} className="fg-dlog-card">
-          <div className="fg-dlog-chips"><Chip k="插画">{cg.label}</Chip>{cg.shape && <Chip k="画幅">{SHAPE_LABEL[cg.shape] || cg.shape}</Chip>}{cg.writer && <Chip k="来源">{WRITER[cg.writer] || cg.writer}</Chip>}</div>
+          <div className="fg-dlog-chips"><Chip k="插画">{cg.label}</Chip>{cg.shape && <Chip k="画幅">{SHAPE_LABEL[cg.shape] || cg.shape}</Chip>}{cg.writer && <Chip k="来源">{WRITER[cg.writer] || cg.writer}</Chip>}{cg.nsfw ? <Chip k="露骨">NSFW</Chip> : null}</div>
           {cg.tags || cg.characters?.length ? (
             <>
               <div className="fg-dlog-mono"><i className="fg-dlog-k">Base</i>{cg.tags || '—'}</div>
