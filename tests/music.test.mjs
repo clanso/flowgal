@@ -13,6 +13,7 @@ import { readSidecar, writeSidecar, AUDIO_FILE, MUSIC_SIDECAR } from '../lib/mus
 import { createSecrets } from '../lib/secrets.js'
 import { secretRef } from '../lib/image/index.js'
 import { createRoutes, BASE } from '../lib/dsh/routes.js'
+import { createApi } from '../lib/api.js'
 import { buildBeats, pickTrack } from '../src/client/theater/playback.js'
 import { DEFAULT_CONFIG } from '../lib/config.js'
 
@@ -49,6 +50,27 @@ test('gate: 曲库：上传、同名同大小不重复存、改描述标签、�
     await music.remove(a.id)
     assert.deepEqual(await music.list(), [])
     assert.equal((await readdir(join(dir, 'assets'))).length, 0)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('gate: 清空曲库：曲目和音频一起删，别的资源（图片、音效）不动', async () => {
+  const dir = await tmp()
+  try {
+    const store = createStore(dir)
+    const music = createMusic({ store })
+    const { call } = createApi({ engine: { subscribe() {} }, music })
+    const clear = () => call('POST', '/music', { action: 'clear' })
+    assert.deepEqual((await clear()).cleared, { tracks: 0, bytes: 0, failed: 0 })
+    await music.add(MP3, 'a.mp3')
+    await music.add(Buffer.concat([MP3, Buffer.alloc(10)]), 'b.mp3')
+    const other = await store.saveAsset(Buffer.from('png'), 'image/png')
+    assert.equal((await readdir(join(dir, 'assets'))).length, 3)
+    assert.deepEqual((await clear()).cleared, { tracks: 2, bytes: MP3.length * 2 + 10, failed: 0 })
+    assert.deepEqual(await music.list(), [])
+    assert.deepEqual(await readdir(join(dir, 'assets')), [other])
+    assert.equal((await music.add(MP3, 'a.mp3')).name, 'a', '清空后同一首能重新导入')
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

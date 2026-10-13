@@ -1708,6 +1708,8 @@ function MusicSection({ data }) {
   const tracks = useMusic()
   const [playing, setPlaying] = React.useState('')
   const [progress, setProgress] = React.useState('')
+  const [clearing, setClearing] = React.useState(false) // 清空曲库：确认那一行开着
+  const [busy, run] = useBusy()
   const folderRef = React.useRef(null)
   const filesRef = React.useRef(null)
   const p = patch => patchConfig({ ui: patch }).catch(e => toast(e.message, 'error'))
@@ -1750,6 +1752,17 @@ function MusicSection({ data }) {
 
   const exportSidecar = () => saveText(writeSidecar(tracks || []), MUSIC_SIDECAR)
 
+  // 清空曲库：重新选曲时一次删光，曲目表和存进来的音频一起删，电脑上的原文件不动。
+  const totalBytes = (tracks || []).reduce((n, t) => n + (t.bytes || 0), 0)
+  const clearAll = () => run('clear', async () => {
+    stopPreview()
+    setPlaying('')
+    const { cleared } = await api.clearMusic()
+    await loadMusic().catch(() => {})
+    setClearing(false)
+    toast(`已清空曲库：删掉 ${cleared.tracks} 首${cleared.failed ? `；${cleared.failed} 个文件没删掉（可能正被占用），曲库里已经没有它们了` : ''}`, cleared.failed ? 'error' : undefined)
+  })
+
   return (
     <>
       <div className="fg-section">播放</div>
@@ -1760,10 +1773,19 @@ function MusicSection({ data }) {
         <button type="button" className="fg-btn is-primary" disabled={Boolean(progress)} onClick={() => folderRef.current && folderRef.current.click()}>导入文件夹</button>
         <button type="button" className="fg-btn" disabled={Boolean(progress)} onClick={() => filesRef.current && filesRef.current.click()}>添加曲子</button>
         <button type="button" className="fg-btn" disabled={!tracks || !tracks.some(t => t.file)} onClick={exportSidecar}>导出描述</button>
+        {!clearing && <button type="button" className="fg-btn fg-danger" disabled={!tracks || !tracks.length || Boolean(progress)} title="把整个曲库删光，重新选曲" onClick={() => setClearing(true)}>清空曲库</button>}
         {progress && <span className="fg-pill is-busy">{progress}</span>}
         <input ref={folderRef} type="file" webkitdirectory="" multiple hidden onChange={e => { importFiles(e.target.files); e.target.value = '' }} />
         <input ref={filesRef} type="file" accept={`audio/*,${MUSIC_SIDECAR}`} multiple hidden onChange={e => { importFiles(e.target.files); e.target.value = '' }} />
       </div>
+      {clearing && tracks && tracks.length > 0 && (
+        <div className="fg-row fg-manage">
+          <span className="fg-note">删掉曲库里全部 {tracks.length} 首（{totalBytes >= 1073741824 ? (totalBytes / 1073741824).toFixed(1) + ' GB' : sizeMB(totalBytes)}），描述、标签和存进 FlowGal 的音频一起删；电脑上的原文件不受影响。描述想留着的话先点「导出描述」。</span>
+          <span className="fg-spacer" />
+          <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'clear'} onClick={clearAll}>{busy === 'clear' ? '清空中…' : '确认清空'}</button>
+          <button type="button" className="fg-btn is-mini" disabled={busy === 'clear'} onClick={() => setClearing(false)}>取消</button>
+        </div>
+      )}
       <div className="fg-note">文件夹里放一份 <code>{MUSIC_SIDECAR}</code>（就是「导出描述」得到的文件；分了子文件夹的，每个子文件夹各放一份也行），导入时会按文件名自动带上描述；同一首再导入不会重复存，但描述会以这个文件为准。</div>
       {!tracks && <div className="fg-note">读取中…</div>}
       {tracks && !tracks.length && <div className="fg-note" style={{ marginTop: '1cqw' }}>曲库还是空的。没有曲子时剧场不放音乐。</div>}
