@@ -472,12 +472,13 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   filter: brightness(.7) saturate(.78);
   animation: fg-actor-in .6s cubic-bezier(.2, .7, .2, 1) both;
 }
+/* 谁挡在谁前面由 Stage.jsx 按 stackLayers 写进 z-index（说话的人在最前，说完也留在前面）；这里的 z-index 只给分屏、闪回里的人用 */
 .fg-actor.is-speaking { filter: brightness(1.04) saturate(1.05) drop-shadow(0 0 1.4cqw rgba(255, 255, 255, .18)); z-index: 2; }
 .fg-actor.is-leaving { animation: fg-actor-out .45s ease both; }
 /* 没在说话、但对这句有反应的人：比旁边站着的人亮一点（说话的人更亮） */
-.fg-actor.is-reacting { filter: brightness(.9) saturate(.92); z-index: 1; }
-/* 走位：上前一步的站到前面；背过身：转过去（scaleX 过 0 像转身）、暗成背影；探头：站在舞台边上，身子往里探 */
-.fg-actor[data-depth="1"] { z-index: 3; }
+.fg-actor.is-reacting { filter: brightness(.9) saturate(.92); }
+/* 走位：上前一步的站到前面；背过身：转过去（scaleX 过 0 像转身）、暗成背影；探头：站在舞台边上，身子往里探；
+   躲到谁身后：缩在他背后，从他肩旁往外探出半个身子（站位、图层在 lib/blocking.js） */
 .fg-actor[data-depth="-1"] { filter: brightness(.62) saturate(.72); }
 .fg-actor-turn, .fg-actor-react { position: absolute; inset: 0; transform-origin: 50% 100%; }
 .fg-actor-turn { transform: translateY(var(--drop, 0%)) rotate(var(--lean, 0deg)) scaleX(var(--flip, 1)); transition: transform .5s cubic-bezier(.45, .05, .3, 1), filter .5s ease; }
@@ -485,6 +486,9 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-actor.is-away .fg-actor-turn { --flip: -1; filter: brightness(.16) saturate(.3) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .28)); }
 .fg-actor.is-peek[data-peek="left"] .fg-actor-turn { --lean: 5deg; }
 .fg-actor.is-peek[data-peek="right"] .fg-actor-turn { --lean: -5deg; }
+.fg-actor.is-hiding:not(.is-down) .fg-actor-turn { --drop: 2%; }
+.fg-actor.is-hiding[data-hide="left"]:not(.is-down) .fg-actor-turn { --lean: -3deg; }
+.fg-actor.is-hiding[data-hide="right"]:not(.is-down) .fg-actor-turn { --lean: 3deg; }
 /* 被击倒：歪倒、往下沉、暗成一道影子（打中那一下之后才倒），上半身沉进一团黑雾里看不清脸；到他再开口、自己走位或被治疗时站起来、雾散掉。
    雾在 .fg-actor-turn 里，跟着人一起歪倒；不倒的时候 visibility: hidden 不画 */
 .fg-actor.is-down .fg-actor-turn { --lean: -11deg; --drop: 14%; filter: brightness(.4) saturate(.35) grayscale(.4); transition-delay: .5s; }
@@ -2019,7 +2023,7 @@ var HIT_EFFECT_LABEL = { hit: "命中", crit: "暴击", miss: "闪避", block: "
 var MOMENT_LABEL = { photo: "拍照", touch: "触碰", pat: "摸头", poke: "戳脸", cheers: "干杯", fireworks: "烟花", cook: "做好一道菜", nickname: "新称呼", promise: "约定", contact: "交换联系方式" };
 var PHONE_LABEL = { call: "来电", dial: "拨出", end: "挂断", notify: "通知", voicemail: "语音留言" };
 var CALL_END_LABEL = { missed: "没接通", declined: "拒接", hungup: "对方挂断" };
-var MOVE_LABEL = { approach: "靠近", apart: "拉开", forward: "上前", back: "后退", turn: "背过身", face: "转身面对", lookback: "回眸", reset: "复位" };
+var MOVE_LABEL = { approach: "靠近", apart: "拉开", forward: "上前", back: "后退", turn: "背过身", face: "转身面对", lookback: "回眸", hide: "躲到身后", reset: "复位" };
 var ENTER_HOW_LABEL = { run: "跑进来", peek: "探头", slow: "慢慢走进来" };
 var EXIT_HOW_LABEL = { storm: "甩头离开", run: "跑开", slow: "慢慢走远" };
 var DELIVERY_LABEL = { menace: "威压", excited: "激动", shout: "怒吼", hesitant: "迟疑", whisper: "低语", breakdown: "崩溃" };
@@ -2883,7 +2887,7 @@ var reactKind = (base) => REACT_KIND[base] || "nod";
 function poseTracker() {
   let poses = /* @__PURE__ */ new Map();
   const get = (name2) => {
-    if (!poses.has(name2)) poses.set(name2, { near: [], far: [], depth: 0, away: false, peek: false, down: false });
+    if (!poses.has(name2)) poses.set(name2, { near: [], far: [], depth: 0, away: false, peek: false, down: false, behind: "" });
     return poses.get(name2);
   };
   const unlink = (a, b) => {
@@ -2900,6 +2904,7 @@ function poseTracker() {
     for (const p4 of poses.values()) {
       p4.near = p4.near.filter((n) => n !== name2);
       p4.far = p4.far.filter((n) => n !== name2);
+      if (p4.behind === name2) p4.behind = "";
     }
   };
   return {
@@ -2935,7 +2940,12 @@ function poseTracker() {
             done.push({ name: name2, act: "reset" });
             continue;
           }
-          if (m.act === "approach" && to) {
+          if (m.act === "forward" || m.act === "approach" || m.act === "apart" && to) p4.behind = "";
+          if (m.act === "hide" && to) {
+            for (const other of [...p4.near, ...p4.far]) unlink(name2, other);
+            p4.behind = to;
+            if (get(to).behind === name2) get(to).behind = "";
+          } else if (m.act === "approach" && to) {
             unlink(name2, to);
             p4.near.push(to);
             get(to).near.push(name2);
@@ -2960,8 +2970,9 @@ function poseTracker() {
         if (!here.has(name2)) continue;
         const near = p4.near.filter((n) => here.has(n));
         const far = p4.far.filter((n) => here.has(n));
-        if (!near.length && !far.length && !p4.depth && !p4.away && !p4.peek && !p4.down) continue;
-        out[name2] = { ...near.length ? { near } : {}, ...far.length ? { far } : {}, ...p4.depth ? { depth: p4.depth } : {}, ...p4.away ? { away: true } : {}, ...p4.peek ? { peek: true } : {}, ...p4.down ? { down: true } : {} };
+        const behind = p4.behind && here.has(p4.behind) ? p4.behind : "";
+        if (!near.length && !far.length && !p4.depth && !p4.away && !p4.peek && !p4.down && !behind) continue;
+        out[name2] = { ...near.length ? { near } : {}, ...far.length ? { far } : {}, ...p4.depth ? { depth: p4.depth } : {}, ...p4.away ? { away: true } : {}, ...p4.peek ? { peek: true } : {}, ...p4.down ? { down: true } : {}, ...behind ? { behind } : {} };
       }
       return { poses: out, moves: done };
     }
@@ -2970,20 +2981,70 @@ function poseTracker() {
 var NEAR_SHARE = 0.25;
 var FAR_STEP = 9;
 var PEEK_X = { left: 5, right: 95 };
+var HIDE_STEP = 9;
 function blockLayout(entries, poses) {
   if (!poses) return entries;
   const at2 = new Map(entries.map((e) => [e.name, e.x]));
-  return entries.map((e) => {
+  const placed = new Map(entries.map((e) => {
     const p4 = poses[e.name];
-    if (!p4) return e;
+    if (!p4) return [e.name, e];
     let x = e.x;
     for (const other of p4.near || []) if (at2.has(other)) x += (at2.get(other) - e.x) * NEAR_SHARE;
     for (const other of p4.far || []) if (at2.has(other)) x += (e.x === at2.get(other) ? e.x < 50 ? -1 : 1 : Math.sign(e.x - at2.get(other))) * FAR_STEP;
     const peek = p4.peek ? e.x <= 50 ? "left" : "right" : "";
     if (peek) x = PEEK_X[peek];
     x = Math.round(Math.max(peek ? 4 : 10, Math.min(peek ? 96 : 90, x)) * 10) / 10;
-    return { ...e, x, ...p4.depth ? { depth: p4.depth } : {}, ...p4.away ? { away: true } : {}, ...peek ? { peek } : {}, ...p4.down ? { down: true } : {} };
-  });
+    return [e.name, { ...e, x, ...p4.depth ? { depth: p4.depth } : {}, ...p4.away ? { away: true } : {}, ...peek ? { peek } : {}, ...p4.down ? { down: true } : {} }];
+  }));
+  const hidden = /* @__PURE__ */ new Set();
+  const taken = /* @__PURE__ */ new Map();
+  const hide = (name2, path = /* @__PURE__ */ new Set()) => {
+    const e = placed.get(name2);
+    const front = poses[name2] && poses[name2].behind;
+    if (!front || hidden.has(name2) || !placed.has(front) || path.has(front)) return e;
+    path.add(name2);
+    const x0 = hide(front, path).x;
+    const fits = (side2) => x0 + side2 * HIDE_STEP >= 10 && x0 + side2 * HIDE_STEP <= 90;
+    const count = (side2) => taken.get(front + (side2 < 0 ? "<" : ">")) || 0;
+    const away = Math.sign(at2.get(name2) - at2.get(front)) || (x0 < 50 ? 1 : -1);
+    const side = [away, -away].filter(fits).sort((a, b) => count(a) - count(b))[0] || away;
+    const x = Math.round(Math.max(10, Math.min(90, x0 + side * HIDE_STEP * (count(side) + 1))) * 10) / 10;
+    taken.set(front + (side < 0 ? "<" : ">"), count(side) + 1);
+    hidden.add(name2);
+    placed.set(name2, { ...e, x, behind: front, hide: side < 0 ? "left" : "right" });
+    return placed.get(name2);
+  };
+  for (const e of entries) hide(e.name);
+  return entries.map((e) => placed.get(e.name));
+}
+function stackLayers(entries, front = []) {
+  const own = (name2) => {
+    const i = front.indexOf(name2);
+    return i < 0 ? Infinity : i;
+  };
+  const byName = new Map(entries.map((e) => [e.name, e]));
+  const hides = (e) => Boolean(e.behind) && e.behind !== e.name && byName.has(e.behind);
+  const group = new Map(entries.map((e) => [e.name, own(e.name)]));
+  for (const e of entries.filter(hides)) {
+    let at2 = e;
+    for (const seen = /* @__PURE__ */ new Set([e.name]); hides(at2) && !seen.has(at2.behind); seen.add(at2.name)) at2 = byName.get(at2.behind);
+    group.set(at2.name, Math.min(group.get(at2.name), own(e.name)));
+  }
+  const recent = (name2) => group.get(name2);
+  const backToFront = (a, b) => (a.e.depth || 0) - (b.e.depth || 0) || recent(b.e.name) - recent(a.e.name) || Math.abs((b.e.x ?? 50) - 50) - Math.abs((a.e.x ?? 50) - 50) || a.i - b.i;
+  const sorted = entries.map((e, i) => ({ e, i })).sort(backToFront).map((o) => o.e);
+  const order = sorted.filter((e) => !hides(e)).map((e) => e.name);
+  let waiting = sorted.filter(hides);
+  while (waiting.length) {
+    const ready = waiting.filter((e) => order.includes(e.behind));
+    if (!ready.length) {
+      order.unshift(...waiting.map((e) => e.name));
+      break;
+    }
+    for (const e of ready) order.splice(order.indexOf(e.behind), 0, e.name);
+    waiting = waiting.filter((e) => !ready.includes(e));
+  }
+  return entries.map((e) => ({ ...e, z: order.indexOf(e.name) + 1 }));
 }
 
 // lib/emotions.js
@@ -3043,6 +3104,7 @@ function buildBeats(view) {
   let amb = "";
   let shown = null;
   const active = /* @__PURE__ */ new Map();
+  const spoke = /* @__PURE__ */ new Map();
   let recalled = null;
   let call2 = null;
   let set = 0;
@@ -3125,6 +3187,8 @@ function buildBeats(view) {
       const target = hit && hit.to && onStageNames.includes(hit.to) ? [hit.to] : [];
       const block = blocking.step({ onStage: onStageNames, left: steps[ui2].left, speakers: type === "narration" ? [] : speakers, moves: line.move || [], peeks: Object.keys(ways).filter((name2) => ways[name2] === "peek"), downs: hit && hit.effect === "down" ? target : [], heals: hit && hit.effect === "heal" ? target : [] });
       for (const name2 of [...speakers, ...steps[ui2].entered, ...reacts.map((r) => r.name), ...block.moves.map((m) => m.name), ...hit ? [hit.from, hit.to].filter((n) => n && onStageNames.includes(n)) : []]) active.set(name2, beats.length);
+      for (const name2 of speakers) spoke.set(name2, beats.length);
+      const front = onStageNames.filter((name2) => spoke.has(name2)).sort((a, b) => spoke.get(b) - spoke.get(a));
       const recall = recalls[ui2];
       const cutin = recall ? "" : line.cutin === true ? speakers[0] || "" : line.cutin || "";
       if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map((e) => ((view.emotions || []).find((x) => x.id === e) || {}).base || e), at2.scene.mood);
@@ -3214,6 +3278,8 @@ function buildBeats(view) {
         cast: steps[ui2].cast,
         recent: steps[ui2].cast.map((c) => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)),
         // 台上的人，最近有动静的在前
+        ...front.length ? { front } : {},
+        // 台上开过口的人，最近开口的在前：谁挡在谁前面（lib/blocking.js 的 stackLayers）
         entered: steps[ui2].entered,
         left: steps[ui2].left,
         ...reacts.length ? { reacts } : {},
@@ -5764,7 +5830,7 @@ var REACT_FRAMES = {
   step: [[{ transform: "none" }, { transform: "translateY(-.9%)", offset: 0.25 }, { transform: "none", offset: 0.5 }, { transform: "translateY(-.7%)", offset: 0.75 }, { transform: "none" }], 560],
   glance: [[{ transform: "none" }, { transform: "translateY(-1%) rotate(-1.2deg)", offset: 0.4 }, { transform: "none" }], 520]
 };
-var STEP_MOVES = /* @__PURE__ */ new Set(["approach", "apart", "forward", "back"]);
+var STEP_MOVES = /* @__PURE__ */ new Set(["approach", "apart", "forward", "back", "hide"]);
 var SYM_MOTION = { surprise: "jolt", bulb: "jolt", sweat: "droop", gloom: "droop", sigh: "droop", heartbreak: "droop", zzz: "droop", anger: "shake", fire: "shake", heart: "bounce", note: "bounce", sparkle: "bounce", bloom: "bounce", blush: "shrink", dizzy: "tilt" };
 var HIT_FRAMES = {
   hit: [[{ transform: "none", filter: "none" }, { transform: "translateX(-2.4%) rotate(-1.6deg)", filter: "brightness(2.2)", offset: 0.12 }, { transform: "translateX(1.4%) rotate(.6deg)", filter: "none", offset: 0.4 }, { transform: "none" }], 420],
@@ -5780,6 +5846,7 @@ var TOUCH_FRAMES = {
   poke: [[{ transform: "none" }, { transform: "translateX(-1.6%) rotate(-2.5deg)", offset: 0.15 }, { transform: "translateX(.8%) rotate(1.4deg)", offset: 0.4 }, { transform: "translateX(-.3%) rotate(-.5deg)", offset: 0.65 }, { transform: "none" }], 700]
 };
 var DEPTH = { 1: [1.1, "-6%"], [-1]: [0.88, "3%"] };
+var HIDING = [0.95, "1.5%"];
 var EXIT_MS = { storm: 650, run: 420, slow: 1300 };
 var SWAP_MS = 280;
 var SIZES = /* @__PURE__ */ new Map();
@@ -5878,17 +5945,18 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     return /* @__PURE__ */ import_react4.default.createElement("img", { key: pic.src, src: pic.src, alt: entry.name, className: fade2 || void 0, style: { "--k": at2.k, "--lift": at2.lift }, draggable: "false", onError: () => setPics((p4) => p4.cur && p4.cur.src === pic.src ? { cur: null, prev: null, broken: pic.src } : { ...p4, prev: null }) });
   };
   const still2 = pics.cur ? /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, pics.prev && picture(pics.prev), picture(pics.cur)) : !src || pics.broken === src ? /* @__PURE__ */ import_react4.default.createElement(Silhouette, { name: entry.name, color, appearance: person && person.appearance, gender: person && person.gender }) : null;
-  const [d, db] = DEPTH[entry.depth] || [1, "0%"];
-  const cls = ["fg-actor", speaking && "is-speaking", reaction && "is-reacting", uploaded && "is-upload", leaving && "is-leaving", aa && "is-aa", entry.away && "is-away", entry.peek && "is-peek", entry.down && "is-down"].filter(Boolean).join(" ");
+  const [d, db] = DEPTH[entry.depth] || (entry.behind ? HIDING : [1, "0%"]);
+  const cls = ["fg-actor", speaking && "is-speaking", reaction && "is-reacting", uploaded && "is-upload", leaving && "is-leaving", aa && "is-aa", entry.away && "is-away", entry.peek && "is-peek", entry.behind && "is-hiding", entry.down && "is-down"].filter(Boolean).join(" ");
   return /* @__PURE__ */ import_react4.default.createElement(
     "div",
     {
       className: cls,
-      style: { "--x": (entry.x ?? actorX(entry.pos)) + "%", "--s": entry.scale ?? 1, "--d": d, "--db": db, "--side": SIDE[entry.pos] || "0%", "--edge": (entry.x ?? actorX(entry.pos)) < 50 ? "-40%" : "40%", "--k": place.k, "--lift": place.lift, "--head": place.head * 100 + "%" },
+      style: { "--x": (entry.x ?? actorX(entry.pos)) + "%", "--s": entry.scale ?? 1, "--d": d, "--db": db, "--side": SIDE[entry.pos] || "0%", "--edge": (entry.x ?? actorX(entry.pos)) < 50 ? "-40%" : "40%", "--k": place.k, "--lift": place.lift, "--head": place.head * 100 + "%", zIndex: entry.z },
       "data-name": entry.name,
       "data-enter": entrance || void 0,
       "data-exit": leaving && entry.how ? entry.how : void 0,
       "data-peek": entry.peek || void 0,
+      "data-hide": entry.hide || void 0,
       "data-depth": entry.depth || void 0
     },
     /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-turn" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-react", ref: reactRef }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-actor-body" }, aa ? /* @__PURE__ */ import_react4.default.createElement(AaSprite, { aa, talk: speaking && talk && talk.key === beat.key ? talk : null, fallback: still2, className: "fg-aa", label: entry.name }) : still2)), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-down-mist", "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("i", null), /* @__PURE__ */ import_react4.default.createElement("i", null), /* @__PURE__ */ import_react4.default.createElement("i", null), /* @__PURE__ */ import_react4.default.createElement("i", null))),
@@ -5927,7 +5995,7 @@ function Cast({ beat, view, talk, max = 5 }) {
   if (!beat.directed && !cast.length && beat.speaker && beat.speaker !== "我" && people.has(beat.speaker)) cast = [{ name: beat.speaker, pos: "center" }];
   const split = beat.split || null;
   if (split) cast = cast.filter((c) => !split.who.includes(c.name));
-  cast = blockLayout(stageLayout(onStage(cast, beat.recent, max)), beat.poses).map((entry) => ({ ...entry, id: entry.name + "@" + (beat.set || 0), seen: beat }));
+  cast = stackLayers(blockLayout(stageLayout(onStage(cast, beat.recent, max)), beat.poses), beat.front).map((entry) => ({ ...entry, id: entry.name + "@" + (beat.set || 0), seen: beat }));
   const leaving = useLeaving(cast, beat);
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cast", "data-split": split ? "on" : void 0 }, cast.map((entry) => /* @__PURE__ */ import_react4.default.createElement(Actor, { key: entry.id, entry, person: people.get(entry.name), beat, emo: beat.emotions[entry.name] || "neutral", emotions: view && view.emotions, talk })), leaving.map((entry) => /* @__PURE__ */ import_react4.default.createElement(Actor, { key: entry.id, entry, person: people.get(entry.name), beat: entry.seen, emo: entry.seen.emotions[entry.name] || "neutral", emotions: view && view.emotions, leaving: true })));
 }
@@ -9038,7 +9106,7 @@ function ScriptView({ script, units }) {
       l.sfx && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "sfx", k: "音效" }, l.sfx),
       l.peak && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "peak", k: "高潮" }, PEAK_LABEL[l.peak] || l.peak),
       l.react && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "react", k: "反应" }, l.react.map((r) => (r.name === "*" ? "全员" : r.name) + " " + [r.emo && emotionLabel(r.emo), r.sym && (SYMBOL_LABEL[r.sym] || r.sym)].filter(Boolean).join(" · ")).join("、")),
-      l.move && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "move", k: "走位" }, l.move.map((m) => `${m.name === "*" ? "全员" : m.name} ${MOVE_LABEL[m.act] || m.act}${m.to ? " " + m.to : ""}`).join("、")),
+      l.move && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "move", k: "走位" }, l.move.map((m) => `${m.name === "*" ? "全员" : m.name} ${m.act === "hide" && m.to ? `躲到${m.to}身后` : (MOVE_LABEL[m.act] || m.act) + (m.to ? " " + m.to : "")}`).join("、")),
       l.enter && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "in", k: "登场" }, l.enter.map((e) => e.name + (e.pos ? `（${POS_LABEL[e.pos] || e.pos}）` : "") + (e.how ? ` · ${ENTER_HOW_LABEL[e.how] || e.how}` : "")).join("、")),
       l.exit && /* @__PURE__ */ import_react10.default.createElement(Chip, { key: "out", k: "退场" }, l.exit.map((n) => n + (l.exitHow && l.exitHow[n] ? ` · ${EXIT_HOW_LABEL[l.exitHow[n]] || l.exitHow[n]}` : "")).join("、"))
     ].filter(Boolean);

@@ -170,7 +170,7 @@ function ScriptView({ script, units }) {
               l.sfx && <Chip key="sfx" k="音效">{l.sfx}</Chip>,
               l.peak && <Chip key="peak" k="高潮">{PEAK_LABEL[l.peak] || l.peak}</Chip>,
               l.react && <Chip key="react" k="反应">{l.react.map(r => (r.name === '*' ? '全员' : r.name) + ' ' + [r.emo && emotionLabel(r.emo), r.sym && (SYMBOL_LABEL[r.sym] || r.sym)].filter(Boolean).join(' · ')).join('、')}</Chip>,
-              l.move && <Chip key="move" k="走位">{l.move.map(m => `${m.name === '*' ? '全员' : m.name} ${MOVE_LABEL[m.act] || m.act}${m.to ? ' ' + m.to : ''}`).join('、')}</Chip>,
+              l.move && <Chip key="move" k="走位">{l.move.map(m => `${m.name === '*' ? '全员' : m.name} ${m.act === 'hide' && m.to ? `躲到${m.to}身后` : (MOVE_LABEL[m.act] || m.act) + (m.to ? ' ' + m.to : '')}`).join('、')}</Chip>,
               l.enter && <Chip key="in" k="登场">{l.enter.map(e => e.name + (e.pos ? `（${POS_LABEL[e.pos] || e.pos}）` : '') + (e.how ? ` · ${ENTER_HOW_LABEL[e.how] || e.how}` : '')).join('、')}</Chip>,
               l.exit && <Chip key="out" k="退场">{l.exit.map(n => n + (l.exitHow && l.exitHow[n] ? ` · ${EXIT_HOW_LABEL[l.exitHow[n]] || l.exitHow[n]}` : '')).join('、')}</Chip>,
             ].filter(Boolean)

@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normalizeScript } from '../lib/director.js'
-import { reactsOf, lineFeelings, poseTracker, blockLayout, reactKind } from '../lib/blocking.js'
+import { reactsOf, lineFeelings, poseTracker, blockLayout, stackLayers, reactKind } from '../lib/blocking.js'
 import { noteEmotionUsers } from '../lib/emotions.js'
 import { buildBeats, stageLayout } from '../src/client/theater/playback.js'
 
@@ -108,4 +108,57 @@ test('gate: 剧场按走位挪立绘：靠近的两人各往对方挪四分之�
   assert.equal(beats[2].exitHow, undefined, '告别那句说完下一拍才走')
   assert.deepEqual(beats[3].exitHow, { 苏晴: 'storm' })
   assert.equal(beats[3].poses, undefined, '换了地方，走位复位')
+})
+
+test('gate: 谁挡在谁前面：说话的人站到最前，说完（旁白、主角开口）也留在前面；没开过口的人在后面，离中间近的在前；上前的总在前面', () => {
+  const units = unitsOf(['dialogue', 'narration', 'dialogue', 'thought', 'dialogue'])
+  const script = {
+    scene: {}, cast: [{ name: '阿竹', pos: 'center' }, { name: '林岚', pos: 'right' }, { name: '苏晴', pos: 'farleft' }],
+    lines: { U1: { sp: '林岚' }, U2: {}, U3: { sp: '苏晴' }, U4: {}, U5: { sp: '林岚' } },
+  }
+  const { beats } = buildBeats({ turns: [{ turn: 1, textVersion: 'v1', units, script }], images: [] })
+  assert.deepEqual(beats.map(b => b.front), [['林岚'], ['林岚'], ['苏晴', '林岚'], ['苏晴', '林岚'], ['林岚', '苏晴']])
+  const z = (beat, poses) => Object.fromEntries(stackLayers(blockLayout(stageLayout(beat.cast), poses), beat.front).map(e => [e.name, e.z]))
+  assert.deepEqual(z(beats[1]), { 苏晴: 1, 阿竹: 2, 林岚: 3 }, '旁白那句林岚还在最前；没开过口的阿竹站在中间，比苏晴靠前')
+  assert.deepEqual(z(beats[3]), { 苏晴: 3, 林岚: 2, 阿竹: 1 }, '主角的心声不换人')
+  assert.deepEqual(z(beats[4]), { 林岚: 3, 苏晴: 2, 阿竹: 1 })
+  assert.deepEqual(z(beats[4], { 阿竹: { depth: 1 } }), { 阿竹: 3, 林岚: 2, 苏晴: 1 }, '上前一步的站在前面')
+  assert.deepEqual(z(beats[4], { 林岚: { depth: -1 } }), { 苏晴: 3, 阿竹: 2, 林岚: 1 }, '退后的站在后面')
+})
+
+test('gate: 躲到某人身后：站到他旁边一点、图层紧贴在他后面，开口也不出来；上前、复位、他下台时出来', () => {
+  const units = unitsOf(['dialogue', 'dialogue', 'dialogue'])
+  const raw = { scene: {}, cast: [{ name: '林岚', pos: 'left' }, { name: '苏晴', pos: 'right' }], lines: [{ u: 'U1', move: [{ name: '苏晴', act: 'hide', to: '林岚' }, { name: '林岚', act: 'hide' }, { name: '林岚', act: 'hide', to: '林岚' }] }] }
+  assert.deepEqual(normalizeScript(raw, units).lines.U1.move, [{ name: '苏晴', act: 'hide', to: '林岚' }], '没写躲到谁身后的不要')
+
+  const here = ['林岚', '苏晴', '阿竹']
+  const t = poseTracker()
+  t.step({ onStage: here, moves: [{ name: '苏晴', act: 'approach', to: '阿竹' }] })
+  let r = t.step({ onStage: here, moves: [{ name: '苏晴', act: 'hide', to: '林岚' }] })
+  assert.deepEqual(r.poses, { 苏晴: { behind: '林岚' } }, '躲起来就不算靠着阿竹了')
+  assert.deepEqual(r.moves, [{ name: '苏晴', act: 'hide', to: '林岚' }])
+  r = t.step({ onStage: here, speakers: ['苏晴'], moves: [{ name: '苏晴', act: 'turn' }] })
+  assert.deepEqual(r.poses, { 苏晴: { behind: '林岚', away: true } }, '开口、背过身都还躲着')
+  r = t.step({ onStage: here, moves: [{ name: '林岚', act: 'hide', to: '苏晴' }] })
+  assert.deepEqual(r.poses, { 林岚: { behind: '苏晴' }, 苏晴: { away: true } }, '反过来躲，前面那个就不躲了')
+  r = t.step({ onStage: here, moves: [{ name: '林岚', act: 'forward' }] })
+  assert.deepEqual(r.poses, { 林岚: { depth: 1 }, 苏晴: { away: true } }, '上前一步就走出来了')
+  t.step({ onStage: here, moves: [{ name: '阿竹', act: 'hide', to: '林岚' }] })
+  r = t.step({ onStage: ['苏晴', '阿竹'], left: ['林岚'] })
+  assert.deepEqual(r.poses, { 苏晴: { away: true } }, '挡在前面的人下台，躲着的人露出来')
+
+  const layout = stageLayout([{ name: '林岚', pos: 'left' }, { name: '阿竹', pos: 'center' }, { name: '苏晴', pos: 'right' }])
+  const placed = blockLayout(layout, { 苏晴: { behind: '林岚' } })
+  assert.equal(placed[2].behind, '林岚')
+  assert.equal(placed[2].hide, 'right', '原来站在他右边，从他右肩探出来')
+  assert.ok(placed[2].x > placed[0].x && placed[2].x - placed[0].x < 12, '站到林岚旁边一点，大半个身子被挡住')
+  const two = blockLayout(layout, { 苏晴: { behind: '林岚' }, 阿竹: { behind: '林岚' } })
+  assert.notEqual(two[1].x, two[2].x, '两个人躲在同一个人身后时错开')
+  const moved = blockLayout(layout, { 林岚: { near: ['阿竹'] }, 阿竹: { near: ['林岚'] }, 苏晴: { behind: '林岚' } })
+  assert.equal(Math.round((moved[2].x - moved[0].x) * 10) / 10, Math.round((placed[2].x - placed[0].x) * 10) / 10, '挡在前面的人走位，躲着的人跟着走')
+
+  const z = front => Object.fromEntries(stackLayers(placed, front).map(e => [e.name, e.z]))
+  assert.ok(z(['苏晴'])['苏晴'] < z(['苏晴'])['林岚'], '躲着的人开口也在后面')
+  assert.equal(z(['苏晴'])['林岚'], 3, '躲着的人开口时，挡在前面的人跟着站到最前，躲着的人才露得出来')
+  assert.deepEqual(z(['阿竹', '苏晴']), { 林岚: 2, 阿竹: 3, 苏晴: 1 })
 })

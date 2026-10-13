@@ -8,7 +8,7 @@ import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
 import { heightOf, placeSprite, usualFace, faceCrop, bandCrop, FACE_RATIO } from '../../../lib/stature.js'
 import { aimCamera } from '../../../lib/camera.js'
-import { reactKind } from '../../../lib/blocking.js'
+import { reactKind, stackLayers } from '../../../lib/blocking.js'
 import { MOMENT_FOLEY, PHONE_FOLEY } from '../../../lib/foley.js'
 import { AaSprite } from './AaSprite.jsx'
 import { stinger, foley } from './audio.js'
@@ -241,7 +241,7 @@ const REACT_FRAMES = {
   step: [[{ transform: 'none' }, { transform: 'translateY(-.9%)', offset: 0.25 }, { transform: 'none', offset: 0.5 }, { transform: 'translateY(-.7%)', offset: 0.75 }, { transform: 'none' }], 560],
   glance: [[{ transform: 'none' }, { transform: 'translateY(-1%) rotate(-1.2deg)', offset: 0.4 }, { transform: 'none' }], 520],
 }
-const STEP_MOVES = new Set(['approach', 'apart', 'forward', 'back'])
+const STEP_MOVES = new Set(['approach', 'apart', 'forward', 'back', 'hide'])
 /** 导演写的情绪符号（sym）不画出来，只让这个人身子跟着一动：一惊、垂下去、气得一抖、高兴得一颤、害羞缩肩、晕得一歪。 */
 const SYM_MOTION = { surprise: 'jolt', bulb: 'jolt', sweat: 'droop', gloom: 'droop', sigh: 'droop', heartbreak: 'droop', zzz: 'droop', anger: 'shake', fire: 'shake', heart: 'bounce', note: 'bounce', sparkle: 'bounce', bloom: 'bounce', blush: 'shrink', dizzy: 'tilt' }
 /**
@@ -266,6 +266,8 @@ const TOUCH_FRAMES = {
 }
 /** 上前 / 退后：立绘放大或缩小多少、脚往下或往上挪多少（占舞台高度）。 */
 const DEPTH = { 1: [1.1, '-6%'], [-1]: [0.88, '3%'] }
+/** 躲在别人身后的人：比挡在前面的人站得靠后一点，小一圈。 */
+const HIDING = [0.95, '1.5%']
 /** 退场方式演多久（毫秒），样式在 theater.css 的 data-exit。 */
 const EXIT_MS = { storm: 650, run: 420, slow: 1300 }
 /** 换立绘（换表情、换动作）时新图淡入、旧图淡出多久（毫秒），样式在 theater.css 的 .is-in / .is-out。 */
@@ -360,11 +362,11 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const still = pics.cur ? <>{pics.prev && picture(pics.prev)}{picture(pics.cur)}</>
     : !src || pics.broken === src ? <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
       : null // 头一回上台、图还在读：读好再出来，不先按没量过的大小露一下
-  const [d, db] = DEPTH[entry.depth] || [1, '0%']
-  const cls = ['fg-actor', speaking && 'is-speaking', reaction && 'is-reacting', uploaded && 'is-upload', leaving && 'is-leaving', aa && 'is-aa', entry.away && 'is-away', entry.peek && 'is-peek', entry.down && 'is-down'].filter(Boolean).join(' ')
+  const [d, db] = DEPTH[entry.depth] || (entry.behind ? HIDING : [1, '0%'])
+  const cls = ['fg-actor', speaking && 'is-speaking', reaction && 'is-reacting', uploaded && 'is-upload', leaving && 'is-leaving', aa && 'is-aa', entry.away && 'is-away', entry.peek && 'is-peek', entry.behind && 'is-hiding', entry.down && 'is-down'].filter(Boolean).join(' ')
   return (
-    <div className={cls} style={{ '--x': (entry.x ?? actorX(entry.pos)) + '%', '--s': entry.scale ?? 1, '--d': d, '--db': db, '--side': SIDE[entry.pos] || '0%', '--edge': (entry.x ?? actorX(entry.pos)) < 50 ? '-40%' : '40%', '--k': place.k, '--lift': place.lift, '--head': place.head * 100 + '%' }}
-      data-name={entry.name} data-enter={entrance || undefined} data-exit={leaving && entry.how ? entry.how : undefined} data-peek={entry.peek || undefined} data-depth={entry.depth || undefined}>
+    <div className={cls} style={{ '--x': (entry.x ?? actorX(entry.pos)) + '%', '--s': entry.scale ?? 1, '--d': d, '--db': db, '--side': SIDE[entry.pos] || '0%', '--edge': (entry.x ?? actorX(entry.pos)) < 50 ? '-40%' : '40%', '--k': place.k, '--lift': place.lift, '--head': place.head * 100 + '%', zIndex: entry.z }}
+      data-name={entry.name} data-enter={entrance || undefined} data-exit={leaving && entry.how ? entry.how : undefined} data-peek={entry.peek || undefined} data-hide={entry.hide || undefined} data-depth={entry.depth || undefined}>
       <div className="fg-actor-turn">
         <div className="fg-actor-react" ref={reactRef}>
           <div className="fg-actor-body">
@@ -422,8 +424,9 @@ export function Cast({ beat, view, talk, max = 5 }) {
   // 人太多时最久没动静的先下场，剩下的按站位均匀排开。
   // 换了一堂布景（换地方、进出回忆）时同一个人也算新登场：跟着旧画面一起退，在新画面里重新出来，不从旧站位滑到新站位
   // 退场的人按最后在台上那一拍的样子退（从回忆里退下去的还穿着当时的衣服），不在退场途中换成现在的样子
-  // 走位（靠近、拉开、上前、背过身、探头）叠在排好的站位上
-  cast = blockLayout(stageLayout(onStage(cast, beat.recent, max)), beat.poses).map(entry => ({ ...entry, id: entry.name + '@' + (beat.set || 0), seen: beat }))
+  // 走位（靠近、拉开、上前、背过身、探头、躲到谁身后）叠在排好的站位上；谁挡在谁前面：说话的人在最前，说完也留在前面，躲着的人开口也还在后面
+  // 退场的人带着最后在台上时的图层走
+  cast = stackLayers(blockLayout(stageLayout(onStage(cast, beat.recent, max)), beat.poses), beat.front).map(entry => ({ ...entry, id: entry.name + '@' + (beat.set || 0), seen: beat }))
   const leaving = useLeaving(cast, beat)
   // 插画全屏盖住舞台：立绘照常在下面，插画收起时直接露出来。
   return (

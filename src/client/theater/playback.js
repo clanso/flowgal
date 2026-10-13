@@ -53,6 +53,7 @@ export function buildBeats(view) {
   let amb = '' // 当前的环境音，同上
   let shown = null // 上一拍画面上的场景和段落：判断新一轮开场要不要转场
   const active = new Map() // 每个人最近一次说话、登场是第几拍：台上人太多时，最久没动静的先下场
+  const spoke = new Map() // 每个人最近一次开口（或旁白写到他、立绘高亮）是第几拍：说话的人站到最前，说完也留在前面
   let recalled = null // 上一拍所在的短闪回：进出闪回时白闪一下
   let call = null // 正在打的电话 { who, video, dir, id, live, unanswered }：跨轮带着，挂断、电话那头的人走进画面时收起
   let set = 0 // 第几堂布景：换了地方、进出回忆这类段落时加一，台上的人跟着旧画面一起退、在新画面里重新登场，不从旧站位滑过去
@@ -140,6 +141,8 @@ export function buildBeats(view) {
       const target = hit && hit.to && onStageNames.includes(hit.to) ? [hit.to] : []
       const block = blocking.step({ onStage: onStageNames, left: steps[ui].left, speakers: type === 'narration' ? [] : speakers, moves: line.move || [], peeks: Object.keys(ways).filter(name => ways[name] === 'peek'), downs: hit && hit.effect === 'down' ? target : [], heals: hit && hit.effect === 'heal' ? target : [] })
       for (const name of [...speakers, ...steps[ui].entered, ...reacts.map(r => r.name), ...block.moves.map(m => m.name), ...(hit ? [hit.from, hit.to].filter(n => n && onStageNames.includes(n)) : [])]) active.set(name, beats.length)
+      for (const name of speakers) spoke.set(name, beats.length)
+      const front = onStageNames.filter(name => spoke.has(name)).sort((a, b) => spoke.get(b) - spoke.get(a))
       const recall = recalls[ui]
       // 特写切谁：写 true 是说话的人（旁白没说话的人就不切），短闪回里不切
       const cutin = recall ? '' : line.cutin === true ? speakers[0] || '' : line.cutin || ''
@@ -217,6 +220,7 @@ export function buildBeats(view) {
         transition,
         cast: steps[ui].cast,
         recent: steps[ui].cast.map(c => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)), // 台上的人，最近有动静的在前
+        ...(front.length ? { front } : {}), // 台上开过口的人，最近开口的在前：谁挡在谁前面（lib/blocking.js 的 stackLayers）
         entered: steps[ui].entered,
         left: steps[ui].left,
         ...(reacts.length ? { reacts } : {}), // 没在说话的人的反应 [{ name, emo, sym }]
