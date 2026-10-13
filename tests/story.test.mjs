@@ -290,6 +290,62 @@ test('gate: 双语对照由导演标 dual：原文、翻译合成一句（text �
   }
 })
 
+test('gate: 双语对照照着导演标的样子配：一整轮「原文（翻译）」只标几句也全配好，太长分页切开的合回一句；中文括号、看不出是外文的不乱配', async () => {
+  const long = 'それが何を意味するか、俺にはわからない。わかるのは、下に何かいるってことだけだ。九十層から先、魔物の数が減ってる。ありえないくらいにな'
+  const longTr = '那意味着什么，我不知道。我只知道，下面有什么东西。从第九十层开始，魔物的数量在减少。少得不正常'
+  const text = ['格伦端着碗走过来。', '「毒見済みか？（试过毒了？）」', '「グレン、それ三回目だよ（格伦，这是第三次问了）」', `格伦说：「${long}（${longTr}）」`, '「……本気？（……认真的？）」', '她笑了（其实是苦笑）。', '「好啊，走吧（小声）」'].join('\n')
+  const units = segmentTurn(text)
+  // 太长的台词分页切开：后几页记着 cont，原文和翻译跨在两页上
+  assert.deepEqual(units.slice(3, 5).map(u => [u.id, u.hint, Boolean(u.cont)]), [['U4', '格伦', false], ['U5', '格伦', true]])
+  const rows = list => list.map(u => [u.id, u.type, u.hint || '', u.text, u.orig || ''])
+  const expected = [
+    ['U1', 'narration', '', '格伦端着碗走过来。', ''],
+    ['U2', 'dialogue', '', '试过毒了？', '毒見済みか？'],
+    ['U3', 'dialogue', '', '格伦，这是第三次问了', 'グレン、それ三回目だよ'],
+    ['U4', 'dialogue', '格伦', longTr, long],
+    ['U6', 'dialogue', '', '……本気？（……认真的？）', ''],
+    ['U7', 'narration', '', '她笑了（其实是苦笑）。', ''],
+    ['U8', 'dialogue', '', '好啊，走吧（小声）', ''],
+  ]
+  // 只标一句做样子：排法一样的都配好，分页的两页合回一句台词；全是汉字的日语、中文里的括号不配
+  const one = pairUnits(units, [{ u: 'U2', orig: '毒見済みか？', tr: '（试过毒了？）' }])
+  assert.deepEqual(rows(one.units), expected)
+  assert.deepEqual([...one.alias], [['U5', 'U4']])
+  assert.ok(one.units.filter(u => u.orig).every(u => !('cont' in u) && !('src' in u)))
+  // 导演直接标分页切开的那句（u 写第一页）也认得，同样当样子
+  assert.deepEqual(rows(pairUnits(units, [{ u: 'U4', orig: long, tr: longTr }]).units), expected)
+  // 全是汉字的那句导演单独标了就配上
+  assert.equal(pairUnits(units, [{ u: 'U2', orig: '毒見済みか？', tr: '试过毒了？' }, { u: 'U6', orig: '……本気？', tr: '……认真的？' }]).units.find(u => u.id === 'U6').orig, '……本気？')
+  // 导演还是用 join 把分页并回去：仍是这个人的台词，再标 dual 照样配
+  const joined = joinUnits(units, ['U4-U5'])
+  assert.deepEqual(joined.units[3], { id: 'U4', type: 'dialogue', text: long + '（' + longTr + '）', para: 3, hint: '格伦', src: `格伦说：「${long}（${longTr}）」` })
+  assert.equal(pairUnits(joined.units, [{ u: 'U4', orig: long, tr: longTr }], joined.alias).units[3].orig, long)
+  // 别的排法照样：斜杠隔开、翻译在前
+  assert.deepEqual(pairUnits(segmentTurn('Hello / 你好\nGood night / 晚安\n今天 / 明天'), [{ u: 'U1', orig: 'Hello', tr: '你好' }]).units.map(u => [u.text, u.orig || '']), [['你好', 'Hello'], ['晚安', 'Good night'], ['今天 / 明天', '']])
+  assert.deepEqual(pairUnits(segmentTurn('「你好（こんにちは）」\n「谢谢（ありがとう）」'), [{ u: 'U1', orig: 'こんにちは', tr: '你好' }]).units.map(u => [u.text, u.orig]), [['你好', 'こんにちは'], ['谢谢', 'ありがとう']])
+
+  // 引擎里走一遍：导演只标一句，剧场里每句都是上方原文、下方翻译，长句是格伦的一句台词
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
+  try {
+    const store = createStore(dir)
+    const tavern = fakeTavern()
+    const reply = JSON.stringify({ dual: [{ u: 'U2', orig: '毒見済みか？', tr: '试过毒了？' }], cast: [{ name: '格伦', pos: 'center' }], lines: [{ u: 'U2', sp: '格伦' }, { u: 'U5', sp: '格伦', emo: 'smile' }], choices: [], images: [], people: [] })
+    const engine = createEngine({ store, services: { tavern, llm: fakeLlm(reply) }, logger: { warn() {}, info() {} } })
+    const turn = { gameId: 'g', turn: 1, textVersion: 'v1', text, rawText: text, card: { name: '格伦' } }
+    tavern.turns.set('g:1', turn)
+    await engine.onTurnSettled(turn)
+    const view = await engine.gameView('g')
+    const { beats } = buildBeats({ turns: view.turns, images: [] })
+    assert.deepEqual(beats.map(b => [b.unitId, b.text, b.orig || '']), expected.map(([id, , , tr, orig]) => [id, tr, orig]))
+    const line = beats.find(b => b.unitId === 'U4')
+    assert.equal(line.speaker, '格伦')
+    assert.equal(view.turns[0].script.lines.U4.emo, 'smile', '写在第二页上的标注跟到合并后的那句')
+    engine.dispose()
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
+})
+
 test('gate: 特殊段落：进入回忆换场景和配乐、在场的人，写 real 时场景、配乐、在场的人自动换回来；一轮结束也回到现实', () => {
   const units = segmentTurn(['长楼梯上，她一直握着那颗宝石。', '三年前。', '“稍等一下哦。”', '“那一方死了会怎样？”', '她回过神来。', '下一句。'].join('\n'))
   const raw = {
