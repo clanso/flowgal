@@ -4,18 +4,21 @@
 // 场景逐句变：导演在某一句写的地点、时段、天气、光线、基调、画面效果从那一句起生效，特殊段落（回忆、梦境……）进出见 lib/scenes.js。
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
 import { placeKey, speakersOf, MODE_NAMES, RECALL_TONES, RECALL_TONE_NAMES, cgIn, cgOut, cgMotion } from '../../../lib/vocab.js'
-import { stageWalk, playedUnits } from '../../../lib/staging.js'
+import { stageWalk, playedUnits, hintedSpeaker, unitSpeakers } from '../../../lib/staging.js'
 import { walkScenes, recallRuns, markRecalls, autoRecallTone, intimateRuns, holdIntimateCgs, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
 import { shiftsAhead } from '../../../lib/look.js'
 import { reactsOf, poseTracker, blockLayout } from '../../../lib/blocking.js'
 
-export { placeKey, blockLayout }
+export { placeKey, blockLayout, hintedSpeaker }
 import { emotionLabel as labelIn, resolveEmotion, standIns, isBuiltinEmotion } from '../../../lib/emotions.js'
+import { sheetOf, poseWalker, lineSteps } from '../../../lib/poses.js'
 
 // 剧场拿到的情绪库（所有对局共用）：内置情绪改过名的按新名字显示，并掉的显示并进去的那个。Theater 每次拿到视图时记一下。
 let shownEmotions = []
 export function showEmotions(lib) { if (lib) shownEmotions = lib }
+/** 剧场最近拿到的情绪库（设置页这种拿不到视图的地方用）。 */
+export const shownLib = () => shownEmotions
 /** 情绪显示的名字；不给情绪库就用剧场最近拿到的那份。 */
 export const emotionLabel = (id, custom) => labelIn(id, custom || shownEmotions)
 /** 一种情绪对应的内置情绪（内置的就是它自己；新情绪按替身那一串找第一个内置的）。 */
@@ -68,6 +71,11 @@ export function buildBeats(view) {
   // 有立绘的人：导演漏列进 cast、却当面开口时让他上台（lib/staging.js 的 walkOn）
   const drawn = new Set((view.cast || []).filter(p => Object.values(p.sprites || {}).some(s => s && s.assetId)).map(p => p.name))
   const people = (view.cast || []).map(p => p.name)
+  // 每个人此刻在哪个动作（lib/poses.js）：身子不动只换脸，情绪在当前动作里没有才换，导演点名的换过去；出图那边按同一套走
+  const byName = new Map((view.cast || []).map(p => [p.name, p]))
+  const sheets = new Map()
+  const sheetFor = name => { if (!sheets.has(name)) sheets.set(name, sheetOf(byName.get(name), view.poseGroups || [])); return sheets.get(name) }
+  const bodies = poseWalker(sheetFor, view.emotions || [])
   turns.forEach((t, ti) => {
     // 正文里框起来的闪回、回忆里的声音：导演没写 recall 也按短闪回演
     const script = markRecalls(t.script, t.units)
@@ -105,7 +113,7 @@ export function buildBeats(view) {
       .sort((a, b) => a.at - b.at)
     // 亲密场面由插画来演：这段里出来的插画一直显示到这段结束（导演整理时已经这样改了，这里让老脚本也一样；玩家在改词里定了显示到哪一句的照他的）
     holdIntimateCgs(turnImages, intimateRuns(scenes))
-    let lastSpeaker = ''
+    const speakerOf = unitSpeakers(units, script, known) // 台词没写 sp 的按切分猜的、再沿用上一位（出图那边也这样算）
     let hush = 0 // 配乐留白还剩几拍：写了换歌（写回原来的曲子也算）、换了地方、进出段落、过场字卡就提前回来；不跨轮
     let split = null // 分屏：电话另一头的人在画面一侧，写 off 或这一轮结束时收起
     const blocking = poseTracker() // 走位：每一轮、每换一堂布景从原位开始
@@ -113,12 +121,9 @@ export function buildBeats(view) {
     units.forEach((unit, ui) => {
       const line = lines[ui]
       const at = scenes[ui]
-      let speaker = ''
       const type = line.type || unit.type
       // 导演只给换人那一句写说话人：同一人连续说话沿用上一位。旁白写了 sp 表示描写的是谁（立绘高亮、换表情，不显示名牌）。
-      if (type === 'dialogue') { speaker = line.sp || (line.type ? '' : hintedSpeaker(unit.hint, known, lastSpeaker)) || lastSpeaker; lastSpeaker = speaker }
-      else if (type === 'thought') speaker = line.sp || '我'
-      else if (line.sp) speaker = line.sp
+      const speaker = speakerOf[ui]
       const speakers = speakersOf(speaker)
       if (line.emo) for (const name of speakers) emotions[name] = line.emo
       if (line.split === 'off') split = null
@@ -141,6 +146,9 @@ export function buildBeats(view) {
       const onStageNames = steps[ui].cast.map(c => c.name)
       const reacts = reactsOf(line, onStageNames, speakers)
       for (const r of reacts) if (r.emo) emotions[r.name] = r.emo
+      for (const step of lineSteps(line, speakers, reacts)) bodies.step(step.name, step.emo, step.pose)
+      const postures = {}
+      for (const [name, st] of Object.entries(bodies.save())) if (st.pose) postures[name] = st.pose
       // 走位和进出的样子
       const ways = Object.fromEntries((line.enter || []).filter(e => e.how && steps[ui].entered.includes(e.name)).map(e => [e.name, e.how]))
       Object.assign(exitWay, line.exitHow || {})
@@ -236,6 +244,7 @@ export function buildBeats(view) {
         ...(Object.keys(ways).length ? { enterHow: ways } : {}), // 跑进来、探头、慢慢走进来
         ...(Object.keys(gone).length ? { exitHow: gone } : {}), // 甩头离开、跑开、慢慢走远
         emotions: { ...emotions },
+        ...(Object.keys(postures).length ? { postures } : {}), // 每个人此刻在哪个动作（动作编号；没走到过的人按他情绪的主动作）
         cg,
         cgAnchor: Boolean(cgEntry && cgEntry.at === ui),
         directed: Boolean(script),
@@ -256,18 +265,6 @@ export function buildBeats(view) {
 }
 
 export function actorX(pos) { return POS_X[pos] ?? 50 }
-
-/**
- * 切分时从引号前后猜的说话人（弱提示，导演没给这句写 sp 时才用）：认得的名字照用；
- * 「宋棠打断她，」这样连动作一起截进来的，取开头那个认得的名字；认不出、又不像名字（超过四个字，比如「秦语气没什么起伏」）的，当作上一位接着说。
- */
-export function hintedSpeaker(hint, known, last) {
-  if (!hint) return ''
-  if (known.includes(hint)) return hint
-  const head = known.filter(name => name && hint.startsWith(name)).sort((a, b) => b.length - a.length)[0]
-  if (head) return head
-  return [...hint].length > 4 ? last || '' : hint
-}
 
 /** 同屏最多站几个人：超出的，最久没说话、没登场的先下场（还算在场，轮到他说话就回来）。临时上台说一两句的（extra）不算在内。max 为 0 不限。 */
 export function onStage(cast, recent, max) {
