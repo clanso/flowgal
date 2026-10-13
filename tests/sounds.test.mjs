@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { VOICES, SOUND_SLOTS, DEFAULT_SOUNDS, resolveVoice, castVoices, lineVoice, soundFor } from '../lib/sounds.js'
+import { VOICES, SOUND_SLOTS, DEFAULT_SOUNDS, resolveVoice, castVoices, lineVoice, soundFor, cleanVoice, voiceLabel, libraryPreset, builtinPreset, LIBRARY_VOICES } from '../lib/sounds.js'
 import { resolveConfig, applyPatch } from '../lib/config.js'
 import { editPerson, effectivePerson } from '../lib/cast.js'
 import { createStore } from '../lib/dsh/store.js'
@@ -37,7 +37,8 @@ test('gate: 声音目录：每个音色和音效版本都能照配方发声，�
   // 选了哪个就放哪个；关掉是 null；「用自己的」有文件放文件，没文件放默认。
   assert.equal(soundFor({ sounds: { slam: 'gong' } }, 'slam').parts, SOUND_SLOTS[1].presets.find(x => x.id === 'gong').parts)
   assert.equal(soundFor({ sounds: { slam: 'off' } }, 'slam'), null)
-  assert.deepEqual(soundFor({ sounds: { slam: 'custom' }, customSounds: { slam: { assetId: 'a.wav' } } }, 'slam'), { assetId: 'a.wav' })
+  // 有文件时带着默认版本的配方：前端按它对齐响度，文件下不来时也放它
+  assert.deepEqual(soundFor({ sounds: { slam: 'custom' }, customSounds: { slam: { assetId: 'a.wav' } } }, 'slam'), { assetId: 'a.wav', parts: SOUND_SLOTS[1].presets[0].parts })
   assert.equal(soundFor({ sounds: { slam: 'custom' } }, 'slam').parts, SOUND_SLOTS[1].presets[0].parts)
   assert.equal(soundFor({}, 'nope'), null)
 })
@@ -183,4 +184,50 @@ test('gate: 某种音效换成自己的文件：认格式、再换时删掉旧�
   } finally {
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
   }
+})
+
+// 音效库里的声音（逆转裁判音效包这种）：打字音当音色，别的能放进落字音效、界面音的槽；标了用途的一键套用。
+const AA = [
+  { id: 'm1', name: '男声哔哔', kind: 'blip', gender: 'male' },
+  { id: 'f1', name: '女声哔哔', kind: 'blip', gender: 'female' },
+  { id: 'tw', name: '打字机', kind: 'blip', gender: '', use: 'narration' },
+  { id: 'desk', name: '拍桌子', kind: 'sfx', use: 'slam' },
+  { id: 'menu', name: '菜单选中音', kind: 'sfx', use: 'select' },
+  { id: 'rain', name: '小雨', kind: 'ambience' },
+]
+
+test('gate: 音效库的打字音当音色：档案和设置能选 lib:编号；按性别用库里的时同性别一个声音、不错开音高，库里没有这个性别就照内置自动分', () => {
+  assert.equal(cleanVoice('lib:m1'), 'lib:m1')
+  assert.equal(cleanVoice('lib:../x'), '', '编号只认字母数字')
+  assert.deepEqual(resolveVoice({ voice: 'lib:f1', voicePitch: 2 }, '真宵', {}, AA), { id: 'lib:f1', pitch: 2, auto: false })
+  const ui = { voiceDefault: LIBRARY_VOICES }
+  const cast = castVoices([
+    { name: '成步堂', gender: 'male', createdTurn: 1 }, { name: '御剑', gender: 'male', createdTurn: 2 },
+    { name: '真宵', gender: 'female', createdTurn: 3 }, { name: '千寻', gender: 'female', createdTurn: 4, voicePitch: -2 },
+  ], ui, AA)
+  assert.deepEqual(['成步堂', '御剑'].map(n => cast.get(n)), [{ id: 'lib:m1', pitch: 0, auto: true }, { id: 'lib:m1', pitch: 0, auto: true }])
+  assert.deepEqual(['真宵', '千寻'].map(n => cast.get(n)), [{ id: 'lib:f1', pitch: 0, auto: true }, { id: 'lib:f1', pitch: -2, auto: true }])
+  // 没标性别的人：库里没有「不分男女」的（打字机是旁白用的不算）就从男女两组里按名字挑
+  assert.ok(['lib:m1', 'lib:f1'].includes(resolveVoice({}, '路人甲', ui, AA).id))
+  // 库里只有女声：男性照内置自动分；库是空的：全部照内置
+  const male = new Set(VOICES.filter(v => v.gender === 'male').map(v => v.id))
+  assert.ok(male.has(resolveVoice({ gender: 'male' }, '成步堂', ui, AA.filter(s => s.gender !== 'male')).id))
+  assert.equal(resolveVoice({}, '路人甲', ui, []).id, 'classic')
+  // 旁白、统一用某一个
+  assert.deepEqual(lineVoice('narration', '', cast, { narrationVoice: 'lib:tw', narrationPitch: 0 }, AA), { id: 'lib:tw', pitch: 0, auto: false })
+  assert.equal(resolveVoice({ gender: 'female' }, '真宵', { voiceDefault: 'lib:tw' }, AA).id, 'lib:tw')
+  assert.deepEqual([voiceLabel('lib:m1', AA), voiceLabel('lib:gone', AA), voiceLabel('bell', AA)], ['男声哔哔', '音效库里已删除的打字音', '清亮铃音'])
+  // 设置校验认 lib:编号（库里删没删由前端管）
+  const saved = resolveConfig({ ui: { voiceDefault: LIBRARY_VOICES, narrationVoice: 'lib:tw', sounds: { slam: 'lib:desk', stab: 'lib:../../x' } } }).ui
+  assert.deepEqual([saved.voiceDefault, saved.narrationVoice, saved.sounds.slam, saved.sounds.stab], [LIBRARY_VOICES, 'lib:tw', 'lib:desk', 'stab'])
+  assert.deepEqual(soundFor(saved, 'slam'), { libId: 'desk', parts: SOUND_SLOTS[1].presets[0].parts })
+})
+
+test('gate: 一键套用音效库里标了用途的声音，换回内置只动音效库的那几项', () => {
+  const patch = libraryPreset(AA)
+  assert.deepEqual(patch, { sounds: { slam: 'lib:desk', select: 'lib:menu' }, voiceDefault: LIBRARY_VOICES, narrationVoice: 'lib:tw', narrationPitch: 0 })
+  assert.equal(libraryPreset([{ id: 'rain', kind: 'ambience' }]), null)
+  const ui = resolveConfig({ ui: { ...patch, sounds: { ...patch.sounds, impact: 'boom' } } }).ui
+  assert.deepEqual(builtinPreset(ui), { sounds: { slam: 'desk', select: 'pop' }, voiceDefault: 'auto', narrationVoice: 'classic', narrationPitch: -6 })
+  assert.equal(builtinPreset(resolveConfig({}).ui), null)
 })

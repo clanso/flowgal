@@ -257,6 +257,9 @@ function setSoundlib(sounds2) {
   soundlibCache = sounds2;
   for (const fn of [...soundlibListeners]) fn();
 }
+function soundlibNow() {
+  return soundlibCache;
+}
 function loadSoundlib() {
   return api.soundlib().then((r) => {
     setSoundlib(r.sounds);
@@ -1579,6 +1582,14 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-libgroup-head + .fg-track, .fg-libgroup-head + .fg-note { margin-top: .8cqw; }
 .fg-libsound { padding: .8cqw 1.2cqw; margin-bottom: .6cqw; }
 .fg-libsound-tags { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* 声音页：一键套用音效库里标了用途的声音；给落字音效 / 界面音从音效库挑一个 */
+.fg-libpreset { display: flex; flex-wrap: wrap; align-items: center; gap: .6cqw; padding: .8cqw 1.2cqw; margin-bottom: 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
+.fg-libpicker { margin-top: .6cqw; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }
+.fg-libpicker-list { max-height: 24cqw; overflow-y: auto; margin-top: .6cqw; }
+.fg-libpicker-item { gap: .6cqw; padding: .3cqw 0; }
+.fg-libpicker-item.is-on .fg-libpicker-name { color: var(--accent); }
+.fg-libpicker-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fg-libpicker-name small { margin-left: .6cqw; opacity: .6; }
 .fg-person-art { position: relative; height: 19cqw; border-radius: .8cqw; overflow: hidden; background: radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--c) 40%, transparent), rgba(0, 0, 0, .3)); }
 .fg-person-art img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
 .fg-person-art .fg-silhouette { height: 100%; }
@@ -2571,6 +2582,20 @@ var VOICE_IDS = new Set(VOICES2.map((v) => v.id));
 var voiceById = (id) => VOICES2.find((v) => v.id === id) || null;
 var VOICE_POOLS = { female: ["bell", "chirp", "soft", "cool", "bubble"], male: ["boy", "deep", "gruff", "elder"], other: ["classic", "kid", "wood", "robot"], "": ["classic"] };
 var VOICE_PITCH_LIMIT = 6;
+var LIB_REF = /^lib:[A-Za-z0-9_-]{1,40}$/;
+var isLibRef = (value) => LIB_REF.test(String(value ?? ""));
+var libRef = (id) => "lib:" + id;
+var libIdOf = (value) => isLibRef(value) ? String(value).slice(4) : "";
+var isVoice = (id) => VOICE_IDS.has(id) || isLibRef(id);
+var LIBRARY_VOICES = "library";
+var libraryBlips = (sounds2) => (sounds2 || []).filter((s) => s && s.kind === "blip" && s.id);
+function voiceLabel(id, blips) {
+  if (isLibRef(id)) {
+    const s = (blips || []).find((b) => b.id === libIdOf(id));
+    return s ? s.name : "音效库里已删除的打字音";
+  }
+  return voiceById(id)?.label || "";
+}
 var SOUND_SLOTS = Object.freeze([
   {
     id: "impact",
@@ -2699,7 +2724,9 @@ function soundFor(ui2, slot) {
   if (!def) return null;
   const choice = ui2?.sounds?.[slot] || def.presets[0].id;
   if (choice === "off") return null;
-  if (choice === "custom") return ui2?.customSounds?.[slot]?.assetId ? { assetId: ui2.customSounds[slot].assetId } : { parts: def.presets[0].parts };
+  const base = def.presets[0].parts;
+  if (choice === "custom") return ui2?.customSounds?.[slot]?.assetId ? { assetId: ui2.customSounds[slot].assetId, parts: base } : { parts: base };
+  if (isLibRef(choice)) return { libId: libIdOf(choice), parts: base };
   return { parts: (def.presets.find((x) => x.id === choice) || def.presets[0]).parts };
 }
 var clamp = (v, lo, hi, d) => {
@@ -2709,37 +2736,47 @@ var clamp = (v, lo, hi, d) => {
 var clampPitch = (v) => Math.round(clamp(v, -VOICE_PITCH_LIMIT, VOICE_PITCH_LIMIT, 0));
 function cleanVoice(value) {
   const v = String(value ?? "").trim();
-  return v === "off" || VOICE_IDS.has(v) ? v : "";
+  return v === "off" || isVoice(v) ? v : "";
 }
 function nameHash(name2) {
   let h = 0;
   for (const ch of String(name2 || "")) h = h * 31 + ch.codePointAt(0) >>> 0;
   return h;
 }
-function poolOf(person, ui2) {
-  return VOICE_IDS.has(ui2?.voiceDefault) ? [ui2.voiceDefault] : VOICE_POOLS[person?.gender] || VOICE_POOLS[""];
+function libraryPool(blips, gender) {
+  const ref = (list3) => list3.map((b) => libRef(b.id));
+  if (gender === "female" || gender === "male") return ref(blips.filter((b) => b.gender === gender));
+  const plain = blips.filter((b) => !b.gender && b.use !== "narration");
+  return ref(plain.length ? plain : blips.filter((b) => b.gender === "female" || b.gender === "male"));
+}
+function poolOf(person, ui2, blips) {
+  if (ui2?.voiceDefault === LIBRARY_VOICES) {
+    const pool = libraryPool(libraryBlips(blips), person?.gender);
+    if (pool.length) return pool;
+  } else if (isVoice(ui2?.voiceDefault)) return [ui2.voiceDefault];
+  return VOICE_POOLS[person?.gender] || VOICE_POOLS[""];
 }
 function autoVoice(id, name2, pitch) {
   const h = nameHash(name2);
-  const spread = id === "classic" ? 12 * Math.log2((420 + h % 7 * 38) / 420) : (h >>> 8) % 5 - 2;
+  const spread = id === "classic" ? 12 * Math.log2((420 + h % 7 * 38) / 420) : isLibRef(id) ? 0 : (h >>> 8) % 5 - 2;
   return { id, pitch: pitch + spread, auto: true };
 }
-function resolveVoice(person, name2, ui2) {
+function resolveVoice(person, name2, ui2, blips) {
   const chosen = cleanVoice(person?.voice);
   if (chosen === "off") return null;
   const pitch = clampPitch(person?.voicePitch);
   if (chosen) return { id: chosen, pitch, auto: false };
-  const pool = poolOf(person, ui2);
+  const pool = poolOf(person, ui2, blips);
   return autoVoice(pool[nameHash(name2) % pool.length], name2, pitch);
 }
-function castVoices(people, ui2) {
+function castVoices(people, ui2, blips) {
   const list3 = [...people || []].sort((a, b) => (a.createdTurn ?? -1) - (b.createdTurn ?? -1) || String(a.name).localeCompare(String(b.name)));
-  const voices = new Map(list3.map((p4) => [p4.name, resolveVoice(p4, p4.name, ui2)]));
+  const voices = new Map(list3.map((p4) => [p4.name, resolveVoice(p4, p4.name, ui2, blips)]));
   const taken = new Set([...voices.values()].filter((v) => v && !v.auto).map((v) => v.id));
   for (const p4 of list3) {
     const voice = voices.get(p4.name);
     if (!voice || !voice.auto) continue;
-    const pool = poolOf(p4, ui2);
+    const pool = poolOf(p4, ui2, blips);
     const start = pool.indexOf(voice.id);
     const free = pool.map((_, i) => pool[(start + i) % pool.length]).find((id) => !taken.has(id));
     if (free && free !== voice.id) voices.set(p4.name, autoVoice(free, p4.name, clampPitch(p4.voicePitch)));
@@ -2747,12 +2784,37 @@ function castVoices(people, ui2) {
   }
   return voices;
 }
-function lineVoice(type, speaker, voices, ui2) {
+function lineVoice(type, speaker, voices, ui2, blips) {
   if (type === "narration" || !speaker) {
-    return ui2?.narrationVoice === "off" ? null : { id: VOICE_IDS.has(ui2?.narrationVoice) ? ui2.narrationVoice : "classic", pitch: clampPitch(ui2?.narrationPitch ?? -6), auto: false };
+    return ui2?.narrationVoice === "off" ? null : { id: isVoice(ui2?.narrationVoice) ? ui2.narrationVoice : "classic", pitch: clampPitch(ui2?.narrationPitch ?? -6), auto: false };
   }
-  const voice = voices?.has?.(speaker) ? voices.get(speaker) : resolveVoice(null, speaker, ui2);
+  const voice = voices?.has?.(speaker) ? voices.get(speaker) : resolveVoice(null, speaker, ui2, blips);
   return voice && type === "thought" ? { ...voice, gain: 0.7 } : voice;
+}
+var SOUND_USES = Object.freeze([...SOUND_SLOTS.map((s) => s.id), "narration"]);
+function libraryPreset(sounds2) {
+  const list3 = sounds2 || [];
+  const patch = {};
+  const slots = {};
+  for (const slot of SOUND_SLOTS) {
+    const hit = list3.find((s) => s.use === slot.id && s.kind !== "blip");
+    if (hit) slots[slot.id] = libRef(hit.id);
+  }
+  if (Object.keys(slots).length) patch.sounds = slots;
+  const blips = libraryBlips(list3);
+  if (blips.some((b) => b.gender === "female" || b.gender === "male")) patch.voiceDefault = LIBRARY_VOICES;
+  const narration = blips.find((b) => b.use === "narration");
+  if (narration) patch.narrationVoice = libRef(narration.id);
+  return Object.keys(patch).length ? patch : null;
+}
+function builtinPreset(ui2) {
+  const patch = {};
+  const slots = {};
+  for (const slot of SOUND_SLOTS) if (isLibRef(ui2?.sounds?.[slot.id])) slots[slot.id] = slot.presets[0].id;
+  if (Object.keys(slots).length) patch.sounds = slots;
+  if (ui2?.voiceDefault === LIBRARY_VOICES || isLibRef(ui2?.voiceDefault)) patch.voiceDefault = "auto";
+  if (isLibRef(ui2?.narrationVoice)) patch.narrationVoice = "classic";
+  return Object.keys(patch).length ? patch : null;
 }
 
 // lib/stature.js
@@ -2824,8 +2886,8 @@ function usualFace(boxes, height) {
 }
 function placeSprite({ box = null, size = null, cm = BASE_HEIGHT.female, usual = 0 } = {}) {
   const ok = Array.isArray(box) && box.length === 4 && box.every(Number.isFinite) && box[3] > box[1] && Array.isArray(size) && size[1] > 0;
-  const measured = ok ? (box[3] - box[1]) / size[1] : FACE_RATIO;
-  const ratio = ok && usual > 0 ? clamp2(measured, usual / FACE_SPREAD, usual * FACE_SPREAD) : measured;
+  const measured2 = ok ? (box[3] - box[1]) / size[1] : FACE_RATIO;
+  const ratio = ok && usual > 0 ? clamp2(measured2, usual / FACE_SPREAD, usual * FACE_SPREAD) : measured2;
   const center2 = ok ? (box[1] + box[3]) / 2 / size[1] : FACE_CENTER;
   const top = ok ? box[1] / size[1] : FACE_CENTER - FACE_RATIO / 2;
   const k = clamp2(FACE_RATIO / ratio, 0.6, 1.4);
@@ -5449,6 +5511,13 @@ function configureSounds(ui2) {
   sounds = ui2;
   for (const file2 of Object.values(ui2.customSounds || {})) fetchFile(file2.assetId).catch(() => {
   });
+  const ac = audioCtx();
+  if (!ac) return;
+  for (const choice of Object.values(ui2.sounds || {})) {
+    const s = isLibRef(choice) && libSound(libIdOf(choice));
+    if (s) loadSample(ac, s.assetId);
+  }
+  warmVoices([{ id: ui2.narrationVoice }]);
 }
 var noiseBuffer = null;
 function noise(ac) {
@@ -5503,9 +5572,73 @@ function playParts(ac, parts, { rate = 1, volume = 1, at: at2 = ac.currentTime, 
     src.stop(end + 0.02);
   }
 }
+function loudness(data, rate) {
+  const poles = [["hp", 20.6], ["hp", 20.6], ["hp", 107.7], ["hp", 737.9], ["lp", 12194], ["lp", 12194]];
+  let y = Float32Array.from(data);
+  let norm = 1;
+  for (const [kind, fc] of poles) {
+    const f = Math.min(fc, rate * 0.45);
+    const k = Math.tan(Math.PI * f / rate);
+    const a1 = (k - 1) / (k + 1);
+    const b0 = kind === "hp" ? 1 / (1 + k) : k / (1 + k);
+    const b1 = kind === "hp" ? -b0 : b0;
+    norm *= kind === "hp" ? 1e3 / Math.hypot(1e3, f) : f / Math.hypot(1e3, f);
+    let x1 = 0, y1 = 0;
+    for (let i = 0; i < y.length; i += 1) {
+      const x = y[i];
+      y1 = b0 * x + b1 * x1 - a1 * y1;
+      x1 = x;
+      y[i] = y1;
+    }
+  }
+  let peak = 0;
+  for (let i = 0; i < y.length; i += 1) peak = Math.max(peak, Math.abs(y[i]));
+  if (!(peak > 0)) return 0;
+  let first = 0, last = y.length - 1;
+  while (Math.abs(y[first]) < peak * 0.05) first += 1;
+  while (Math.abs(y[last]) < peak * 0.05) last -= 1;
+  let sum = 0;
+  for (let i = first; i <= last; i += 1) sum += y[i] * y[i];
+  return Math.sqrt(sum / (last - first + 1)) / norm;
+}
+var bufferLoudness = (buffer) => loudness(buffer.getChannelData(0), buffer.sampleRate);
+var FALLBACK_LEVEL = 63e-4;
+var levels = /* @__PURE__ */ new WeakMap();
+function recipeLevel(parts) {
+  const known = levels.get(parts);
+  if (known) return known;
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const rate = 44100;
+  const seconds = Math.max(...parts.map((x) => (x.at || 0) + x.dur + (x.hold || 0))) + 0.05;
+  const job = { value: null };
+  levels.set(parts, job);
+  try {
+    const off = new OAC(1, Math.ceil(seconds * rate), rate);
+    playParts(off, parts, { at: 0 });
+    off.startRendering().then((buffer) => {
+      job.value = bufferLoudness(buffer) || FALLBACK_LEVEL;
+    }, () => {
+      job.value = FALLBACK_LEVEL;
+    });
+  } catch {
+    job.value = FALLBACK_LEVEL;
+  }
+  return job;
+}
+function matchGain(parts, sample2) {
+  const ref = recipeLevel(parts).value ?? FALLBACK_LEVEL;
+  return sample2.level > 0 ? Math.min(16, ref / sample2.level) : 1;
+}
+var libIndex = { list: null, map: /* @__PURE__ */ new Map() };
+function libSound(id) {
+  const list3 = soundlibNow();
+  if (libIndex.list !== list3) libIndex = { list: list3, map: new Map((list3 || []).map((x) => [x.id, x])) };
+  return libIndex.map.get(id) || null;
+}
 var MAX_FILE_SECONDS = 4;
 var files = /* @__PURE__ */ new Map();
 var buffers = /* @__PURE__ */ new Map();
+var samples = /* @__PURE__ */ new Map();
 function fetchFile(id) {
   if (!files.has(id)) {
     const p4 = fetch(assetUrl(id)).then((r) => {
@@ -5525,13 +5658,40 @@ function decoded(ac, id) {
   }
   return buffers.get(id);
 }
-function playFile(ac, id, volume) {
+function measured(id, buffer) {
+  const known = samples.get(id);
+  if (known && known.buffer) return known;
+  const sample2 = { buffer, level: bufferLoudness(buffer) };
+  samples.set(id, sample2);
+  return sample2;
+}
+function loadSample(ac, id) {
+  const known = samples.get(id);
+  if (known) return known.buffer ? known : null;
+  samples.set(id, {});
+  decoded(ac, id).then((buffer) => measured(id, buffer), () => samples.delete(id));
+  return null;
+}
+var sampleReady = (ac, id) => decoded(ac, id).then((buffer) => measured(id, buffer));
+function playSample(ac, sample2, { rate = 1, volume = 1, at: at2 = ac.currentTime, out = ac.destination } = {}) {
   if (!(volume > 0)) return;
+  const src = ac.createBufferSource();
+  const g = ac.createGain();
+  src.buffer = sample2.buffer;
+  src.playbackRate.value = rate;
+  g.gain.value = volume;
+  src.connect(g).connect(out);
+  src.start(at2);
+}
+function playFile(ac, id, volume, base) {
+  if (!(volume > 0)) return;
+  if (base) recipeLevel(base);
   decoded(ac, id).then((buffer) => {
     const src = ac.createBufferSource();
     const g = ac.createGain();
     const t = ac.currentTime;
     src.buffer = buffer;
+    if (base) volume *= matchGain(base, measured(id, buffer));
     g.gain.setValueAtTime(volume, t);
     src.connect(g).connect(ac.destination);
     src.start(t);
@@ -5569,7 +5729,9 @@ function playLibSound(assetId, volume = 1) {
 function playSound(sound, volume) {
   const ac = sound && audioCtx();
   if (!ac) return;
-  if (sound.assetId) playFile(ac, sound.assetId, volume);
+  const lib = sound.libId ? libSound(sound.libId) : null;
+  if (lib) playFile(ac, lib.assetId, volume * (lib.volume ?? 1), sound.parts);
+  else if (sound.assetId) playFile(ac, sound.assetId, volume, sound.parts);
   else playParts(ac, sound.parts, { volume });
 }
 function impulse(ac, seconds, decay = 2.5) {
@@ -5693,42 +5855,80 @@ function chainFor(ac, style) {
   chains.set(style, input);
   return input;
 }
-function blip(voice, { pitch = 1, gain = 1 } = {}) {
-  const v = voice && voiceById(voice.id);
-  const ac = v && audioCtx();
+var CLASSIC = voiceById("classic").parts;
+function voiceSource(ac, id) {
+  if (!isLibRef(id)) {
+    const v = voiceById(id);
+    return v ? { parts: v.parts } : null;
+  }
+  if (!soundlibNow()) return null;
+  const lib = libSound(libIdOf(id));
+  if (!lib) return { parts: CLASSIC };
+  const sample2 = loadSample(ac, lib.assetId);
+  recipeLevel(CLASSIC);
+  return sample2 ? { sample: sample2, gain: (lib.volume ?? 1) * matchGain(CLASSIC, sample2) } : null;
+}
+function emit(ac, source, { rate = 1, volume = 1, at: at2 = ac.currentTime, out = ac.destination, memory = false } = {}) {
+  if (source.sample) playSample(ac, source.sample, { rate, volume: volume * source.gain, at: at2, out });
+  else playParts(ac, memory ? submerged(source.parts) : source.parts, { rate, volume, at: at2, out });
+}
+function warmVoices(voices) {
+  const ac = audioCtx();
   if (!ac) return;
+  for (const voice of voices || []) {
+    if (!voice || !isLibRef(voice.id)) continue;
+    const lib = libSound(libIdOf(voice.id));
+    if (lib) loadSample(ac, lib.assetId);
+  }
+  recipeLevel(CLASSIC);
+}
+function blip(voice, { pitch = 1, gain = 1 } = {}) {
+  const ac = voice && audioCtx();
+  const v = ac && voiceSource(ac, voice.id);
+  if (!v) return;
   const style = voice.style || "";
   const jitter = pitch * (0.96 + Math.random() * 0.08);
   const volume = (sounds.blipVolume ?? 1) * gain;
   const rateOf = (who) => 2 ** ((who.pitch || 0) / 12) * jitter;
   if (style === "chorus") {
-    const others = (voice.also || []).filter((o) => voiceById(o.id));
-    const group = others.length ? [voice, ...others] : [voice, { ...voice, pitch: (voice.pitch || 0) - 3 }, { ...voice, pitch: (voice.pitch || 0) + 4 }];
+    const others = (voice.also || []).map((o) => ({ who: o, source: voiceSource(ac, o.id) })).filter((o) => o.source);
+    const group = others.length ? [{ who: voice, source: v }, ...others] : [voice, { ...voice, pitch: (voice.pitch || 0) - 3 }, { ...voice, pitch: (voice.pitch || 0) + 4 }].map((who) => ({ who, source: v }));
     const share = 1 / Math.sqrt(group.length);
-    group.forEach((who, i) => playParts(ac, voiceById(who.id).parts, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014 }));
+    group.forEach(({ who, source }, i) => emit(ac, source, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014 }));
     return;
   }
   const memory = style === "memory" ? MEMORY_DEPTH[voice.tone] ? voice.tone : "warm" : "";
   const out = chainFor(ac, memory ? "memory-" + memory : style);
   const rate = rateOf(voice) * (style === "telepathy" ? 1.08 : style === "machine" ? 0.94 : memory ? MEMORY_RATE[memory] : 1);
   if (memory) {
-    const parts = submerged(v.parts);
-    playParts(ac, parts, { rate, volume: volume * (voice.gain ?? 1), out });
-    playParts(ac, parts, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out });
+    emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, memory: true });
+    emit(ac, v, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out, memory: true });
     if (Math.random() < 0.16) playParts(ac, BUBBLE, { rate: 0.8 + Math.random() * 0.6, volume, out, at: ac.currentTime + 0.03 + Math.random() * 0.04 });
     return;
   }
-  playParts(ac, v.parts, { rate, volume: volume * (voice.gain ?? 1), out });
-  if (style === "telepathy") playParts(ac, v.parts, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out });
+  emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out });
+  if (style === "telepathy") emit(ac, v, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out });
   if (style === "radio") playParts(ac, [{ wave: "noise", f: 3200, q: 0.8, gain: 0.05, dur: 0.06 }], { volume, out });
 }
-function previewVoice(voice, ui2 = sounds) {
-  const v = voice && voiceById(voice.id);
-  const ac = v && audioCtx();
+async function previewVoice(voice, ui2 = sounds) {
+  const ac = voice && audioCtx();
   if (!ac) return;
+  if (isLibRef(voice.id)) {
+    const lib = libSound(libIdOf(voice.id));
+    if (lib) {
+      await sampleReady(ac, lib.assetId);
+      await recipeLevelDone(CLASSIC);
+    }
+  }
+  const v = voiceSource(ac, voice.id);
+  if (!v) return;
   const base = 2 ** ((voice.pitch || 0) / 12);
   const t0 = ac.currentTime + 0.02;
-  for (const dt of [0, 0.09, 0.18, 0.42, 0.51, 0.6, 0.69]) playParts(ac, v.parts, { rate: base * (0.96 + Math.random() * 0.08), volume: ui2.blipVolume ?? 1, at: t0 + dt });
+  for (const dt of [0, 0.09, 0.18, 0.42, 0.51, 0.6, 0.69]) emit(ac, v, { rate: base * (0.96 + Math.random() * 0.08), volume: ui2.blipVolume ?? 1, at: t0 + dt });
+}
+async function recipeLevelDone(parts) {
+  const job = recipeLevel(parts);
+  for (let i = 0; i < 25 && job.value === null; i += 1) await new Promise((r) => setTimeout(r, 20));
 }
 function stinger(kind) {
   if (sounds.sfx !== false) playSound(soundFor(sounds, kind), sounds.sfxVolume ?? 1);
@@ -5748,9 +5948,7 @@ function sfx(kind = "select") {
 function previewSound(slot, choice, ui2 = sounds) {
   const def = slotById(slot);
   if (!def || choice === "off") return;
-  const file2 = choice === "custom" && ui2.customSounds && ui2.customSounds[slot];
-  const sound = file2 ? { assetId: file2.assetId } : { parts: (def.presets.find((x) => x.id === choice) || def.presets[0]).parts };
-  playSound(sound, ui2.sfxVolume ?? 1);
+  playSound(soundFor({ ...ui2, sounds: { ...ui2.sounds, [slot]: choice } }, slot), ui2.sfxVolume ?? 1);
 }
 var wobble = (k = 0.06) => 1 - k + Math.random() * 2 * k;
 function erosFoley(id, volume = 1) {
@@ -8359,7 +8557,7 @@ function writeSidecar(tracks, note = "") {
 // lib/soundlib-sidecar.js
 var SOUND_SIDECAR = "flowgal-sounds.json";
 var FORMAT2 = "flowgal-sounds";
-var FIELDS = ["name", "kind", "category", "description", "tags", "volume"];
+var FIELDS = ["name", "kind", "category", "description", "tags", "volume", "gender", "use"];
 var slash = (path) => String(path || "").replace(/\\/g, "/").replace(/^\/+/, "");
 var dirOf = (path) => {
   const p4 = slash(path);
@@ -8402,7 +8600,9 @@ function writeSoundSidecar(sounds2, note = "") {
       category: s.category || "",
       description: s.description || "",
       tags: s.tags || [],
-      ...s.volume !== void 0 && s.volume !== 1 ? { volume: s.volume } : {}
+      ...s.volume !== void 0 && s.volume !== 1 ? { volume: s.volume } : {},
+      ...s.gender ? { gender: s.gender } : {},
+      ...s.use ? { use: s.use } : {}
     }))
   }, null, 2) + "\n";
 }
@@ -8809,7 +9009,11 @@ function lookGroups(person) {
 }
 var VOICE_GROUPS = [["female", "女声"], ["male", "男声"], ["", "不分男女"]];
 var PITCHES = Array.from({ length: VOICE_PITCH_LIMIT * 2 + 1 }, (_, i) => i - VOICE_PITCH_LIMIT).map((n) => [String(n), n > 0 ? `音高 +${n}` : n < 0 ? `音高 ${n}` : "音高 原调"]);
-var voiceText = (voice) => voice ? voiceById(voice.id).label : "不出声";
+var voiceText = (voice) => voice ? voiceLabel(voice.id, libraryBlips(soundlibNow())) : "不出声";
+var blipOptions = (blips, current) => [
+  ...blips.map((b) => [libRef(b.id), b.name]),
+  ...isLibRef(current) && !blips.some((b) => b.id === libIdOf(current)) ? [[current, "音效库里已删除的打字音"]] : []
+];
 var LOOK_HINTS = {
   fandom: "同人角色填 character name (copyright)；原创留空",
   sex: "1girl / 1boy",
@@ -8835,6 +9039,7 @@ function ProfileEditor({ gameId, person, cast, group, turn }) {
   const [busy, run] = useBusy();
   const cfg = useConfig();
   const ui2 = cfg ? cfg.config.ui : null;
+  const blips = libraryBlips(useSoundlib());
   import_react9.default.useEffect(() => {
     setForm(pick(person));
   }, [person.appearance, JSON.stringify(person.appearanceFields || {}), person.gender, person.note, person.negative, person.seed, person.seedCustom, person.height, person.voice, person.voicePitch]);
@@ -8847,10 +9052,10 @@ function ProfileEditor({ gameId, person, cast, group, turn }) {
   };
   const others = (cast || []).filter((p4) => p4.name !== person.name);
   const draft = { ...person, gender: form.gender, voice: form.voice, voicePitch: Number(form.voicePitch) };
-  const voiceNow = castVoices([...others, draft], ui2).get(person.name);
+  const voiceNow = castVoices([...others, draft], ui2, blips).get(person.name);
   const guess = heightOf({ ...person, gender: form.gender, height: null });
-  const autoVoice2 = castVoices([...others, { ...draft, voice: "" }], ui2).get(person.name);
-  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "固定外貌"), /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-look-grid" }, LOOK_FIELDS.map((f) => /* @__PURE__ */ import_react9.default.createElement("label", { key: f, className: `fg-look-field${f === "other" ? " is-wide" : ""}` }, /* @__PURE__ */ import_react9.default.createElement("span", null, LOOK_FIELD_LABELS[f]), f === "other" ? /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] }) : /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] })))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: ".5cqw" } }, "出图时用：", lookTags(form.look, person.appearance) || "（空）", person.appearance && lookTags(form.look, person.appearance) === person.appearance ? "（tag 没变，已画好的立绘照用）" : "", "　衣服不写在这里，走「衣橱与状态」。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "性别 / 种子"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.gender, onChange: set("gender") }, GENDERS.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.seed, placeholder: `默认 ${person.seed}`, onChange: (e) => setForm({ ...form, seed: e.target.value.replace(/\D/g, "") }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", title: "换一个随机种子", onClick: () => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) }) }, "🎲"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "所有立绘差分共用这个种子"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "身高"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.height, placeholder: `约 ${guess.cm}`, onChange: (e) => setForm({ ...form, height: e.target.value.replace(/\D/g, "").slice(0, 3) }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "厘米。剧场里大家的头缩放到一样大，高的人站得高、矮的站得低。留空用", guess.from === "acting" ? "设计师读资料估的" : "按性别和外貌估的", "（", guess.cm, "）。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "声音"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voice, onChange: set("voice"), "aria-label": "打字音音色" }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "" }, "自动（", voiceText(autoVoice2), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "off" }, "不出声"), VOICE_GROUPS.map(([g, label]) => /* @__PURE__ */ import_react9.default.createElement("optgroup", { key: g, label }, VOICES2.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v.id, value: v.id }, v.label))))), /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voicePitch, onChange: set("voicePitch"), "aria-label": "音高", title: "升降几个半音" }, PITCHES.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !voiceNow, onClick: () => previewVoice(voiceNow, ui2 || void 0) }, "▶ 试听"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "这个角色说话时的打字音"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "立绘备注"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.note, onChange: set("note"), onKeyDown: (e) => e.stopPropagation(), placeholder: "写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" })), /* @__PURE__ */ import_react9.default.createElement(ActingNote, { gameId, person, group, turn }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "不要出现"), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.negative, onChange: set("negative"), onKeyDown: (e) => e.stopPropagation(), placeholder: "glasses, ponytail（每张立绘都加进负面词）" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存档案")));
+  const autoVoice2 = castVoices([...others, { ...draft, voice: "" }], ui2, blips).get(person.name);
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "固定外貌"), /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-look-grid" }, LOOK_FIELDS.map((f) => /* @__PURE__ */ import_react9.default.createElement("label", { key: f, className: `fg-look-field${f === "other" ? " is-wide" : ""}` }, /* @__PURE__ */ import_react9.default.createElement("span", null, LOOK_FIELD_LABELS[f]), f === "other" ? /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] }) : /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] })))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: ".5cqw" } }, "出图时用：", lookTags(form.look, person.appearance) || "（空）", person.appearance && lookTags(form.look, person.appearance) === person.appearance ? "（tag 没变，已画好的立绘照用）" : "", "　衣服不写在这里，走「衣橱与状态」。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "性别 / 种子"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.gender, onChange: set("gender") }, GENDERS.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.seed, placeholder: `默认 ${person.seed}`, onChange: (e) => setForm({ ...form, seed: e.target.value.replace(/\D/g, "") }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", title: "换一个随机种子", onClick: () => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) }) }, "🎲"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "所有立绘差分共用这个种子"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "身高"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.height, placeholder: `约 ${guess.cm}`, onChange: (e) => setForm({ ...form, height: e.target.value.replace(/\D/g, "").slice(0, 3) }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "厘米。剧场里大家的头缩放到一样大，高的人站得高、矮的站得低。留空用", guess.from === "acting" ? "设计师读资料估的" : "按性别和外貌估的", "（", guess.cm, "）。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "声音"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voice, onChange: set("voice"), "aria-label": "打字音音色" }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "" }, "自动（", voiceText(autoVoice2), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "off" }, "不出声"), VOICE_GROUPS.map(([g, label]) => /* @__PURE__ */ import_react9.default.createElement("optgroup", { key: g, label }, VOICES2.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v.id, value: v.id }, v.label)))), blipOptions(blips, form.voice).length > 0 && /* @__PURE__ */ import_react9.default.createElement("optgroup", { label: "音效库里的打字音" }, blipOptions(blips, form.voice).map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l)))), /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voicePitch, onChange: set("voicePitch"), "aria-label": "音高", title: "升降几个半音" }, PITCHES.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !voiceNow, onClick: () => previewVoice(voiceNow, ui2 || void 0) }, "▶ 试听"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "这个角色说话时的打字音"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "立绘备注"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.note, onChange: set("note"), onKeyDown: (e) => e.stopPropagation(), placeholder: "写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" })), /* @__PURE__ */ import_react9.default.createElement(ActingNote, { gameId, person, group, turn }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "不要出现"), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.negative, onChange: set("negative"), onKeyDown: (e) => e.stopPropagation(), placeholder: "glasses, ponytail（每张立绘都加进负面词）" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存档案")));
 }
 function WardrobeEditor({ gameId, person }) {
   const [, run] = useBusy();
@@ -9216,7 +9421,7 @@ function CastPanel({ view, gameId, onClose }) {
   const log = view && view.castLog || [];
   const emotions = view && view.emotions || [];
   const cfg = useConfig();
-  const voices = castVoices(cast, cfg ? cfg.config.ui : null);
+  const voices = castVoices(cast, cfg ? cfg.config.ui : null, libraryBlips(useSoundlib()));
   const [bench, setBench] = import_react9.default.useState("");
   const benchPerson = bench && cast.find((p4) => p4.name === bench);
   const used = import_react9.default.useMemo(() => {
@@ -9289,7 +9494,8 @@ function Limit({ value, onCommit, fallback, min = 0, unit, free = "不限", widt
   } }), !open && unit && /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, unit), /* @__PURE__ */ import_react9.default.createElement("label", { className: "fg-row fg-note", style: { gap: ".3em" } }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "checkbox", checked: open, onChange: (e) => onCommit(e.target.checked ? null : fallback) }), free));
 }
 function Select({ value, options, onChange, style }) {
-  return /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", value, style, onChange: (e) => onChange(e.target.value) }, options.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l)));
+  const one = ([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l);
+  return /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", value, style, onChange: (e) => onChange(e.target.value) }, options.map((o) => Array.isArray(o) ? one(o) : o.options.length ? /* @__PURE__ */ import_react9.default.createElement("optgroup", { key: o.group, label: o.group }, o.options.map(one)) : null));
 }
 var INLINE = { width: "auto" };
 function ModelField({ value, options, onCommit, placeholder, emptyLabel }) {
@@ -9538,8 +9744,11 @@ function SoundSection({ data }) {
   const ui2 = data.config.ui;
   const p4 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
   const [busy, run] = useBusy();
+  const [picking, setPicking] = import_react9.default.useState("");
   const fileRef = import_react9.default.useRef(null);
   const slotRef = import_react9.default.useRef("");
+  const library = useSoundlib() || [];
+  const blips = libraryBlips(library);
   const pick = (slot) => {
     slotRef.current = slot;
     if (fileRef.current) fileRef.current.click();
@@ -9554,18 +9763,44 @@ function SoundSection({ data }) {
     setConfig(await api.removeSound(slot));
   }, "已删掉，退回默认的那个");
   const narration = ui2.narrationVoice === "off" ? null : { id: ui2.narrationVoice, pitch: ui2.narrationPitch };
-  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: ui2.voiceDefault, options: [["auto", "自动（按性别分）"], ...VOICES2.map((v) => [v.id, `都用「${v.label}」`])], onChange: (v) => p4({ voiceDefault: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), ["off", "不出声"]], style: INLINE, onChange: (v) => p4({ narrationVoice: v }) }), /* @__PURE__ */ import_react9.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length, " 个（点一下试听）"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.map((v) => /* @__PURE__ */ import_react9.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react9.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react9.default.createElement("span", null, VOICE_GENDER[v.gender], " · ", v.desc)))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, { key: group }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
+  const preset2 = libraryPreset(library);
+  const builtin = builtinPreset(ui2);
+  const usable = library.filter((s) => s.use).length;
+  const choose = (slot, value) => {
+    p4({ sounds: { [slot]: value } });
+    previewSound(slot, value, ui2);
+  };
+  const defaultOptions = [["auto", "自动（按性别分）"], ...blips.length || ui2.voiceDefault === LIBRARY_VOICES ? [[LIBRARY_VOICES, "音效库里的打字音（按性别分）"]] : [], ...VOICES2.map((v) => [v.id, `都用「${v.label}」`]), { group: "都用音效库里的", options: blipOptions(blips, ui2.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }];
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, (preset2 || builtin) && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note fg-libpreset" }, usable > 0 && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, "音效库里有 ", usable, " 个标了用途的声音（比如逆转裁判音效包里的男声 / 女声哔哔、打字机、拍桌子、法槌）。"), preset2 && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", onClick: () => {
+    p4(preset2);
+    toast("已套用音效库里的声音");
+  } }, "一键套用"), builtin && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
+    p4(builtin);
+    toast("已换回内置的声音");
+  } }, "换回内置")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: ui2.voiceDefault, options: defaultOptions, onChange: (v) => p4({ voiceDefault: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), { group: "音效库里的打字音", options: blipOptions(blips, ui2.narrationVoice) }, ["off", "不出声"]], style: INLINE, onChange: (v) => p4({ narrationVoice: v }) }), /* @__PURE__ */ import_react9.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length + blips.length, " 个（点一下试听）"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.map((v) => /* @__PURE__ */ import_react9.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react9.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react9.default.createElement("span", null, VOICE_GENDER[v.gender], " · ", v.desc))), blips.map((b) => /* @__PURE__ */ import_react9.default.createElement("button", { key: b.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: libRef(b.id), pitch: 0 }, ui2) }, /* @__PURE__ */ import_react9.default.createElement("b", null, "▶ ", b.name), /* @__PURE__ */ import_react9.default.createElement("span", null, "音效库 · ", VOICE_GENDER[b.gender || ""], b.use === "narration" ? " · 旁白用" : "", b.description ? " · " + b.description : "")))), !blips.length && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "想用逆转裁判那样的哔哔声：把打字音导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, { key: group }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）；也可以从音效库里挑一个。自己的文件和音效库的声音都按默认版本的响度放。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
     const mine = ui2.customSounds[slot.id];
-    const options = [...slot.presets.map((x, i) => [x.id, i ? x.label : `${x.label}（默认）`]), ...mine ? [["custom", `我的：${mine.name || "上传的文件"}`]] : [], ["off", "关掉"]];
-    return /* @__PURE__ */ import_react9.default.createElement(Field, { key: slot.id, label: slot.label, hint: slot.hint }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: ui2.sounds[slot.id], options, style: INLINE, onChange: (v) => {
-      p4({ sounds: { [slot.id]: v } });
-      previewSound(slot.id, v, ui2);
-    } }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: ui2.sounds[slot.id] === "off", onClick: () => previewSound(slot.id, ui2.sounds[slot.id], ui2) }, "▶ 试听"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "up" + slot.id, onClick: () => pick(slot.id) }, busy === "up" + slot.id ? "上传中…" : mine ? "换文件" : "用自己的"), mine && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "rm" + slot.id, onClick: () => remove(slot.id) }, "删掉文件")));
+    const current = ui2.sounds[slot.id];
+    const suggested = library.filter((s) => s.use === slot.id);
+    const chosen = isLibRef(current) && !suggested.some((s) => s.id === libIdOf(current)) ? library.find((s) => s.id === libIdOf(current)) : null;
+    const libOptions = [...suggested, ...chosen ? [chosen] : []].map((s) => [libRef(s.id), `${s.name}（${s.category}）`]);
+    if (isLibRef(current) && !library.some((s) => s.id === libIdOf(current))) libOptions.push([current, "音效库里已删除的声音（放默认的）"]);
+    const options = [...slot.presets.map((x, i) => [x.id, i ? x.label : `${x.label}（默认）`]), ...mine ? [["custom", `我的：${mine.name || "上传的文件"}`]] : [], { group: "音效库", options: libOptions }, ["off", "关掉"]];
+    return /* @__PURE__ */ import_react9.default.createElement(Field, { key: slot.id, label: slot.label, hint: slot.hint }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: current, options, style: INLINE, onChange: (v) => choose(slot.id, v) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: current === "off", onClick: () => previewSound(slot.id, current, ui2) }, "▶ 试听"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: `fg-btn${picking === slot.id ? " is-on" : ""}`, disabled: !library.length, title: library.length ? "" : "音效库是空的", onClick: () => setPicking((k) => k === slot.id ? "" : slot.id) }, "从音效库挑"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "up" + slot.id, onClick: () => pick(slot.id) }, busy === "up" + slot.id ? "上传中…" : mine ? "换文件" : "用自己的"), mine && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "rm" + slot.id, onClick: () => remove(slot.id) }, "删掉文件")), picking === slot.id && /* @__PURE__ */ import_react9.default.createElement(LibPicker, { sounds: library, slot: slot.id, current, ui: ui2, onPick: (v) => {
+      choose(slot.id, v);
+      setPicking("");
+    } }));
   }))), /* @__PURE__ */ import_react9.default.createElement("input", { ref: fileRef, type: "file", accept: "audio/*", hidden: true, onChange: (e) => {
     const file2 = e.target.files && e.target.files[0];
     e.target.value = "";
     if (file2) upload(file2);
   } }));
+}
+var PICKER_SHOWN = 40;
+function LibPicker({ sounds: sounds2, slot, current, ui: ui2, onPick }) {
+  const [query, setQuery] = import_react9.default.useState("");
+  const words = query.trim().split(/\s+/).filter(Boolean);
+  const found = sounds2.filter((s) => s.kind !== "ambience" && words.every((w) => `${s.name} ${s.category} ${(s.tags || []).join(" ")} ${s.description}`.includes(w))).sort((a, b) => Number(b.use === slot) - Number(a.use === slot) || String(a.category).localeCompare(String(b.category), "zh-CN") || String(a.name).localeCompare(String(b.name), "zh-CN"));
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-libpicker" }, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "100%" }, value: query, autoFocus: true, placeholder: "搜名字、分类、标签、描述（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-libpicker-list" }, found.slice(0, PICKER_SHOWN).map((s) => /* @__PURE__ */ import_react9.default.createElement("div", { key: s.id, className: `fg-row fg-libpicker-item${current === libRef(s.id) ? " is-on" : ""}` }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", title: "试听", onClick: () => previewSound(slot, libRef(s.id), ui2) }, "▶"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-libpicker-name" }, s.name, /* @__PURE__ */ import_react9.default.createElement("small", null, s.category, s.use === slot ? " · 推荐" : "")), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: current === libRef(s.id), onClick: () => onPick(libRef(s.id)) }, current === libRef(s.id) ? "正在用" : "用这个"))), !found.length && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "没找到。"), found.length > PICKER_SHOWN && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "还有 ", found.length - PICKER_SHOWN, " 个，多打几个字缩小范围。")));
 }
 var sizeMB = (bytes) => (bytes / 1048576).toFixed(1) + " MB";
 function TrackCard({ track, playing, onPlay }) {
@@ -9673,7 +9908,9 @@ function saveText(text, name2) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1e3);
 }
-var KIND_LABEL = { ambience: "环境音", sfx: "音效" };
+var KIND_LABEL = { ambience: "环境音", blip: "打字音", sfx: "音效" };
+var KIND_ORDER = ["ambience", "blip", "sfx"];
+var USE_OPTIONS = [["", "没有"], ...SOUND_SLOTS.map((s) => [s.id, `${s.group === "ui" ? "界面音" : "落字音效"} · ${s.label}`]), ["narration", "旁白的打字音"]];
 var LIB_SHOWN = 200;
 function LibSoundCard({ sound, playing, onPlay }) {
   const [busy, run] = useBusy();
@@ -9687,7 +9924,7 @@ function LibSoundCard({ sound, playing, onPlay }) {
       await api.removeLibSounds([sound.id]);
       await loadSoundlib();
     }, "已删除");
-  } }, "删除")), !open && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note fg-libsound-tags" }, (sound.tags || []).join("、") || "（没有标签）", sound.description ? " · " + sound.description : ""), open && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: sound.kind, onChange: (e) => save({ kind: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "sfx" }, "音效（响一次）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "ambience" }, "环境音（循环）")), /* @__PURE__ */ import_react9.default.createElement(Text, { value: sound.category, placeholder: "分类，两层用 / 隔开：门窗/敲门", style: { flex: 1, width: "auto" }, onCommit: (v) => save({ category: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "音量"), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.05", value: sound.volume ?? 1, onChange: (e) => save({ volume: Number(e.target.value) }), style: { width: "8cqw" } })), /* @__PURE__ */ import_react9.default.createElement(Text, { value: (sound.tags || []).join("、"), placeholder: "标签：正文里会出现的词，用顿号隔开。导演按它们挑候选，例如：敲门、咚咚、门", style: { width: "100%" }, onCommit: (v) => save({ tags: v }) }), /* @__PURE__ */ import_react9.default.createElement(TextArea, { value: sound.description, placeholder: "听起来什么样、什么时候用。例如：木门被轻轻敲了两下，礼貌、迟疑", onCommit: (v) => save({ description: v }) }))));
+  } }, "删除")), !open && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note fg-libsound-tags" }, sound.kind === "blip" ? `打字音 · ${VOICE_GENDER[sound.gender || ""]}` : (sound.tags || []).join("、") || "（没有标签）", sound.use ? ` · 推荐用途：${(USE_OPTIONS.find(([v]) => v === sound.use) || [])[1] || sound.use}` : "", sound.description ? " · " + sound.description : ""), open && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: sound.kind, onChange: (e) => save({ kind: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "sfx" }, "音效（响一次）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "ambience" }, "环境音（循环）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "blip" }, "打字音（一个字一下）")), sound.kind === "blip" && /* @__PURE__ */ import_react9.default.createElement(Select, { value: sound.gender || "", options: [["", "不分男女"], ["female", "女声"], ["male", "男声"]], style: INLINE, onChange: (v) => save({ gender: v }) }), /* @__PURE__ */ import_react9.default.createElement(Text, { value: sound.category, placeholder: "分类，两层用 / 隔开：门窗/敲门", style: { flex: 1, width: "auto" }, onCommit: (v) => save({ category: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "音量"), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.05", value: sound.volume ?? 1, onChange: (e) => save({ volume: Number(e.target.value) }), style: { width: "8cqw" } })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "推荐用途"), /* @__PURE__ */ import_react9.default.createElement(Select, { value: sound.use || "", options: USE_OPTIONS, style: INLINE, onChange: (v) => save({ use: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "「声音」页一键套用时用")), sound.kind !== "blip" && /* @__PURE__ */ import_react9.default.createElement(Text, { value: (sound.tags || []).join("、"), placeholder: "标签：正文里会出现的词，用顿号隔开。导演按它们挑候选，例如：敲门、咚咚、门", style: { width: "100%" }, onCommit: (v) => save({ tags: v }) }), /* @__PURE__ */ import_react9.default.createElement(TextArea, { value: sound.description, placeholder: "听起来什么样、什么时候用。例如：木门被轻轻敲了两下，礼貌、迟疑", onCommit: (v) => save({ description: v }) }))));
 }
 function ErosField({ cfg, p: p4 }) {
   const [open, setOpen] = import_react9.default.useState(false);
@@ -9734,10 +9971,11 @@ function SoundLibSection({ data }) {
     }
     const have = new Map((sounds2 || []).map((s) => [`${s.file}|${s.bytes}`, s]));
     const failed = [];
-    let added = 0, updated = 0;
+    let added = 0, updated = 0, useful = 0;
     for (let i = 0; i < audio.length; i++) {
       const f = audio[i];
       const { file: file2, meta } = match(pathOf(f));
+      if (meta && (meta.use || meta.kind === "blip")) useful++;
       setProgress(`导入中 ${i + 1} / ${audio.length}：${file2}`);
       try {
         const old = have.get(`${file2}|${f.size}`);
@@ -9757,7 +9995,7 @@ function SoundLibSection({ data }) {
     setProgress("");
     await loadSoundlib().catch(() => {
     });
-    toast(`新导入 ${added} 个${updated ? `，更新了 ${updated} 个的描述` : ""}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join("；")}` : ""}`, failed.length ? "error" : void 0);
+    toast(`新导入 ${added} 个${updated ? `，更新了 ${updated} 个的描述` : ""}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join("；")}` : ""}${useful && !failed.length ? "。里面有打字音和标了用途的声音，到「声音」页可以一键套用" : ""}`, failed.length ? "error" : void 0);
   };
   const groups = import_react9.default.useMemo(() => {
     const map = /* @__PURE__ */ new Map();
@@ -9766,7 +10004,7 @@ function SoundLibSection({ data }) {
       if (!map.has(key)) map.set(key, { key, kind: s.kind, name: key.split("|")[1], items: [] });
       map.get(key).items.push(s);
     }
-    return [...map.values()].sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name, "zh-CN") : a.kind === "ambience" ? -1 : 1);
+    return [...map.values()].sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name, "zh-CN") : KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
   }, [sounds2]);
   const words = query.trim().split(/\s+/).filter(Boolean);
   const found = words.length ? (sounds2 || []).filter((s) => {
@@ -9784,7 +10022,7 @@ function SoundLibSection({ data }) {
   return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "播放"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "环境音", hint: "雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.amb, onChange: (v) => p4({ amb: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.ambVolume, onChange: (e) => p4({ ambVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "剧情音效", hint: "推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.storySfx, onChange: (v) => p4({ storySfx: v }) }), /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.05", value: cfg.ui.storySfxVolume, onChange: (e) => p4({ storySfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react9.default.createElement(ErosField, { cfg, p: p4 }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "我的音效库", sounds2 ? ` · ${sounds2.length} 个` : ""), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪一幕放什么环境音、哪句配什么音效。所以标签要写正文里会出现的词。"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !sounds2 || !sounds2.some((s) => s.file), onClick: () => saveText(writeSoundSidecar(sounds2 || []), SOUND_SIDECAR) }, "导出描述"), progress && /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react9.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
     importFiles(e.target.files);
     e.target.value = "";
-  } })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "文件夹最上面放一份 ", /* @__PURE__ */ import_react9.default.createElement("code", null, SOUND_SIDECAR), "（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签；没有描述文件时名字取文件名、分类取所在的文件夹。同一个文件再导入不会重复存，但描述会以描述文件为准。"), !sounds2 && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "读取中…"), sounds2 && !sounds2.length && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "音效库还是空的。没有声音时剧场不放环境音和剧情音效。"), sounds2 && sounds2.length > 0 && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "100%", margin: "0.6cqw 0 1cqw" }, value: query, placeholder: "搜索名字、分类、标签、描述（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), found && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "找到 ", found.length, " 个", found.length > LIB_SHOWN ? `，先列出前 ${LIB_SHOWN} 个` : ""), found && cards(found), !found && groups.map((g) => /* @__PURE__ */ import_react9.default.createElement("div", { key: g.key, className: "fg-libgroup" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row fg-libgroup-head" }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpenGroup((k) => k === g.key ? "" : g.key) }, openGroup === g.key ? "▾" : "▸", " ", KIND_LABEL[g.kind], " · ", g.name), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, g.items.length, " 个"), /* @__PURE__ */ import_react9.default.createElement("span", { style: { flex: 1 } }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "g" + g.key, onClick: () => removeGroup(g) }, "删除这一类")), openGroup === g.key && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, g.items.length > LIB_SHOWN && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "这一类有 ", g.items.length, " 个，先列出前 ", LIB_SHOWN, " 个；用搜索找其余的。"), cards(g.items))))));
+  } })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "文件夹最上面放一份 ", /* @__PURE__ */ import_react9.default.createElement("code", null, SOUND_SIDECAR), "（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹。同一个文件再导入不会重复存，但描述会以描述文件为准。种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。"), !sounds2 && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "读取中…"), sounds2 && !sounds2.length && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "音效库还是空的。没有声音时剧场不放环境音和剧情音效。"), sounds2 && sounds2.length > 0 && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "100%", margin: "0.6cqw 0 1cqw" }, value: query, placeholder: "搜索名字、分类、标签、描述（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), found && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "找到 ", found.length, " 个", found.length > LIB_SHOWN ? `，先列出前 ${LIB_SHOWN} 个` : ""), found && cards(found), !found && groups.map((g) => /* @__PURE__ */ import_react9.default.createElement("div", { key: g.key, className: "fg-libgroup" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row fg-libgroup-head" }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpenGroup((k) => k === g.key ? "" : g.key) }, openGroup === g.key ? "▾" : "▸", " ", KIND_LABEL[g.kind], " · ", g.name), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, g.items.length, " 个"), /* @__PURE__ */ import_react9.default.createElement("span", { style: { flex: 1 } }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "g" + g.key, onClick: () => removeGroup(g) }, "删除这一类")), openGroup === g.key && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, g.items.length > LIB_SHOWN && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "这一类有 ", g.items.length, " 个，先列出前 ", LIB_SHOWN, " 个；用搜索找其余的。"), cards(g.items))))));
 }
 var stamp = (t) => new Date(t).toLocaleString("zh-CN", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 function UpdateSection({ data }) {
@@ -10363,16 +10601,21 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }, [hit, impactOn]);
   const sayOff = import_react13.default.useMemo(() => offDeliveries(off), [off]);
   const people = import_react13.default.useMemo(() => new Map((view && view.cast || []).map((p4) => [p4.name, p4])), [view]);
-  const voices = import_react13.default.useMemo(() => castVoices(view && view.cast || [], ui0), [view, ui0]);
+  const soundlib = useSoundlib();
+  const blips = import_react13.default.useMemo(() => libraryBlips(soundlib), [soundlib]);
+  const voices = import_react13.default.useMemo(() => castVoices(view && view.cast || [], ui0, blips), [view, ui0, blips]);
+  import_react13.default.useEffect(() => {
+    warmVoices([...voices.values(), { id: ui0.narrationVoice }]);
+  }, [voices, ui0.narrationVoice]);
   const voice = import_react13.default.useMemo(() => {
     if (!beat) return null;
     const names = beat.speakers || [beat.speaker];
-    const main = lineVoice(beat.type, names[0], voices, ui0);
+    const main = lineVoice(beat.type, names[0], voices, ui0, blips);
     if (!main || !beat.voice) return main;
-    const also = beat.voice === "chorus" ? names.slice(1).map((name2) => lineVoice(beat.type, name2, voices, ui0)).filter(Boolean) : [];
+    const also = beat.voice === "chorus" ? names.slice(1).map((name2) => lineVoice(beat.type, name2, voices, ui0, blips)).filter(Boolean) : [];
     const tone = beat.recall ? recallTone || beat.recall.tone : "";
     return { ...main, style: beat.voice, ...also.length ? { also } : {}, ...tone ? { tone } : {} };
-  }, [beat && beat.type, beat && beat.speaker, beat && beat.voice, beat && beat.recall, recallTone, voices, ui0]);
+  }, [beat && beat.type, beat && beat.speaker, beat && beat.voice, beat && beat.recall, recallTone, voices, ui0, blips]);
   const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff });
   import_react13.default.useEffect(() => {
     if (panel && !done) finish();
@@ -10427,7 +10670,6 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   import_react13.default.useEffect(() => {
     if (!closingRef.current) hushBgm(hushed);
   }, [hushed]);
-  const soundlib = useSoundlib();
   const soundById = import_react13.default.useMemo(() => new Map((soundlib || []).map((s) => [s.id, s])), [soundlib]);
   const soundBeat = waking ? null : change && !swapped && was ? was : beat;
   const ambId = ui0.amb !== false && soundBeat && soundBeat.amb !== "none" ? soundBeat.amb : "";

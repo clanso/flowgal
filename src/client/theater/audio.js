@@ -1,8 +1,9 @@
 // 配乐（「我的配乐」里的曲子，交叉淡入淡出；设置里试听时先把它压下去）+ 环境音（音效库里循环的底，另一条）
 // + 剧情音效（音效库里响一次的）+ 打字音 / 落字音效 / 界面音。
-// 打字音和音效照 lib/sounds.js 的配方用 WebAudio 现场合成，不需要音频文件；某种音效换成了玩家上传的文件时放那个文件。
-import { assetUrl } from '../api.js'
-import { voiceById, soundFor, slotById, DEFAULT_SOUNDS } from '../../../lib/sounds.js'
+// 打字音和音效照 lib/sounds.js 的配方用 WebAudio 现场合成，不需要音频文件；某种音效换成了玩家上传的文件、
+// 音效库里的声音，或者音色用的是音效库里的打字音时放那个文件，响度按内置的对齐（见「响度对齐」）。
+import { assetUrl, soundlibNow } from '../api.js'
+import { voiceById, soundFor, slotById, DEFAULT_SOUNDS, isLibRef, libIdOf } from '../../../lib/sounds.js'
 import { FOLEY } from '../../../lib/foley.js'
 import { EROS_FOLEY, EROS_LOOPS, TENTACLE_LOOPS, TENTACLE_SWAP, PEAK_FOLEY } from '../../../lib/eros.js'
 
@@ -149,11 +150,15 @@ export function stopPreview() {
 /** 当前的声音设置（剧场打开时按设置调一次，见 configureSounds）。 */
 let sounds = { blipVolume: 1, sfx: true, sfxVolume: 1, sounds: DEFAULT_SOUNDS, customSounds: {} }
 
-/** 按设置调音量、各音效用哪个版本；上传的音效先下载好，第一次响时不用等。 */
+/** 按设置调音量、各音效用哪个版本；上传的、音效库里选的音效和旁白的音色先下载好，第一次响时不用等。 */
 export function configureSounds(ui) {
   if (!ui) return
   sounds = ui
   for (const file of Object.values(ui.customSounds || {})) fetchFile(file.assetId).catch(() => {})
+  const ac = audioCtx()
+  if (!ac) return
+  for (const choice of Object.values(ui.sounds || {})) { const s = isLibRef(choice) && libSound(libIdOf(choice)); if (s) loadSample(ac, s.assetId) }
+  warmVoices([{ id: ui.narrationVoice }])
 }
 
 let noiseBuffer = null
@@ -207,10 +212,75 @@ function playParts(ac, parts, { rate = 1, volume = 1, at = ac.currentTime, out =
   }
 }
 
-// 上传的音效：先下载字节，第一次放的时候解码，之后用缓存。太长的只放前 4 秒（最后淡出）。
+// ───────────── 响度对齐 ─────────────
+// 音效库的声音、上传的文件顶替内置配方（打字音、落字音效、界面音）时，按内置那个的响度放：两边都量 A 计权后的有效响度
+// （从第一次够响到最后一次够响之间的 RMS），按比例定增益。音效文件往往是满幅的，不对齐会比内置的响二三十分贝。
+
+/** A 计权（四个一阶高通 20.6 / 20.6 / 107.7 / 737.9 Hz，两个一阶低通 12194 Hz，双线性变换）后的有效 RMS，1 kHz 处归一。 */
+function loudness(data, rate) {
+  const poles = [['hp', 20.6], ['hp', 20.6], ['hp', 107.7], ['hp', 737.9], ['lp', 12194], ['lp', 12194]]
+  let y = Float32Array.from(data)
+  let norm = 1
+  for (const [kind, fc] of poles) {
+    const f = Math.min(fc, rate * 0.45)
+    const k = Math.tan((Math.PI * f) / rate)
+    const a1 = (k - 1) / (k + 1)
+    const b0 = kind === 'hp' ? 1 / (1 + k) : k / (1 + k)
+    const b1 = kind === 'hp' ? -b0 : b0
+    norm *= kind === 'hp' ? 1000 / Math.hypot(1000, f) : f / Math.hypot(1000, f)
+    let x1 = 0, y1 = 0
+    for (let i = 0; i < y.length; i += 1) { const x = y[i]; y1 = b0 * x + b1 * x1 - a1 * y1; x1 = x; y[i] = y1 }
+  }
+  let peak = 0
+  for (let i = 0; i < y.length; i += 1) peak = Math.max(peak, Math.abs(y[i]))
+  if (!(peak > 0)) return 0
+  let first = 0, last = y.length - 1
+  while (Math.abs(y[first]) < peak * 0.05) first += 1
+  while (Math.abs(y[last]) < peak * 0.05) last -= 1
+  let sum = 0
+  for (let i = first; i <= last; i += 1) sum += y[i] * y[i]
+  return Math.sqrt(sum / (last - first + 1)) / norm
+}
+/** 一段采样的响度（多声道取第一条）。 */
+const bufferLoudness = buffer => loudness(buffer.getChannelData(0), buffer.sampleRate)
+
+/** 配方的响度：离线渲染一遍量出来，按配方缓存。浏览器不支持离线渲染时用经典哔哔量级的一个估计值。 */
+const FALLBACK_LEVEL = 0.0063 // 约 -44 dB，经典哔哔的量级
+const levels = new WeakMap() // parts → { value }：value 量好之前是 null
+function recipeLevel(parts) {
+  const known = levels.get(parts)
+  if (known) return known
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext
+  const rate = 44100
+  const seconds = Math.max(...parts.map(x => (x.at || 0) + x.dur + (x.hold || 0))) + 0.05
+  const job = { value: null }
+  levels.set(parts, job)
+  try {
+    const off = new OAC(1, Math.ceil(seconds * rate), rate)
+    playParts(off, parts, { at: 0 })
+    off.startRendering().then(buffer => { job.value = bufferLoudness(buffer) || FALLBACK_LEVEL }, () => { job.value = FALLBACK_LEVEL })
+  } catch { job.value = FALLBACK_LEVEL }
+  return job
+}
+/** 采样顶替配方时乘的增益：两边响度之比（太轻的文件最多拉高 24 dB）；配方还没量好时先用估计值。 */
+function matchGain(parts, sample) {
+  const ref = recipeLevel(parts).value ?? FALLBACK_LEVEL
+  return sample.level > 0 ? Math.min(16, ref / sample.level) : 1
+}
+
+/** 音效库里的一个声音（库还没读到、或者编号不在库里是 null）。 */
+let libIndex = { list: null, map: new Map() }
+function libSound(id) {
+  const list = soundlibNow()
+  if (libIndex.list !== list) libIndex = { list, map: new Map((list || []).map(x => [x.id, x])) }
+  return libIndex.map.get(id) || null
+}
+
+// 上传的音效、音效库的声音：先下载字节，第一次放的时候解码，之后用缓存。落字音效和界面音太长的只放前 4 秒（最后淡出）。
 const MAX_FILE_SECONDS = 4
 const files = new Map()   // assetId → Promise<ArrayBuffer>
 const buffers = new Map() // assetId → Promise<AudioBuffer>
+const samples = new Map() // assetId → { buffer, level }：解码好、量好响度的，打字音一个字一下要马上能放
 function fetchFile(id) {
   if (!files.has(id)) {
     const p = fetch(assetUrl(id)).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer() })
@@ -227,13 +297,46 @@ function decoded(ac, id) {
   }
   return buffers.get(id)
 }
-function playFile(ac, id, volume) {
+/** 解码好的采样记下响度（每个文件只量一次）。 */
+function measured(id, buffer) {
+  const known = samples.get(id)
+  if (known && known.buffer) return known
+  const sample = { buffer, level: bufferLoudness(buffer) }
+  samples.set(id, sample)
+  return sample
+}
+/** 解码好、量好响度的采样；还没好时开始准备，返回 null（这一下先不响）。 */
+function loadSample(ac, id) {
+  const known = samples.get(id)
+  if (known) return known.buffer ? known : null
+  samples.set(id, {})
+  decoded(ac, id).then(buffer => measured(id, buffer), () => samples.delete(id))
+  return null
+}
+/** 等采样准备好。 */
+const sampleReady = (ac, id) => decoded(ac, id).then(buffer => measured(id, buffer))
+/** 放一下采样：rate 变速（音高跟着变），volume 增益。 */
+function playSample(ac, sample, { rate = 1, volume = 1, at = ac.currentTime, out = ac.destination } = {}) {
   if (!(volume > 0)) return
+  const src = ac.createBufferSource()
+  const g = ac.createGain()
+  src.buffer = sample.buffer
+  src.playbackRate.value = rate
+  g.gain.value = volume
+  src.connect(g).connect(out)
+  src.start(at)
+}
+
+/** 放上传的、音效库的文件：base 是它顶替的内置配方，按它的响度对齐。 */
+function playFile(ac, id, volume, base) {
+  if (!(volume > 0)) return
+  if (base) recipeLevel(base)
   decoded(ac, id).then(buffer => {
     const src = ac.createBufferSource()
     const g = ac.createGain()
     const t = ac.currentTime
     src.buffer = buffer
+    if (base) volume *= matchGain(base, measured(id, buffer))
     g.gain.setValueAtTime(volume, t)
     src.connect(g).connect(ac.destination)
     src.start(t)
@@ -261,10 +364,13 @@ export function playLibSound(assetId, volume = 1) {
   }).catch(() => {})
 }
 
+/** 落字音效、界面音：内置配方现场合成；上传的文件、音效库的声音（库里删了的退回默认版本）按默认版本的响度放。 */
 function playSound(sound, volume) {
   const ac = sound && audioCtx()
   if (!ac) return
-  if (sound.assetId) playFile(ac, sound.assetId, volume)
+  const lib = sound.libId ? libSound(sound.libId) : null
+  if (lib) playFile(ac, lib.assetId, volume * (lib.volume ?? 1), sound.parts)
+  else if (sound.assetId) playFile(ac, sound.assetId, volume, sound.parts)
   else playParts(ac, sound.parts, { volume })
 }
 
@@ -383,25 +489,60 @@ function chainFor(ac, style) {
   return input
 }
 
+// ───────────── 打字音 ─────────────
+
+const CLASSIC = voiceById('classic').parts
+/**
+ * 一个音色怎么出声：内置的照配方合成（{ parts }）；音效库里的打字音放采样（{ sample, gain }，响度对齐经典哔哔，再乘库里给它调的音量）。
+ * 音效库还没读到、采样还没下载解码好时返回 null（这个字先不响，同时开始准备）；库里已经删掉的退回经典哔哔。
+ */
+function voiceSource(ac, id) {
+  if (!isLibRef(id)) { const v = voiceById(id); return v ? { parts: v.parts } : null }
+  if (!soundlibNow()) return null
+  const lib = libSound(libIdOf(id))
+  if (!lib) return { parts: CLASSIC }
+  const sample = loadSample(ac, lib.assetId)
+  recipeLevel(CLASSIC)
+  return sample ? { sample, gain: (lib.volume ?? 1) * matchGain(CLASSIC, sample) } : null
+}
+/** 响一下：配方合成，或者放采样（变速当移调）。memory 时配方的起音软下来、尾巴拖长（采样照原样，只靠效果链闷住）。 */
+function emit(ac, source, { rate = 1, volume = 1, at = ac.currentTime, out = ac.destination, memory = false } = {}) {
+  if (source.sample) playSample(ac, source.sample, { rate, volume: volume * source.gain, at, out })
+  else playParts(ac, memory ? submerged(source.parts) : source.parts, { rate, volume, at, out })
+}
+
+/** 先把这些音色用到的采样下载、解码好（剧场按这一局的角色和旁白调一次），第一句话第一个字就能响。 */
+export function warmVoices(voices) {
+  const ac = audioCtx()
+  if (!ac) return
+  for (const voice of voices || []) {
+    if (!voice || !isLibRef(voice.id)) continue
+    const lib = libSound(libIdOf(voice.id))
+    if (lib) loadSample(ac, lib.assetId)
+  }
+  recipeLevel(CLASSIC)
+}
+
 /**
  * 打字音：voice 是 lib/sounds.js 的 lineVoice 算出来的 { id 音色, pitch 升降几个半音, gain }，
  * 再带上这句的声音样子 style（电话、广播、心灵感应、齐声……见 lib/vocab.js 的 VOICES）；齐声时 also 是另外几个人的声音。
  * pitch / gain 是演法给的倍数（威压低沉、激动尖细、低语轻）。每个字音高随机抖一点，不那么机械。
+ * 音色可以是音效库里的打字音（lib:编号）：放那段采样，变速当移调。
  */
 export function blip(voice, { pitch = 1, gain = 1 } = {}) {
-  const v = voice && voiceById(voice.id)
-  const ac = v && audioCtx()
-  if (!ac) return
+  const ac = voice && audioCtx()
+  const v = ac && voiceSource(ac, voice.id)
+  if (!v) return
   const style = voice.style || ''
   const jitter = pitch * (0.96 + Math.random() * 0.08)
   const volume = (sounds.blipVolume ?? 1) * gain
   const rateOf = who => 2 ** ((who.pitch || 0) / 12) * jitter
   if (style === 'chorus') {
     // 齐声：每个人的声音各响一下，错开几毫秒；只有一个人的声音时叠两个错开音高的分身
-    const others = (voice.also || []).filter(o => voiceById(o.id))
-    const group = others.length ? [voice, ...others] : [voice, { ...voice, pitch: (voice.pitch || 0) - 3 }, { ...voice, pitch: (voice.pitch || 0) + 4 }]
+    const others = (voice.also || []).map(o => ({ who: o, source: voiceSource(ac, o.id) })).filter(o => o.source)
+    const group = others.length ? [{ who: voice, source: v }, ...others] : [voice, { ...voice, pitch: (voice.pitch || 0) - 3 }, { ...voice, pitch: (voice.pitch || 0) + 4 }].map(who => ({ who, source: v }))
     const share = 1 / Math.sqrt(group.length)
-    group.forEach((who, i) => playParts(ac, voiceById(who.id).parts, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014 }))
+    group.forEach(({ who, source }, i) => emit(ac, source, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014 }))
     return
   }
   // 短闪回里的回忆声按基调换一条链（voice.tone，见 Theater.jsx）
@@ -410,26 +551,35 @@ export function blip(voice, { pitch = 1, gain = 1 } = {}) {
   const rate = rateOf(voice) * (style === 'telepathy' ? 1.08 : style === 'machine' ? 0.94 : memory ? MEMORY_RATE[memory] : 1)
   if (memory) {
     // 回忆：软起音的字 + 低八度的一层（声音变厚、发闷），偶尔冒个气泡
-    const parts = submerged(v.parts)
-    playParts(ac, parts, { rate, volume: volume * (voice.gain ?? 1), out })
-    playParts(ac, parts, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out })
+    emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, memory: true })
+    emit(ac, v, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out, memory: true })
     if (Math.random() < 0.16) playParts(ac, BUBBLE, { rate: 0.8 + Math.random() * 0.6, volume, out, at: ac.currentTime + 0.03 + Math.random() * 0.04 })
     return
   }
-  playParts(ac, v.parts, { rate, volume: volume * (voice.gain ?? 1), out })
+  emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out })
   // 心灵感应：高八度的一层虚影；广播：一点电流声
-  if (style === 'telepathy') playParts(ac, v.parts, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out })
+  if (style === 'telepathy') emit(ac, v, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out })
   if (style === 'radio') playParts(ac, [{ wave: 'noise', f: 3200, q: 0.8, gain: 0.05, dur: 0.06 }], { volume, out })
 }
 
-/** 试听一个音色：按打字音音量念一小段（三个字、一个停顿、再四个字）。ui 是当前设置。 */
-export function previewVoice(voice, ui = sounds) {
-  const v = voice && voiceById(voice.id)
-  const ac = v && audioCtx()
+/** 试听一个音色：按打字音音量念一小段（三个字、一个停顿、再四个字）。ui 是当前设置。音效库的打字音等下载好再念。 */
+export async function previewVoice(voice, ui = sounds) {
+  const ac = voice && audioCtx()
   if (!ac) return
+  if (isLibRef(voice.id)) {
+    const lib = libSound(libIdOf(voice.id))
+    if (lib) { await sampleReady(ac, lib.assetId); await recipeLevelDone(CLASSIC) }
+  }
+  const v = voiceSource(ac, voice.id)
+  if (!v) return
   const base = 2 ** ((voice.pitch || 0) / 12)
   const t0 = ac.currentTime + 0.02
-  for (const dt of [0, 0.09, 0.18, 0.42, 0.51, 0.6, 0.69]) playParts(ac, v.parts, { rate: base * (0.96 + Math.random() * 0.08), volume: ui.blipVolume ?? 1, at: t0 + dt })
+  for (const dt of [0, 0.09, 0.18, 0.42, 0.51, 0.6, 0.69]) emit(ac, v, { rate: base * (0.96 + Math.random() * 0.08), volume: ui.blipVolume ?? 1, at: t0 + dt })
+}
+/** 等配方的响度量好（最多等半秒）。 */
+async function recipeLevelDone(parts) {
+  const job = recipeLevel(parts)
+  for (let i = 0; i < 25 && job.value === null; i += 1) await new Promise(r => setTimeout(r, 20))
 }
 
 /** 落字音效：impact / slam / stab / ding / whoosh，按设置里选的版本或上传的文件；音效关了不响。 */
@@ -455,13 +605,11 @@ export function sfx(kind = 'select') {
   stinger(kind === 'back' ? 'select' : kind)
 }
 
-/** 试听某一种音效的某个版本（custom 是上传的那个），不看音效开关。ui 是当前设置。 */
+/** 试听某一种音效的某个版本（custom 是上传的那个，lib:编号 是音效库里的），不看音效开关。ui 是当前设置。 */
 export function previewSound(slot, choice, ui = sounds) {
   const def = slotById(slot)
   if (!def || choice === 'off') return
-  const file = choice === 'custom' && ui.customSounds && ui.customSounds[slot]
-  const sound = file ? { assetId: file.assetId } : { parts: (def.presets.find(x => x.id === choice) || def.presets[0]).parts }
-  playSound(sound, ui.sfxVolume ?? 1)
+  playSound(soundFor({ ...ui, sounds: { ...ui.sounds, [slot]: choice } }, slot), ui.sfxVolume ?? 1)
 }
 
 // ───────────── 亲密场面（lib/eros.js）─────────────
