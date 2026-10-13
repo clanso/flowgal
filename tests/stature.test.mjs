@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { guessHeight, heightOf, cleanHeight, placeSprite, genderOf, faceCrop, FACE_RATIO } from '../lib/stature.js'
+import { guessHeight, heightOf, cleanHeight, placeSprite, usualFace, genderOf, faceCrop, FACE_RATIO, FACE_SPREAD } from '../lib/stature.js'
 import { cleanActing, mergeActing, poseTags } from '../lib/acting.js'
 import { composePrompt } from '../lib/image/style.js'
 import { resolveConfig } from '../lib/config.js'
@@ -51,6 +51,23 @@ test('gate: 头一样大：脸框占图比例不同的立绘缩放后脸一样�
   assert.deepEqual(placeSprite({ cm: 160 }), { k: 1, lift: 0, head: 0.095 }, '参照身高、参照构图：跟以前一样')
   // 画得太离谱的不硬掰
   assert.equal(placeSprite({ box: faceAt(0.4, 0.4), size: H, cm: 160 }).k, 0.6)
+})
+
+test('gate: 同一个人换动作：侧身、低头那张脸框认小了，按他平常的脸框算，不会突然大一圈；正常的远近不一照常缩放', () => {
+  // 柯萝伊（832×1216）整张画的立绘：双手交握身前（几套衣服各一张）、攥着胸前坠子、挺直攥拳、侧身捂着衣领（侧着脸，只框到半张脸）
+  const clasp = [352, 184, 528, 328], pendant = [320, 248, 536, 416], fist = [344, 184, 512, 320], aside = [480, 232, 616, 328]
+  const usual = usualFace([[352, 176, 520, 320], [336, 224, 528, 368], [352, 176, 528, 328], clasp, aside, pendant, [352, 184, 528, 328], fist], H[1])
+  assert.ok(Math.abs(usual - 144 / H[1]) < 1e-9, '取中位数')
+  const at = box => placeSprite({ box, size: H, cm: 162, usual })
+  const raw = box => placeSprite({ box, size: H, cm: 162 })
+  assert.equal(raw(aside).k, 1.4, '以前：按认小了的框放大到顶，比平常那张大三成')
+  assert.ok(at(aside).k / at(clasp).k <= FACE_SPREAD + 0.01, '现在：最多比平常大 FACE_SPREAD 倍')
+  assert.deepEqual(at(clasp), raw(clasp), '平常的不动')
+  assert.deepEqual(at(fist), raw(fist))
+  assert.ok(Math.abs(at(pendant).k - raw(pendant).k) < 0.02, '贴得近一点（脸框大一成多）的差不多照常缩小')
+  assert.equal(usualFace([clasp], H[1]), 0, '只有一张看不出谁偏了')
+  assert.equal(usualFace([], H[1]), 0)
+  assert.deepEqual(placeSprite({ box: aside, size: H, cm: 162, usual: 0 }), raw(aside), '没有参照就照旧')
 })
 
 test('gate: 设计师估的身高跟着动作与表情设计存；演出型立绘可以前倾、弯腰（设计师决定，插件不拦）', () => {

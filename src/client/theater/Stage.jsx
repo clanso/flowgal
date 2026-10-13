@@ -6,7 +6,7 @@ import { Particles } from './particles.js'
 import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, HIT_IMPACT_MS, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
-import { heightOf, placeSprite, faceCrop, bandCrop, FACE_RATIO } from '../../../lib/stature.js'
+import { heightOf, placeSprite, usualFace, faceCrop, bandCrop, FACE_RATIO } from '../../../lib/stature.js'
 import { aimCamera } from '../../../lib/camera.js'
 import { reactKind } from '../../../lib/blocking.js'
 import { MOMENT_FOLEY, PHONE_FOLEY } from '../../../lib/foley.js'
@@ -252,6 +252,10 @@ const TOUCH_FRAMES = {
 const DEPTH = { 1: [1.1, '-6%'], [-1]: [0.88, '3%'] }
 /** 退场方式演多久（毫秒），样式在 theater.css 的 data-exit。 */
 const EXIT_MS = { storm: 650, run: 420, slow: 1300 }
+/** 换立绘（换表情、换动作）时新图淡入、旧图淡出多久（毫秒），样式在 theater.css 的 .is-in / .is-out。 */
+const SWAP_MS = 280
+/** 立绘图片的原始宽高（按图片地址）：读过的记下来，换回这张时不用再等它读完。 */
+const SIZES = new Map()
 
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name)
@@ -294,36 +298,52 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name])
   const src = sprite ? assetUrl(sprite) : ''
   const color = (person && person.color) || '#9b7bff'
-  const [shown, setShown] = React.useState(src)
-  const [swap, setSwap] = React.useState(false)
-  const [size, setSize] = React.useState(null) // 显示中那张图的原始宽高（按脸框缩放要用）
+  // 显示中的那张（cur）和刚换下、正在淡出的那张（prev），都带着图的原始宽高（按脸框缩放要用）。
+  // 换表情、换动作时先在后台读好新图、量好大小再换上：新图从第一帧起就按自己的脸框摆好，盖在旧图上淡入，不从旧图的大小缩放过去。
+  // broken：读不出来的那张（被删了、数据目录搬了），退回剪影，不留一个破图标
+  const [pics, setPics] = React.useState(() => ({ cur: src && SIZES.has(src) ? { src, size: SIZES.get(src) } : null, prev: null, broken: '' }))
   React.useEffect(() => {
-    if (!shown) return undefined
+    if (!src) { setPics({ cur: null, prev: null, broken: '' }); return undefined }
+    if (pics.cur && pics.cur.src === src) return undefined
+    const show = size => setPics(p => ({ cur: { src, size }, prev: p.cur && p.cur.src !== src ? p.cur : null, broken: '' }))
+    if (SIZES.has(src)) { show(SIZES.get(src)); return undefined }
     let live = true
     const img = new Image()
-    img.onload = () => { if (live && img.naturalHeight) setSize([img.naturalWidth, img.naturalHeight]) }
-    img.src = shown
-    return () => { live = false }
-  }, [shown])
-  React.useEffect(() => {
-    if (src === shown) return undefined
-    if (!src) { setShown(''); return undefined }
-    // 先在后台加载好再换，避免表情切换时闪白。
-    const img = new Image()
-    img.onload = () => { setShown(src); setSwap(true) }
+    img.onload = () => {
+      if (!live || !img.naturalHeight) return
+      SIZES.set(src, [img.naturalWidth, img.naturalHeight])
+      show(SIZES.get(src))
+    }
+    img.onerror = () => { if (live) setPics({ cur: null, prev: null, broken: src }) }
     img.src = src
-    const t = setTimeout(() => setSwap(false), 300)
-    return () => clearTimeout(t)
+    return () => { live = false }
   }, [src])
+  React.useEffect(() => {
+    if (!pics.prev) return undefined
+    const t = setTimeout(() => setPics(p => (p.prev ? { ...p, prev: null } : p)), SWAP_MS)
+    return () => clearTimeout(t)
+  }, [pics.prev])
   const records = Object.values((person && person.sprites) || {})
   const uploaded = records.some(r => r && r.assetId === sprite && r.uploaded)
   // 立绘记录带逆转式素材包时，用分层画布（眨眼 + 口型），原图作读包前的后备
   const aa = (records.find(r => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null
-  // 头一样大、按身高站：按显示中那张图的脸框缩放，按这个人的身高抬高或压低（lib/stature.js）
-  const record = shown ? records.find(r => r && shown === assetUrl(r.assetId)) : null
-  const place = placeSprite({ box: faceBoxOf(record, size), size, cm: heightOf(person).cm })
-  // 图片文件读不出来（被删了、数据目录搬了）时退回剪影，不留一个破图标
-  const still = shown ? <img src={shown} alt={entry.name} className={swap ? 'is-swap' : ''} draggable="false" onError={() => setShown('')} /> : <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
+  // 头一样大、按身高站：每张图按自己的脸框缩放，按这个人的身高抬高或压低（lib/stature.js）；
+  // 生成的立绘脸框跟这个人平常的差太多（侧身、低头那张认小了）时按平常的算，换到那张时人不会突然大一圈
+  const cm = heightOf(person).cm
+  const faces = records.filter(r => r && r.faceBox && !r.uploaded).map(r => r.faceBox)
+  const placeOf = pic => {
+    const record = pic ? records.find(r => r && pic.src === assetUrl(r.assetId)) : null
+    return placeSprite({ box: faceBoxOf(record, pic && pic.size), size: pic && pic.size, cm, usual: record && !record.uploaded ? usualFace(faces, pic.size[1]) : 0 })
+  }
+  const place = placeOf(pics.cur)
+  const picture = pic => {
+    const at = pic === pics.cur ? place : placeOf(pic)
+    const fade = pic === pics.cur ? (pics.prev ? 'is-in' : '') : 'is-out'
+    return <img key={pic.src} src={pic.src} alt={entry.name} className={fade || undefined} style={{ '--k': at.k, '--lift': at.lift }} draggable="false" onError={() => setPics(p => (p.cur && p.cur.src === pic.src ? { cur: null, prev: null, broken: pic.src } : { ...p, prev: null }))} />
+  }
+  const still = pics.cur ? <>{pics.prev && picture(pics.prev)}{picture(pics.cur)}</>
+    : !src || pics.broken === src ? <Silhouette name={entry.name} color={color} appearance={person && person.appearance} gender={person && person.gender} />
+      : null // 头一回上台、图还在读：读好再出来，不先按没量过的大小露一下
   const [d, db] = DEPTH[entry.depth] || [1, '0%']
   const cls = ['fg-actor', speaking && 'is-speaking', reaction && 'is-reacting', uploaded && 'is-upload', leaving && 'is-leaving', aa && 'is-aa', entry.away && 'is-away', entry.peek && 'is-peek', entry.down && 'is-down'].filter(Boolean).join(' ')
   return (
