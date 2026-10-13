@@ -82,6 +82,7 @@ export const api = {
   test: () => call('/test', {}),
   models: () => call('/models'),
   llm: provider => call(`/llm?provider=${encodeURIComponent(provider || '')}`),
+  cgModels: () => call('/cg-models'),
   update: check => call(`/update${check ? `?check=${check}` : ''}`),
   runUpdate: action => call('/update', { action }),
   music: () => call('/music'),
