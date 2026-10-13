@@ -1314,7 +1314,7 @@
 .fg-aa-box.is-eyes { color: #5fd3ff; }
 .fg-aa-box.is-mouth { color: #ff8ad8; }
 .fg-aa-box.is-face { color: #ffd166; }
-.fg-face-info { gap: .6cqw; margin: .4cqw 0; }
+.fg-face-info { gap: .6cqw; margin: .4cqw 0; } .fg-face-info:not(.fg-row) { display: grid; }
 .fg-face-editor { margin: .6cqw 0; }
 .fg-face-editor .fg-aa-frame { height: 28cqw; }
 /* 动作与表情设计：一个动作一块，块里每个情绪一行（名字、归哪个动作、他的这种表情） */
@@ -1363,6 +1363,10 @@ button.fg-pm-name:hover { color: var(--accent); }
 .fg-pm-open td { text-align: left !important; background: color-mix(in oklab, var(--accent) 6%, transparent); }
 .fg-pm-face { position: sticky; left: .6cqw; display: grid; grid-template-columns: auto 1fr 1fr; gap: .6cqw; align-items: center; max-width: 70cqw; }
 .fg-pose-groups { display: grid; gap: .6cqw; min-width: 0; }
+.fg-face-levels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4cqw 2cqw; }
+.fg-face-levels > label { gap: .8em; } .fg-face-levels b { min-width: 1.6em; }
+.fg-dial input[type=range] { width: 14cqw; }
+.fg-pm-level { display: flex; align-items: center; gap: .6em; flex-wrap: wrap; }
 .fg-field:has(.fg-pose-groups) { align-items: start; } .fg-field:has(.fg-pose-groups) > div { min-width: 0; }
 .fg-aa-box text { fill: currentColor; paint-order: stroke; stroke: rgba(0, 0, 0, .75); stroke-width: 3px; pointer-events: none; }
 .fg-aa-play > canvas, .fg-aa-play > img { position: absolute; left: 50%; top: 0; height: 100%; width: auto; transform: translateX(-50%); }
@@ -1436,7 +1440,7 @@ button.fg-pm-name:hover { color: var(--accent); }
 .fg-btn.is-primary { background: linear-gradient(100deg, var(--accent), var(--accent2)); border-color: transparent; color: #fff; font-weight: 700; }
 .fg-btn[disabled] { opacity: .45; pointer-events: none; }
 .fg-row { display: flex; gap: .8cqw; flex-wrap: wrap; align-items: center; }
-.fg-switch { position: relative; width: 3.4cqw; height: 1.9cqw; border-radius: 99px; background: rgba(255, 255, 255, .14); transition: background .2s; }
+.fg-switch { position: relative; flex: none; width: 3.4cqw; height: 1.9cqw; border-radius: 99px; background: rgba(255, 255, 255, .14); transition: background .2s; }
 .fg-switch::after { content: ""; position: absolute; left: .25cqw; top: .25cqw; width: 1.4cqw; height: 1.4cqw; border-radius: 50%; background: #fff; transition: transform .25s cubic-bezier(.3, 1.4, .5, 1); }
 .fg-switch.is-on { background: linear-gradient(100deg, var(--accent), var(--accent2)); }
 .fg-switch.is-on::after { transform: translateX(1.5cqw); }
@@ -1526,6 +1530,7 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
 @container stage (max-aspect-ratio: 4/5) {
+  .fg-face-levels { grid-template-columns: minmax(0, 1fr); } .fg-dial input[type=range] { width: 30cqw; }
   .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
@@ -1577,7 +1582,7 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-fx-top { flex-wrap: wrap; } .fg-fx-top .fg-note { flex-basis: 100%; }
   .fg-fx-group { padding: 2cqw 2.4cqw 2.4cqw; border-radius: 2cqw; }
   .fg-fx-head b { font-size: 3.4cqw; } .fg-fx-count { font-size: 2.6cqw; }
-  .fg-fx-head .fg-switch { width: 8.4cqw; height: 4.6cqw; } .fg-fx-head .fg-switch::after { left: .6cqw; top: .6cqw; width: 3.4cqw; height: 3.4cqw; } .fg-fx-head .fg-switch.is-on::after { transform: translateX(3.8cqw); }
+  .fg-switch { width: 8.4cqw; height: 4.6cqw; } .fg-switch::after { left: .6cqw; top: .6cqw; width: 3.4cqw; height: 3.4cqw; } .fg-switch.is-on::after { transform: translateX(3.8cqw); }
   .fg-fx-items { gap: 1.2cqw; }
   .fg-fx-chip { font-size: 2.8cqw; padding: .9cqw 2cqw .9cqw 1.4cqw; gap: 1cqw; } .fg-fx-chip i { width: 1.8cqw; height: 1.8cqw; }
   .fg-input, .fg-select, .fg-textarea { font-size: 3cqw; }

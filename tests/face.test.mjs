@@ -219,13 +219,13 @@ async function settle(engine, gameId, done, what = '') {
   }
 }
 
-test('gate: 只换脸整条流程：要「生气」→ 先画抱臂底图「冷淡」→ 等认脸 → 收到脸框换脸（框外和底图一模一样）→ 换种子重画 → 底图重画后跟着重换 → 关掉只换脸就整张画', async () => {
+test('gate: 只换脸整条流程（以前的画法：不放大、硬方框、不比对）：要「生气」→ 先画抱臂底图「冷淡」→ 等认脸 → 收到脸框换脸（框外和底图一模一样）→ 换种子重画 → 底图重画后跟着重换 → 关掉只换脸就整张画', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-face-'))
   try {
     const store = createStore(dir)
     const { requests, fetchImpl } = fakeNai()
     const engine = createEngine({ store, services: {}, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] } } })
+    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] }, face: { crop: false, soft: false, check: false } } })
     await engine.setSecret('novelai', 'official', 'k')
     await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair, blue eyes', seed: 7 } })
     const look = { appearance: '1girl, long black hair, blue eyes', outfit: '', states: [] }
@@ -260,7 +260,11 @@ test('gate: 只换脸整条流程：要「生气」→ 先画抱臂底图「冷�
     const face = await decodePng((await engine.readAsset(lin.sprites[angry].assetId)).data)
     for (const [x, y] of [[5, 5], [87, 120], [168, 120], [128, 87], [128, 152], [200, 300]]) assert.deepEqual(px(face, x, y), px(body, x, y), `框外 (${x},${y}) 跟底图一样`)
     assert.deepEqual(px(face, 128, 120), [255, 0, 0, 255], '框里是重画的脸')
-    assert.deepEqual(lin.sprites[angry].face, { from: cold, pose: 'arms', body: lin.sprites[cold].assetId, box: BOX })
+    const { paint, ...made } = lin.sprites[angry].face
+    assert.deepEqual(made, { from: cold, pose: 'arms', body: lin.sprites[cold].assetId, box: BOX })
+    assert.deepEqual(paint, { level: 3, strength: 0.8, tries: 1, check: paint.check, crop: false, soft: false, reference: false }, '生气默认「强」，重绘强度 0.8')
+    assert.equal(infill.parameters.inpaintImg2ImgStrength, 0.8)
+    assert.deepEqual(infill.parameters.img2img, { strength: 0.8, color_correct: true })
     assert.match(lin.sprites[angry].characters[0], /angry/, '记下换脸用的提示词（逆转式工作台接着用）')
 
     // 换个种子重画这张脸

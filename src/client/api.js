@@ -68,6 +68,7 @@ export const api = {
   deleteImage: (gameId, imageId) => call('/image/delete', { gameId, imageId }),
   addImage: (gameId, turn, after, plan) => call('/image/add', { gameId, turn, after, plan }),
   cancel: (gameId, kind, id) => call('/cancel', { gameId, kind, id }),
+  faces: (since, signal) => call(`/faces${since ? `?since=${since}` : ''}`, null, { signal }),
   directorLog: (gameId, since, signal) => call(`/director-log?gameId=${encodeURIComponent(gameId)}${since ? `&since=${since}` : ''}`, null, { signal }),
   directorEntry: (gameId, id) => call(`/director-log?gameId=${encodeURIComponent(gameId)}&id=${encodeURIComponent(id)}`),
   place: (gameId, key) => call('/place/render', { gameId, key }),
@@ -244,6 +245,12 @@ function useLongPoll(key, active, fetchOnce) {
 export function useGameView(gameId, active = true) {
   const { data, error } = useLongPoll(gameId, active, (since, signal) => api.game(gameId, since, signal))
   return { view: data ? data.view : null, error }
+}
+
+/** 订阅所有对局里等认脸的动作底图（开着 FlowGal 的页面就认，见 theater/faceFramer.js）。 */
+export function useFacesWaiting(active = true) {
+  const { data } = useLongPoll('faces', active, (since, signal) => api.faces(since, signal))
+  return data ? data.faces : null
 }
 
 /** 订阅一局的导演日志（列表 + 正在跑的实时输出）。 */
