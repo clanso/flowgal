@@ -916,17 +916,25 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-cover-down { from { opacity: 1; } to { opacity: 0; } }
 /* 白闪：一下子白透，再慢慢退回来 */
 .fg-cover[data-cover="white"][data-state="up"] { animation-timing-function: ease-out; }
-/* 闭眼睁眼：眼睛的形状（中间宽、两头尖）先四角暗下去、再收成一条缝合上，停一下，再睁开（先睁一条缝、又眯一下）。--eye 是眼睛张开的高度，95% 就是全睁开 */
+/* 闭眼睁眼：像真的眼皮。上眼皮往下走得多、下眼皮只抬一点（眼缝的中线慢慢往下移）；眼皮边缘软、带一圈暗红（光透过眼皮）；
+   合上前眼皮发沉、挣扎着又睁开一点才合上，合着时不是纯黑、是眼皮里透的暗红；睁开时先睁一条缝、又合上，再睁开一半、眨一下才完全睁开，
+   画面一开始是糊的，睁开以后才慢慢对上焦。--eye 是眼缝的高度（95% 全睁开），--eye-y 是眼缝中线的位置，--eye-blur 是看出去有多糊 */
 @property --eye { syntax: '<percentage>'; inherits: false; initial-value: 95%; }
-.fg-cover[data-cover="lids"] { opacity: 1; background: none; }
+@property --eye-y { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
+@property --eye-blur { syntax: '<length>'; inherits: false; initial-value: 0px; }
+.fg-cover[data-cover="lids"] { opacity: 1; background: none; --eye-blur: 0px; -webkit-backdrop-filter: blur(var(--eye-blur)); backdrop-filter: blur(var(--eye-blur)); }
 .fg-cover[data-cover="lids"][data-state] { animation: none; }
-.fg-cover[data-cover="lids"][data-state="idle"], .fg-cover[data-cover="lids"][data-state="off"] { opacity: 0; }
-.fg-cover[data-cover="lids"]::before { content: ""; position: absolute; inset: 0; --eye: 95%; background: radial-gradient(ellipse 70% var(--eye) at 50% 50%, transparent 78%, #000 100%); }
-.fg-cover[data-cover="lids"][data-state="up"]::before { animation: fg-eye-shut var(--ms) cubic-bezier(.45, 0, .55, 1) both; }
-.fg-cover[data-cover="lids"][data-state="full"]::before { --eye: 0%; background: #000; }
-.fg-cover[data-cover="lids"][data-state="down"]::before { animation: fg-eye-open var(--ms) cubic-bezier(.3, 0, .3, 1) both; }
-@keyframes fg-eye-shut { from { --eye: 95%; } to { --eye: 0%; } }
-@keyframes fg-eye-open { 0% { --eye: 0%; } 30% { --eye: 24%; } 45% { --eye: 10%; } 100% { --eye: 95%; } }
+.fg-cover[data-cover="lids"][data-state="idle"], .fg-cover[data-cover="lids"][data-state="off"] { opacity: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.fg-cover[data-cover="lids"]::before { content: ""; position: absolute; inset: 0; --eye: 95%; --eye-y: 50%; background: radial-gradient(ellipse 72% var(--eye) at 50% var(--eye-y), transparent 70%, rgba(52, 12, 16, .55) 84%, #000 100%); }
+.fg-cover[data-cover="lids"][data-state="up"] { animation: fg-eye-blur-in var(--ms) ease-in both; }
+.fg-cover[data-cover="lids"][data-state="up"]::before { animation: fg-eye-shut var(--ms) ease-in-out both; }
+.fg-cover[data-cover="lids"][data-state="full"]::before { background: radial-gradient(ellipse 80% 60% at 50% 58%, #1c0708, #000 75%); }
+.fg-cover[data-cover="lids"][data-state="down"] { animation: fg-eye-blur-out var(--ms) ease-out both; }
+.fg-cover[data-cover="lids"][data-state="down"]::before { animation: fg-eye-open var(--ms) ease-in-out both; }
+@keyframes fg-eye-shut { 0% { --eye: 95%; --eye-y: 50%; } 30% { --eye: 44%; --eye-y: 52%; } 45% { --eye: 56%; --eye-y: 51%; } 75% { --eye: 14%; --eye-y: 57%; } 100% { --eye: 0%; --eye-y: 60%; } }
+@keyframes fg-eye-open { 0% { --eye: 0%; --eye-y: 60%; } 18% { --eye: 22%; --eye-y: 56%; } 30% { --eye: 3%; --eye-y: 59%; } 55% { --eye: 50%; --eye-y: 52%; } 66% { --eye: 38%; --eye-y: 53%; } 100% { --eye: 95%; --eye-y: 50%; } }
+@keyframes fg-eye-blur-in { from { --eye-blur: 0px; } to { --eye-blur: 6px; } }
+@keyframes fg-eye-blur-out { 0% { --eye-blur: 12px; } 55% { --eye-blur: 7px; } 100% { --eye-blur: 0px; } }
 /* 画面撕裂：几道色带闪过去，中间一下全黑换画面 */
 .fg-cover[data-cover="glitch"][data-state="up"] { animation: fg-cover-glitch var(--ms) steps(4) both; }
 .fg-cover[data-cover="glitch"][data-state="down"] { animation: fg-cover-glitch var(--ms) steps(4) reverse both; }
@@ -1165,9 +1173,10 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-blink-in { 0%, 42% { opacity: 0; } 50%, 100% { opacity: 1; } }
 @keyframes fg-glitch-in { 0% { opacity: 0; transform: translateX(3%); filter: hue-rotate(90deg) contrast(2); } 20% { opacity: 1; transform: translateX(-2%); } 40% { transform: translateX(1.5%) skewX(4deg); filter: hue-rotate(-60deg) contrast(1.6); } 60% { transform: translateX(-.8%); } 80% { transform: none; filter: hue-rotate(20deg); } 100% { filter: none; } }
 @keyframes fg-swirl-in { from { opacity: 0; transform: rotate(-14deg) scale(1.45); filter: blur(16px) brightness(1.4); } to { opacity: 1; transform: none; filter: none; } }
-.fg-flash.is-blink { background: none; animation: none; }
-.fg-flash.is-blink::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 70% var(--eye) at 50% 50%, transparent 78%, #000 100%); animation: fg-eye-blink 1.5s cubic-bezier(.5, 0, .4, 1) both; }
-@keyframes fg-eye-blink { 0% { --eye: 95%; } 35%, 55% { --eye: 0%; } 100% { --eye: 95%; } }
+.fg-flash.is-blink { background: none; animation: fg-eye-blink-blur 1.5s ease-in-out both; -webkit-backdrop-filter: blur(var(--eye-blur)); backdrop-filter: blur(var(--eye-blur)); }
+.fg-flash.is-blink::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 72% var(--eye) at 50% var(--eye-y), transparent 70%, rgba(52, 12, 16, .55) 84%, #000 100%); animation: fg-eye-blink 1.5s ease-in-out both; }
+@keyframes fg-eye-blink { 0% { --eye: 95%; --eye-y: 50%; } 30%, 45% { --eye: 0%; --eye-y: 60%; } 62% { --eye: 30%; --eye-y: 55%; } 72% { --eye: 16%; --eye-y: 57%; } 100% { --eye: 95%; --eye-y: 50%; } }
+@keyframes fg-eye-blink-blur { 0% { --eye-blur: 0px; } 30%, 45% { --eye-blur: 6px; } 62% { --eye-blur: 9px; } 100% { --eye-blur: 0px; } }
 .fg-flash.is-glitch { background: linear-gradient(transparent 0 22%, rgba(255, 0, 90, .5) 22% 25%, transparent 25% 51%, rgba(0, 255, 220, .45) 51% 53%, transparent 53% 78%, rgba(255, 255, 255, .6) 78% 79.5%, transparent 79.5%); mix-blend-mode: screen; animation: fg-glitch .7s steps(6) both; }
 @keyframes fg-glitch { 0% { opacity: 1; transform: translate(0, 0); } 30% { transform: translate(-4%, 8%); } 60% { transform: translate(5%, -12%); opacity: .8; } 100% { opacity: 0; transform: translate(0, 20%); } }
 
@@ -1708,7 +1717,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
   /* 换背景还是淡入淡出（只是不推拉、不模糊、不旋转），不会一下子跳过去 */
   .fg-bg.is-enter { animation: fg-fade-slow var(--enter-dur, 1.1s) ease both !important; }
   .fg-cover[data-cover="lids"]::before { display: none; }
-  .fg-cover[data-cover="lids"] { background: #000; }
+  .fg-cover[data-cover="lids"] { background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .fg-cover[data-cover="lids"][data-state="up"] { animation: fg-cover-up var(--ms) ease both; }
   .fg-cover[data-cover="lids"][data-state="down"] { animation: fg-cover-down var(--ms) ease both; }
   .fg-cover[data-cover="lids"][data-state="off"], .fg-cover[data-cover="lids"][data-state="idle"] { opacity: 0; }
@@ -3379,7 +3388,7 @@ var SCENE_CAST_MS = 450;
 var COVERS = {
   black: { cover: "black", clear: true, up: 700, hold: 400, down: 900 },
   flash: { cover: "white", clear: false, up: 120, hold: 150, down: 650 },
-  blink: { cover: "lids", clear: false, up: 550, hold: 250, down: 700 },
+  blink: { cover: "lids", clear: false, up: 800, hold: 300, down: 1400 },
   glitch: { cover: "glitch", clear: false, up: 300, hold: 0, down: 400 },
   swirl: { cover: "swirl", clear: true, up: 900, hold: 200, down: 900 }
 };
