@@ -1985,7 +1985,6 @@ function saveText(text, name) {
 }
 
 const KIND_LABEL = { ambience: '环境音', blip: '打字音', sfx: '音效' }
-const KIND_ORDER = ['ambience', 'blip', 'sfx']
 /** 推荐用途：「声音」页一键套用时，标了哪个槽就放进哪个槽，标了旁白的打字音给旁白。 */
 const USE_OPTIONS = [['', '没有'], ...SOUND_SLOTS.map(s => [s.id, `${s.group === 'ui' ? '界面音' : '落字音效'} · ${s.label}`]), ['narration', '旁白的打字音']]
 const LIB_SHOWN = 200 // 搜索结果、一个分组里最多列出多少个
@@ -2033,7 +2032,6 @@ function LibSoundCard({ sound, playing, onPlay }) {
   )
 }
 
-/** 音效库页：开关音量、导入整个文件夹（带上里面的描述文件）、按种类和分类分组浏览、搜索、试听、逐个改、整类删、导出描述。 */
 /** 亲密场面（lib/eros.js）：开关，和一排试听（节奏底、触手、高潮、一下一下的音效）。音量跟剧情音效走。 */
 function ErosField({ cfg, p }) {
   const [open, setOpen] = React.useState(false)
@@ -2058,17 +2056,30 @@ function ErosField({ cfg, p }) {
   )
 }
 
-function SoundLibSection({ data }) {
+// 音效库和环境音库各一页：开关音量、导入整个文件夹（带上里面的描述文件）、按分类分组浏览、搜索、试听、逐个改、整类删、导出描述、清空。
+// 音效库页列音效和打字音，环境音库页列环境音；导演挑候选时本来就分开挑。清空只清这一页的音效或环境音，
+// 打字音和「声音」页正在用的（落字音效、界面音的槽，旁白、默认音色）留着。
+const LIB_PAGE = {
+  sfx: { kinds: ['sfx', 'blip'], title: '音效库', unit: '个音效', other: '环境音库', empty: '音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。', note: '推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪句配什么音效。所以标签要写正文里会出现的词。' },
+  ambience: { kinds: ['ambience'], title: '环境音库', unit: '个环境音', other: '音效库', empty: '环境音库还是空的。没有环境音时剧场不放环境音。', note: '雨声、蝉鸣、车站广播这类循环的底。后台导演整理每一轮时按地点、天气和正文挑一批候选，决定每一幕放哪个，跨轮沿用。标签写地点、天气、时段这类词最管用。' },
+}
+
+function SoundLibSection({ data, kind = 'sfx' }) {
   const cfg = data.config
-  const sounds = useSoundlib()
+  const page = LIB_PAGE[kind]
+  const all = useSoundlib()
+  const sounds = React.useMemo(() => (all ? all.filter(s => page.kinds.includes(s.kind || 'sfx')) : null), [all, page])
+  const otherKind = kind === 'sfx' ? 'ambience' : 'sfx'
   const [playing, setPlaying] = React.useState('')
   const [progress, setProgress] = React.useState('')
   const [query, setQuery] = React.useState('')
   const [openGroup, setOpenGroup] = React.useState('')
+  const [clearing, setClearing] = React.useState(false) // 清空这一库：确认那一行开着
   const [busy, run] = useBusy()
   const folderRef = React.useRef(null)
   const p = patch => patchConfig({ ui: patch }).catch(e => toast(e.message, 'error'))
   React.useEffect(() => () => stopPreview(), [])
+  React.useEffect(() => { setQuery(''); setOpenGroup(''); setClearing(false) }, [kind])
 
   const play = s => {
     if (playing === s.id) { stopPreview(); return }
@@ -2076,7 +2087,10 @@ function SoundLibSection({ data }) {
     setPlaying(s.id)
   }
 
-  /** 逐个导入；文件夹里的描述文件（可以有好几份）按相对路径给每个声音带上名字、种类、分类、描述、标签。已经在库里的只更新描述。 */
+  /**
+   * 逐个导入；文件夹里的描述文件（可以有好几份）按相对路径给每个声音带上名字、种类、分类、描述、标签。已经在库里的只更新描述。
+   * 种类按描述文件写的；描述文件没写的，算这一页的（在环境音库导入的就是环境音）。
+   */
   const importFiles = async list => {
     const files = [...(list || [])]
     if (!files.length) return
@@ -2088,9 +2102,9 @@ function SoundLibSection({ data }) {
     const match = soundMatcher(sidecars)
     const audio = files.filter(f => AUDIO_FILE.test(f.name)).sort((a, b) => pathOf(a).localeCompare(pathOf(b), 'zh-CN', { numeric: true }))
     if (!audio.length) { toast('没找到音频文件（mp3、m4a、aac、ogg、opus、wav、flac）', 'error'); return }
-    const have = new Map((sounds || []).map(s => [`${s.file}|${s.bytes}`, s]))
+    const have = new Map((all || []).map(s => [`${s.file}|${s.bytes}`, s]))
     const failed = []
-    let added = 0, updated = 0, useful = 0
+    let added = 0, updated = 0, useful = 0, elsewhere = 0
     for (let i = 0; i < audio.length; i++) {
       const f = audio[i]
       const { file, meta } = match(pathOf(f))
@@ -2099,18 +2113,19 @@ function SoundLibSection({ data }) {
       try {
         const old = have.get(`${file}|${f.size}`)
         if (old) { if (meta) { await api.updateLibSound(old.id, meta); updated++ } continue }
-        await api.uploadLibSound(f, file, meta)
+        const sound = await api.uploadLibSound(f, file, { kind, ...(meta || {}) })
         added++
+        if (sound && !page.kinds.includes(sound.kind)) elsewhere++
       } catch (e) {
         failed.push(`${file}：${e.message}`)
       }
     }
     setProgress('')
     await loadSoundlib().catch(() => {})
-    toast(`新导入 ${added} 个${updated ? `，更新了 ${updated} 个的描述` : ''}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join('；')}` : ''}${useful && !failed.length ? '。里面有打字音和标了用途的声音，到「声音」页可以一键套用' : ''}`, failed.length ? 'error' : undefined)
+    toast(`新导入 ${added} 个${elsewhere ? `（其中 ${elsewhere} 个描述文件写的是${KIND_LABEL[otherKind]}，放进了${LIB_PAGE[otherKind].title}）` : ''}${updated ? `，更新了 ${updated} 个的描述` : ''}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join('；')}` : ''}${useful && !failed.length ? '。里面有打字音和标了用途的声音，到「声音」页可以一键套用' : ''}`, failed.length ? 'error' : undefined)
   }
 
-  // 分组：种类 → 分类（两层的按第一层分组，组里显示完整分类）。搜索时不分组，直接列出匹配的。
+  // 分组：种类 → 分类（两层的按第一层分组，组里显示完整分类），这一页的种类排前面（音效库页的打字音排在音效后面）。搜索时不分组，直接列出匹配的。
   const groups = React.useMemo(() => {
     const map = new Map()
     for (const s of sounds || []) {
@@ -2118,33 +2133,55 @@ function SoundLibSection({ data }) {
       if (!map.has(key)) map.set(key, { key, kind: s.kind, name: key.split('|')[1], items: [] })
       map.get(key).items.push(s)
     }
-    return [...map.values()].sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name, 'zh-CN') : KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind)))
-  }, [sounds])
+    return [...map.values()].sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name, 'zh-CN') : a.kind === kind ? -1 : 1))
+  }, [sounds, kind])
   const words = query.trim().split(/\s+/).filter(Boolean)
   const found = words.length ? (sounds || []).filter(s => { const text = `${s.name} ${s.category} ${(s.tags || []).join(' ')} ${s.description}`; return words.every(w => text.includes(w)) }) : null
   const cards = list => list.slice(0, LIB_SHOWN).map(s => <LibSoundCard key={s.id} sound={s} playing={playing === s.id} onPlay={() => play(s)} />)
   const removeGroup = g => {
-    if (!window.confirm(`把「${KIND_LABEL[g.kind]} · ${g.name}」这一类 ${g.items.length} 个都从音效库删掉？电脑上的原文件不受影响。`)) return
+    if (!window.confirm(`把「${g.kind === kind ? g.name : `${KIND_LABEL[g.kind]} · ${g.name}`}」这一类 ${g.items.length} 个都从${page.title}删掉？电脑上的原文件不受影响。`)) return
     run('g' + g.key, async () => { await api.removeLibSounds(g.items.map(s => s.id)); await loadSoundlib() }, '已删除')
   }
+  // 清空这一库：重新整理时一次删光，只删这一种，另一库不动；电脑上的原文件不动。打字音和「声音」页正在用的留着（服务端也按设置留）。
+  const inUse = new Set([...Object.values(cfg.ui.sounds || {}), cfg.ui.narrationVoice, cfg.ui.voiceDefault].map(libIdOf).filter(Boolean))
+  const doomed = (sounds || []).filter(s => s.kind === kind && !inUse.has(s.id))
+  const kept = { blips: (sounds || []).filter(s => s.kind === 'blip').length, used: (sounds || []).filter(s => s.kind === kind && inUse.has(s.id)).length }
+  const totalBytes = doomed.reduce((n, s) => n + (s.bytes || 0), 0)
+  const clearAll = () => run('clear', async () => {
+    stopPreview()
+    setPlaying('')
+    const { cleared } = await api.clearLibSounds(kind)
+    await loadSoundlib().catch(() => {})
+    setClearing(false)
+    toast(`已清空${page.title}：删掉 ${cleared.sounds} 个${cleared.kept ? `，留着「声音」页正在用的 ${cleared.kept} 个` : ''}${cleared.failed ? `；${cleared.failed} 个文件没删掉（可能正被占用），库里已经没有它们了` : ''}`, cleared.failed ? 'error' : undefined)
+  })
 
   return (
     <>
       <div className="fg-section">播放</div>
-      <Field label="环境音" hint="雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。"><div className="fg-row"><Toggle value={cfg.ui.amb} onChange={v => p({ amb: v })} /><input type="range" min="0" max="1" step="0.05" value={cfg.ui.ambVolume} onChange={e => p({ ambVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
-      <Field label="剧情音效" hint="推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。"><div className="fg-row"><Toggle value={cfg.ui.storySfx} onChange={v => p({ storySfx: v })} /><input type="range" min="0" max="2" step="0.05" value={cfg.ui.storySfxVolume} onChange={e => p({ storySfxVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
-      <ErosField cfg={cfg} p={p} />
-      <div className="fg-section">我的音效库{sounds ? ` · ${sounds.length} 个` : ''}</div>
-      <div className="fg-note">库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪一幕放什么环境音、哪句配什么音效。所以标签要写正文里会出现的词。</div>
+      {kind === 'ambience' && <Field label="环境音" hint="雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。"><div className="fg-row"><Toggle value={cfg.ui.amb} onChange={v => p({ amb: v })} /><input type="range" min="0" max="1" step="0.05" value={cfg.ui.ambVolume} onChange={e => p({ ambVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>}
+      {kind === 'sfx' && <Field label="剧情音效" hint="推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。"><div className="fg-row"><Toggle value={cfg.ui.storySfx} onChange={v => p({ storySfx: v })} /><input type="range" min="0" max="2" step="0.05" value={cfg.ui.storySfxVolume} onChange={e => p({ storySfxVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>}
+      {kind === 'sfx' && <ErosField cfg={cfg} p={p} />}
+      <div className="fg-section">我的{page.title}{sounds ? ` · ${sounds.length} 个` : ''}</div>
+      <div className="fg-note">{page.note}</div>
       <div className="fg-row" style={{ margin: '1cqw 0' }}>
         <button type="button" className="fg-btn is-primary" disabled={Boolean(progress)} onClick={() => folderRef.current && folderRef.current.click()}>导入文件夹</button>
         <button type="button" className="fg-btn" disabled={!sounds || !sounds.some(s => s.file)} onClick={() => saveText(writeSoundSidecar(sounds || []), SOUND_SIDECAR)}>导出描述</button>
+        {!clearing && <button type="button" className="fg-btn fg-danger" disabled={!doomed.length || Boolean(progress)} title={`把${page.title}删光，重新整理；${page.other}${kind === 'sfx' ? '、打字音' : ''}和「声音」页正在用的不动`} onClick={() => setClearing(true)}>清空{page.title}</button>}
         {progress && <span className="fg-pill is-busy">{progress}</span>}
         <input ref={folderRef} type="file" webkitdirectory="" multiple hidden onChange={e => { importFiles(e.target.files); e.target.value = '' }} />
       </div>
-      <div className="fg-note">文件夹最上面放一份 <code>{SOUND_SIDECAR}</code>（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹。同一个文件再导入不会重复存，但描述会以描述文件为准。种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。</div>
+      {clearing && doomed.length > 0 && (
+        <div className="fg-row fg-manage">
+          <span className="fg-note">删掉{page.title}里的 {doomed.length} {page.unit}（{totalBytes >= 1073741824 ? (totalBytes / 1073741824).toFixed(1) + ' GB' : sizeMB(totalBytes)}），名字、分类、标签和存进 FlowGal 的音频一起删；{page.other}不动{kept.blips ? `，${kept.blips} 个打字音留着` : ''}{kept.used ? `，「声音」页正在用的 ${kept.used} 个留着` : ''}，电脑上的原文件也不受影响。描述想留着的话先点「导出描述」。</span>
+          <span className="fg-spacer" />
+          <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'clear'} onClick={clearAll}>{busy === 'clear' ? '清空中…' : '确认清空'}</button>
+          <button type="button" className="fg-btn is-mini" disabled={busy === 'clear'} onClick={() => setClearing(false)}>取消</button>
+        </div>
+      )}
+      <div className="fg-note">文件夹最上面放一份 <code>{SOUND_SIDECAR}</code>（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹，在这一页导入的算{KIND_LABEL[kind]}。同一个文件再导入不会重复存，但描述会以描述文件为准。{kind === 'sfx' ? '种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。' : ''}</div>
       {!sounds && <div className="fg-note">读取中…</div>}
-      {sounds && !sounds.length && <div className="fg-note" style={{ marginTop: '1cqw' }}>音效库还是空的。没有声音时剧场不放环境音和剧情音效。</div>}
+      {sounds && !sounds.length && <div className="fg-note" style={{ marginTop: '1cqw' }}>{page.empty}</div>}
       {sounds && sounds.length > 0 && (
         <>
           <input className="fg-input" style={{ width: '100%', margin: '0.6cqw 0 1cqw' }} value={query} placeholder="搜索名字、分类、标签、描述（空格隔开几个词）" onChange={e => setQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />
@@ -2153,7 +2190,7 @@ function SoundLibSection({ data }) {
           {!found && groups.map(g => (
             <div key={g.key} className="fg-libgroup">
               <div className="fg-row fg-libgroup-head">
-                <button type="button" className="fg-btn" onClick={() => setOpenGroup(k => (k === g.key ? '' : g.key))}>{openGroup === g.key ? '▾' : '▸'} {KIND_LABEL[g.kind]} · {g.name}</button>
+                <button type="button" className="fg-btn" onClick={() => setOpenGroup(k => (k === g.key ? '' : g.key))}>{openGroup === g.key ? '▾' : '▸'} {g.kind === kind ? g.name : `${KIND_LABEL[g.kind]} · ${g.name}`}</button>
                 <span className="fg-note">{g.items.length} 个</span>
                 <span style={{ flex: 1 }} />
                 <button type="button" className="fg-btn" disabled={busy === 'g' + g.key} onClick={() => removeGroup(g)}>删除这一类</button>
@@ -2225,14 +2262,15 @@ export function Settings({ onClose, onDirectorLog = null, initialTab = 'look' })
   const data = useConfig()
   const [tab, setTab] = React.useState(initialTab)
   return (
-    <Panel title="设置" en="Config" onClose={onClose} tabs={[{ id: 'look', label: '外观与演出' }, { id: 'effects', label: '特效' }, { id: 'sound', label: '声音' }, { id: 'music', label: '配乐' }, { id: 'soundlib', label: '音效库' }, { id: 'director', label: '导演' }, { id: 'images', label: '生图渠道' }, { id: 'style', label: '画风与配图' }, { id: 'about', label: '版本与更新' }]} tab={tab} onTab={setTab}
+    <Panel title="设置" en="Config" onClose={onClose} tabs={[{ id: 'look', label: '外观与演出' }, { id: 'effects', label: '特效' }, { id: 'sound', label: '声音' }, { id: 'music', label: '配乐' }, { id: 'soundlib', label: '音效库' }, { id: 'ambience', label: '环境音库' }, { id: 'director', label: '导演' }, { id: 'images', label: '生图渠道' }, { id: 'style', label: '画风与配图' }, { id: 'about', label: '版本与更新' }]} tab={tab} onTab={setTab}
       actions={data && <span className={`fg-pill${data.ready ? '' : ' fg-err'}`}>{data.ready ? '生图已就绪' : data.readyReason}</span>}>
       {!data && <div className="fg-note">读取设置中…</div>}
       {data && tab === 'look' && <LookSection data={data} />}
       {data && tab === 'effects' && <EffectsSection data={data} />}
       {data && tab === 'sound' && <SoundSection data={data} />}
       {data && tab === 'music' && <MusicSection data={data} />}
-      {data && tab === 'soundlib' && <SoundLibSection data={data} />}
+      {data && tab === 'soundlib' && <SoundLibSection data={data} kind="sfx" />}
+      {data && tab === 'ambience' && <SoundLibSection data={data} kind="ambience" />}
       {data && tab === 'director' && <DirectorSection data={data} onDirectorLog={onDirectorLog} />}
       {data && tab === 'images' && <BackendSection data={data} />}
       {data && tab === 'style' && <><StyleSection data={data} /><ImagesSection data={data} /></>}
