@@ -3,7 +3,7 @@ import React from 'react'
 import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, soundlibNow, hostName } from '../api.js'
 import { emotionLabel, shownLib, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, RECALL_TONES, RECALL_TONE_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
-import { allEmotions, emotionEntry, personEmotions, nearestOf } from '../../../lib/emotions.js'
+import { allEmotions, emotionEntry, personEmotions, nearestOf, emotionLevel } from '../../../lib/emotions.js'
 import { EmotionLibrary } from './EmotionLibrary.jsx'
 import { PoseMatrix } from './PoseMatrix.jsx'
 import { settleNeutral, slotKey, tokenFor, parseToken, cleanPoseGroups, sheetOf, homePose, poseFor } from '../../../lib/poses.js'
@@ -24,6 +24,8 @@ import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../l
 import { SOUND_SIDECAR, readSoundSidecar, soundMatcher, writeSoundSidecar } from '../../../lib/soundlib-sidecar.js'
 import { modelKey, qualityFor, negativeFor, sizeFor, MAX_STYLES } from '../../../lib/image/style.js'
 import { naiModelInfo } from '../../../lib/image/nai-models.js'
+import { naiReferenceOk } from '../../../lib/image/novelai.js'
+import { DEFAULT_FACE, FACE_LEVELS, FACE_LEVEL_LABEL, FACE_LIMITS } from '../../../lib/face-paint.js'
 import { CG_MAX_CHARACTERS, POSES } from '../../../lib/vocab.js'
 import { faceBoxFrom, cleanFaceBox } from '../../../lib/face.js'
 import { heightOf } from '../../../lib/stature.js'
@@ -640,17 +642,39 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
   if (record && record.face) {
     const body = sprites[record.face.from]
     const bodyLabel = emotionEntry((body && body.emotion) || keyEmotion(record.face.from), emotions).label
+    const paint = record.face.paint
+    const fixed = typeof record.face.strength === 'number'
+    const redo = strength => run('redo', () => api.cast(gameId, 'face-redo', { name: person.name, key: emotionKey, ...(strength === undefined ? {} : { strength }) }), strength === undefined ? '换个种子重画脸' : '按这个强度重画脸')
+    const how = paint ? [
+      `强弱「${FACE_LEVEL_LABEL[paint.level] || '?'}」`,
+      `重绘强度 ${Number(paint.strength).toFixed(2)}${fixed ? '（你定的）' : ''}`,
+      paint.crop ? '放大重画' : '',
+      paint.soft ? '软边' : '',
+      paint.reference ? '带角色参考' : '',
+      paint.check ? `比对：接缝 ${paint.check.seam}、明暗 ${paint.check.shade}、变化 ${paint.check.change}${paint.tries > 1 ? `（画了 ${paint.tries} 次，${paint.check.ok ? '这张过了' : '都没完全过，留了最像的'}）` : paint.check.ok ? '' : '（没过）'}` : '',
+    ].filter(Boolean).join(' · ') : ''
     return (
-      <div className="fg-row fg-face-info">
-        <span className="fg-note">只换脸：在「{bodyLabel}」这张「{record.poseLabel || (POSES[record.face.pose] || {}).label || '动作'}」底图上重画脸，身体衣服跟底图一样{Number.isInteger(record.face.seed) ? ` · 脸的种子 ${record.face.seed}` : ''}</span>
-        {record.assetId && <button type="button" className="fg-btn is-mini" disabled={busy === 'redo'} onClick={() => run('redo', () => api.cast(gameId, 'face-redo', { name: person.name, key: emotionKey }), '换个种子重画脸')}>换个种子重画脸</button>}
+      <div className="fg-face-info">
+        <div className="fg-row">
+          <span className="fg-note">只换脸：在「{bodyLabel}」这张「{record.poseLabel || (POSES[record.face.pose] || {}).label || '动作'}」底图上重画脸，身体衣服跟底图一样{Number.isInteger(record.face.seed) ? ` · 脸的种子 ${record.face.seed}` : ''}</span>
+          {record.assetId && <button type="button" className="fg-btn is-mini" disabled={busy === 'redo'} onClick={() => redo(undefined)}>换个种子重画脸</button>}
+        </div>
+        {how && <div className="fg-note">{how}</div>}
+        {record.assetId && (
+          <div className="fg-row">
+            <span className="fg-note">这张的重绘强度</span>
+            <Select value={fixed ? record.face.strength.toFixed(2) : ''} style={INLINE} onChange={v => redo(v === '' ? null : Number(v))}
+              options={[['', '自动（按强弱）'], ...[...new Set([0.3, 0.4, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1, ...(fixed ? [record.face.strength] : [])])].sort((a, b) => a - b).map(n => [n.toFixed(2), n.toFixed(2) + (n <= 0.5 ? '（改得少，留住画风）' : n >= 0.95 ? '（从零重画）' : '')])]} />
+            <span className="fg-note">改了就按它重画这张；表情没换上调高，画风跑偏调低</span>
+          </div>
+        )}
       </div>
     )
   }
   const deps = Object.values(sprites).filter(r => r && r.face && r.face.from === emotionKey)
   if (!record || !record.assetId || (!deps.length && !record.pose)) return null
   const auto = framedResult(record.assetId)
-  const boxText = record.faceBox ? (record.faceBy === 'hand' ? '脸框：你框的' : '脸框：自动认出') : auto === 'miss' ? '脸框：自动没认准，框一下' : '脸框：还没认（剧场开着、认脸小模型下好时自动认）'
+  const boxText = record.faceBox ? (record.faceBy === 'hand' ? '脸框：你框的' : '脸框：自动认出') : auto === 'miss' ? '脸框：自动没认准，框一下' : '脸框：还没认（开着 FlowGal 的页面、认脸小模型下好时自动认）'
   return (
     <>
       <div className="fg-row fg-face-info">
@@ -894,6 +918,11 @@ function ActingEditor({ gameId, person, emotions, group, turn, used, onOpen }) {
         <b>{emotionEntry(e, emotions).label}：他的这种情绪什么样</b>
         <input className="fg-input" value={face.desc || ''} placeholder="他的这种情绪什么样（中文一句）" onChange={ev => setFace(e, { desc: ev.target.value })} onKeyDown={ev => ev.stopPropagation()} />
         <input className="fg-input" value={face.tags || ''} placeholder="脸上的英文 tag（没写就用情绪库里的）" onChange={ev => setFace(e, { tags: ev.target.value })} onKeyDown={ev => ev.stopPropagation()} />
+        <div className="fg-pm-level">
+          <span className="fg-note">强弱</span>
+          {FACE_LEVELS.map(l => <button key={l} type="button" className={`fg-btn is-mini${(face.level || 0) === l ? ' is-on' : ''}`} title={LEVEL_HINT[l]} onClick={() => setFace(e, { level: face.level === l ? undefined : l })}>{FACE_LEVEL_LABEL[l]}</button>)}
+          <span className="fg-note">{face.level ? '' : `没标：按情绪默认的「${FACE_LEVEL_LABEL[emotionLevel(e, emotions)]}」。`}换脸时强弱定重绘强度（越强改得越多），「极」的在这个动作上整张画（设置 → 画风与配图里能调）</span>
+        </div>
       </div>
     )
   }
@@ -1613,6 +1642,65 @@ function PoseGroups({ cfg, onPatch }) {
   )
 }
 
+/** 滑块：拖的时候只改显示，松手（或键盘改完）才存。 */
+function Dial({ value, min, max, step, onCommit, digits = 2, label = '' }) {
+  const [v, setV] = React.useState(value)
+  React.useEffect(() => { setV(value) }, [value])
+  const commit = () => { if (Number(v) !== Number(value)) onCommit(Number(v)) }
+  return (
+    <span className="fg-row fg-dial" style={{ gap: '.6em' }}>
+      <input type="range" min={min} max={max} step={step} value={v} aria-label={label} onChange={e => setV(Number(e.target.value))} onPointerUp={commit} onKeyUp={commit} onBlur={commit} />
+      <span className="fg-note">{Number(v).toFixed(digits)}</span>
+    </span>
+  )
+}
+
+const LEVEL_HINT = { 1: '微：微笑、害羞这类小变化', 2: '中：开心、难过、担心', 3: '强：生气、惊讶', 4: '极：大笑、大哭、惊恐' }
+
+/** 换脸怎么画（lib/face-paint.js）：放大重画、软边遮罩、每档强弱的重绘强度、最激烈的整张画、画完比对、角色参考。 */
+function FaceSettings({ cfg, onPatch }) {
+  const f = cfg.images.face || DEFAULT_FACE
+  const set = patch => onPatch({ face: patch })
+  const refOk = naiReferenceOk(cfg.novelai && cfg.novelai.model)
+  const edited = JSON.stringify(f) !== JSON.stringify(DEFAULT_FACE)
+  const reset = () => { if (window.confirm('换脸的这些设置都回到默认？')) set(JSON.parse(JSON.stringify(DEFAULT_FACE))) }
+  const [lo, hi] = FACE_LIMITS.strength
+  return (
+    <>
+      <Field label="放大重画" hint={`照 SD 里 ADetailer 的做法：把头那一块（脸框长边的 ${f.cropScale} 倍，带上头发和脸的轮廓）裁出来放大到 ${f.cropSize}×${f.cropSize} 再重画，画完缩回去贴上。脸在整张立绘里只有一两百像素见方，放大了模型才有足够的像素照底图的画法画眼睛。NovelAI Opus 会员 1024×1024 以内不花 Anlas，再大要扣。关掉就像以前一样整张图上原尺寸重画。`}>
+        <div className="fg-row">
+          <Toggle value={f.crop} onChange={v => set({ crop: v })} />
+          {f.crop && <><span className="fg-note">裁脸框的</span><Dial value={f.cropScale} min={FACE_LIMITS.cropScale[0]} max={FACE_LIMITS.cropScale[1]} step={0.1} digits={1} label="裁多大" onCommit={v => set({ cropScale: v })} /><span className="fg-note">倍，放大到</span>
+            <Select value={String(f.cropSize)} options={[512, 640, 768, 896, 1024, 1152, 1280, 1408, 1536].map(n => [String(n), `${n}×${n}${n > 1024 ? '（扣 Anlas）' : ''}`])} onChange={v => set({ cropSize: Number(v) })} style={INLINE} /></>}
+        </div>
+      </Field>
+      <Field label="软边遮罩" hint="重画的范围是围着眉眼口和两颊的圆角，往外一圈慢慢过渡到底图，不再是看得出框边的硬方框，脸边的头发尽量留原图。宽度是脸框半边长的几成：宽一点接缝更看不出，窄一点头发动得更少。关掉是以前的硬方框（框边 8 像素羽化）。">
+        <div className="fg-row"><Toggle value={f.soft} onChange={v => set({ soft: v })} />{f.soft && <><span className="fg-note">过渡宽度</span><Dial value={f.feather} min={FACE_LIMITS.feather[0]} max={FACE_LIMITS.feather[1]} step={0.05} label="过渡宽度" onCommit={v => set({ feather: v })} /></>}</div>
+      </Field>
+      <Field label="重绘强度" hint="按这个人这种情绪的强弱定（表演设计师给每种情绪标微 / 中 / 强 / 极，人物志「动作与表情」里点情绪名能改）。低的留住底图原来的线条、颜色和光影，只动得了眉眼嘴；高的改得动大表情，但越高越可能跑出底图的画风。人物志里点开一张换脸的差分还能单独定这张的强度。">
+        <div className="fg-face-levels">
+          {FACE_LEVELS.map(l => (
+            <label key={l} className="fg-row" title={LEVEL_HINT[l]}>
+              <b>{FACE_LEVEL_LABEL[l]}</b>
+              <Dial value={f.strength[l]} min={lo} max={hi} step={0.01} label={`${FACE_LEVEL_LABEL[l]}的重绘强度`} onCommit={v => set({ strength: { [l]: v } })} />
+              {l === 4 && f.wholePeak && <span className="fg-note">（开着「最激烈的整张画」时不用）</span>}
+            </label>
+          ))}
+        </div>
+      </Field>
+      <Field label="最激烈的整张画" hint="强弱是「极」的情绪（大笑、大哭、惊恐这类五官都在用力的）不换脸，在同一个动作上、用同一个种子整张画：脸由主模型画，画风跟底图自然一致，身子会跟着情绪动一点。"><Toggle value={f.wholePeak} onChange={v => set({ wholePeak: v })} /></Field>
+      <Field label="画完自动比对" hint="换完量一下：软边那一圈新旧对不上（会有重影、色差），或者脸上大块的明暗变了（原来的阴影、排线没了，画风跑偏），就换个种子、调低强度再画；整张脸几乎没变（表情没换上）就调高强度再画；留最像的那张。宽严：小于 1 更严、更容易重来，大于 1 更松。每次重来都是一次出图。">
+        <div className="fg-row">
+          <Toggle value={f.check} onChange={v => set({ check: v })} />
+          {f.check && <><span className="fg-note">跑偏了最多再画</span><Select value={String(f.retries)} options={[0, 1, 2, 3, 4, 5].map(n => [String(n), `${n} 次`])} onChange={v => set({ retries: Number(v) })} style={INLINE} /><span className="fg-note">宽严</span><Dial value={f.tolerance} min={FACE_LIMITS.tolerance[0]} max={FACE_LIMITS.tolerance[1]} step={0.1} digits={1} label="比对的宽严" onCommit={v => set({ tolerance: v })} /></>}
+        </div>
+      </Field>
+      <Field label="底图当角色参考" hint={`把整张底图当 NovelAI 的角色参考（Precise Reference，人物和画风一起参考）跟换脸一起发，锁住画风。NovelAI 只给 V4.5 训了带参考的重绘模型，V5 还没有；每张多花 5 Anlas。${refOk ? '' : `现在用的模型（${(cfg.novelai && cfg.novelai.model) || ''}）不支持，开着也不会带。`}接口不认时自动不带。`}><Toggle value={f.reference} onChange={v => set({ reference: v })} /></Field>
+      <div className="fg-row" style={{ justifyContent: 'flex-end' }}><button type="button" className="fg-btn is-mini" disabled={!edited} onClick={reset}>换脸设置恢复默认</button></div>
+    </>
+  )
+}
+
 const SIZE_SHAPES = [['landscape', '横版'], ['portrait', '竖版'], ['square', '方形']]
 /** 「1216×832」「1216x832」「1216 832」都认。 */
 const parseSize = text => { const m = /^\s*(\d{3,4})\s*[×xX*，, ]\s*(\d{3,4})\s*$/.exec(String(text)); return m ? [Number(m[1]), Number(m[2])] : null }
@@ -1634,7 +1722,8 @@ function ImagesSection({ data }) {
       <Field label="新地点背景"><Toggle value={cfg.images.backgrounds} onChange={v => p({ backgrounds: v })} /></Field>
       <Field label="立绘" hint="角色登场、换装、长期状态变化时，画这一套的平静立绘。"><Toggle value={cfg.images.portraits} onChange={v => p({ portraits: v })} /></Field>
       <Field label="情绪差分" hint="导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。"><div className="fg-row"><Toggle value={cfg.images.expressions} onChange={v => p({ expressions: v })} /><span className="fg-note">每轮最多</span><Limit value={cfg.images.expressionsPerTurn} fallback={12} unit="张" onCommit={v => p({ expressionsPerTurn: v })} /></div></Field>
-      <Field label="表情只换脸" hint="galgame 的「一个动作 + 一套表情」：同一套衣服每个动作整张画一张底图，同一个动作的其余情绪用 NovelAI 局部重绘只重画脸（眉、眼、两颊、嘴），身体和衣服一个像素都不动。每个人有哪些动作、哪种情绪归哪个动作、脸上什么样，是立绘设计师读完资料和剧情给他设计的（人物志 →「动作与表情」）。底图画好后要认一次脸：剧场开着、认脸模型下好时自动认（下了认脸大模型就一律用大模型），认不准的在人物志里点开底图框一下。只对 NovelAI 有效；关掉就像以前一样每个情绪整张画。已经画好的立绘不会自动重画。"><Toggle value={cfg.images.faceSwap} onChange={v => p({ faceSwap: v })} /></Field>
+      <Field label="表情只换脸" hint="galgame 的「一个动作 + 一套表情」：同一套衣服每个动作整张画一张底图，同一个动作的其余情绪用 NovelAI 局部重绘只重画脸（眉、眼、两颊、嘴），身体和衣服一个像素都不动。每个人有哪些动作、哪种情绪归哪个动作、脸上什么样，是立绘设计师读完资料和剧情给他设计的（人物志 →「动作与表情」）。底图画好后要认一次脸：开着 FlowGal 的页面（聊天页、剧场都行）、认脸模型下好时自动认（下了认脸大模型就一律用大模型），认不准的在人物志里点开底图框一下。只对 NovelAI 有效；关掉就像以前一样每个情绪整张画。已经画好的立绘不会自动重画。"><Toggle value={cfg.images.faceSwap} onChange={v => p({ faceSwap: v })} /></Field>
+      {cfg.images.faceSwap && cfg.images.backend === 'novelai' && <FaceSettings cfg={cfg} onPatch={p} />}
       {cfg.images.faceSwap && <PoseGroups cfg={cfg} onPatch={p} />}
       <Field label="立绘设计师" hint="给一个人画第一张立绘之前，先读完人物卡、世界书和到这一轮为止的全部剧情，按他的人设和经历设计专属的几个动作和每种情绪的表情（人物志 →「动作与表情」里能看能改）；之后每张差分的提示词也由它读完资料来写，照设计画，只换脸的表情直接用设计好的。一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼、用通用动作组。"><Toggle value={cfg.images.spriteWriter} onChange={v => p({ spriteWriter: v })} /></Field>
       {cfg.images.backend === 'novelai' && (cfg.novelai?.endpoint || 'official') === 'official'

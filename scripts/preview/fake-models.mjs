@@ -119,16 +119,26 @@ export function fakeLlmReply({ system = '', prompt = '', decorate = (turn, units
 /** 插画的每个角色块画一个人；没有角色块的单人图（画风的试画样图）按整段提示词画一个。 */
 const figuresFor = (prompt, captions) => (captions.length ? captions.map(c => spriteLayer(c.char_caption)) : /\b1(girl|boy)\b/.test(prompt) ? [spriteLayer(prompt)] : [])
 
-/** 换脸的假结果：原图照旧，遮罩里按这张的提示词染一层颜色（同一个提示词同一个颜色，种子不同深浅不同）。 */
+/**
+ * 换脸的假结果：原图照旧，遮罩中间那一块（眉眼口）按这张的提示词染一层颜色（同一个提示词同一个颜色，种子不同深浅不同），
+ * 遮罩边上不动（跟真的局部重绘一样，软边上新旧接得上，比对能过）。
+ */
 async function tintMasked(json, face) {
   const img = await decodePng(fromBase64(json.parameters.image))
   const mask = await decodePng(fromBase64(json.parameters.mask))
   const h = fnv1a(face)
   const color = [h & 255, (h >> 8) & 255, (h >> 16) & 255]
-  const k = 0.35 + ((json.parameters.seed || 0) % 3) * 0.1
-  for (let i = 0; i < img.data.length; i += 4) {
-    if (!mask.data[i]) continue
-    for (let c = 0; c < 3; c++) img.data[i + c] = img.data[i + c] * (1 - k) + color[c] * k
+  const k = (0.35 + ((json.parameters.seed || 0) % 3) * 0.1) * (json.parameters.inpaintImg2ImgStrength ?? 1)
+  const { width, height } = img
+  let x0 = width, y0 = height, x1 = 0, y1 = 0
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (mask.data[(y * width + x) * 4]) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y) }
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = (x1 - x0) / 2, ry = (y1 - y0) / 2
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const i = (y * width + x) * 4
+      if (!mask.data[i] || ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 > 0.3) continue
+      for (let c = 0; c < 3; c++) img.data[i + c] = img.data[i + c] * (1 - k) + color[c] * k
+    }
   }
   return encodePng(img)
 }
