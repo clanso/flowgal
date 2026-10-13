@@ -1233,6 +1233,14 @@
 .fg-libgroup-head + .fg-track, .fg-libgroup-head + .fg-note { margin-top: .8cqw; }
 .fg-libsound { padding: .8cqw 1.2cqw; margin-bottom: .6cqw; }
 .fg-libsound-tags { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* 声音页：一键套用音效库里标了用途的声音；给落字音效 / 界面音从音效库挑一个 */
+.fg-libpreset { display: flex; flex-wrap: wrap; align-items: center; gap: .6cqw; padding: .8cqw 1.2cqw; margin-bottom: 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
+.fg-libpicker { margin-top: .6cqw; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }
+.fg-libpicker-list { max-height: 24cqw; overflow-y: auto; margin-top: .6cqw; }
+.fg-libpicker-item { gap: .6cqw; padding: .3cqw 0; }
+.fg-libpicker-item.is-on .fg-libpicker-name { color: var(--accent); }
+.fg-libpicker-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fg-libpicker-name small { margin-left: .6cqw; opacity: .6; }
 .fg-person-art { position: relative; height: 19cqw; border-radius: .8cqw; overflow: hidden; background: radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--c) 40%, transparent), rgba(0, 0, 0, .3)); }
 .fg-person-art img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
 .fg-person-art .fg-silhouette { height: 100%; }

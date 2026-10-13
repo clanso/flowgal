@@ -181,6 +181,8 @@ export function useMusic() {
 let soundlibCache = null
 const soundlibListeners = new Set()
 export function setSoundlib(sounds) { soundlibCache = sounds; for (const fn of [...soundlibListeners]) fn() }
+/** 现在手上的音效库（还没读到是 null）：剧场放音效库里的打字音、落字音效时按编号查。 */
+export function soundlibNow() { return soundlibCache }
 export function loadSoundlib() { return api.soundlib().then(r => { setSoundlib(r.sounds); return r.sounds }) }
 export function useSoundlib() {
   const [, force] = React.useReducer(x => x + 1, 0)

@@ -1,6 +1,6 @@
 // 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含声音、「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
-import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, hostName } from '../api.js'
+import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, soundlibNow, hostName } from '../api.js'
 import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, RECALL_TONES, RECALL_TONE_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions, nearestOf } from '../../../lib/emotions.js'
@@ -16,7 +16,7 @@ import { SKINS } from './skins.js'
 import { EFFECT_GROUPS, EFFECT_IDS } from './effects.js'
 import { previewTrack, stopPreview, previewVoice, previewSound, erosFoley, previewEros, erosPeak } from './audio.js'
 import { EROS_SFX, EROS_PACES, EROS_LABEL, TENTACLE, TENTACLE_LABEL, PEAKS, PEAK_LABEL } from '../../../lib/eros.js'
-import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, voiceById, castVoices } from '../../../lib/sounds.js'
+import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, castVoices, libraryBlips, voiceLabel, isLibRef, libRef, libIdOf, LIBRARY_VOICES, libraryPreset, builtinPreset } from '../../../lib/sounds.js'
 import { cleanPack, packFiles } from '../../../lib/aa-sprite.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
 import { SOUND_SIDECAR, readSoundSidecar, soundMatcher, writeSoundSidecar } from '../../../lib/soundlib-sidecar.js'
@@ -382,7 +382,12 @@ function lookGroups(person) {
 // 声音：音色按男女分组；音高上下各几个半音。
 const VOICE_GROUPS = [['female', '女声'], ['male', '男声'], ['', '不分男女']]
 const PITCHES = Array.from({ length: VOICE_PITCH_LIMIT * 2 + 1 }, (_, i) => i - VOICE_PITCH_LIMIT).map(n => [String(n), n > 0 ? `音高 +${n}` : n < 0 ? `音高 ${n}` : '音高 原调'])
-const voiceText = voice => (voice ? voiceById(voice.id).label : '不出声')
+const voiceText = voice => (voice ? voiceLabel(voice.id, libraryBlips(soundlibNow())) : '不出声')
+/** 音效库里的打字音，当下拉框里的一组：[[lib:编号, 名字], …]；当前选着、但库里已经删了的也留一项。 */
+const blipOptions = (blips, current) => [
+  ...blips.map(b => [libRef(b.id), b.name]),
+  ...(isLibRef(current) && !blips.some(b => b.id === libIdOf(current)) ? [[current, '音效库里已删除的打字音']] : []),
+]
 
 // 固定外貌各字段的提示（照柏宝绘的写法）。
 const LOOK_HINTS = {
@@ -406,6 +411,7 @@ function ProfileEditor({ gameId, person, cast, group, turn }) {
   const [busy, run] = useBusy()
   const cfg = useConfig()
   const ui = cfg ? cfg.config.ui : null
+  const blips = libraryBlips(useSoundlib())
   React.useEffect(() => { setForm(pick(person)) }, [person.appearance, JSON.stringify(person.appearanceFields || {}), person.gender, person.note, person.negative, person.seed, person.seedCustom, person.height, person.voice, person.voicePitch])
   const dirty = JSON.stringify(form) !== JSON.stringify(pick(person))
   const set = k => e => setForm({ ...form, [k]: e.target.value })
@@ -418,9 +424,9 @@ function ProfileEditor({ gameId, person, cast, group, turn }) {
   // 按表单里还没保存的选择试听；「自动」显示实际会分到哪个音色（跟着表单里的性别变）。
   const others = (cast || []).filter(p => p.name !== person.name)
   const draft = { ...person, gender: form.gender, voice: form.voice, voicePitch: Number(form.voicePitch) }
-  const voiceNow = castVoices([...others, draft], ui).get(person.name)
+  const voiceNow = castVoices([...others, draft], ui, blips).get(person.name)
   const guess = heightOf({ ...person, gender: form.gender, height: null })
-  const autoVoice = castVoices([...others, { ...draft, voice: '' }], ui).get(person.name)
+  const autoVoice = castVoices([...others, { ...draft, voice: '' }], ui, blips).get(person.name)
   return (
     <div className="fg-person-form">
       <div className="fg-field"><label>固定外貌</label>
@@ -458,6 +464,7 @@ function ProfileEditor({ gameId, person, cast, group, turn }) {
             <option value="">自动（{voiceText(autoVoice)}）</option>
             <option value="off">不出声</option>
             {VOICE_GROUPS.map(([g, label]) => <optgroup key={g} label={label}>{VOICES.filter(v => v.gender === g).map(v => <option key={v.id} value={v.id}>{v.label}</option>)}</optgroup>)}
+            {blipOptions(blips, form.voice).length > 0 && <optgroup label="音效库里的打字音">{blipOptions(blips, form.voice).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</optgroup>}
           </select>
           <select className="fg-select" style={{ width: 'auto' }} value={form.voicePitch} onChange={set('voicePitch')} aria-label="音高" title="升降几个半音">{PITCHES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <button type="button" className="fg-btn" disabled={!voiceNow} onClick={() => previewVoice(voiceNow, ui || undefined)}>▶ 试听</button>
@@ -1025,7 +1032,7 @@ export function CastPanel({ view, gameId, onClose }) {
   const log = (view && view.castLog) || []
   const emotions = (view && view.emotions) || []
   const cfg = useConfig()
-  const voices = castVoices(cast, cfg ? cfg.config.ui : null)
+  const voices = castVoices(cast, cfg ? cfg.config.ui : null, libraryBlips(useSoundlib()))
   const [bench, setBench] = React.useState('') // 打开了谁的逆转式工作台
   const benchPerson = bench && cast.find(p => p.name === bench)
   // 这一局里每个人说话时用过哪些情绪（老存档的新情绪还没记是谁用的，按这个挂）
@@ -1105,8 +1112,14 @@ function Limit({ value, onCommit, fallback, min = 0, unit, free = '不限', widt
     </span>
   )
 }
+/** 下拉框：options 是 [值, 文字]；也可以夹着 { group: 组名, options: [...] } 分组（空组不显示）。 */
 function Select({ value, options, onChange, style }) {
-  return <select className="fg-select" value={value} style={style} onChange={e => onChange(e.target.value)}>{options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+  const one = ([v, l]) => <option key={v} value={v}>{l}</option>
+  return (
+    <select className="fg-select" value={value} style={style} onChange={e => onChange(e.target.value)}>
+      {options.map(o => (Array.isArray(o) ? one(o) : o.options.length ? <optgroup key={o.group} label={o.group}>{o.options.map(one)}</optgroup> : null))}
+    </select>
+  )
 }
 // 和按钮排在同一行的下拉框：按内容宽，不占满一行。
 const INLINE = { width: 'auto' }
@@ -1723,56 +1736,87 @@ function EffectsSection({ data }) {
 const VOICE_GENDER = { female: '女声', male: '男声', '': '不分男女' }
 const SOUND_GROUPS = [['stage', '落字音效', '台词演出里的重音、怒吼、崩溃，打斗的出手'], ['ui', '界面音', '按钮、选项、翻页']]
 
-/** 打字音和音效：试听每个音色、定没指定声音的角色怎么分、旁白用什么；每种音效选版本、试听、换成自己的文件。 */
+/**
+ * 打字音和音效：试听每个音色、定没指定声音的角色怎么分、旁白用什么；每种音效选版本、试听、换成自己的文件或音效库里的声音。
+ * 音效库里种类是「打字音」的声音也是音色；标了推荐用途的（比如逆转裁判音效包）可以一键套用。
+ */
 function SoundSection({ data }) {
   const ui = data.config.ui
   const p = patch => patchConfig({ ui: patch }).catch(e => toast(e.message, 'error'))
   const [busy, run] = useBusy()
+  const [picking, setPicking] = React.useState('') // 正在从音效库里给哪个槽挑声音
   const fileRef = React.useRef(null)
   const slotRef = React.useRef('')
+  const library = useSoundlib() || []
+  const blips = libraryBlips(library)
   const pick = slot => { slotRef.current = slot; if (fileRef.current) fileRef.current.click() }
   const upload = file => { const slot = slotRef.current; run('up' + slot, async () => { setConfig(await api.uploadSound(slot, file)) }, '已换成你的音效') }
   const remove = slot => run('rm' + slot, async () => { setConfig(await api.removeSound(slot)) }, '已删掉，退回默认的那个')
   const narration = ui.narrationVoice === 'off' ? null : { id: ui.narrationVoice, pitch: ui.narrationPitch }
+  const preset = libraryPreset(library)
+  const builtin = builtinPreset(ui)
+  const usable = library.filter(s => s.use).length
+  const choose = (slot, value) => { p({ sounds: { [slot]: value } }); previewSound(slot, value, ui) }
+  const defaultOptions = [['auto', '自动（按性别分）'], ...(blips.length || ui.voiceDefault === LIBRARY_VOICES ? [[LIBRARY_VOICES, '音效库里的打字音（按性别分）']] : []), ...VOICES.map(v => [v.id, `都用「${v.label}」`]), { group: '都用音效库里的', options: blipOptions(blips, ui.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }]
   return (
     <>
+      {(preset || builtin) && (
+        <div className="fg-note fg-libpreset">
+          {usable > 0 && <>音效库里有 {usable} 个标了用途的声音（比如逆转裁判音效包里的男声 / 女声哔哔、打字机、拍桌子、法槌）。</>}
+          {preset && <button type="button" className="fg-btn is-primary" onClick={() => { p(preset); toast('已套用音效库里的声音') }}>一键套用</button>}
+          {builtin && <button type="button" className="fg-btn" onClick={() => { p(builtin); toast('已换回内置的声音') }}>换回内置</button>}
+        </div>
+      )}
       <div className="fg-section">打字音</div>
       <Field label="打字音"><div className="fg-row"><Toggle value={ui.blip} onChange={v => p({ blip: v })} /><input type="range" min="0" max="2" step="0.1" value={ui.blipVolume} aria-label="打字音音量" onChange={e => p({ blipVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
-      <Field label="没指定的角色" hint="每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。">
-        <Select value={ui.voiceDefault} options={[['auto', '自动（按性别分）'], ...VOICES.map(v => [v.id, `都用「${v.label}」`])]} onChange={v => p({ voiceDefault: v })} />
+      <Field label="没指定的角色" hint="每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。">
+        <Select value={ui.voiceDefault} options={defaultOptions} onChange={v => p({ voiceDefault: v })} />
       </Field>
       <Field label="旁白">
         <div className="fg-row">
-          <Select value={ui.narrationVoice} options={[...VOICES.map(v => [v.id, v.label]), ['off', '不出声']]} style={INLINE} onChange={v => p({ narrationVoice: v })} />
+          <Select value={ui.narrationVoice} options={[...VOICES.map(v => [v.id, v.label]), { group: '音效库里的打字音', options: blipOptions(blips, ui.narrationVoice) }, ['off', '不出声']]} style={INLINE} onChange={v => p({ narrationVoice: v })} />
           <Select value={String(ui.narrationPitch)} options={PITCHES} style={INLINE} onChange={v => p({ narrationPitch: Number(v) })} />
           <button type="button" className="fg-btn" disabled={!narration} onClick={() => previewVoice(narration, ui)}>▶ 试听</button>
         </div>
       </Field>
-      <div className="fg-section">音色一览 · {VOICES.length} 个（点一下试听）</div>
+      <div className="fg-section">音色一览 · {VOICES.length + blips.length} 个（点一下试听）</div>
       <div className="fg-skins fg-voices">
         {VOICES.map(v => (
           <button key={v.id} type="button" className="fg-skin" onClick={() => previewVoice({ id: v.id, pitch: 0 }, ui)}>
             <b>▶ {v.label}</b><span>{VOICE_GENDER[v.gender]} · {v.desc}</span>
           </button>
         ))}
+        {blips.map(b => (
+          <button key={b.id} type="button" className="fg-skin" onClick={() => previewVoice({ id: libRef(b.id), pitch: 0 }, ui)}>
+            <b>▶ {b.name}</b><span>音效库 · {VOICE_GENDER[b.gender || '']}{b.use === 'narration' ? ' · 旁白用' : ''}{b.description ? ' · ' + b.description : ''}</span>
+          </button>
+        ))}
       </div>
+      {!blips.length && <div className="fg-note">想用逆转裁判那样的哔哔声：把打字音导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。</div>}
       <div className="fg-section">音效</div>
       <Field label="音效"><div className="fg-row"><Toggle value={ui.sfx} onChange={v => p({ sfx: v })} /><input type="range" min="0" max="2" step="0.1" value={ui.sfxVolume} aria-label="音效音量" onChange={e => p({ sfxVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
       {SOUND_GROUPS.map(([group, title, note]) => (
         <React.Fragment key={group}>
           <div className="fg-section">{title}</div>
-          <div className="fg-note">{note}。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）。</div>
+          <div className="fg-note">{note}。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）；也可以从音效库里挑一个。自己的文件和音效库的声音都按默认版本的响度放。</div>
           {SOUND_SLOTS.filter(s => s.group === group).map(slot => {
             const mine = ui.customSounds[slot.id]
-            const options = [...slot.presets.map((x, i) => [x.id, i ? x.label : `${x.label}（默认）`]), ...(mine ? [['custom', `我的：${mine.name || '上传的文件'}`]] : []), ['off', '关掉']]
+            const current = ui.sounds[slot.id]
+            const suggested = library.filter(s => s.use === slot.id)
+            const chosen = isLibRef(current) && !suggested.some(s => s.id === libIdOf(current)) ? library.find(s => s.id === libIdOf(current)) : null
+            const libOptions = [...suggested, ...(chosen ? [chosen] : [])].map(s => [libRef(s.id), `${s.name}（${s.category}）`])
+            if (isLibRef(current) && !library.some(s => s.id === libIdOf(current))) libOptions.push([current, '音效库里已删除的声音（放默认的）'])
+            const options = [...slot.presets.map((x, i) => [x.id, i ? x.label : `${x.label}（默认）`]), ...(mine ? [['custom', `我的：${mine.name || '上传的文件'}`]] : []), { group: '音效库', options: libOptions }, ['off', '关掉']]
             return (
               <Field key={slot.id} label={slot.label} hint={slot.hint}>
                 <div className="fg-row">
-                  <Select value={ui.sounds[slot.id]} options={options} style={INLINE} onChange={v => { p({ sounds: { [slot.id]: v } }); previewSound(slot.id, v, ui) }} />
-                  <button type="button" className="fg-btn" disabled={ui.sounds[slot.id] === 'off'} onClick={() => previewSound(slot.id, ui.sounds[slot.id], ui)}>▶ 试听</button>
+                  <Select value={current} options={options} style={INLINE} onChange={v => choose(slot.id, v)} />
+                  <button type="button" className="fg-btn" disabled={current === 'off'} onClick={() => previewSound(slot.id, current, ui)}>▶ 试听</button>
+                  <button type="button" className={`fg-btn${picking === slot.id ? ' is-on' : ''}`} disabled={!library.length} title={library.length ? '' : '音效库是空的'} onClick={() => setPicking(k => (k === slot.id ? '' : slot.id))}>从音效库挑</button>
                   <button type="button" className="fg-btn" disabled={busy === 'up' + slot.id} onClick={() => pick(slot.id)}>{busy === 'up' + slot.id ? '上传中…' : mine ? '换文件' : '用自己的'}</button>
                   {mine && <button type="button" className="fg-btn" disabled={busy === 'rm' + slot.id} onClick={() => remove(slot.id)}>删掉文件</button>}
                 </div>
+                {picking === slot.id && <LibPicker sounds={library} slot={slot.id} current={current} ui={ui} onPick={v => { choose(slot.id, v); setPicking('') }} />}
               </Field>
             )
           })}
@@ -1780,6 +1824,32 @@ function SoundSection({ data }) {
       ))}
       <input ref={fileRef} type="file" accept="audio/*" hidden onChange={e => { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) upload(file) }} />
     </>
+  )
+}
+
+/** 从音效库里给落字音效 / 界面音挑一个：搜名字、分类、标签、描述，标了这个用途的排最前；点名字试听，点「用这个」选上。 */
+const PICKER_SHOWN = 40
+function LibPicker({ sounds, slot, current, ui, onPick }) {
+  const [query, setQuery] = React.useState('')
+  const words = query.trim().split(/\s+/).filter(Boolean)
+  const found = sounds
+    .filter(s => s.kind !== 'ambience' && words.every(w => `${s.name} ${s.category} ${(s.tags || []).join(' ')} ${s.description}`.includes(w)))
+    .sort((a, b) => Number(b.use === slot) - Number(a.use === slot) || String(a.category).localeCompare(String(b.category), 'zh-CN') || String(a.name).localeCompare(String(b.name), 'zh-CN'))
+  return (
+    <div className="fg-libpicker">
+      <input className="fg-input" style={{ width: '100%' }} value={query} autoFocus placeholder="搜名字、分类、标签、描述（空格隔开几个词）" onChange={e => setQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />
+      <div className="fg-libpicker-list">
+        {found.slice(0, PICKER_SHOWN).map(s => (
+          <div key={s.id} className={`fg-row fg-libpicker-item${current === libRef(s.id) ? ' is-on' : ''}`}>
+            <button type="button" className="fg-btn" title="试听" onClick={() => previewSound(slot, libRef(s.id), ui)}>▶</button>
+            <span className="fg-libpicker-name">{s.name}<small>{s.category}{s.use === slot ? ' · 推荐' : ''}</small></span>
+            <button type="button" className="fg-btn" disabled={current === libRef(s.id)} onClick={() => onPick(libRef(s.id))}>{current === libRef(s.id) ? '正在用' : '用这个'}</button>
+          </div>
+        ))}
+        {!found.length && <div className="fg-note">没找到。</div>}
+        {found.length > PICKER_SHOWN && <div className="fg-note">还有 {found.length - PICKER_SHOWN} 个，多打几个字缩小范围。</div>}
+      </div>
+    </div>
   )
 }
 
@@ -1914,7 +1984,10 @@ function saveText(text, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 }
 
-const KIND_LABEL = { ambience: '环境音', sfx: '音效' }
+const KIND_LABEL = { ambience: '环境音', blip: '打字音', sfx: '音效' }
+const KIND_ORDER = ['ambience', 'blip', 'sfx']
+/** 推荐用途：「声音」页一键套用时，标了哪个槽就放进哪个槽，标了旁白的打字音给旁白。 */
+const USE_OPTIONS = [['', '没有'], ...SOUND_SLOTS.map(s => [s.id, `${s.group === 'ui' ? '界面音' : '落字音效'} · ${s.label}`]), ['narration', '旁白的打字音']]
 const LIB_SHOWN = 200 // 搜索结果、一个分组里最多列出多少个
 
 /** 音效库里的一个声音：试听、改名字 / 种类 / 分类 / 音量 / 标签 / 描述、删除。 */
@@ -1932,19 +2005,26 @@ function LibSoundCard({ sound, playing, onPlay }) {
           <button type="button" className="fg-btn" onClick={() => setOpen(v => !v)}>{open ? '收起' : '编辑'}</button>
           <button type="button" className="fg-btn" disabled={busy === 'd'} onClick={() => { if (window.confirm(`从音效库删除「${sound.name}」？电脑上的原文件不受影响。`)) run('d', async () => { await api.removeLibSounds([sound.id]); await loadSoundlib() }, '已删除') }}>删除</button>
         </div>
-        {!open && <div className="fg-note fg-libsound-tags">{(sound.tags || []).join('、') || '（没有标签）'}{sound.description ? ' · ' + sound.description : ''}</div>}
+        {!open && <div className="fg-note fg-libsound-tags">{sound.kind === 'blip' ? `打字音 · ${VOICE_GENDER[sound.gender || '']}` : (sound.tags || []).join('、') || '（没有标签）'}{sound.use ? ` · 推荐用途：${(USE_OPTIONS.find(([v]) => v === sound.use) || [])[1] || sound.use}` : ''}{sound.description ? ' · ' + sound.description : ''}</div>}
         {open && (
           <>
             <div className="fg-row">
               <select className="fg-select" style={{ width: 'auto' }} value={sound.kind} onChange={e => save({ kind: e.target.value })}>
                 <option value="sfx">音效（响一次）</option>
                 <option value="ambience">环境音（循环）</option>
+                <option value="blip">打字音（一个字一下）</option>
               </select>
+              {sound.kind === 'blip' && <Select value={sound.gender || ''} options={[['', '不分男女'], ['female', '女声'], ['male', '男声']]} style={INLINE} onChange={v => save({ gender: v })} />}
               <Text value={sound.category} placeholder="分类，两层用 / 隔开：门窗/敲门" style={{ flex: 1, width: 'auto' }} onCommit={v => save({ category: v })} />
               <span className="fg-note">音量</span>
               <input type="range" min="0" max="2" step="0.05" value={sound.volume ?? 1} onChange={e => save({ volume: Number(e.target.value) })} style={{ width: '8cqw' }} />
             </div>
-            <Text value={(sound.tags || []).join('、')} placeholder="标签：正文里会出现的词，用顿号隔开。导演按它们挑候选，例如：敲门、咚咚、门" style={{ width: '100%' }} onCommit={v => save({ tags: v })} />
+            <div className="fg-row">
+              <span className="fg-note">推荐用途</span>
+              <Select value={sound.use || ''} options={USE_OPTIONS} style={INLINE} onChange={v => save({ use: v })} />
+              <span className="fg-note">「声音」页一键套用时用</span>
+            </div>
+            {sound.kind !== 'blip' && <Text value={(sound.tags || []).join('、')} placeholder="标签：正文里会出现的词，用顿号隔开。导演按它们挑候选，例如：敲门、咚咚、门" style={{ width: '100%' }} onCommit={v => save({ tags: v })} />}
             <TextArea value={sound.description} placeholder="听起来什么样、什么时候用。例如：木门被轻轻敲了两下，礼貌、迟疑" onCommit={v => save({ description: v })} />
           </>
         )}
@@ -2010,10 +2090,11 @@ function SoundLibSection({ data }) {
     if (!audio.length) { toast('没找到音频文件（mp3、m4a、aac、ogg、opus、wav、flac）', 'error'); return }
     const have = new Map((sounds || []).map(s => [`${s.file}|${s.bytes}`, s]))
     const failed = []
-    let added = 0, updated = 0
+    let added = 0, updated = 0, useful = 0
     for (let i = 0; i < audio.length; i++) {
       const f = audio[i]
       const { file, meta } = match(pathOf(f))
+      if (meta && (meta.use || meta.kind === 'blip')) useful++
       setProgress(`导入中 ${i + 1} / ${audio.length}：${file}`)
       try {
         const old = have.get(`${file}|${f.size}`)
@@ -2026,7 +2107,7 @@ function SoundLibSection({ data }) {
     }
     setProgress('')
     await loadSoundlib().catch(() => {})
-    toast(`新导入 ${added} 个${updated ? `，更新了 ${updated} 个的描述` : ''}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join('；')}` : ''}`, failed.length ? 'error' : undefined)
+    toast(`新导入 ${added} 个${updated ? `，更新了 ${updated} 个的描述` : ''}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join('；')}` : ''}${useful && !failed.length ? '。里面有打字音和标了用途的声音，到「声音」页可以一键套用' : ''}`, failed.length ? 'error' : undefined)
   }
 
   // 分组：种类 → 分类（两层的按第一层分组，组里显示完整分类）。搜索时不分组，直接列出匹配的。
@@ -2037,7 +2118,7 @@ function SoundLibSection({ data }) {
       if (!map.has(key)) map.set(key, { key, kind: s.kind, name: key.split('|')[1], items: [] })
       map.get(key).items.push(s)
     }
-    return [...map.values()].sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name, 'zh-CN') : a.kind === 'ambience' ? -1 : 1))
+    return [...map.values()].sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name, 'zh-CN') : KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind)))
   }, [sounds])
   const words = query.trim().split(/\s+/).filter(Boolean)
   const found = words.length ? (sounds || []).filter(s => { const text = `${s.name} ${s.category} ${(s.tags || []).join(' ')} ${s.description}`; return words.every(w => text.includes(w)) }) : null
@@ -2061,7 +2142,7 @@ function SoundLibSection({ data }) {
         {progress && <span className="fg-pill is-busy">{progress}</span>}
         <input ref={folderRef} type="file" webkitdirectory="" multiple hidden onChange={e => { importFiles(e.target.files); e.target.value = '' }} />
       </div>
-      <div className="fg-note">文件夹最上面放一份 <code>{SOUND_SIDECAR}</code>（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签；没有描述文件时名字取文件名、分类取所在的文件夹。同一个文件再导入不会重复存，但描述会以描述文件为准。</div>
+      <div className="fg-note">文件夹最上面放一份 <code>{SOUND_SIDECAR}</code>（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹。同一个文件再导入不会重复存，但描述会以描述文件为准。种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。</div>
       {!sounds && <div className="fg-note">读取中…</div>}
       {sounds && !sounds.length && <div className="fg-note" style={{ marginTop: '1cqw' }}>音效库还是空的。没有声音时剧场不放环境音和剧情音效。</div>}
       {sounds && sounds.length > 0 && (

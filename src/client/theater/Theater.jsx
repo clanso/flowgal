@@ -9,13 +9,13 @@ import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.j
 import { DirectorLog } from './DirectorLog.jsx'
 import { useFaceFramer } from './faceFramer.js'
 import { useParallax } from './parallax.js'
-import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros } from './audio.js'
+import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros, warmVoices } from './audio.js'
 import { ErosPeak, useErosPulse } from './Eros.jsx'
 import { EROS_SFX } from '../../../lib/eros.js'
 import { ONOMATOPOEIA } from '../../../lib/foley.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
 import { preloadImage, whenImageReady } from './preload.js'
-import { castVoices, lineVoice } from '../../../lib/sounds.js'
+import { castVoices, lineVoice, libraryBlips } from '../../../lib/sounds.js'
 import { ROMANCE_LABEL, SENSE_LABEL } from '../../../lib/vocab.js'
 
 // 读到哪一句：每局记在浏览器里。
@@ -247,19 +247,23 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const typeFx = React.useCallback(f => { if (f.kind === 'sound' || impactOn) hit(f) }, [hit, impactOn])
   const sayOff = React.useMemo(() => offDeliveries(off), [off])
   const people = React.useMemo(() => new Map(((view && view.cast) || []).map(p => [p.name, p])), [view])
-  // 这句用谁的声音念：旁白按设置，台词和心声按说话人档案里的声音（没指定时按性别自动分，一局里尽量不撞）
-  const voices = React.useMemo(() => castVoices((view && view.cast) || [], ui0), [view, ui0])
+  // 这句用谁的声音念：旁白按设置，台词和心声按说话人档案里的声音（没指定时按性别自动分，一局里尽量不撞）。
+  // 音色可以是音效库里的打字音：先把这一局要用的下载好，第一句话的第一个字就能响
+  const soundlib = useSoundlib()
+  const blips = React.useMemo(() => libraryBlips(soundlib), [soundlib])
+  const voices = React.useMemo(() => castVoices((view && view.cast) || [], ui0, blips), [view, ui0, blips])
+  React.useEffect(() => { warmVoices([...voices.values(), { id: ui0.narrationVoice }]) }, [voices, ui0.narrationVoice])
   // 声音的样子（电话里、广播、心灵感应……）跟着这句走；齐声时几个人的声音一起响
   const voice = React.useMemo(() => {
     if (!beat) return null
     const names = beat.speakers || [beat.speaker]
-    const main = lineVoice(beat.type, names[0], voices, ui0)
+    const main = lineVoice(beat.type, names[0], voices, ui0, blips)
     if (!main || !beat.voice) return main
-    const also = beat.voice === 'chorus' ? names.slice(1).map(name => lineVoice(beat.type, name, voices, ui0)).filter(Boolean) : []
+    const also = beat.voice === 'chorus' ? names.slice(1).map(name => lineVoice(beat.type, name, voices, ui0, blips)).filter(Boolean) : []
     // 短闪回里的回忆声按基调闷得深浅不一样（audio.js 的 MEMORY_DEPTH）
     const tone = beat.recall ? recallTone || beat.recall.tone : ''
     return { ...main, style: beat.voice, ...(also.length ? { also } : {}), ...(tone ? { tone } : {}) }
-  }, [beat && beat.type, beat && beat.speaker, beat && beat.voice, beat && beat.recall, recallTone, voices, ui0])
+  }, [beat && beat.type, beat && beat.speaker, beat && beat.voice, beat && beat.recall, recallTone, voices, ui0, blips])
   const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff })
   // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
   React.useEffect(() => { if (panel && !done) finish() }, [panel, done])
@@ -314,7 +318,6 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const hushed = Boolean(musicBeat && musicBeat.hush)
   React.useEffect(() => { if (!closingRef.current) hushBgm(hushed) }, [hushed])
   // 环境音和剧情音效：导演从音效库里配的（音效库是空的就什么都不响）。剧情音效读到那句时响一次，快进时不响。
-  const soundlib = useSoundlib()
   const soundById = React.useMemo(() => new Map((soundlib || []).map(s => [s.id, s])), [soundlib])
   const soundBeat = waking ? null : change && !swapped && was ? was : beat
   const ambId = ui0.amb !== false && soundBeat && soundBeat.amb !== 'none' ? soundBeat.amb : ''
