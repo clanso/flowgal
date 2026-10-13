@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { guessHeight, heightOf, cleanHeight, placeSprite, usualFace, genderOf, faceCrop, FACE_RATIO, FACE_SPREAD } from '../lib/stature.js'
+import { guessHeight, heightOf, cleanHeight, placeSprite, usualFace, faceHeight, genderOf, faceCrop, FACE_RATIO, FACE_SPREAD } from '../lib/stature.js'
 import { cleanActing, mergeActing, poseTags } from '../lib/acting.js'
 import { composePrompt } from '../lib/image/style.js'
 import { resolveConfig } from '../lib/config.js'
@@ -48,9 +48,21 @@ test('gate: 头一样大：脸框占图比例不同的立绘缩放后脸一样�
   const unknown = placeSprite({ cm: 172 })
   assert.equal(unknown.k, 1)
   assert.ok(unknown.lift > 0)
-  assert.deepEqual(placeSprite({ cm: 160 }), { k: 1, lift: 0, head: 0.095 }, '参照身高、参照构图：跟以前一样')
+  assert.deepEqual(placeSprite({ cm: 160 }), { k: 1, lift: -0.03, head: 0.125 }, '参照身高、参照构图：比参照立绘低一点，给高个子留出头顶')
   // 画得太离谱的不硬掰
   assert.equal(placeSprite({ box: faceAt(0.4, 0.4), size: H, cm: 160 }).k, 0.6)
+})
+
+test('gate: 高个子明显高出一截：186 的骑士和 162 的药师站在一起，脸差出大半个头；再高、再矮的往回收，不出画、不沉到对话框里', () => {
+  // 格伦（186，抱臂那张）和柯萝伊（162，攥着坠子那张）：以前 186 被顶到 176 那么高，两人的脸只差 0.088 框高，几乎一样高
+  const faceMid = (box, cm) => { const p = placeSprite({ box, size: H, cm }); return p.lift + (1 - (box[1] + box[3]) / 2 / H[1]) * p.k }
+  const glenn = faceMid([336, 184, 488, 344], 186), chloe = faceMid([320, 248, 536, 416], 162)
+  assert.ok(glenn - chloe > 0.17, '差出大半个头（头一样大时一个脸框约 0.13 框高）')
+  assert.ok(faceHeight(186) > faceHeight(182) && faceHeight(195) > faceHeight(186), '高个子之间也分得出高矮')
+  assert.ok(faceHeight(186) - faceHeight(172) > 0.08, '186 比普通男性（172）也高一截')
+  assert.ok(faceHeight(230) <= 0.98, '巨人头顶不出画')
+  assert.ok(faceHeight(108) >= 0.42 && faceHeight(128) > faceHeight(108), '孩子、矮人不沉到对话框里，也分得出高矮')
+  for (let cm = 60; cm < 260; cm++) assert.ok(faceHeight(cm + 1) >= faceHeight(cm), '越高脸越高')
 })
 
 test('gate: 同一个人换动作：侧身、低头那张脸框认小了，按他平常的脸框算，不会突然大一圈；正常的远近不一照常缩放', () => {

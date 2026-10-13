@@ -2686,8 +2686,17 @@ function heightOf(person) {
 }
 var FACE_RATIO = 0.13;
 var FACE_CENTER = 0.24;
-var PER_CM = 6e-3;
+var FACE_AT = 0.73;
+var PER_CM = 85e-4;
+var FACE_HIGH = 0.9;
+var FACE_LOW = 0.6;
 var clamp2 = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+function faceHeight(cm) {
+  let v = FACE_AT + (cm - BASE_HEIGHT.female) * PER_CM;
+  if (v > FACE_HIGH) v = FACE_HIGH + (v - FACE_HIGH) * 0.5;
+  if (v < FACE_LOW) v = FACE_LOW - (FACE_LOW - v) * 0.6;
+  return clamp2(v, 0.42, 0.98);
+}
 var FACE_SPREAD = 1.15;
 function usualFace(boxes, height) {
   if (!(height > 0)) return 0;
@@ -2703,7 +2712,7 @@ function placeSprite({ box = null, size = null, cm = BASE_HEIGHT.female, usual =
   const center2 = ok ? (box[1] + box[3]) / 2 / size[1] : FACE_CENTER;
   const top = ok ? box[1] / size[1] : FACE_CENTER - FACE_RATIO / 2;
   const k = clamp2(FACE_RATIO / ratio, 0.6, 1.4);
-  const want = clamp2(1 - FACE_CENTER + (cm - BASE_HEIGHT.female) * PER_CM, 0.42, 0.86);
+  const want = faceHeight(cm);
   const lift = clamp2(want - (1 - center2) * k, -0.5, 0.3);
   const head = clamp2(1 - lift - (1 - top) * k - 0.08 * k, -0.2, 0.9);
   return { k: round(k), lift: round(lift), head: round(head) };
