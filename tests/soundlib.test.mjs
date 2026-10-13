@@ -181,3 +181,31 @@ test('gate: 打字音也进音效库：带性别和推荐用途导入、导出�
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('gate: 清空只清一种：清音效库不动环境音和打字音、「声音」页正在用的留着；清环境音库不动音效；文件一起删，别的资源不动', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-soundlib-'))
+  try {
+    const store = createStore(dir)
+    const soundlib = createSoundLib({ store })
+    const ui = { sounds: {}, narrationVoice: 'classic', voiceDefault: 'auto' }
+    const { call } = createApi({ engine: { subscribe() {}, publicConfig: async () => ({ config: { ui } }) }, music: {}, soundlib })
+    const clear = kind => call('POST', '/soundlib', { action: 'clear', kind })
+    const door = await soundlib.add(OGG, '门窗/开门.ogg')
+    const slam = await soundlib.add(OGG2, '逆转/拍桌.ogg', { use: 'slam' })
+    const blip = await soundlib.add(Buffer.concat([OGG, Buffer.alloc(5)]), '逆转/男声哔哔.ogg', { kind: 'blip', gender: 'male' })
+    const rain = await soundlib.add(Buffer.concat([OGG2, Buffer.alloc(7)]), '天气/小雨.ogg', { kind: 'ambience' })
+    const image = await store.saveAsset(Buffer.from('png'), 'image/png')
+    ui.sounds = { slam: 'lib:' + slam.id, click: 'tick' }
+    assert.deepEqual((await clear('sfx')).cleared, { sounds: 1, bytes: OGG.length, kept: 1, failed: 0 })
+    assert.deepEqual((await soundlib.list()).map(s => s.id).sort(), [slam.id, blip.id, rain.id].sort(), '拍桌在用、打字音和环境音都不是这一种')
+    assert.equal((await readdir(join(dir, 'assets'))).includes(door.assetId), false)
+    assert.deepEqual((await clear('ambience')).cleared, { sounds: 1, bytes: OGG2.length + 7, kept: 0, failed: 0 })
+    assert.deepEqual((await readdir(join(dir, 'assets'))).sort(), [slam.assetId, blip.assetId, image].sort())
+    ui.sounds = {}
+    assert.equal((await clear('sfx')).cleared.sounds, 1, '不再用了就能清掉')
+    assert.equal((await soundlib.add(OGG, '门窗/开门.ogg')).name, door.name, '清空后同一个文件能重新导入')
+    assert.equal((await soundlib.clear()).sounds, 2, '不给种类时全清')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})

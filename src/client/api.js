@@ -99,6 +99,7 @@ export const api = {
   soundlib: () => call('/soundlib'),
   updateLibSound: (id, patch) => call('/soundlib', { action: 'update', id, patch }),
   removeLibSounds: ids => call('/soundlib', { action: 'remove', ids }),
+  clearLibSounds: kind => call('/soundlib', { action: 'clear', kind }),
   /** 往音效库导入一个（最大 20 MB）：path 是相对导入文件夹的路径，meta 是描述文件里这一条。 */
   async uploadLibSound(file, path, meta) {
     const query = `name=${encodeURIComponent(path || file.name || '')}${meta ? `&meta=${encodeURIComponent(JSON.stringify(meta))}` : ''}`
