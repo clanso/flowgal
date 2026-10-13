@@ -440,8 +440,10 @@ export function Cast({ beat, view, talk, max = 5 }) {
   // 插画全屏盖住舞台：立绘照常在下面，插画收起时直接露出来。
   // 亲密场面（scene.eros 开着）里立绘退下：有插画演插画，还没有就只留背景，不让两个人站着说话；这段结束再回来。
   const veiled = Boolean(beat.scene && beat.scene.eros && beat.scene.eros !== 'none')
+  // 浅景深：台上不止一个人、其中有人在说话时，没说话也没反应的人微微虚一点（theater.css 的 [data-talk]）；旁白时谁都不虚
+  const talking = cast.length > 1 && cast.some(c => (beat.speakers ? beat.speakers.includes(c.name) : beat.speaker === c.name))
   return (
-    <div className="fg-cast" data-split={split ? 'on' : undefined} data-veil={veiled ? '' : undefined}>
+    <div className="fg-cast" data-split={split ? 'on' : undefined} data-veil={veiled ? '' : undefined} data-talk={talking ? '' : undefined}>
       {cast.map(entry => (
         <Actor key={entry.id} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={talk} />
       ))}

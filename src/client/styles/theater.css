@@ -102,10 +102,14 @@
 .fg-letterbox::before { top: 0; transform-origin: top; } .fg-letterbox::after { bottom: 0; transform-origin: bottom; }
 @keyframes fg-bars { from { transform: scaleY(0); } }
 
-.fg-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }
+.fg-particles { position: absolute; inset: -3%; width: 106%; height: 106%; pointer-events: none; z-index: 8; }
+/* 鼠标视差（parallax.js 给 --px / --py，-1～1）：背景动得最少、人多一点、天气粒子最多，按远近错开。粒子画布四边各多出 3%，挪开时边上不空。 */
+.fg-bg { translate: calc(var(--px, 0) * -.5cqw) calc(var(--py, 0) * -.3cqw); }
+.fg-cast { translate: calc(var(--px, 0) * -1.1cqw) calc(var(--py, 0) * -.55cqw); }
+.fg-particles { translate: calc(var(--px, 0) * -2cqw) calc(var(--py, 0) * -1.1cqw); }
 
 /* ── 立绘 ── */
-.fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
+.fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1), filter 1.2s ease; }
 .fg-cast[data-split] { right: 34%; }
 .fg-cast[data-veil] { opacity: 0; } /* 亲密场面里立绘退下（Stage.jsx 的 Cast） */
 /* 分屏：右边斜切的一格，另一头的地点和人；白色斜边，滑进滑出；有插画时让开 */
@@ -188,6 +192,10 @@
 /* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */
 .fg-actor.is-aa .fg-actor-body { animation: none; }
 .fg-actor.is-aa.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }
+/* 浅景深：有人在说话时，旁边没说话也没反应的人微微虚一点，退后一步的更虚（Stage.jsx 的 Cast 写 data-talk；旁白时谁都不虚） */
+.fg-actor-body { transition: filter .8s ease; }
+.fg-cast[data-talk] .fg-actor:not(.is-speaking, .is-reacting, .is-leaving) .fg-actor-body { filter: blur(.1cqw); }
+.fg-cast[data-talk] .fg-actor[data-depth="-1"]:not(.is-speaking, .is-reacting, .is-leaving) .fg-actor-body { filter: blur(.2cqw); }
 /* --k 按脸框缩放（头一样大），--lift 按身高抬高或压低（lib/stature.js）；都按立绘框的高度算。每张图带着自己的（Stage.jsx 写在 img 上），
    换图时新图从第一帧起就是自己的大小；过渡只在同一张图后来才量好脸框、改了身高时缓过去 */
 .fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: calc(var(--k, 1) * 100%); width: auto; max-width: none; transform: translateX(-50%);
@@ -307,6 +315,14 @@
 .fg-camera[data-cam="zoomout"] { animation: fg-zoomout 1.6s cubic-bezier(.2, .7, .2, 1) both; }
 .fg-camera[data-cam="pan"] { animation: fg-pan 3s ease-in-out both; }
 .fg-camera[data-cam="blur"] { animation: fg-blur 2.2s ease both; }
+/* 移焦：先对着人（背景慢慢糊开），停一下，焦点再慢慢移到背景：人糊开、暗一点，景清楚；镜头同时极慢地往前靠一点。下一拍缓回来。
+   --rack-bg / --rack-cast 是注册过的数字，能平滑地动；不支持 @property 的浏览器里会在中途一下子切过去。 */
+@property --rack-bg { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --rack-cast { syntax: '<number>'; inherits: true; initial-value: 0; }
+.fg-camera[data-cam="rackfocus"] { transform: scale(1.03); transition: transform 3.6s cubic-bezier(.3, 0, .3, 1); animation: fg-rack 3.6s cubic-bezier(.45, 0, .3, 1) both; }
+.fg-camera[data-cam="rackfocus"] .fg-bg { filter: blur(calc(var(--rack-bg) * 6px)) brightness(calc(1 - var(--rack-bg) * .1)); transition: scale 2.6s cubic-bezier(.4, 0, .2, 1); }
+.fg-camera[data-cam="rackfocus"] .fg-cast { filter: blur(calc(var(--rack-cast) * .45cqw)) brightness(calc(1 - var(--rack-cast) * .18)); transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
+@keyframes fg-rack { 0% { --rack-bg: 0; --rack-cast: 0; } 26%, 36% { --rack-bg: 1; --rack-cast: 0; } 100% { --rack-bg: 0; --rack-cast: 1; } }
 @keyframes fg-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-1.2%, .6%); } 30% { transform: translate(1%, -.8%); } 45% { transform: translate(-.8%, .4%); } 60% { transform: translate(.6%, .6%); } 80% { transform: translate(-.3%, -.2%); } }
 @keyframes fg-whip { 0% { transform: none; filter: none; } 35% { transform: translateX(-9%) scale(1.04); filter: blur(10px); } 60% { transform: translateX(2.5%) scale(1.02); filter: blur(3px); } 100% { transform: none; filter: none; } }
 @keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }
@@ -639,6 +655,38 @@
 .fg-light[data-v="glare"] { background: radial-gradient(70% 60% at 50% 40%, rgba(255, 255, 255, .75), rgba(255, 255, 255, .15) 80%); mix-blend-mode: screen; backdrop-filter: brightness(1.15) contrast(.9); -webkit-backdrop-filter: brightness(1.15) contrast(.9); }
 .fg-light[data-v="flicker"] { background: rgba(6, 8, 24, .78); mix-blend-mode: multiply; }
 .fg-light[data-v="flicker"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-flicker 4.5s steps(1) infinite; }
+/* 窗光：窗外斜射进来的几道光柱，从左上往右下，边缘柔、往下渐渐散掉；两组光柱各自极慢地挪、明暗起伏（配 weather dust 像光里的浮尘） */
+.fg-light[data-v="sunbeam"] { mix-blend-mode: screen; background: linear-gradient(150deg, rgba(255, 226, 180, .2), rgba(255, 226, 180, .05) 45%, transparent 70%); }
+.fg-light[data-v="sunbeam"]::before, .fg-light[data-v="sunbeam"]::after { inset: -10%; transform-origin: 6% -18%; filter: blur(.9cqw);
+  -webkit-mask-image: linear-gradient(160deg, #000 20%, transparent 88%); mask-image: linear-gradient(160deg, #000 20%, transparent 88%); }
+.fg-light[data-v="sunbeam"]::before { animation: fg-beam-a 17s ease-in-out infinite alternate;
+  background: conic-gradient(from 122deg at 6% -18%, transparent 0deg 4deg, rgba(255, 240, 210, .34) 6deg, transparent 9.5deg 13deg, rgba(255, 240, 210, .22) 14.5deg 17deg, transparent 20.5deg 25deg,
+    rgba(255, 240, 210, .38) 27deg, transparent 30.5deg 34deg, rgba(255, 240, 210, .2) 37deg, transparent 42deg); }
+.fg-light[data-v="sunbeam"]::after { animation: fg-beam-b 11s ease-in-out infinite alternate;
+  background: conic-gradient(from 124deg at 6% -18%, transparent 0deg 9deg, rgba(255, 248, 225, .22) 10.5deg, transparent 12deg 21deg, rgba(255, 248, 225, .26) 22.5deg, transparent 24.5deg 31deg,
+    rgba(255, 248, 225, .18) 32deg, transparent 34deg); }
+@keyframes fg-beam-a { from { transform: rotate(-1.2deg); opacity: .75; } to { transform: rotate(1deg); opacity: 1; } }
+@keyframes fg-beam-b { 0% { transform: rotate(1.4deg); opacity: .45; } 50% { opacity: 1; } 100% { transform: rotate(-.8deg); opacity: .6; } }
+/* 漏光：胶片边上渗进来的暖橘色光（红橙到琥珀），从右上慢慢涌进来又退回去，左下角也泛一点（回忆、夕阳、告白） */
+.fg-light[data-v="leak"] { mix-blend-mode: screen; background: linear-gradient(235deg, rgba(255, 140, 40, .62), rgba(255, 70, 20, .3) 26%, rgba(255, 60, 20, .08) 48%, transparent 62%); }
+.fg-light[data-v="leak"]::before { background: radial-gradient(42% 66% at 100% 22%, rgba(255, 214, 140, .8), rgba(255, 110, 36, .42) 45%, transparent 75%); filter: blur(1.5cqw); animation: fg-leak 9s ease-in-out infinite alternate; }
+.fg-light[data-v="leak"]::after { background: radial-gradient(45% 55% at 0% 100%, rgba(255, 80, 40, .38), transparent 70%), radial-gradient(14% 30% at 93% 6%, rgba(255, 250, 230, .5), transparent 70%); animation: fg-leak-b 13s ease-in-out infinite alternate; }
+@keyframes fg-leak { from { opacity: .5; transform: translateX(3%) scale(.96); } to { opacity: 1; transform: translateX(-2%) scale(1.08); } }
+@keyframes fg-leak-b { 0% { opacity: .3; } 60% { opacity: .9; } 100% { opacity: .55; } }
+/* 逆光：迎着右上方的光，亮的光心、一圈光晕、一道横向的蓝白光条，对角线上几个彩色的光斑（鬼影）；光斑随鼠标微微挪动，像镜头在动 */
+.fg-light[data-v="flare"] { mix-blend-mode: screen; background:
+  radial-gradient(circle at 80% 16%, rgba(255, 252, 240, .95) 0, rgba(255, 240, 205, .75) 1.2cqw, rgba(255, 214, 150, .28) 5cqw, rgba(255, 190, 120, .1) 14cqw, transparent 30cqw),
+  radial-gradient(circle at 80% 16%, transparent 9cqw, rgba(255, 222, 180, .1) 9.6cqw, transparent 11cqw),
+  radial-gradient(130% 110% at 80% 16%, rgba(255, 220, 170, .2), transparent 55%); }
+.fg-light[data-v="flare"]::before { inset: auto; left: 20%; width: 120%; top: calc(16% - .25cqw); height: .5cqw; background: linear-gradient(90deg, transparent, rgba(170, 210, 255, .55) 50%, transparent);
+  filter: blur(.12cqw); animation: fg-flare-streak 7s ease-in-out infinite; }
+.fg-light[data-v="flare"]::after { filter: blur(.1cqw); translate: calc(var(--px, 0) * 2.2cqw) calc(var(--py, 0) * 1.6cqw); animation: fg-flare-ghost 9s ease-in-out infinite alternate; background:
+  radial-gradient(circle at 63.5% 34.7%, rgba(255, 214, 150, .32) 0 .5cqw, transparent .75cqw),
+  radial-gradient(circle at 42.5% 58.5%, rgba(140, 190, 255, .14) 0 2.2cqw, rgba(140, 190, 255, .24) 2.6cqw, transparent 2.9cqw),
+  radial-gradient(circle at 32% 70.4%, rgba(255, 140, 200, .12) 0 4cqw, transparent 4.6cqw),
+  radial-gradient(circle at 21.5% 82.3%, transparent 3cqw, rgba(150, 255, 220, .2) 3.3cqw, transparent 4cqw); }
+@keyframes fg-flare-streak { 0%, 100% { opacity: .75; transform: scaleX(.94); } 50% { opacity: 1; transform: scaleX(1.04); } }
+@keyframes fg-flare-ghost { from { opacity: .7; transform: translate(.6%, -.6%); } to { opacity: 1; transform: translate(-.6%, .7%); } }
 @keyframes fg-flicker { 0%, 100% { opacity: 1; } 8% { opacity: .25; } 9% { opacity: 1; } 11% { opacity: .35; } 12% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .15; } 50% { opacity: .9; } 51% { opacity: .3; } 53% { opacity: 1; } 78% { opacity: .45; } 79% { opacity: 1; } }
 
 /* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密更暖，人离得更近一点，四角像心跳一样一明一暗。压在背景和立绘上，插画不受影响。 */
@@ -721,6 +769,9 @@
 .fg-world[data-fx="slowmo"] { animation: fg-fx-slowmo 10s ease-in-out infinite alternate; }
 .fg-world[data-fx="timestop"] { filter: grayscale(.92) contrast(1.18) brightness(.9); }
 .fg-world[data-fx="timestop"] :is(.fg-actor-body, .fg-cg-img, .fg-cg-pan, .fg-cg-art, .fg-down-mist i) { animation-play-state: paused !important; }
+/* 褪成回忆：一幕的结尾，十来秒里画面慢慢推近、泛黄、褪色，四周发白发虚、起颗粒（.fg-fxlayer），像眼前这一幕正在变成回忆；停在最后的样子，一般接黑场 */
+.fg-world[data-fx="fading"] { animation: fg-fx-fading 11s cubic-bezier(.35, 0, .3, 1) both; }
+@keyframes fg-fx-fading { from { transform: none; filter: none; } to { transform: scale(1.13); filter: sepia(.58) saturate(.74) contrast(.93) brightness(1.03); } }
 @keyframes fg-fx-slowmo { from { transform: scale(1.01); } to { transform: scale(1.05) translateY(-.4%); } }
 @keyframes fg-fx-sway { 0%, 100% { transform: scale(1.05) rotate(-.7deg) translateY(-.5%); } 50% { transform: scale(1.05) rotate(.7deg) translateY(.5%); } }
 @keyframes fg-fx-ride { 0%, 100% { transform: scale(1.03) translateY(0); } 18% { transform: scale(1.03) translateY(-.35%); } 30% { transform: scale(1.03) translateY(.1%); } 62% { transform: scale(1.03) translateY(-.15%); } 74% { transform: scale(1.03) translateY(.12%); } }
@@ -760,6 +811,11 @@
 @keyframes fg-beat-vignette { 0%, 60%, 100% { opacity: .45; } 12% { opacity: 1; } 24% { opacity: .6; } 36% { opacity: .85; } }
 .fg-fxlayer[data-v="rumble"] { background: radial-gradient(110% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, .35)); }
 .fg-fxlayer[data-v="drift"], .fg-fxlayer[data-v="sway"], .fg-fxlayer[data-v="ride"], .fg-fxlayer[data-v="handheld"] { display: none; }
+.fg-fxlayer[data-v="fading"] { background: radial-gradient(115% 85% at 50% 45%, transparent 50%, rgba(255, 236, 205, .42)), radial-gradient(150% 120% at 50% 50%, transparent 62%, rgba(40, 24, 10, .3)); }
+.fg-fxlayer[data-v="fading"]:not(.is-leave) { animation-duration: 9s; animation-timing-function: cubic-bezier(.4, 0, .6, 1); }
+.fg-fxlayer[data-v="fading"]::before { backdrop-filter: blur(2.5px); -webkit-backdrop-filter: blur(2.5px); -webkit-mask-image: radial-gradient(85% 75% at 50% 45%, transparent 52%, #000 100%); mask-image: radial-gradient(85% 75% at 50% 45%, transparent 52%, #000 100%);
+  animation: fg-layer-in 10s ease-in both; }
+.fg-fxlayer[data-v="fading"]::after { background-image: var(--fg-noise); opacity: .18; mix-blend-mode: overlay; animation: fg-grain .5s steps(4) infinite, fg-layer-in 10s ease-in both; }
 
 /* 特殊段落：回忆、梦境、幻觉、想象、主观视角、内心世界、画面里、故事中、预见、虚拟世界。盖住插画在内的整个画面。 */
 .fg-mode { z-index: 9; }
@@ -805,6 +861,7 @@
 @keyframes fg-mode-breath { 0%, 100% { transform: scale(1.035) translateY(0); } 50% { transform: scale(1.035) translateY(-.45%); } }
 @media (prefers-reduced-motion: reduce) {
   .fg-world, .fg-world-in, .fg-fxlayer, .fg-mode, .fg-light { animation: none !important; }
+  .fg-world[data-fx="fading"] { filter: sepia(.58) saturate(.74) contrast(.93) brightness(1.03); } /* 不推近，直接是褪色后的样子 */
 }
 
 /* 转场：慢慢变过去（时间流逝）、闭眼睁眼、画面撕裂、旋转入梦。 */

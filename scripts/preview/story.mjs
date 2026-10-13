@@ -13,6 +13,7 @@
 // 第 3 轮的原文像很多角色卡那样夹着状态栏、变量更新和章节尾巴（raw），导演把它们标成不演。
 // 场景逐句变：第 3 轮闪电那句路灯闪烁、苏晴跑走后暗下来；第 4 轮先出「翌日 放学后」字卡，中途进入三年前的回忆，
 // 回到现实时灯一盏盏熄灭（换成诡异、停掉音乐），林岚在黑暗里出现时打上一束光。
+// 光：第 1 轮午后的琴房窗光斜照、浮尘有远有近，第 4 轮三年前的回忆里胶片漏光。
 // 内置拟声音效：第 1 轮推开琴房的门「吱呀」，第 3 轮闪电「轰」。
 // 特效：第 3 轮苏晴说出「掉下去了」时慢动作；手机：林岚打来电话（手机响起、接通后分屏、她的声音隔着电话、她先挂断），最后苏晴发来一条消息；
 // 短闪回：第 3 轮苏晴凑过来时，我想起林岚塞信封时的一句话。
@@ -98,7 +99,7 @@ const find = (units, needle) => {
 export function directorReply(turn, units) {
   const L = (needle, line) => ({ u: find(units, needle), ...line })
   if (turn === 1) return {
-    scene: { location: '琴房', time: 'afternoon', weather: 'dust', mood: 'sweet', transition: 'cinematic', bg: 'music room, grand piano, afternoon sunlight, dust particles, scenery, no humans' },
+    scene: { location: '琴房', time: 'afternoon', weather: 'dust', light: 'sunbeam', mood: 'sweet', transition: 'cinematic', bg: 'music room, grand piano, afternoon sunlight, dust particles, scenery, no humans' },
     cast: [{ name: '林岚', pos: 'center' }],
     lines: [
       L('放学铃响过很久', { sfx: '吱呀' }),
@@ -173,7 +174,7 @@ export function directorReply(turn, units) {
     cast: [{ name: '林岚', pos: 'center' }],
     lines: [
       L('第二天放学', { cut: { kind: 'time', text: '翌日 放学后' } }),
-      L('三年前的那个黄昏', { mode: 'memory', scene: { location: '音乐教室（三年前）', time: 'dusk', weather: 'sakura', mood: 'touching', bg: 'school music room, grand piano, sunset through window, cherry blossoms outside, scenery, no humans' }, enter: [{ name: '林岚', pos: 'center' }], then: [{ name: '林岚', outfit: '校服', states: [] }] }),
+      L('三年前的那个黄昏', { mode: 'memory', scene: { location: '音乐教室（三年前）', time: 'dusk', weather: 'sakura', light: 'leak', mood: 'touching', bg: 'school music room, grand piano, sunset through window, cherry blossoms outside, scenery, no humans' }, enter: [{ name: '林岚', pos: 'center' }], then: [{ name: '林岚', outfit: '校服', states: [] }] }),
       L('学姐，这是什么曲子', { sp: '我' }),
       L('一首还没写完的曲子', { sp: '林岚', emo: 'smile' }),
       L('琴声戛然而止', { mode: 'real', scene: { light: 'dark', mood: 'eerie', transition: 'none' } }),

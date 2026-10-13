@@ -28,6 +28,22 @@ test('gate: 导演写的镜头：新镜头收下；camOn 只给对准人的镜�
   assert.equal(crowded.lines['U' + (MAX_CAMS_PER_TURN + 1)].cam, undefined, '按正文顺序留前面的')
 })
 
+test('gate: 移焦是整个画面的镜头，不对准人；窗光、漏光、逆光和「褪成回忆」导演写了就收下', () => {
+  const units = ['U1', 'U2', 'U3'].map(id => ({ id, type: 'dialogue', text: id }))
+  const script = normalizeScript({
+    scene: { light: 'sunbeam', weather: 'dust' }, cast: [],
+    lines: [
+      { u: 'U1', sp: '林岚', cam: 'rackfocus', camOn: '苏晴' },
+      { u: 'U2', sp: '林岚', scene: { light: 'leak' } },
+      { u: 'U3', sp: '林岚', cam: 'fadeblack', scene: { light: 'flare', fx: 'fading' } },
+    ],
+  }, units)
+  assert.deepEqual([script.lines.U1.cam, script.lines.U1.camOn], ['rackfocus', undefined])
+  assert.equal(script.scene.light, 'sunbeam')
+  assert.equal(script.lines.U2.scene.light, 'leak')
+  assert.deepEqual([script.lines.U3.scene.light, script.lines.U3.scene.fx], ['flare', 'fading'])
+})
+
 // 推完以后脸在画面上的位置：transform: scale(zs) translate(tx, ty)，原点在框中心
 const onScreen = (face, aim) => [0, 1].map(i => 50 + aim['--zs'] * (face[i] + parseFloat(aim[i ? '--ty' : '--tx']) - 50))
 
