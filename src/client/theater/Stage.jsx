@@ -75,7 +75,10 @@ function Sky({ scene }) {
   )
 }
 
-/** 背景层：换图时新层带转场进入，旧层淡出后移除。 */
+/**
+ * 背景层：换图时新层带转场盖到旧层上面，旧层不动（不先淡出，免得中途露出底下的黑），新层演完再移除旧层。
+ * 慢慢推拉（Ken Burns）在里面那层画上，进出场的动画在外面这层，换场时旧图不会突然弹回原来的大小。
+ */
 export function Backdrop({ scene, view, transition = 'dissolve' }) {
   const bg = backgroundFor(scene, view)
   const id = bg.src || 'sky:' + scene.time + ':' + scene.location
@@ -88,7 +91,8 @@ export function Backdrop({ scene, view, transition = 'dissolve' }) {
   }, [id, scene.time])
   React.useEffect(() => {
     if (layers.length < 2) return undefined
-    const t = setTimeout(() => setLayers(list => list.filter(l => !l.leaving)), 1900)
+    const top = layers[layers.length - 1]
+    const t = setTimeout(() => setLayers(list => list.filter(l => !l.leaving)), (TRANSITION_MS[top.tr] ?? TRANSITION_MS.dissolve) + 300)
     return () => clearTimeout(t)
   }, [layers])
   return (
@@ -97,13 +101,25 @@ export function Backdrop({ scene, view, transition = 'dissolve' }) {
         const [anim, dur] = TRANSITION[layer.tr] || TRANSITION.dissolve
         const cls = ['fg-bg', layer.bg.src ? 'is-image' : '', layer.enter && layer.tr !== 'none' ? 'is-enter' : '', layer.leaving ? 'is-leave' : ''].join(' ')
         return (
-          <div key={layer.id} className={cls} data-tr={layer.tr} data-out={layer.leaving ? layer.out : undefined} style={{ '--enter-anim': anim, '--enter-dur': dur, backgroundImage: layer.bg.src ? `url("${layer.bg.src}")` : undefined }}>
-            {!layer.bg.src && <Sky scene={layer.scene} />}
+          <div key={layer.id} className={cls} data-tr={layer.tr} data-out={layer.leaving ? layer.out : undefined} style={{ '--enter-anim': anim, '--enter-dur': dur }}>
+            <div className="fg-bg-art" style={layer.bg.src ? { backgroundImage: `url("${layer.bg.src}")` } : undefined}>
+              {!layer.bg.src && <Sky scene={layer.scene} />}
+            </div>
           </div>
         )
       })}
     </>
   )
+}
+
+/**
+ * 换场时盖住画面的那一层（playback.js 的 changePlan）：黑、白、眼皮、撕裂、旋涡。
+ * state：idle 还没盖（清场时）、up 盖上去、full 盖满（这时在下面换画面）、down 揭开、off 演完或被点掉。
+ */
+export function SceneCover({ plan, state }) {
+  if (!plan || !plan.cover) return null
+  const ms = state === 'up' ? plan.up : state === 'down' ? plan.down : 0
+  return <div className="fg-cover" data-cover={plan.cover} data-state={state} style={{ '--ms': ms + 'ms' }} aria-hidden="true" />
 }
 
 /** 剪影立绘：还没生成立绘的人物，按外貌档案画一个半身剪影（发型、发色）+ 描边光 + 竖排名字占位。 */
@@ -1090,12 +1106,13 @@ const RECALL_ENTRY = { sweet: 'is-bloom', dread: 'is-dread', flash: 'is-snap', h
 /**
  * recallStyle 是设置里短闪回的演法（「压暗画面」进出都起薄雾），tone 是设置里固定的基调（不固定时用导演写的 / 剧场挑的）。
  * wake：从回忆里醒过来的那一句（playback.js 的 beatHold），rising 时回忆正在褪白，之后白慢慢散开、露出现在的画面。
+ * changed：这一拍演一次换场（changePlan），黑场、白闪、闭眼这些由 SceneCover 在换场时间线上演，这里不再叠一层。
  */
-export function Flash({ beat, recallStyle = 'text', tone = '', wake = false, rising = false }) {
+export function Flash({ beat, recallStyle = 'text', tone = '', wake = false, rising = false, changed = false }) {
   if (!beat) return null
   if (wake) return <div key={beat.key} className={`fg-flash is-wake${rising ? ' is-rising' : ''}`} style={{ '--rise': WAKE_SWAP_MS + 'ms', '--clear': WAKE_MS - WAKE_SWAP_MS + 'ms' }} />
   const kind = beat.cam === 'flash' ? '' : beat.cam === 'redflash' ? 'is-red' : beat.cam === 'fadeblack' ? 'is-black' : null
-  const tr = TRANSITION_OVERLAY[beat.transition] ?? null
+  const tr = changed ? null : TRANSITION_OVERLAY[beat.transition] ?? null // 换场时盖住画面的那一层由 SceneCover 演
   const entry = beat.recallEdge === 'in' ? RECALL_ENTRY[tone || (beat.recall && beat.recall.tone)] : null
   const cls = kind ?? tr ?? entry ?? (beat.recallEdge && recallStyle === 'ghost' ? 'is-mist' : null)
   if (cls === null) return null

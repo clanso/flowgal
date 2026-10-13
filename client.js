@@ -127,6 +127,7 @@ var api = {
   test: () => call("/test", {}),
   models: () => call("/models"),
   llm: (provider) => call(`/llm?provider=${encodeURIComponent(provider || "")}`),
+  cgModels: () => call("/cg-models"),
   update: (check) => call(`/update${check ? `?check=${check}` : ""}`),
   runUpdate: (action) => call("/update", { action }),
   music: () => call("/music"),
@@ -388,10 +389,12 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-camera { position: absolute; inset: 0; transform-origin: 50% 50%; }
 
 /* ── 背景层 ── */
-.fg-bg { position: absolute; inset: -3%; background-size: cover; background-position: center 42%; will-change: transform, opacity; }
-.fg-bg.is-image { animation: fg-kenburns 38s ease-in-out infinite alternate; }
-.fg-bg.is-enter { animation: var(--enter-anim, fg-dissolve) var(--enter-dur, 1.1s) cubic-bezier(.6, .05, .3, 1) both, fg-kenburns 38s ease-in-out infinite alternate; }
-.fg-bg.is-leave { animation: fg-fade-out .9s ease both; }
+/* 外层管进出场的转场，里层（.fg-bg-art）画图、慢慢推拉；新层盖在旧层上面演转场，旧层不动，演完才移除（不先淡出，中途不会露出底下的黑） */
+.fg-bg { position: absolute; inset: -3%; will-change: transform, opacity; }
+.fg-bg-art { position: absolute; inset: 0; background-size: cover; background-position: center 42%; }
+.fg-bg.is-image > .fg-bg-art { animation: fg-kenburns 38s ease-in-out infinite alternate; }
+.fg-bg.is-enter { animation: var(--enter-anim, fg-dissolve) var(--enter-dur, 1.1s) cubic-bezier(.45, 0, .55, 1) both; }
+.fg-bg.is-leave { animation: none; }
 @keyframes fg-kenburns { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.1) translate(-1.6%, -1.2%); } }
 @keyframes fg-dissolve { from { opacity: 0; filter: blur(8px) brightness(1.3); } to { opacity: 1; filter: none; } }
 @keyframes fg-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
@@ -892,6 +895,43 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-hitflash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .25), rgba(160, 0, 20, .8)); }
 @keyframes fg-black { 0% { opacity: 0; } 35%, 60% { opacity: 1; } 100% { opacity: 0; } }
 
+/* ── 换场（playback.js 的 changePlan，Theater 按时间线切 data-change）──
+   清场：台上的人先退下去，对话框、左上角的地点也让开；盖住画面的那一层盖满时下面才换成新地方，揭开后人再上来、出地点标题 */
+.fg-stage[data-change] .fg-cast { transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .45s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
+.fg-stage[data-clearing] .fg-cast { opacity: 0; transition-duration: .65s, .35s, 2.6s; }
+.fg-stage[data-change] .fg-hud { opacity: 0; transition: opacity .35s ease; }
+.fg-cover { position: absolute; inset: 0; z-index: 19; pointer-events: none; opacity: 0; transition: opacity .25s ease; }
+.fg-cover[data-cover="black"] { background: #000; }
+.fg-cover[data-cover="white"] { background: #fff; }
+.fg-cover[data-cover="swirl"] { background: radial-gradient(120% 100% at 50% 50%, rgba(255, 250, 255, .98), rgba(226, 206, 255, .96) 55%, rgba(120, 96, 200, .94)); }
+.fg-cover[data-cover="glitch"] { background: #05040c; }
+.fg-cover[data-state="up"] { animation: fg-cover-up var(--ms) cubic-bezier(.4, 0, .6, 1) both; }
+.fg-cover[data-state="full"] { opacity: 1; transition: none; }
+.fg-cover[data-state="down"] { animation: fg-cover-down var(--ms) cubic-bezier(.35, 0, .4, 1) both; }
+@keyframes fg-cover-up { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fg-cover-down { from { opacity: 1; } to { opacity: 0; } }
+/* 白闪：一下子白透，再慢慢退回来 */
+.fg-cover[data-cover="white"][data-state="up"] { animation-timing-function: ease-out; }
+/* 闭眼睁眼：眼睛的形状（中间宽、两头尖）先四角暗下去、再收成一条缝合上，停一下，再睁开（先睁一条缝、又眯一下）。--eye 是眼睛张开的高度，95% 就是全睁开 */
+@property --eye { syntax: '<percentage>'; inherits: false; initial-value: 95%; }
+.fg-cover[data-cover="lids"] { opacity: 1; background: none; }
+.fg-cover[data-cover="lids"][data-state] { animation: none; }
+.fg-cover[data-cover="lids"][data-state="idle"], .fg-cover[data-cover="lids"][data-state="off"] { opacity: 0; }
+.fg-cover[data-cover="lids"]::before { content: ""; position: absolute; inset: 0; --eye: 95%; background: radial-gradient(ellipse 70% var(--eye) at 50% 50%, transparent 78%, #000 100%); }
+.fg-cover[data-cover="lids"][data-state="up"]::before { animation: fg-eye-shut var(--ms) cubic-bezier(.45, 0, .55, 1) both; }
+.fg-cover[data-cover="lids"][data-state="full"]::before { --eye: 0%; background: #000; }
+.fg-cover[data-cover="lids"][data-state="down"]::before { animation: fg-eye-open var(--ms) cubic-bezier(.3, 0, .3, 1) both; }
+@keyframes fg-eye-shut { from { --eye: 95%; } to { --eye: 0%; } }
+@keyframes fg-eye-open { 0% { --eye: 0%; } 30% { --eye: 24%; } 45% { --eye: 10%; } 100% { --eye: 95%; } }
+/* 画面撕裂：几道色带闪过去，中间一下全黑换画面 */
+.fg-cover[data-cover="glitch"][data-state="up"] { animation: fg-cover-glitch var(--ms) steps(4) both; }
+.fg-cover[data-cover="glitch"][data-state="down"] { animation: fg-cover-glitch var(--ms) steps(4) reverse both; }
+@keyframes fg-cover-glitch {
+  0% { opacity: 0; background: linear-gradient(transparent 0 22%, rgba(255, 0, 90, .6) 22% 25%, transparent 25% 51%, rgba(0, 255, 220, .5) 51% 53%, transparent 53%); }
+  50% { opacity: .85; background: linear-gradient(#05040c 0 40%, rgba(255, 255, 255, .7) 40% 42%, #05040c 42%); }
+  100% { opacity: 1; background: #05040c; }
+}
+
 /* ───────────── 气氛：逐句可变 ─────────────
    层次（都在 .fg-world-in 里）：背景 → 时段调色 → 立绘 → 基调色调 .fg-tone → 光线 .fg-light → 亲密氛围 .fg-romance → 插画 → 天气粒子
    → 画面效果叠层 .fg-fxlayer → 暗角；感官 .fg-sense、特殊段落滤镜 .fg-mode 在镜头外面（推镜头时不跟着放大）。每层由 FadeLayer 换值时淡入淡出（--fade）。 */
@@ -1122,10 +1162,8 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-glitch-in { 0% { opacity: 0; transform: translateX(3%); filter: hue-rotate(90deg) contrast(2); } 20% { opacity: 1; transform: translateX(-2%); } 40% { transform: translateX(1.5%) skewX(4deg); filter: hue-rotate(-60deg) contrast(1.6); } 60% { transform: translateX(-.8%); } 80% { transform: none; filter: hue-rotate(20deg); } 100% { filter: none; } }
 @keyframes fg-swirl-in { from { opacity: 0; transform: rotate(-14deg) scale(1.45); filter: blur(16px) brightness(1.4); } to { opacity: 1; transform: none; filter: none; } }
 .fg-flash.is-blink { background: none; animation: none; }
-.fg-flash.is-blink::before, .fg-flash.is-blink::after { content: ""; position: absolute; left: -5%; right: -5%; height: 56%; background: #000; animation: fg-lid 1.5s cubic-bezier(.6, 0, .3, 1) both; }
-.fg-flash.is-blink::before { top: 0; border-radius: 0 0 50% 50% / 0 0 30% 30%; transform-origin: top; }
-.fg-flash.is-blink::after { bottom: 0; border-radius: 50% 50% 0 0 / 30% 30% 0 0; transform-origin: bottom; }
-@keyframes fg-lid { 0% { transform: scaleY(0); } 35%, 55% { transform: scaleY(1); } 100% { transform: scaleY(0); } }
+.fg-flash.is-blink::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 70% var(--eye) at 50% 50%, transparent 78%, #000 100%); animation: fg-eye-blink 1.5s cubic-bezier(.5, 0, .4, 1) both; }
+@keyframes fg-eye-blink { 0% { --eye: 95%; } 35%, 55% { --eye: 0%; } 100% { --eye: 95%; } }
 .fg-flash.is-glitch { background: linear-gradient(transparent 0 22%, rgba(255, 0, 90, .5) 22% 25%, transparent 25% 51%, rgba(0, 255, 220, .45) 51% 53%, transparent 53% 78%, rgba(255, 255, 255, .6) 78% 79.5%, transparent 79.5%); mix-blend-mode: screen; animation: fg-glitch .7s steps(6) both; }
 @keyframes fg-glitch { 0% { opacity: 1; transform: translate(0, 0); } 30% { transform: translate(-4%, 8%); } 60% { transform: translate(5%, -12%); opacity: .8; } 100% { opacity: 0; transform: translate(0, 20%); } }
 
@@ -1662,7 +1700,14 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-pop { from { opacity: 0; transform: translateY(-.4cqw); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .fg-bg, .fg-cg-img, .fg-cg-art, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-down-mist i { animation: none !important; }
+  .fg-bg-art, .fg-cg-img, .fg-cg-art, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-down-mist i { animation: none !important; }
+  /* 换背景还是淡入淡出（只是不推拉、不模糊、不旋转），不会一下子跳过去 */
+  .fg-bg.is-enter { animation: fg-fade-slow var(--enter-dur, 1.1s) ease both !important; }
+  .fg-cover[data-cover="lids"]::before { display: none; }
+  .fg-cover[data-cover="lids"] { background: #000; }
+  .fg-cover[data-cover="lids"][data-state="up"] { animation: fg-cover-up var(--ms) ease both; }
+  .fg-cover[data-cover="lids"][data-state="down"] { animation: fg-cover-down var(--ms) ease both; }
+  .fg-cover[data-cover="lids"][data-state="off"], .fg-cover[data-cover="lids"][data-state="idle"] { opacity: 0; }
   .fg-recall::after, .fg-recall-face { animation: none !important; } /* 闪回里的光斑漂移、心跳脉动、小头像错位 */
   .fg-romance::before, .fg-romance::after, .fg-sense::after, .fg-world-in[data-sense] .fg-cast { animation: none !important; } /* 光斑漂移、心跳暗角、耳边的呼吸、触碰的涟漪、失神的晃 */
   .fg-sense[data-v="heat"]::before, .fg-sense[data-v="touch"]::before, .fg-sense[data-v="scent"]::before { animation: none !important; }
@@ -2187,7 +2232,8 @@ function walkScenes(start, lines) {
     const mode = layer ? layer.mode : "";
     const moved = mode !== beforeMode || scene.location !== before.location;
     let transition = "";
-    if (moved) transition = delta?.transition || (mode && mode !== beforeMode ? MODE_TRANSITION[mode] : mode !== beforeMode && beforeMode === "memory" ? "haze" : "dissolve");
+    const passed = mode === beforeMode && scene.time !== before.time;
+    if (moved) transition = delta?.transition || (mode && mode !== beforeMode ? MODE_TRANSITION[mode] : mode !== beforeMode && beforeMode === "memory" ? "haze" : passed ? "black" : "dissolve");
     else if (placeKey(scene) !== placeKey(before) || scene.bg !== before.bg) transition = delta?.transition || "fade";
     else if (delta?.transition && delta.transition !== "none") transition = delta.transition;
     return { scene, mode, bgm: now.bgm, amb: now.amb, real, layer, moved, transition, ...line.cut ? { cut: line.cut } : {} };
@@ -3262,16 +3308,52 @@ var SCENE_BEAT_MS = 300;
 var WAKE_SWAP_MS = 1700;
 var WAKE_MS = 3600;
 var WAKE_FROM = /* @__PURE__ */ new Set(["haze", "dissolve", "fade"]);
-function beatHold(beat, { cg = "", was = {}, eros = true } = {}) {
+var SCENE_CLEAR_MS = 350;
+var SCENE_CAST_MS = 450;
+var COVERS = {
+  black: { cover: "black", clear: true, up: 700, hold: 400, down: 900 },
+  flash: { cover: "white", clear: false, up: 120, hold: 150, down: 650 },
+  blink: { cover: "lids", clear: false, up: 550, hold: 250, down: 700 },
+  glitch: { cover: "glitch", clear: false, up: 300, hold: 0, down: 400 },
+  swirl: { cover: "swirl", clear: true, up: 900, hold: 200, down: 900 }
+};
+var CUT_COVER = { cover: "black", clear: true, up: 700, hold: 2300, down: 1e3 };
+var OPEN_COVER = { cover: "black", clear: true, up: 0, hold: 300, down: 1e3 };
+var OWN_WAY = /* @__PURE__ */ new Set(["haze", "wake"]);
+function changePlan(beat, was = {}, { opening = false } = {}) {
+  if (!beat || !beat.scene) return null;
+  const moved = !opening && beat.sceneEnter && (beat.scene.location !== was.place || (beat.mode || "") !== (was.mode || ""));
+  const tr = beat.transition || "";
+  if (!opening && !beat.cut && (!moved || tr === "none" || OWN_WAY.has(tr))) return null;
+  if (!opening && !beat.cut && was.mode === "memory" && (beat.mode || "") !== "memory" && WAKE_FROM.has(tr)) return null;
+  if (opening && tr === "none" && !beat.cut) return null;
+  const shape = opening ? beat.cut ? { ...CUT_COVER, up: 0 } : OPEN_COVER : beat.cut ? CUT_COVER : COVERS[tr] || { cover: "", clear: true, up: 0, hold: 0, down: TRANSITION_MS[tr] || TRANSITION_MS.dissolve };
+  const steps = [];
+  let t = 0;
+  const step2 = (name2, ms) => {
+    if (ms > 0) {
+      steps.push([name2, t]);
+      t += ms;
+    }
+  };
+  if (!opening) step2("clear", shape.clear ? SCENE_CLEAR_MS : 0);
+  step2("up", shape.up);
+  const swap = t;
+  step2("hold", shape.hold);
+  step2("down", shape.down);
+  step2("cast", shape.clear ? SCENE_CAST_MS : 0);
+  step2("settle", SCENE_BEAT_MS);
+  return { tr: opening && !COVERS[tr] ? "black" : tr, cover: shape.cover, clear: shape.clear, up: shape.up, hold: shape.hold, down: shape.down, steps, swap, total: t, ...beat.cut ? { cut: true } : {}, ...opening ? { opening: true } : {} };
+}
+function beatHold(beat, { cg = "", was = {}, eros = true, opening = false } = {}) {
   let ms = 0, away = false;
   if (cg && cg !== was.cg && !beat.cut) {
     ms = Math.max(ms, cgHoldMs(beat.cg, beat.scene.mood));
     away = true;
   }
-  const sameLayer = (beat.mode || "") === (was.mode || "");
-  const moved = beat.sceneEnter && beat.scene.location !== was.place && sameLayer;
-  if (moved && !beat.cut && TRANSITION_MS[beat.transition]) {
-    ms = Math.max(ms, TRANSITION_MS[beat.transition] + SCENE_BEAT_MS);
+  const change = changePlan(beat, was, { opening });
+  if (change) {
+    ms = Math.max(ms, change.total);
     away = true;
   }
   if (PAUSE_MS[beat.pause]) {
@@ -3284,12 +3366,12 @@ function beatHold(beat, { cg = "", was = {}, eros = true } = {}) {
   if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0);
   if (beat.hush === "start") ms = Math.max(ms, HUSH_LEAD_MS);
   if (eros && beat.peak) ms = Math.max(ms, PEAK_LEAD_MS[beat.peak] || 0);
-  const wake = was.mode === "memory" && (beat.mode || "") !== "memory" && !beat.cut && WAKE_FROM.has(beat.transition);
+  const wake = !opening && was.mode === "memory" && (beat.mode || "") !== "memory" && !beat.cut && WAKE_FROM.has(beat.transition);
   if (wake) {
     ms = Math.max(ms, WAKE_MS);
     away = true;
   }
-  return { ms, away, ...wake ? { wake } : {} };
+  return { ms, away, ...wake ? { wake } : {}, ...change ? { change } : {} };
 }
 function pickTrack(beat, tracks, urlOf) {
   if (!beat || !tracks || !tracks.length || beat.bgm === "none") return null;
@@ -5592,14 +5674,20 @@ function Backdrop({ scene, view, transition = "dissolve" }) {
   }, [id, scene.time]);
   import_react4.default.useEffect(() => {
     if (layers.length < 2) return void 0;
-    const t = setTimeout(() => setLayers((list2) => list2.filter((l) => !l.leaving)), 1900);
+    const top = layers[layers.length - 1];
+    const t = setTimeout(() => setLayers((list2) => list2.filter((l) => !l.leaving)), (TRANSITION_MS[top.tr] ?? TRANSITION_MS.dissolve) + 300);
     return () => clearTimeout(t);
   }, [layers]);
   return /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, layers.map((layer) => {
     const [anim, dur] = TRANSITION[layer.tr] || TRANSITION.dissolve;
     const cls = ["fg-bg", layer.bg.src ? "is-image" : "", layer.enter && layer.tr !== "none" ? "is-enter" : "", layer.leaving ? "is-leave" : ""].join(" ");
-    return /* @__PURE__ */ import_react4.default.createElement("div", { key: layer.id, className: cls, "data-tr": layer.tr, "data-out": layer.leaving ? layer.out : void 0, style: { "--enter-anim": anim, "--enter-dur": dur, backgroundImage: layer.bg.src ? `url("${layer.bg.src}")` : void 0 } }, !layer.bg.src && /* @__PURE__ */ import_react4.default.createElement(Sky, { scene: layer.scene }));
+    return /* @__PURE__ */ import_react4.default.createElement("div", { key: layer.id, className: cls, "data-tr": layer.tr, "data-out": layer.leaving ? layer.out : void 0, style: { "--enter-anim": anim, "--enter-dur": dur } }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-bg-art", style: layer.bg.src ? { backgroundImage: `url("${layer.bg.src}")` } : void 0 }, !layer.bg.src && /* @__PURE__ */ import_react4.default.createElement(Sky, { scene: layer.scene })));
   }));
+}
+function SceneCover({ plan, state: state2 }) {
+  if (!plan || !plan.cover) return null;
+  const ms = state2 === "up" ? plan.up : state2 === "down" ? plan.down : 0;
+  return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cover", "data-cover": plan.cover, "data-state": state2, style: { "--ms": ms + "ms" }, "aria-hidden": "true" });
 }
 var SIL = {
   hairLong: "M100 22C58 22 36 54 36 98c0 46-4 92-14 150h156c-10-58-14-104-14-150 0-44-22-76-64-76z",
@@ -6281,11 +6369,11 @@ function useCamera(beat, cameraRef) {
 }
 var TRANSITION_OVERLAY = { flash: "", black: "is-black", blink: "is-blink", glitch: "is-glitch", haze: "is-haze" };
 var RECALL_ENTRY = { sweet: "is-bloom", dread: "is-dread", flash: "is-snap", haze: "is-mist" };
-function Flash({ beat, recallStyle = "text", tone = "", wake = false, rising = false }) {
+function Flash({ beat, recallStyle = "text", tone = "", wake = false, rising = false, changed = false }) {
   if (!beat) return null;
   if (wake) return /* @__PURE__ */ import_react4.default.createElement("div", { key: beat.key, className: `fg-flash is-wake${rising ? " is-rising" : ""}`, style: { "--rise": WAKE_SWAP_MS + "ms", "--clear": WAKE_MS - WAKE_SWAP_MS + "ms" } });
   const kind = beat.cam === "flash" ? "" : beat.cam === "redflash" ? "is-red" : beat.cam === "fadeblack" ? "is-black" : null;
-  const tr = TRANSITION_OVERLAY[beat.transition] ?? null;
+  const tr = changed ? null : TRANSITION_OVERLAY[beat.transition] ?? null;
   const entry = beat.recallEdge === "in" ? RECALL_ENTRY[tone || beat.recall && beat.recall.tone] : null;
   const cls = kind ?? tr ?? entry ?? (beat.recallEdge && recallStyle === "ghost" ? "is-mist" : null);
   if (cls === null) return null;
@@ -8515,7 +8603,7 @@ function DirectorSection({ data, onDirectorLog }) {
     });
   }, [cfg.director.provider]);
   const p4 = (patch) => patchConfig({ director: patch }).catch((e) => toast(e.message, "error"));
-  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "导演（后台整理）", onDirectorLog && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: onDirectorLog }, "查看导演日志")), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自动整理", hint: "每轮正文写完后，后台模型把它整理成场景：说话人、表情、站位、镜头、天气、选项、插画分镜。正文一字不改。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.director.auto, onChange: (v) => p4({ auto: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "模型", hint: hostName() === "st" ? "默认跟着酒馆当前的连接；也可以选一套连接配置（在酒馆「API 连接」里存的）专门给导演用，整理用便宜的小模型就够。" : "留空跟随 Tavern 的后台模型。整理用的是便宜的小模型就够。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: cfg.director.provider, onChange: (v) => p4({ provider: v, model: "" }), options: [["", hostName() === "st" ? "跟着酒馆当前的连接" : "跟随 Tavern"], ...llm.providers.map((x) => [x.id, x.name])] }), cfg.director.provider && (llm.models.length ? /* @__PURE__ */ import_react9.default.createElement(Select, { value: cfg.director.model, onChange: (v) => p4({ model: v }), options: [["", "（请选择）"], ...llm.models.map((m) => [m.id, m.name])] }) : /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.director.model, placeholder: "模型 ID", onCommit: (v) => p4({ model: v }) })))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "最大输出 / 温度", hint: "默认 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "9cqw" }, value: cfg.director.maxTokens, onCommit: (v) => p4({ maxTokens: v }) }), /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "7cqw" }, value: cfg.director.temperature, onCommit: (v) => p4({ temperature: v }) }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "资料长度", hint: "给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认 1000000，等于不截断；超出模型窗口时自动缩短。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", value: cfg.director.contextChars, onCommit: (v) => p4({ contextChars: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自定义提示词", hint: "留空用内置导演提示词。可用 {{maxImages}} {{styleHint}}。情绪库、配乐曲库附在用户消息里，自定义时也生效。" }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.systemPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "导演（后台整理）", onDirectorLog && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: onDirectorLog }, "查看导演日志")), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自动整理", hint: "每轮正文写完后，后台模型把它整理成场景：说话人、表情、站位、镜头、天气、选项、插画分镜。正文一字不改。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.director.auto, onChange: (v) => p4({ auto: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "模型", hint: hostName() === "st" ? "默认跟着酒馆当前的连接；也可以选一套连接配置（在酒馆「API 连接」里存的）专门给导演用，整理用便宜的小模型就够。" : "留空跟随 Tavern 的后台模型。整理用的是便宜的小模型就够。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: cfg.director.provider, onChange: (v) => p4({ provider: v, model: "" }), options: [["", hostName() === "st" ? "跟着酒馆当前的连接" : "跟随 Tavern"], ...llm.providers.map((x) => [x.id, x.name])] }), cfg.director.provider && (llm.models.length ? /* @__PURE__ */ import_react9.default.createElement(Select, { value: cfg.director.model, onChange: (v) => p4({ model: v }), options: [["", "（请选择）"], ...llm.models.map((m) => [m.id, m.name])] }) : /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.director.model, placeholder: "模型 ID", onCommit: (v) => p4({ model: v }) })))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "最大输出 / 温度", hint: "默认 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "9cqw" }, value: cfg.director.maxTokens, onCommit: (v) => p4({ maxTokens: v }) }), /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "7cqw" }, value: cfg.director.temperature, onCommit: (v) => p4({ temperature: v }) }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "资料长度", hint: "给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认 1000000，等于不截断；超出模型窗口时自动缩短。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", value: cfg.director.contextChars, onCommit: (v) => p4({ contextChars: v }) })), /* @__PURE__ */ import_react9.default.createElement(CgModelFields, { data, providers: llm.providers }), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自定义提示词", hint: "留空用内置导演提示词。可用 {{maxImages}} {{styleHint}}。情绪库、配乐曲库附在用户消息里，自定义时也生效。" }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.systemPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
     if (e.target.value !== cfg.director.systemPrompt) p4({ systemPrompt: e.target.value });
   } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "立绘设计师提示词", hint: '留空用内置的。可用 {{styleHint}}。输出格式必须是 {"sprites":[{"key","tags"}]}（负面只用画风里带的，写了也不收）。' }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.spritePrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
     if (e.target.value !== cfg.director.spritePrompt) p4({ spritePrompt: e.target.value });
@@ -8524,6 +8612,24 @@ function DirectorSection({ data, onDirectorLog }) {
   } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "插画分镜师提示词", hint: '留空用内置的（Base + 每人一个角色块的写法）。可用 {{styleHint}}。输出格式必须是 {"images":[{"key","tag","nl","characters":[{"name","tag","nl"}],"size"}]}。' }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.cgPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
     if (e.target.value !== cfg.director.cgPrompt) p4({ cgPrompt: e.target.value });
   } })));
+}
+function CgModelFields({ data, providers }) {
+  const own = data.config.director.cgLlm;
+  const [busy, run] = useBusy();
+  const [hostModels, setHostModels] = import_react9.default.useState([]);
+  const [list2, setList] = import_react9.default.useState(null);
+  const p4 = (patch) => patchConfig({ director: { cgLlm: patch } }).catch((e) => toast(e.message, "error"));
+  import_react9.default.useEffect(() => {
+    if (own.source !== "host" || !own.provider) return setHostModels([]);
+    api.llm(own.provider).then((r) => setHostModels(r.models || [])).catch(() => setHostModels([]));
+  }, [own.source, own.provider]);
+  const loadList = () => run("m", async () => setList(await api.cgModels()));
+  import_react9.default.useEffect(() => {
+    setList(null);
+    if (own.source === "custom" && own.baseURL) loadList();
+  }, [own.source, own.baseURL, data.keys.cgllm]);
+  const sources = [["", "跟导演一样"], ["host", hostName() === "st" ? "另选一套酒馆连接配置" : "另选一个 Tavern 里的模型"], ["custom", "自定义接口（OpenAI 兼容）"]];
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement(Field, { label: "插画分镜师的模型", hint: "写 CG 提示词的模型可以和导演分开。有的模型不肯把露骨的画面写具体，就给分镜师单独换一个；自定义接口填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: own.source, style: INLINE, onChange: (v) => p4({ source: v, provider: "", model: "" }), options: sources }), own.source === "host" && /* @__PURE__ */ import_react9.default.createElement(Select, { value: own.provider, style: INLINE, onChange: (v) => p4({ provider: v, model: "" }), options: [["", "（选一个）"], ...providers.map((x) => [x.id, x.name])] }), own.source === "host" && own.provider && (hostModels.length ? /* @__PURE__ */ import_react9.default.createElement(Select, { value: own.model, style: INLINE, onChange: (v) => p4({ model: v }), options: [["", "（请选择）"], ...hostModels.map((m) => [m.id, m.name])] }) : /* @__PURE__ */ import_react9.default.createElement(Text, { value: own.model, placeholder: "模型 ID", onCommit: (v) => p4({ model: v }) })))), own.source === "custom" && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement(Field, { label: "接口地址" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: own.baseURL, placeholder: "https://api.deepseek.com/v1", style: { flex: 1, width: "100%" }, onCommit: (v) => p4({ baseURL: String(v).trim() }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "Key", hint: `存在宿主（${data.secretStorage || "插件目录"}），不会发到浏览器。本机的接口不要 Key 就空着。` }, /* @__PURE__ */ import_react9.default.createElement(KeyInput, { backend: "cgllm", has: data.keys.cgllm })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "模型", hint: list2 ? list2.note : own.baseURL ? "正在读取模型列表…" : "先填接口地址" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(ModelField, { value: own.model, options: list2 && list2.models || [], placeholder: "模型 ID", onCommit: (v) => p4({ model: v, ...(list2?.models || []).find((m) => m.id === v)?.window ? { contextWindow: list2.models.find((m) => m.id === v).window } : {} }) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "m" || !own.baseURL, onClick: loadList }, busy === "m" ? "读取中…" : "刷新列表"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "上下文窗口", hint: "这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收；最大输出、温度、资料长度跟导演用同一套设置。接口报出更小的输出上限时自动按它重试。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "9cqw" }, value: own.contextWindow, onCommit: (v) => p4({ contextWindow: v }) }))));
 }
 function PoseGroups({ poses, onChange }) {
   const changed = Object.keys(poses).length > 0;
@@ -8835,7 +8941,7 @@ var lookText = (v) => typeof v === "string" ? v : v ? formatLook(v) : "";
 var STATUS = { running: ["进行中", "is-running"], ok: ["完成", "is-ok"], failed: ["失败", "is-failed"], cancelled: ["已停止", "is-cancelled"] };
 var REASON = { auto: "正文写完后自动整理", force: "手动重新整理", sprite: "写立绘提示词", cg: "写插画提示词", acting: "设计动作与表情" };
 var WRITER = { ai: "模型写的", fallback: "按档案拼的", user: "玩家改的" };
-var sourceLabel = (source) => ({ tavern: hostName() === "st" ? "跟着酒馆当前的连接" : "跟随 Tavern 后台模型", plugin: "插件设置里指定" })[source];
+var sourceLabel = (source) => ({ tavern: hostName() === "st" ? "跟着酒馆当前的连接" : "跟随 Tavern 后台模型", plugin: "插件设置里指定", cg: "插画分镜师单独选的", custom: "插画分镜师的自定义接口" })[source];
 var USAGE_LABEL = { inputTokens: "输入", outputTokens: "输出", reasoningTokens: "思考", cachedInputTokens: "缓存命中", cacheReadTokens: "缓存读", cacheWriteTokens: "缓存写", totalTokens: "合计" };
 var SHAPE_LABEL = { landscape: "横版", portrait: "竖版", square: "方形" };
 var thenText = (t) => [t.name, t.outfit, t.states ? t.states.length ? t.states.map((s) => s.name).join("、") : "无状态" : "", t.change ? "外貌另写" : ""].filter(Boolean).join(" ");
@@ -8998,7 +9104,7 @@ function LogDetail({ gameId, summary }) {
   const tabs = running ? [["live", "实时输出"], ["prompt", "提示词"]] : [["result", acting ? "设计结果" : writer ? "写出的提示词" : "整理结果"], ["raw", `原始输出${summary.attempts > 1 ? ` · ${summary.attempts} 次` : ""}`], ["prompt", "提示词"]];
   const live = summary.live || { output: "", reasoning: "", chars: 0, note: "" };
   const elapsed = running ? Math.max(summary.ms, now - summary.at) : summary.ms;
-  return /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-detail" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-head" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-title" }, sprite || acting ? `${entryTitle(summary)}（读到第 ${summary.turn} 轮）` : entryTitle(summary), " ", /* @__PURE__ */ import_react10.default.createElement(StatusPill, { status: summary.status }), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-spacer" }), running && /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn", disabled: stopping, onClick: stop }, writer ? "停止" : "停止整理")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-facts" }, /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "模型"), summary.model || "—", summary.provider ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, " · ", summary.provider) : null, sourceLabel() ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "（", sourceLabel(), "）") : null), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "时间"), clock2(summary.at), " · ", secs(elapsed), " · ", REASON[summary.reason] || summary.reason), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "最大输出"), num(summary.maxTokens), " token", entry && entry.temperature != null ? ` · 温度 ${entry.temperature}` : ""), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "模型窗口"), summary.window ? `${num(summary.window)} token` : "宿主没给窗口大小，按设置原样发", entry && entry.outputDefault ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, " · 模型默认输出 ", num(entry.outputDefault)) : null), entry && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "资料"), entry.contextLength ? `发了 ${num(entry.contextChars)} 字（人物卡与世界书共 ${num(entry.contextLength)} 字）` : "这张卡没有人物卡 / 世界书资料"), entry && writer && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "剧情"), `发了 ${num(entry.storyChars)} 字（到这一轮为止共 ${num(entry.storyLength)} 字）`), summary.usage && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "用量"), usageText(summary.usage))), summary.notes.map((n, i) => /* @__PURE__ */ import_react10.default.createElement("div", { key: i, className: "fg-dlog-notice" }, "⚠ ", n)), summary.error && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-err fg-dlog-error" }, summary.error)), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-tabs fg-dlog-tabs" }, tabs.map(([id, label]) => /* @__PURE__ */ import_react10.default.createElement("button", { key: id, type: "button", className: `fg-tab${tab === id ? " is-on" : ""}`, onClick: () => setTab(id) }, label))), loadError && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-err" }, loadError), tab === "live" && /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-meter" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-dlog-dot" }), live.note || `第 ${summary.attempts || 1} 次请求`, " · 已收到 ", num(live.chars), " 字", live.chars ? "" : live.reasoning ? " · 模型在思考" : " · 等模型开口…"), live.reasoning && /* @__PURE__ */ import_react10.default.createElement(Block, { label: "模型思考（实时）" }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: live.reasoning, follow: true })), /* @__PURE__ */ import_react10.default.createElement(Block, { label: "模型输出（实时）" }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: live.output, follow: true, cursor: true, empty: "还没有输出" }))), tab === "result" && (entry ? sprite ? /* @__PURE__ */ import_react10.default.createElement(SpritesView, { sprites: entry.sprites }) : acting ? /* @__PURE__ */ import_react10.default.createElement(ActingView, { acting: entry.acting }) : cg ? /* @__PURE__ */ import_react10.default.createElement(CgsView, { cgs: entry.cgs }) : /* @__PURE__ */ import_react10.default.createElement(ScriptView, { script: entry.script, units: entry.units || [] }) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "raw" && (entry ? /* @__PURE__ */ import_react10.default.createElement(Attempts, { attempts: entry.attempts || [] }) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "prompt" && (entry ? /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(Block, { label: `系统提示词 · ${num((entry.system || "").length)} 字`, text: entry.system }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: entry.system })), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `用户消息 · ${num((entry.user || "").length)} 字${sprite ? "（资料 + 全部剧情 + 角色档案 + 要画的差分）" : acting ? "（资料 + 全部剧情 + 角色档案 + 要设计的情绪）" : cg ? "（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）" : "（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）"}`, text: entry.user }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: entry.user }))) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")));
+  return /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-detail" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-head" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-title" }, sprite || acting ? `${entryTitle(summary)}（读到第 ${summary.turn} 轮）` : entryTitle(summary), " ", /* @__PURE__ */ import_react10.default.createElement(StatusPill, { status: summary.status }), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-spacer" }), running && /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn", disabled: stopping, onClick: stop }, writer ? "停止" : "停止整理")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-facts" }, /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "模型"), summary.model || "—", summary.provider ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, " · ", summary.provider) : null, sourceLabel(summary.source) ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "（", sourceLabel(summary.source), "）") : null), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "时间"), clock2(summary.at), " · ", secs(elapsed), " · ", REASON[summary.reason] || summary.reason), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "最大输出"), num(summary.maxTokens), " token", entry && entry.temperature != null ? ` · 温度 ${entry.temperature}` : ""), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "模型窗口"), summary.window ? `${num(summary.window)} token` : "宿主没给窗口大小，按设置原样发", entry && entry.outputDefault ? /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, " · 模型默认输出 ", num(entry.outputDefault)) : null), entry && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "资料"), entry.contextLength ? `发了 ${num(entry.contextChars)} 字（人物卡与世界书共 ${num(entry.contextLength)} 字）` : "这张卡没有人物卡 / 世界书资料"), entry && writer && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "剧情"), `发了 ${num(entry.storyChars)} 字（到这一轮为止共 ${num(entry.storyLength)} 字）`), summary.usage && /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("i", null, "用量"), usageText(summary.usage))), summary.notes.map((n, i) => /* @__PURE__ */ import_react10.default.createElement("div", { key: i, className: "fg-dlog-notice" }, "⚠ ", n)), summary.error && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-err fg-dlog-error" }, summary.error)), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-tabs fg-dlog-tabs" }, tabs.map(([id, label]) => /* @__PURE__ */ import_react10.default.createElement("button", { key: id, type: "button", className: `fg-tab${tab === id ? " is-on" : ""}`, onClick: () => setTab(id) }, label))), loadError && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-err" }, loadError), tab === "live" && /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-meter" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-dlog-dot" }), live.note || `第 ${summary.attempts || 1} 次请求`, " · 已收到 ", num(live.chars), " 字", live.chars ? "" : live.reasoning ? " · 模型在思考" : " · 等模型开口…"), live.reasoning && /* @__PURE__ */ import_react10.default.createElement(Block, { label: "模型思考（实时）" }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: live.reasoning, follow: true })), /* @__PURE__ */ import_react10.default.createElement(Block, { label: "模型输出（实时）" }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: live.output, follow: true, cursor: true, empty: "还没有输出" }))), tab === "result" && (entry ? sprite ? /* @__PURE__ */ import_react10.default.createElement(SpritesView, { sprites: entry.sprites }) : acting ? /* @__PURE__ */ import_react10.default.createElement(ActingView, { acting: entry.acting }) : cg ? /* @__PURE__ */ import_react10.default.createElement(CgsView, { cgs: entry.cgs }) : /* @__PURE__ */ import_react10.default.createElement(ScriptView, { script: entry.script, units: entry.units || [] }) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "raw" && (entry ? /* @__PURE__ */ import_react10.default.createElement(Attempts, { attempts: entry.attempts || [] }) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "prompt" && (entry ? /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(Block, { label: `系统提示词 · ${num((entry.system || "").length)} 字`, text: entry.system }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: entry.system })), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `用户消息 · ${num((entry.user || "").length)} 字${sprite ? "（资料 + 全部剧情 + 角色档案 + 要画的差分）" : acting ? "（资料 + 全部剧情 + 角色档案 + 要设计的情绪）" : cg ? "（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）" : "（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）"}`, text: entry.user }, /* @__PURE__ */ import_react10.default.createElement(Pre, { text: entry.user }))) : /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "读取中…")));
 }
 function DirectorLog({ gameId, onClose, focusTurn = null }) {
   const { log, error } = useDirectorLog(gameId);
@@ -9061,6 +9167,37 @@ function ErosPeak({ beat, cameraRef, volume }) {
   return /* @__PURE__ */ import_react11.default.createElement("div", { className: `fg-peak is-${kind}`, "aria-hidden": "true" }, kind !== "climax" && EROS_PULSES.map((ms, i) => /* @__PURE__ */ import_react11.default.createElement("i", { key: ms, style: { "--at": ms + "ms", "--k": (1 - i * 0.2).toFixed(2) } })));
 }
 
+// src/client/theater/preload.js
+var cache = /* @__PURE__ */ new Map();
+function preloadImage(src) {
+  if (!src) return Promise.resolve();
+  let entry = cache.get(src);
+  if (!entry) {
+    entry = { ready: false };
+    const img = new Image();
+    img.decoding = "async";
+    img.src = src;
+    entry.img = img;
+    entry.promise = (img.decode ? img.decode() : new Promise((ok, fail) => {
+      img.onload = ok;
+      img.onerror = fail;
+    })).catch(() => {
+    }).then(() => {
+      entry.ready = true;
+    });
+    cache.set(src, entry);
+    if (cache.size > 64) cache.delete(cache.keys().next().value);
+  }
+  return entry.promise;
+}
+function imageReady2(src) {
+  return !src || Boolean(cache.get(src)?.ready);
+}
+function whenImageReady(src, ms) {
+  if (imageReady2(src)) return Promise.resolve();
+  return Promise.race([preloadImage(src), new Promise((ok) => setTimeout(ok, ms))]);
+}
+
 // src/client/theater/Theater.jsx
 var POS_KEY = (gameId) => "flowgal:pos:" + gameId;
 var readPos = (gameId) => {
@@ -9084,6 +9221,8 @@ function senseLayer(beat, scene) {
   const who = beat && (beat.cast || []).find((c) => c.name === beat.speaker);
   return who && ["left", "farleft"].includes(who.pos) ? "ear-left" : "ear-right";
 }
+var BG_WAIT_MS = 1500;
+var BG_AHEAD = 60;
 var GLYPH_AHEAD = 12;
 var GLYPH_WAIT = 1200;
 var glyphsOf = (list2) => ({
@@ -9194,22 +9333,62 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const cgOn = beat && !title && beat.cg && cgSrc(beat.cg, assetUrl) ? beat.cg.id : "";
   const shownRef = import_react12.default.useRef({ key: "", beat: null, was: null, cg: "", place: "", mode: "", hold: { ms: 0, away: false } });
   if (beat && shownRef.current.key !== beat.key) {
-    const was = shownRef.current;
-    shownRef.current = { key: beat.key, beat, was: was.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was, eros: ui0.eros !== false }) };
+    const was2 = shownRef.current;
+    shownRef.current = { key: beat.key, beat, was: was2.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was: was2, eros: ui0.eros !== false, opening: !was2.key }) };
   } else if (shownRef.current.cg !== cgOn) shownRef.current = { ...shownRef.current, cg: cgOn };
   const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false };
   const recallStyle = ui0.recall || "text";
   const recallTone = ui0.recallTone && ui0.recallTone !== "auto" ? ui0.recallTone : "";
-  const edgeMs = !beat || title ? 0 : beat.cut ? CUT_MS : beat.transition === "haze" ? HAZE_MS : recallStyle === "ghost" ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0;
+  const edgeMs = !beat || title ? 0 : beat.cut && !hold.change ? CUT_MS : beat.transition === "haze" ? HAZE_MS : recallStyle === "ghost" ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0;
   const pauseMs = speed > 0 ? Math.max(edgeMs, hold.ms) : 0;
   const [pauseSeen, setPauseSeen] = import_react12.default.useState("");
   const pausing = pauseMs > 0 && pauseSeen !== beat.key;
-  const cutting = pausing && Boolean(beat.cut);
+  const change = pausing && hold.change ? hold.change : null;
+  const [changeAt, setChangeAt] = import_react12.default.useState({ key: "", phase: "" });
   import_react12.default.useEffect(() => {
-    if (!pausing) return void 0;
+    if (!change) return void 0;
+    const key = beat.key;
+    const bg = backgroundFor(beat.scene, view).src;
+    let live = true, timer = 0, i = 0;
+    const t0 = performance.now();
+    const next = () => {
+      if (!live) return;
+      if (i >= change.steps.length) {
+        timer = setTimeout(() => {
+          if (live) setPauseSeen(key);
+        }, Math.max(0, pauseMs - (performance.now() - t0)));
+        return;
+      }
+      const [phase2, at2] = change.steps[i];
+      const end = i + 1 < change.steps.length ? change.steps[i + 1][1] : change.total;
+      i += 1;
+      const run = () => {
+        if (!live) return;
+        setChangeAt({ key, phase: phase2 });
+        timer = setTimeout(next, end - at2);
+      };
+      if (phase2 === "down") whenImageReady(bg, BG_WAIT_MS).then(run);
+      else run();
+    };
+    preloadImage(bg);
+    next();
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [change, beat && beat.key]);
+  const phase = !change ? "" : changeAt.key === beat.key ? changeAt.phase : change.steps[0][0];
+  const swapped = !change || (change.steps.find(([name2]) => name2 === phase) || [, 0])[1] >= change.swap;
+  const coverState = !change ? "off" : phase === "clear" ? "idle" : phase === "up" ? "up" : phase === "hold" ? "full" : phase === "down" ? "down" : "off";
+  const clearing = Boolean(change && change.clear && ["clear", "up", "hold", "down"].includes(phase));
+  import_react12.default.useEffect(() => {
+    if (!pausing || hold.change) return void 0;
     const t = setTimeout(() => setPauseSeen(beat.key), pauseMs);
     return () => clearTimeout(t);
   }, [pausing, beat && beat.key]);
+  const cutOn = Boolean(change && change.cut && phase === "hold");
+  const cutShown = import_react12.default.useRef("");
+  if (cutOn) cutShown.current = beat.key;
   const holdText = Boolean(beat) && glyphKey !== beat.key || pausing;
   const [wokeKey, setWokeKey] = import_react12.default.useState("");
   const waking = pausing && Boolean(hold.wake) && Boolean(shownRef.current.was) && wokeKey !== beat.key;
@@ -9266,12 +9445,26 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if (index < 0) return;
     loadSkinFonts(ui0.skin, ui0.fontBase).then(() => loadGlyphs(rootRef.current, glyphsOf(beats.slice(index + 1, index + 1 + GLYPH_AHEAD))));
   }, [index, beats, ui0.skin, ui0.fontBase]);
+  import_react12.default.useEffect(() => {
+    if (index < 0 || !view) return;
+    const seen = /* @__PURE__ */ new Set();
+    for (const b of beats.slice(index, index + BG_AHEAD)) {
+      const src = backgroundFor(b.scene, view).src;
+      if (!src || seen.has(src)) continue;
+      seen.add(src);
+      preloadImage(src);
+      if (seen.size >= 4) break;
+    }
+  }, [index, beats, view]);
   const scene = beat ? beat.scene : (beats[beats.length - 1] || {}).scene;
   const tracks = useMusic();
-  const musicBeat = waking ? null : beat;
+  const was = shownRef.current.was;
+  const restartMusic = Boolean(change && was && ui0.bgm) && (pickTrack(beat, tracks, assetUrl) || {}).id !== (pickTrack(was, tracks, assetUrl) || {}).id;
+  const silent = restartMusic && ["clear", "up", "hold"].includes(phase);
+  const musicBeat = waking || silent ? null : beat;
   const track = import_react12.default.useMemo(() => ui0.bgm ? pickTrack(musicBeat, tracks, assetUrl) : null, [ui0.bgm, tracks, musicBeat && musicBeat.bgm, scene && scene.mood, scene && scene.location]);
   import_react12.default.useEffect(() => {
-    if (!closingRef.current && (track || !ui0.bgm || waking)) playBgm(track, ui0.bgmVolume);
+    if (!closingRef.current && (track || !ui0.bgm || waking || silent)) playBgm(track, ui0.bgmVolume);
   }, [track && track.id, ui0.bgm, ui0.bgmVolume]);
   const hushed = Boolean(musicBeat && musicBeat.hush);
   import_react12.default.useEffect(() => {
@@ -9279,7 +9472,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }, [hushed]);
   const soundlib = useSoundlib();
   const soundById = import_react12.default.useMemo(() => new Map((soundlib || []).map((s) => [s.id, s])), [soundlib]);
-  const ambId = ui0.amb !== false && musicBeat && musicBeat.amb !== "none" ? musicBeat.amb : "";
+  const soundBeat = waking ? null : change && !swapped && was ? was : beat;
+  const ambId = ui0.amb !== false && soundBeat && soundBeat.amb !== "none" ? soundBeat.amb : "";
   const ambSound = ambId && soundById.get(ambId) || null;
   import_react12.default.useEffect(() => {
     if (closingRef.current) return;
@@ -9295,7 +9489,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }, [sfxKey]);
   const erosOn = ui0.eros !== false && ui0.storySfx !== false && !skip && !title;
   const erosVolume = (ui0.storySfxVolume ?? 0.8) / 0.8;
-  const bedScene = erosOn && musicBeat ? musicBeat.scene : null;
+  const bedScene = erosOn && soundBeat ? soundBeat.scene : null;
   const bedPace = bedScene && bedScene.eros !== "none" ? bedScene.eros || "" : "";
   const bedTentacle = bedScene && bedScene.tentacle !== "none" ? bedScene.tentacle || "" : "";
   import_react12.default.useEffect(() => {
@@ -9427,9 +9621,10 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       { id: "config", label: "CONFIG", title: "设置", run: () => setPanel("settings") }
     ]
   };
-  const stageBeat = waking ? shownRef.current.was : beat || (beats.length ? beats[beats.length - 1] : null);
-  const hud = waking ? stageBeat : beat;
-  const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? "wake" : stageBeat && stageBeat.transition;
+  const before = Boolean(change && !swapped && was);
+  const stageBeat = waking || before ? was : beat || (beats.length ? beats[beats.length - 1] : null);
+  const hud = waking || before ? stageBeat : beat;
+  const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? "wake" : change && change.cover && change.cover !== "swirl" ? "none" : stageBeat && stageBeat.transition;
   const stageScene = stageBeat ? stageBeat.scene : { location: "", time: "night", weather: "stars", mood: "calm", light: "normal", fx: "none" };
   const stageMode = stageBeat && stageBeat.mode || "";
   const romance = stageScene.romance && stageScene.romance !== "none" ? stageScene.romance : "";
@@ -9475,6 +9670,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     {
       className: "fg-stage",
       ref: stageRef,
+      "data-change": phase || void 0,
+      "data-clearing": clearing ? "" : void 0,
       onClick: () => {
         if (hidden) {
           setHidden(false);
@@ -9514,9 +9711,10 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "sense", value: atmosphere ? senseLayer(stageBeat, stageScene) : "", ms: sense === "blind" ? 1400 : 900 }),
     /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-bars", "data-on": atmosphere && stageScene.bars === "on" ? "" : void 0, "aria-hidden": "true" }),
     /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "mode", value: atmosphere ? stageMode : "", ms: stageTr === "wake" ? 200 : stageTr === "haze" ? 2400 : 1200 }),
-    beat && !title && /* @__PURE__ */ import_react12.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking }),
+    beat && !title && /* @__PURE__ */ import_react12.default.createElement(SceneCover, { key: beat.key, plan: hold.change, state: coverState }),
+    beat && !title && /* @__PURE__ */ import_react12.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking, changed: Boolean(hold.change) }),
     /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),
-    beat && !title && !skip && !cutting && beat.peak && ui0.eros !== false && /* @__PURE__ */ import_react12.default.createElement(ErosPeak, { key: beat.key, beat, cameraRef, volume: ui0.storySfx !== false ? erosVolume : 0 }),
+    beat && !title && !skip && !change && beat.peak && ui0.eros !== false && /* @__PURE__ */ import_react12.default.createElement(ErosPeak, { key: beat.key, beat, cameraRef, volume: ui0.storySfx !== false ? erosVolume : 0 }),
     beat && !title && beat.cutin && /* @__PURE__ */ import_react12.default.createElement(CutIn, { key: beat.key, beat, view }),
     beat && !title && beat.hit && /* @__PURE__ */ import_react12.default.createElement(HitImpact, { key: beat.key, beat, sound: sfxOn, fx: hit }),
     beat && !title && beat.moment && /* @__PURE__ */ import_react12.default.createElement(MomentLayer, { key: beat.key, beat, view, sound: sfxOn }),
@@ -9525,8 +9723,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     beat && !title && beat.phone && beat.phone.kind === "end" && /* @__PURE__ */ import_react12.default.createElement(PhoneEnd, { key: beat.key, beat, view, sound: sfxOn }),
     beat && !title && beat.phone && (beat.phone.kind === "notify" || beat.phone.kind === "voicemail") && /* @__PURE__ */ import_react12.default.createElement(PhoneBanner, { key: beat.key, beat, view, sound: sfxOn }),
     !panel && /* @__PURE__ */ import_react12.default.createElement(RestartNotice, { floating: true }),
-    beat && !title && /* @__PURE__ */ import_react12.default.createElement(TitleCard, { beat, delay: speed > 0 ? beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0 : 0 }),
-    beat && !title && beat.cut && speed > 0 && /* @__PURE__ */ import_react12.default.createElement(CutCard, { beat, out: !cutting }),
+    beat && !title && (!change || phase === "cast" || phase === "settle") && /* @__PURE__ */ import_react12.default.createElement(TitleCard, { beat, delay: speed > 0 ? beat.cut && !hold.change ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0 : 0 }),
+    beat && !title && beat.cut && speed > 0 && cutShown.current === beat.key && /* @__PURE__ */ import_react12.default.createElement(CutCard, { beat, out: !cutOn }),
     !title && beat && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react12.default.createElement("div", null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hud-place" }, hud.scene.location || `第 ${hud.turn} 轮`), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hud-meta" }, hud.mode && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-hud-mode" }, MODE_LABEL[hud.mode]), /* @__PURE__ */ import_react12.default.createElement("span", null, TIME_LABEL[hud.scene.time] || ""), hud.scene.weather && hud.scene.weather !== "clear" && /* @__PURE__ */ import_react12.default.createElement("span", null, WEATHER_LABEL[hud.scene.weather]), LIGHT_LABEL[hud.scene.light] && /* @__PURE__ */ import_react12.default.createElement("span", null, LIGHT_LABEL[hud.scene.light]), FX_LABEL[hud.scene.fx] && /* @__PURE__ */ import_react12.default.createElement("span", null, FX_LABEL[hud.scene.fx]), ROMANCE_LABEL[hud.scene.romance] && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-hud-romance" }, "♡ ", ROMANCE_LABEL[hud.scene.romance]), SENSE_LABEL[hud.scene.sense] && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-hud-sense" }, SENSE_LABEL[hud.scene.sense]), hud.scene.mood && /* @__PURE__ */ import_react12.default.createElement("span", null, "♪ ", MOOD_LABEL[hud.scene.mood])))),
     !title && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, directing && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), drawing > 0 && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), beat && beat.call && beat.call.state === "live" && /* @__PURE__ */ import_react12.default.createElement(CallChip, { key: beat.call.id, call: beat.call, sound: sfxOn }), track && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill" + (hushed ? " is-hushed" : ""), title: hushed ? `${track.name}（留白，一会儿回来）` : track.name }, "♪ ", track.name), viewError && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
     beat && !title && beat.card && /* @__PURE__ */ import_react12.default.createElement(SceneCard, { beat }),

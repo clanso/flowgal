@@ -2,7 +2,7 @@
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
 import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS } from './playback.js'
-import { Backdrop, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, CutIn, HitImpact, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
+import { Backdrop, SceneCover, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, CutIn, HitImpact, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, useCamera, useHits } from './Stage.jsx'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
@@ -12,6 +12,7 @@ import { ErosPeak, useErosPulse } from './Eros.jsx'
 import { EROS_SFX } from '../../../lib/eros.js'
 import { ONOMATOPOEIA } from '../../../lib/foley.js'
 import { loadSkinFonts, loadGlyphs } from './skins.js'
+import { preloadImage, whenImageReady } from './preload.js'
 import { castVoices, lineVoice } from '../../../lib/sounds.js'
 import { ROMANCE_LABEL, SENSE_LABEL } from '../../../lib/vocab.js'
 
@@ -33,6 +34,11 @@ function senseLayer(beat, scene) {
   const who = beat && (beat.cast || []).find(c => c.name === beat.speaker)
   return who && ['left', 'farleft'].includes(who.pos) ? 'ear-left' : 'ear-right'
 }
+
+/** 换场时新背景还没解码好，最多多等这么久（盖满 / 清完场停在那里），再不好就照常揭开。 */
+const BG_WAIT_MS = 1500
+/** 提前把后面几处换场要用的背景下载、解码好。 */
+const BG_AHEAD = 60
 
 /** 提前下载后面几拍要用的字形分片。 */
 const GLYPH_AHEAD = 12
@@ -150,22 +156,52 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const shownRef = React.useRef({ key: '', beat: null, was: null, cg: '', place: '', mode: '', hold: { ms: 0, away: false } })
   if (beat && shownRef.current.key !== beat.key) {
     const was = shownRef.current
-    shownRef.current = { key: beat.key, beat, was: was.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was, eros: ui0.eros !== false }) }
+    shownRef.current = { key: beat.key, beat, was: was.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was, eros: ui0.eros !== false, opening: !was.key }) }
   } else if (shownRef.current.cg !== cgOn) shownRef.current = { ...shownRef.current, cg: cgOn }
   const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false }
   // 短闪回的演法（设置）：只有「压暗画面」进出时起雾、等画面变过去；另外两种画面不动，直接出字
   const recallStyle = ui0.recall || 'text'
   const recallTone = ui0.recallTone && ui0.recallTone !== 'auto' ? ui0.recallTone : '' // 设置里固定了一种基调
-  const edgeMs = !beat || title ? 0 : beat.cut ? CUT_MS : beat.transition === 'haze' ? HAZE_MS : recallStyle === 'ghost' ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0
+  const edgeMs = !beat || title ? 0 : beat.cut && !hold.change ? CUT_MS : beat.transition === 'haze' ? HAZE_MS : recallStyle === 'ghost' ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0
   const pauseMs = speed > 0 ? Math.max(edgeMs, hold.ms) : 0
   const [pauseSeen, setPauseSeen] = React.useState('')
   const pausing = pauseMs > 0 && pauseSeen !== beat.key
-  const cutting = pausing && Boolean(beat.cut)
+  // 换场（playback.js 的 changePlan）：清场 → 盖上 → 盖满时换成新画面 → 揭开 → 人上来、出地点标题 → 出字，一段一段按时间线走；
+  // 换画面之前先等新背景解码好（最多多等一会儿），点一下直接跳到换好的样子，快进时不演
+  const change = pausing && hold.change ? hold.change : null
+  const [changeAt, setChangeAt] = React.useState({ key: '', phase: '' })
   React.useEffect(() => {
-    if (!pausing) return undefined
+    if (!change) return undefined
+    const key = beat.key
+    const bg = backgroundFor(beat.scene, view).src
+    let live = true, timer = 0, i = 0
+    const t0 = performance.now()
+    const next = () => {
+      if (!live) return
+      if (i >= change.steps.length) { timer = setTimeout(() => { if (live) setPauseSeen(key) }, Math.max(0, pauseMs - (performance.now() - t0))); return }
+      const [phase, at] = change.steps[i]
+      const end = i + 1 < change.steps.length ? change.steps[i + 1][1] : change.total
+      i += 1
+      const run = () => { if (!live) return; setChangeAt({ key, phase }); timer = setTimeout(next, end - at) }
+      if (phase === 'down') whenImageReady(bg, BG_WAIT_MS).then(run) // 揭开之前新背景得能画出来
+      else run()
+    }
+    preloadImage(bg)
+    next()
+    return () => { live = false; clearTimeout(timer) }
+  }, [change, beat && beat.key])
+  const phase = !change ? '' : changeAt.key === beat.key ? changeAt.phase : change.steps[0][0]
+  const swapped = !change || (change.steps.find(([name]) => name === phase) || [, 0])[1] >= change.swap
+  const coverState = !change ? 'off' : phase === 'clear' ? 'idle' : phase === 'up' ? 'up' : phase === 'hold' ? 'full' : phase === 'down' ? 'down' : 'off'
+  const clearing = Boolean(change && change.clear && ['clear', 'up', 'hold', 'down'].includes(phase))
+  React.useEffect(() => {
+    if (!pausing || hold.change) return undefined // 换场的那一拍由上面的时间线收尾
     const t = setTimeout(() => setPauseSeen(beat.key), pauseMs)
     return () => clearTimeout(t)
   }, [pausing, beat && beat.key])
+  const cutOn = Boolean(change && change.cut && phase === 'hold')
+  const cutShown = React.useRef('')
+  if (cutOn) cutShown.current = beat.key
   const holdText = (Boolean(beat) && glyphKey !== beat.key) || pausing
   // 从回忆里醒过来：回忆褪白的这段时间舞台还演着回忆的最后一拍、配乐停下，白到最浓时（WAKE_SWAP_MS）才换成现在；点一下直接换
   const [wokeKey, setWokeKey] = React.useState('')
@@ -223,20 +259,38 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if (index < 0) return
     loadSkinFonts(ui0.skin, ui0.fontBase).then(() => loadGlyphs(rootRef.current, glyphsOf(beats.slice(index + 1, index + 1 + GLYPH_AHEAD))))
   }, [index, beats, ui0.skin, ui0.fontBase])
+  // 后面几处换场要用的背景：提前下载、解码好，换场揭开时不用等
+  React.useEffect(() => {
+    if (index < 0 || !view) return
+    const seen = new Set()
+    for (const b of beats.slice(index, index + BG_AHEAD)) {
+      const src = backgroundFor(b.scene, view).src
+      if (!src || seen.has(src)) continue
+      seen.add(src)
+      preloadImage(src)
+      if (seen.size >= 4) break
+    }
+  }, [index, beats, view])
   // 配乐：放导演选的曲子；导演还没整理到的轮次按曲目描述粗配，换场才换歌。
   const scene = beat ? beat.scene : (beats[beats.length - 1] || {}).scene
   const tracks = useMusic()
   // 定好从哪一拍开始演之前不放：不然先按最后一拍放一首，定位后又换一首，一进剧场声音就卡一下。
-  const musicBeat = waking ? null : beat
+  // 换场换了曲子：旧的在清场、暗下去时淡出，盖满时静着，新画面揭开时新的再起（停、黑、起）；同一首接着放，不重来
+  const was = shownRef.current.was
+  const restartMusic = Boolean(change && was && ui0.bgm) && (pickTrack(beat, tracks, assetUrl) || {}).id !== (pickTrack(was, tracks, assetUrl) || {}).id
+  const silent = restartMusic && ['clear', 'up', 'hold'].includes(phase)
+  const musicBeat = waking || silent ? null : beat
   const track = React.useMemo(() => (ui0.bgm ? pickTrack(musicBeat, tracks, assetUrl) : null), [ui0.bgm, tracks, musicBeat && musicBeat.bgm, scene && scene.mood, scene && scene.location])
-  React.useEffect(() => { if (!closingRef.current && (track || !ui0.bgm || waking)) playBgm(track, ui0.bgmVolume) }, [track && track.id, ui0.bgm, ui0.bgmVolume])
+  React.useEffect(() => { if (!closingRef.current && (track || !ui0.bgm || waking || silent)) playBgm(track, ui0.bgmVolume) }, [track && track.id, ui0.bgm, ui0.bgmVolume])
+  // 环境音、亲密场面的节奏底跟着画面走：换场时盖满、换了画面才换
   // 配乐留白：屏住呼吸的那几句配乐停在原处，过了几句从停下的地方淡回来
   const hushed = Boolean(musicBeat && musicBeat.hush)
   React.useEffect(() => { if (!closingRef.current) hushBgm(hushed) }, [hushed])
   // 环境音和剧情音效：导演从音效库里配的（音效库是空的就什么都不响）。剧情音效读到那句时响一次，快进时不响。
   const soundlib = useSoundlib()
   const soundById = React.useMemo(() => new Map((soundlib || []).map(s => [s.id, s])), [soundlib])
-  const ambId = ui0.amb !== false && musicBeat && musicBeat.amb !== 'none' ? musicBeat.amb : ''
+  const soundBeat = waking ? null : change && !swapped && was ? was : beat
+  const ambId = ui0.amb !== false && soundBeat && soundBeat.amb !== 'none' ? soundBeat.amb : ''
   const ambSound = (ambId && soundById.get(ambId)) || null
   React.useEffect(() => {
     if (closingRef.current) return
@@ -256,7 +310,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   // 高潮那一下（beat.peak）见下面的 ErosPeak。开关是设置里的「亲密音效」，音量跟剧情音效走；快进、标题画面时停。
   const erosOn = ui0.eros !== false && ui0.storySfx !== false && !skip && !title
   const erosVolume = (ui0.storySfxVolume ?? 0.8) / 0.8
-  const bedScene = erosOn && musicBeat ? musicBeat.scene : null
+  const bedScene = erosOn && soundBeat ? soundBeat.scene : null
   const bedPace = bedScene && bedScene.eros !== 'none' ? bedScene.eros || '' : ''
   const bedTentacle = bedScene && bedScene.tentacle !== 'none' ? bedScene.tentacle || '' : ''
   React.useEffect(() => {
@@ -353,10 +407,13 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     ],
   }
 
-  const stageBeat = waking ? shownRef.current.was : beat || (beats.length ? beats[beats.length - 1] : null)
-  const hud = waking ? stageBeat : beat // 左上角的地点跟着画面走：回忆还没褪完时还是回忆里的地方
+  // 换场还没换到新画面（清场、盖上去的时候）：舞台还演着上一拍
+  const before = Boolean(change && !swapped && was)
+  const stageBeat = waking || before ? was : beat || (beats.length ? beats[beats.length - 1] : null)
+  const hud = waking || before ? stageBeat : beat // 左上角的地点跟着画面走：回忆还没褪完、换场还没换过去时还是原来的地方
   // 醒过来那一下换画面时已经白透了：回忆的背景、人和滤镜直接撤掉，不在白雾散开时又露出来（theater.css 的 data-tr="wake"）
-  const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? 'wake' : stageBeat && stageBeat.transition
+  // 换场时盖满才换背景，盖着看不见，直接换；旋涡揭开时新画面跟着旋进来；没有盖的（溶解、慢慢变化、横扫……）新背景在旧背景上演它的转场
+  const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? 'wake' : change && change.cover && change.cover !== 'swirl' ? 'none' : stageBeat && stageBeat.transition
   const stageScene = stageBeat ? stageBeat.scene : { location: '', time: 'night', weather: 'stars', mood: 'calm', light: 'normal', fx: 'none' }
   const stageMode = (stageBeat && stageBeat.mode) || ''
   // 亲密氛围、感官主导的一段（lib/vocab.js 的 ROMANCE、SENSES）
@@ -384,7 +441,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
   return (
     <div ref={rootRef} className={`fg-theater${closing ? ' is-closing' : ''}${hidden ? ' fg-ui-hidden' : ''}`} data-skin={ui0.skin} style={{ '--stage-ar': stageRatio(cfg) }} role="dialog" aria-label="FlowGal 剧场">
-      <div className="fg-stage" ref={stageRef} onClick={() => { if (hidden) { setHidden(false); return } if (!title && !panel && !choosing) advance() }}
+      <div className="fg-stage" ref={stageRef} data-change={phase || undefined} data-clearing={clearing ? '' : undefined} onClick={() => { if (hidden) { setHidden(false); return } if (!title && !panel && !choosing) advance() }}
         onWheel={e => { if (!title && !panel && e.deltaY < -30) setPanel('log') }}>
         <div className="fg-camera" ref={cameraRef} data-cam={cam.kind || undefined} style={cam.style || undefined}>
           {/* 画面效果（船上摇晃、车里颠簸、心跳……）和特殊段落（梦里飘、幻觉里扭曲）各动一层，叠在一起不互相顶掉 */}
@@ -416,9 +473,10 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {/* 电影黑边：严肃的一段一直挂着，也在镜头外面 */}
         <div className="fg-bars" data-on={atmosphere && stageScene.bars === 'on' ? '' : undefined} aria-hidden="true" />
         <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} />
-        {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} />}
+        {beat && !title && <SceneCover key={beat.key} plan={hold.change} state={coverState} />}
+        {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} changed={Boolean(hold.change)} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
-        {beat && !title && !skip && !cutting && beat.peak && ui0.eros !== false && <ErosPeak key={beat.key} beat={beat} cameraRef={cameraRef} volume={ui0.storySfx !== false ? erosVolume : 0} />}
+        {beat && !title && !skip && !change && beat.peak && ui0.eros !== false && <ErosPeak key={beat.key} beat={beat} cameraRef={cameraRef} volume={ui0.storySfx !== false ? erosVolume : 0} />}
         {beat && !title && beat.cutin && <CutIn key={beat.key} beat={beat} view={view} />}
         {beat && !title && beat.hit && <HitImpact key={beat.key} beat={beat} sound={sfxOn} fx={hit} />}
         {beat && !title && beat.moment && <MomentLayer key={beat.key} beat={beat} view={view} sound={sfxOn} />}
@@ -428,8 +486,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {beat && !title && beat.phone && beat.phone.kind === 'end' && <PhoneEnd key={beat.key} beat={beat} view={view} sound={sfxOn} />}
         {beat && !title && beat.phone && (beat.phone.kind === 'notify' || beat.phone.kind === 'voicemail') && <PhoneBanner key={beat.key} beat={beat} view={view} sound={sfxOn} />}
         {!panel && <RestartNotice floating />}
-        {beat && !title && <TitleCard beat={beat} delay={speed > 0 ? (beat.cut ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0) : 0} />}
-        {beat && !title && beat.cut && speed > 0 && <CutCard beat={beat} out={!cutting} />}
+        {/* 地点标题：换场时等新画面亮起来、人上来时再出 */}
+        {beat && !title && (!change || phase === 'cast' || phase === 'settle') && <TitleCard beat={beat} delay={speed > 0 ? (beat.cut && !hold.change ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0) : 0} />}
+        {beat && !title && beat.cut && speed > 0 && cutShown.current === beat.key && <CutCard beat={beat} out={!cutOn} />}
 
         {!title && beat && (
           <div className="fg-hud">
