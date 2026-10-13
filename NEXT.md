@@ -195,6 +195,10 @@ updated: 2026-10-13
 - 去掉眼睛的特写（2026-10-13，驾驶员：中间出现一条的人物特写也去掉）：
   - cutin 整个去掉：剧场的 CutIn 和样式、导演提示词里的 cutin 规则和字段、director 的规范化和每轮上限（MAX_CUTINS_PER_TURN）、lib/stature.js 的 bandCrop、DirectorLog 的「特写」、tests/cutin.test.mjs。老存档里写着 cutin 的句子照常演，只是不切。决定性的一句还有镜头 closeup / zoom / slowpush。
   - 自动化：npm test 258/258（去掉 tests/cutin.test.mjs 3 条）；npm run build 通过；预览第 3 轮苏晴「不行！」那句不再切，页面没有报错。
+- 转身不再翻面（2026-10-13，驾驶员：不喜欢纸片人反转）：
+  - 背过身原来是 .fg-actor-turn 的 scaleX 从 1 过 0 到 -1（像纸片一样翻过去），甩头离开也先翻一下。现在不翻面：背过身时身子往外侧一晃、肩膀一沉，一边糊一下一边暗成一道微微糊开的背影（留一圈淡淡的轮廓光）；转回来往里一晃、从影子里亮回来，回眸多一下抬头（Stage.jsx 的 TURN_FRAMES）；甩头离开是一下暗成背影再快步走掉。--flip 和 glance 去掉了。
+  - 自动化：npm test 258/258；npm run build 通过。预览：临时让苏晴在「不过我可不是跟踪你们哦」背过身（转到一半、转过去以后两张截图）。
+  - 没验：DSH 真机上真立绘的背影暗度够不够。
 
 ## 开放风险
 

@@ -477,13 +477,13 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-actor.is-leaving { animation: fg-actor-out .45s ease both; }
 /* 没在说话、但对这句有反应的人：比旁边站着的人亮一点（说话的人更亮） */
 .fg-actor.is-reacting { filter: brightness(.9) saturate(.92); }
-/* 走位：上前一步的站到前面；背过身：转过去（scaleX 过 0 像转身）、暗成背影；探头：站在舞台边上，身子往里探；
+/* 走位：上前一步的站到前面；背过身：不翻面，身子往外一侧一晃（Stage.jsx 的 TURN_FRAMES），一边糊一下一边暗成一道背影；探头：站在舞台边上，身子往里探；
    躲到谁身后：缩在他背后，从他肩旁往外探出半个身子（站位、图层在 lib/blocking.js） */
 .fg-actor[data-depth="-1"] { filter: brightness(.62) saturate(.72); }
 .fg-actor-turn, .fg-actor-react { position: absolute; inset: 0; transform-origin: 50% 100%; }
-.fg-actor-turn { transform: translateY(var(--drop, 0%)) rotate(var(--lean, 0deg)) scaleX(var(--flip, 1)); transition: transform .5s cubic-bezier(.45, .05, .3, 1), filter .5s ease; }
-/* 没有背面的立绘：转过去以后压成一道背影（几乎看不清脸），边上留一圈淡淡的轮廓光 */
-.fg-actor.is-away .fg-actor-turn { --flip: -1; filter: brightness(.16) saturate(.3) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .28)); }
+.fg-actor-turn { transform: translateY(var(--drop, 0%)) rotate(var(--lean, 0deg)); transition: transform .5s cubic-bezier(.45, .05, .3, 1), filter .7s ease; }
+/* 没有背面的立绘：转过去以后压成一道微微糊开的背影（看不清脸），边上留一圈淡淡的轮廓光；转回来时从影子里亮回来 */
+.fg-actor.is-away .fg-actor-turn { filter: brightness(.12) saturate(.25) blur(.12cqw) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .28)); }
 .fg-actor.is-peek[data-peek="left"] .fg-actor-turn { --lean: 5deg; }
 .fg-actor.is-peek[data-peek="right"] .fg-actor-turn { --lean: -5deg; }
 .fg-actor.is-hiding:not(.is-down) .fg-actor-turn { --drop: 2%; }
@@ -516,9 +516,9 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-actor[data-enter="run"] { animation: fg-actor-run-in .5s cubic-bezier(.2, .8, .3, 1.15) both; }
 .fg-actor[data-enter="slow"] { animation: fg-actor-in 1.6s cubic-bezier(.3, .4, .3, 1) both; }
 .fg-actor[data-enter="peek"] { animation: fg-actor-peek-in .9s cubic-bezier(.2, .7, .2, 1) both; }
-/* 走的样子：甩头离开（一扭身、快步走掉）、跑开、慢慢走远（缩小、淡掉）；时长对上 Stage.jsx 的 EXIT_MS */
+/* 走的样子：甩头离开（一下暗成背影、快步走掉，不翻面）、跑开、慢慢走远（缩小、淡掉）；时长对上 Stage.jsx 的 EXIT_MS */
 .fg-actor.is-leaving[data-exit="storm"] { animation: fg-actor-storm .65s cubic-bezier(.5, 0, .8, .4) both; }
-.fg-actor.is-leaving[data-exit="storm"] .fg-actor-turn { --flip: -1; transition-duration: .2s; }
+.fg-actor.is-leaving[data-exit="storm"] .fg-actor-turn { filter: brightness(.22) saturate(.35) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .2)); transition-duration: .2s; }
 .fg-actor.is-leaving[data-exit="run"] { animation: fg-actor-run-out .42s cubic-bezier(.5, 0, .9, .5) both; }
 .fg-actor.is-leaving[data-exit="slow"] { animation: fg-actor-slow-out 1.3s ease-in both; }
 /* --edge：离这个人近的那一边（站在中间的按他在左半边还是右半边），跑进跑出、探头都从那边来、往那边去 */
@@ -5798,10 +5798,14 @@ var REACT_FRAMES = {
   shake: [[{ transform: "none" }, { transform: "translateX(-.8%)", offset: 0.15 }, { transform: "translateX(.8%)", offset: 0.35 }, { transform: "translateX(-.5%)", offset: 0.55 }, { transform: "translateX(.3%)", offset: 0.75 }, { transform: "none" }], 460],
   nod: [[{ transform: "none" }, { transform: "translateY(.9%)", offset: 0.35 }, { transform: "none", offset: 0.7 }, { transform: "none" }], 560],
   tilt: [[{ transform: "none" }, { transform: "rotate(2.2deg)", offset: 0.3 }, { transform: "rotate(1.6deg)", offset: 0.7 }, { transform: "none" }], 1e3],
-  step: [[{ transform: "none" }, { transform: "translateY(-.9%)", offset: 0.25 }, { transform: "none", offset: 0.5 }, { transform: "translateY(-.7%)", offset: 0.75 }, { transform: "none" }], 560],
-  glance: [[{ transform: "none" }, { transform: "translateY(-1%) rotate(-1.2deg)", offset: 0.4 }, { transform: "none" }], 520]
+  step: [[{ transform: "none" }, { transform: "translateY(-.9%)", offset: 0.25 }, { transform: "none", offset: 0.5 }, { transform: "translateY(-.7%)", offset: 0.75 }, { transform: "none" }], 560]
 };
 var STEP_MOVES = /* @__PURE__ */ new Set(["approach", "apart", "forward", "back", "hide"]);
+var TURN_FRAMES = {
+  turn: (dir) => [[{ transform: "none", filter: "none" }, { transform: `translateX(${dir * 1.8}%) rotate(${dir * 1.2}deg) scale(.985)`, filter: "blur(2.4px)", offset: 0.4 }, { transform: `translateX(${dir * 0.6}%) translateY(.6%) scale(.99)`, filter: "blur(.6px)", offset: 0.72 }, { transform: "none", filter: "none" }], 820],
+  face: (dir) => [[{ transform: "none", filter: "none" }, { transform: `translateX(${-dir * 1.4}%) rotate(${-dir * 0.9}deg)`, filter: "blur(2px)", offset: 0.38 }, { transform: "none", filter: "none" }], 700],
+  lookback: (dir) => [[{ transform: "none", filter: "none" }, { transform: `translateX(${-dir * 1.2}%) translateY(-.9%) rotate(${-dir * 1.4}deg)`, filter: "blur(1.8px)", offset: 0.36 }, { transform: "translateY(-.3%)", filter: "none", offset: 0.7 }, { transform: "none", filter: "none" }], 760]
+};
 var SYM_MOTION = { surprise: "jolt", bulb: "jolt", sweat: "droop", gloom: "droop", sigh: "droop", heartbreak: "droop", zzz: "droop", anger: "shake", fire: "shake", heart: "bounce", note: "bounce", sparkle: "bounce", bloom: "bounce", blush: "shrink", dizzy: "tilt" };
 var HIT_FRAMES = {
   hit: [[{ transform: "none", filter: "none" }, { transform: "translateX(-2.4%) rotate(-1.6deg)", filter: "brightness(2.2)", offset: 0.12 }, { transform: "translateX(1.4%) rotate(.6deg)", filter: "none", offset: 0.4 }, { transform: "none" }], 420],
@@ -5833,8 +5837,9 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     if (!el || typeof el.animate !== "function" || !reaction && !move && !symKind) return;
     if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const base = reaction ? ((emotions || []).find((e) => e.id === reaction.emo) || {}).base || reaction.emo : "";
-    const kind = symKind || (reaction && (reaction.emo || !move) ? reactKind(base) : move.act === "lookback" || move.act === "turn" || move.act === "face" ? "glance" : STEP_MOVES.has(move.act) ? "step" : "");
-    const frames = REACT_FRAMES[kind];
+    const turning = move && TURN_FRAMES[move.act] ? TURN_FRAMES[move.act]((entry.x ?? 50) < 50 ? -1 : 1) : null;
+    const kind = symKind || (reaction && (reaction.emo || !move) ? reactKind(base) : STEP_MOVES.has(move.act) ? "step" : "");
+    const frames = turning || REACT_FRAMES[kind];
     if (frames) el.animate(frames[0], { duration: frames[1], easing: "cubic-bezier(.3, .7, .3, 1)" });
   }, [beat.key]);
   const struck = !leaving && beat.hit && beat.hit.to === entry.name ? beat.hit.effect : "";

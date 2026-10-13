@@ -227,7 +227,7 @@ function faceBoxOf(record, size) {
 }
 
 /**
- * 没在说话的人的反应：身子跟着一动（lib/blocking.js 的 reactKind 按情绪挑）。走位时走两步的起伏、回眸时回头那一下。
+ * 没在说话的人的反应：身子跟着一动（lib/blocking.js 的 reactKind 按情绪挑）。走位时走两步的起伏；转身、回眸见下面的 TURN_FRAMES。
  * 用 Web Animations 动 .fg-actor-react 这一层，不碰呼吸、说话时的轻跳和登场退场。
  */
 const REACT_FRAMES = {
@@ -239,9 +239,17 @@ const REACT_FRAMES = {
   nod: [[{ transform: 'none' }, { transform: 'translateY(.9%)', offset: 0.35 }, { transform: 'none', offset: 0.7 }, { transform: 'none' }], 560],
   tilt: [[{ transform: 'none' }, { transform: 'rotate(2.2deg)', offset: 0.3 }, { transform: 'rotate(1.6deg)', offset: 0.7 }, { transform: 'none' }], 1000],
   step: [[{ transform: 'none' }, { transform: 'translateY(-.9%)', offset: 0.25 }, { transform: 'none', offset: 0.5 }, { transform: 'translateY(-.7%)', offset: 0.75 }, { transform: 'none' }], 560],
-  glance: [[{ transform: 'none' }, { transform: 'translateY(-1%) rotate(-1.2deg)', offset: 0.4 }, { transform: 'none' }], 520],
 }
 const STEP_MOVES = new Set(['approach', 'apart', 'forward', 'back', 'hide'])
+/**
+ * 背过身 / 转回来、回眸：立绘没有背面，不翻面（像纸片一样翻过去很假），身子往外侧一晃、肩膀一沉，一边糊一下一边暗成背影（theater.css 的 .is-away）；
+ * 转回来往里一晃、从影子里亮回来，回眸多一下抬头。dir 是往哪边转（站在左半边往左）。
+ */
+const TURN_FRAMES = {
+  turn: dir => [[{ transform: 'none', filter: 'none' }, { transform: `translateX(${dir * 1.8}%) rotate(${dir * 1.2}deg) scale(.985)`, filter: 'blur(2.4px)', offset: 0.4 }, { transform: `translateX(${dir * 0.6}%) translateY(.6%) scale(.99)`, filter: 'blur(.6px)', offset: 0.72 }, { transform: 'none', filter: 'none' }], 820],
+  face: dir => [[{ transform: 'none', filter: 'none' }, { transform: `translateX(${-dir * 1.4}%) rotate(${-dir * 0.9}deg)`, filter: 'blur(2px)', offset: 0.38 }, { transform: 'none', filter: 'none' }], 700],
+  lookback: dir => [[{ transform: 'none', filter: 'none' }, { transform: `translateX(${-dir * 1.2}%) translateY(-.9%) rotate(${-dir * 1.4}deg)`, filter: 'blur(1.8px)', offset: 0.36 }, { transform: 'translateY(-.3%)', filter: 'none', offset: 0.7 }, { transform: 'none', filter: 'none' }], 760],
+}
 /** 导演写的情绪符号（sym）不画出来，只让这个人身子跟着一动：一惊、垂下去、气得一抖、高兴得一颤、害羞缩肩、晕得一歪。 */
 const SYM_MOTION = { surprise: 'jolt', bulb: 'jolt', sweat: 'droop', gloom: 'droop', sigh: 'droop', heartbreak: 'droop', zzz: 'droop', anger: 'shake', fire: 'shake', heart: 'bounce', note: 'bounce', sparkle: 'bounce', bloom: 'bounce', blush: 'shrink', dizzy: 'tilt' }
 /**
@@ -288,8 +296,9 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     if (!el || typeof el.animate !== 'function' || (!reaction && !move && !symKind)) return
     if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const base = reaction ? (((emotions || []).find(e => e.id === reaction.emo) || {}).base || reaction.emo) : ''
-    const kind = symKind || (reaction && (reaction.emo || !move) ? reactKind(base) : move.act === 'lookback' || move.act === 'turn' || move.act === 'face' ? 'glance' : STEP_MOVES.has(move.act) ? 'step' : '')
-    const frames = REACT_FRAMES[kind]
+    const turning = move && TURN_FRAMES[move.act] ? TURN_FRAMES[move.act]((entry.x ?? 50) < 50 ? -1 : 1) : null
+    const kind = symKind || (reaction && (reaction.emo || !move) ? reactKind(base) : STEP_MOVES.has(move.act) ? 'step' : '')
+    const frames = turning || REACT_FRAMES[kind]
     if (frames) el.animate(frames[0], { duration: frames[1], easing: 'cubic-bezier(.3, .7, .3, 1)' })
   }, [beat.key])
   // 战斗里一次出手：出手的人往对面冲一下，被打的人在打中那一刻一动
