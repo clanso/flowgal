@@ -127,12 +127,13 @@
   filter: brightness(.7) saturate(.78);
   animation: fg-actor-in .6s cubic-bezier(.2, .7, .2, 1) both;
 }
+/* 谁挡在谁前面由 Stage.jsx 按 stackLayers 写进 z-index（说话的人在最前，说完也留在前面）；这里的 z-index 只给分屏、闪回里的人用 */
 .fg-actor.is-speaking { filter: brightness(1.04) saturate(1.05) drop-shadow(0 0 1.4cqw rgba(255, 255, 255, .18)); z-index: 2; }
 .fg-actor.is-leaving { animation: fg-actor-out .45s ease both; }
 /* 没在说话、但对这句有反应的人：比旁边站着的人亮一点（说话的人更亮） */
-.fg-actor.is-reacting { filter: brightness(.9) saturate(.92); z-index: 1; }
-/* 走位：上前一步的站到前面；背过身：转过去（scaleX 过 0 像转身）、暗成背影；探头：站在舞台边上，身子往里探 */
-.fg-actor[data-depth="1"] { z-index: 3; }
+.fg-actor.is-reacting { filter: brightness(.9) saturate(.92); }
+/* 走位：上前一步的站到前面；背过身：转过去（scaleX 过 0 像转身）、暗成背影；探头：站在舞台边上，身子往里探；
+   躲到谁身后：缩在他背后，从他肩旁往外探出半个身子（站位、图层在 lib/blocking.js） */
 .fg-actor[data-depth="-1"] { filter: brightness(.62) saturate(.72); }
 .fg-actor-turn, .fg-actor-react { position: absolute; inset: 0; transform-origin: 50% 100%; }
 .fg-actor-turn { transform: translateY(var(--drop, 0%)) rotate(var(--lean, 0deg)) scaleX(var(--flip, 1)); transition: transform .5s cubic-bezier(.45, .05, .3, 1), filter .5s ease; }
@@ -140,6 +141,9 @@
 .fg-actor.is-away .fg-actor-turn { --flip: -1; filter: brightness(.16) saturate(.3) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .28)); }
 .fg-actor.is-peek[data-peek="left"] .fg-actor-turn { --lean: 5deg; }
 .fg-actor.is-peek[data-peek="right"] .fg-actor-turn { --lean: -5deg; }
+.fg-actor.is-hiding:not(.is-down) .fg-actor-turn { --drop: 2%; }
+.fg-actor.is-hiding[data-hide="left"]:not(.is-down) .fg-actor-turn { --lean: -3deg; }
+.fg-actor.is-hiding[data-hide="right"]:not(.is-down) .fg-actor-turn { --lean: 3deg; }
 /* 被击倒：歪倒、往下沉、暗成一道影子（打中那一下之后才倒），上半身沉进一团黑雾里看不清脸；到他再开口、自己走位或被治疗时站起来、雾散掉。
    雾在 .fg-actor-turn 里，跟着人一起歪倒；不倒的时候 visibility: hidden 不画 */
 .fg-actor.is-down .fg-actor-turn { --lean: -11deg; --drop: 14%; filter: brightness(.4) saturate(.35) grayscale(.4); transition-delay: .5s; }
