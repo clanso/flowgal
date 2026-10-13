@@ -154,7 +154,6 @@ function ScriptView({ script, units }) {
               l.split && <Chip key="split" k="分屏">{l.split === 'off' ? '收起' : l.split.who.join('、') + (l.split.location ? ` @ ${l.split.location}` : '')}</Chip>,
               l.sym && <Chip key="sym" k="符号">{SYMBOL_LABEL[l.sym] || l.sym}</Chip>,
               l.cam && <Chip key="cam" k="镜头">{CAMERA_LABEL[l.cam] || l.cam}{l.camOn ? ` · ${l.camOn}` : ''}</Chip>,
-              l.cutin && <Chip key="cutin" k="特写">{l.cutin === true ? l.sp || '说话的人' : l.cutin}</Chip>,
               l.moment && <Chip key="moment" k="瞬间">{[MOMENT_LABEL[l.moment.kind] || l.moment.kind, l.moment.who, l.moment.text && `「${l.moment.text}」`, l.moment.place].filter(Boolean).join(' ')}</Chip>,
               l.phone && <Chip key="phone" k="手机">{[(l.phone.video ? '视频' : '') + (PHONE_LABEL[l.phone.kind] || l.phone.kind), l.phone.who, l.phone.result && CALL_END_LABEL[l.phone.result], l.phone.text && `「${l.phone.text}」`].filter(Boolean).join(' ')}</Chip>,
               l.hit && <Chip key="hit" k="出手">{[l.hit.from, l.hit.to && '→ ' + l.hit.to, l.hit.move && `「${l.hit.move}」`, HIT_EFFECT_LABEL[l.hit.effect] || l.hit.effect].filter(Boolean).join(' ')}</Chip>,

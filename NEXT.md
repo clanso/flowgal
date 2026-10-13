@@ -192,6 +192,9 @@ updated: 2026-10-13
   - 实现：playback.js 的 changePlan 给每处换场排时间线（清场 → 盖上 → 盖满时换成新地方 → 揭开 → 人上来、出地点标题 → 停 300 ms 出字），beatHold 用它的总长；Theater.jsx 按段切 .fg-stage 的 data-change / data-clearing，没换过去之前舞台、环境音、亲密节奏底还演上一拍，换曲子时「停、黑、起」，揭开前等新背景解码（preload.js，最多 1.5 s），后面几处换场的背景提前解码；Stage.jsx 的 SceneCover 是盖的那一层（黑、白、眼睛合上、撕裂、旋涡）。闭眼睁眼改成眼睛的形状；溶解时旧层不淡出；「减少动态效果」下换背景仍淡入淡出；过场字卡在盖满时出；剧场刚打开从黑里亮起来（开场就是章节字卡的照样停够）。没写转场时，换地方的同时时段变了默认黑场（lib/scenes.js、lib/director.js），提示词加了怎么挑转场。
   - 自动化：npm test 252/252（新增 tests/scene-change.test.mjs 8 条；story.test.mjs 两处改成新语义）；npm run build 通过。无头浏览器只有约 3 帧 / 秒，动画曲线另用定格截图逐帧看过。
   - 没验：DSH 真机上的流畅度和手感。
+- 去掉眼睛的特写（2026-10-13，驾驶员：中间出现一条的人物特写也去掉）：
+  - cutin 整个去掉：剧场的 CutIn 和样式、导演提示词里的 cutin 规则和字段、director 的规范化和每轮上限（MAX_CUTINS_PER_TURN）、lib/stature.js 的 bandCrop、DirectorLog 的「特写」、tests/cutin.test.mjs。老存档里写着 cutin 的句子照常演，只是不切。决定性的一句还有镜头 closeup / zoom / slowpush。
+  - 自动化：npm test 258/258（去掉 tests/cutin.test.mjs 3 条）；npm run build 通过；预览第 3 轮苏晴「不行！」那句不再切，页面没有报错。
 
 ## 开放风险
 

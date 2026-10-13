@@ -311,23 +311,6 @@
 @keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }
 @keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }
 @keyframes fg-blur { 0% { filter: blur(0); } 30% { filter: blur(6px); } 100% { filter: blur(0); } }
-/* ── 眼睛的特写（导演 cutin，Stage.jsx 的 CutIn）：画面压暗一点，中间缓缓拉开一道窄窄的宽银幕，里面是这个人此刻的眼睛（慢慢推近），
-   两边淡进黑里，上下各一道细细的说话人颜色的线；停 --hold 之后合上。不出声、不写字。在对话框下面、画面上面 ── */
-.fg-cutin { position: absolute; inset: 0; z-index: 19; pointer-events: none; background: rgba(4, 3, 8, .34); animation: fg-fade-in .5s ease both, fg-fade-out .55s ease var(--hold, 1.8s) forwards; }
-.fg-cutin-band { position: absolute; left: 0; right: 0; top: 28%; height: 19%; overflow: hidden; background: linear-gradient(180deg, #040307, color-mix(in oklab, var(--speaker, #9b7bff) 9%, #07060b) 50%, #040307);
-  box-shadow: 0 1.6cqw 4cqw rgba(0, 0, 0, .6), 0 -1.6cqw 4cqw rgba(0, 0, 0, .6);
-  animation: fg-cutin-open .7s cubic-bezier(.65, 0, .25, 1) both, fg-cutin-close .5s cubic-bezier(.6, 0, .4, 1) var(--hold, 1.8s) forwards; }
-.fg-cutin-band::before, .fg-cutin-band::after { content: ""; position: absolute; left: 0; right: 0; height: 1px; z-index: 1; opacity: .5;
-  background: linear-gradient(90deg, transparent 6%, color-mix(in oklab, var(--speaker, #9b7bff) 40%, #fff) 50%, transparent 94%); }
-.fg-cutin-band::before { top: 0; }
-.fg-cutin-band::after { bottom: 0; }
-.fg-cutin-shot { position: absolute; left: 18%; width: 64%; top: 0; bottom: 0; overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 24%, #000 76%, transparent); mask-image: linear-gradient(90deg, transparent, #000 24%, #000 76%, transparent); }
-.fg-cutin-lens { position: absolute; inset: 0; animation: fg-cutin-push calc(var(--hold, 1.8s) + .5s) cubic-bezier(.3, .1, .3, 1) .15s both; }
-.fg-cutin-lens img { position: absolute; max-width: none; height: auto; filter: contrast(1.06) saturate(.9); }
-@keyframes fg-cutin-open { from { clip-path: inset(50% 0 50% 0); } to { clip-path: inset(0); } }
-@keyframes fg-cutin-close { from { clip-path: inset(0); } to { clip-path: inset(50% 0 50% 0); } }
-@keyframes fg-cutin-push { 0% { opacity: 0; transform: scale(1.1); } 30% { opacity: 1; } 100% { opacity: 1; transform: scale(1); } }
 /* 小瞬间：拍照、触碰、干杯、卡片。都在对话框下面，演完淡出（--hold 之后）。 */
 .fg-moment { position: absolute; inset: 0; z-index: 18; pointer-events: none; animation: fg-fade-out .45s ease var(--hold, 2s) forwards; }
 .fg-touch-ring { position: absolute; left: 50%; top: 44%; width: 26cqw; height: 26cqw; border-radius: 50%; transform: translate(-50%, -50%) scale(.2); opacity: 0;
@@ -1388,7 +1371,6 @@
   .fg-cg.is-leaving { animation: fg-cg-fade-out .6s ease both !important; }
   .fg-cg::before { display: none; }
   .fg-camera[data-cam="whip"] { animation: none !important; }
-  .fg-cutin-band, .fg-cutin-lens { animation: none !important; } /* 特写不拉开、不推近，整块淡入淡出 */
   .fg-photo, .fg-cup, .fg-moment-card { animation: fg-fade-in .2s ease both !important; } /* 小瞬间：不飞、不弹，只淡入 */
   .fg-touch-ring, .fg-clink, .fg-fw-trail, .fg-fw-burst, .fg-steam i { animation: none !important; opacity: 0; }
   .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */
@@ -1397,8 +1379,6 @@
 }
 @container stage (max-aspect-ratio: 4/5) {
   .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }
-  .fg-cutin-band { top: 30%; height: 13%; }
-  .fg-cutin-shot { left: 4%; width: 92%; }
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
   .fg-dialog { left: 3%; right: 3%; height: 22%; }
   .fg-recall-face { width: 17cqw; }

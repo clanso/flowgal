@@ -6,7 +6,7 @@ import { Particles } from './particles.js'
 import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, HIT_IMPACT_MS, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
-import { heightOf, placeSprite, usualFace, faceCrop, bandCrop, FACE_RATIO } from '../../../lib/stature.js'
+import { heightOf, placeSprite, usualFace, faceCrop, FACE_RATIO } from '../../../lib/stature.js'
 import { aimCamera } from '../../../lib/camera.js'
 import { reactKind, stackLayers } from '../../../lib/blocking.js'
 import { MOMENT_FOLEY, PHONE_FOLEY } from '../../../lib/foley.js'
@@ -566,55 +566,6 @@ export function RecallFace({ beat, view, tone = '' }) {
   return (
     <div className="fg-recall-face" key={name} data-tone={tone || recall.tone || 'warm'} style={{ '--speaker': person.color || undefined }} aria-hidden="true">
       {crop && <img src={src} alt="" draggable="false" style={{ width: crop.width + '%', left: crop.left + '%', top: crop.top + '%' }} />}
-    </div>
-  )
-}
-
-/** 眼睛的特写拉开之后停多久（之后合上），整段演完多久。 */
-export const CUTIN_HOLD_MS = 1800
-const CUTIN_MS = CUTIN_HOLD_MS + 600
-
-/**
- * 眼睛的特写（导演 cutin）：画面压暗一点，中间缓缓拉开一道窄窄的宽银幕，里面是这个人这一刻表情的眼睛（按脸框裁，lib/stature.js 的 bandCrop），
- * 慢慢推近；停一下再合上。不出声、不写名字。还没画立绘的人只有那道暗下来的宽银幕。每一拍挂一次（key 是这一拍）。
- */
-export function CutIn({ beat, view }) {
-  const name = beat.cutin
-  const person = ((view && view.cast) || []).find(p => p.name === name) || null
-  const sprite = person ? spriteFor(person, beat.turn, (beat.emotions && beat.emotions[name]) || 'neutral', view && view.emotions, beat.then && beat.then[name], beat.ahead && beat.ahead[name]) : ''
-  const src = sprite ? assetUrl(sprite) : ''
-  const shotRef = React.useRef(null)
-  const [size, setSize] = React.useState(null)
-  const [aspect, setAspect] = React.useState(0)
-  const [gone, setGone] = React.useState(false)
-  React.useLayoutEffect(() => {
-    const el = shotRef.current
-    if (el && el.clientHeight) setAspect(el.clientWidth / el.clientHeight)
-  }, [])
-  React.useEffect(() => {
-    const t = setTimeout(() => setGone(true), CUTIN_MS)
-    return () => clearTimeout(t)
-  }, [])
-  React.useEffect(() => {
-    if (!src) return undefined
-    let live = true
-    const img = new Image()
-    img.onload = () => { if (live && img.naturalHeight) setSize([img.naturalWidth, img.naturalHeight]) }
-    img.src = src
-    return () => { live = false }
-  }, [src])
-  if (gone) return null
-  const record = person && src ? Object.values(person.sprites || {}).find(r => r && r.assetId === sprite) : null
-  const crop = size && aspect ? bandCrop(faceBoxOf(record, size), size, aspect) : null
-  return (
-    <div className="fg-cutin" style={{ '--speaker': (person && person.color) || undefined, '--hold': CUTIN_HOLD_MS + 'ms' }} aria-hidden="true">
-      <div className="fg-cutin-band">
-        <div className="fg-cutin-shot" ref={shotRef}>
-          <div className="fg-cutin-lens">
-            {crop && <img src={src} alt="" draggable="false" style={{ width: crop.width + '%', left: crop.left + '%', top: crop.top + '%' }} />}
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
