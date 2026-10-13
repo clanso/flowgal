@@ -1320,16 +1320,50 @@
 /* 动作与表情设计：一个动作一块，块里每个情绪一行（名字、归哪个动作、他的这种表情） */
 .fg-acting { display: grid; gap: .7cqw; }
 .fg-acting .fg-field { grid-template-columns: 9cqw 1fr; }
-.fg-acting-pose { display: grid; gap: .45cqw; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
-.fg-acting-head { display: flex; align-items: center; gap: .6cqw; }
-.fg-acting-emo { display: grid; grid-template-columns: 9cqw 11cqw 1fr 1fr 6cqw; gap: .5cqw; align-items: center; font-size: .95em; }
-.fg-acting-emo b { font-weight: 600; letter-spacing: .04em; }
-.fg-acting-emo b i { font-style: normal; font-size: .75em; margin-left: .4em; padding: .05em .45em; border-radius: 99px; background: var(--accent); color: #111; }
-.fg-pose-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .8cqw; width: 100%; }
-.fg-pose-col { display: flex; flex-direction: column; gap: .3cqw; padding: .6cqw; border-radius: .6cqw; background: rgba(255, 255, 255, .05); }
-.fg-pose-item { display: flex; align-items: center; justify-content: space-between; gap: .4cqw; font-size: .92em; }
-.fg-pose-item i { opacity: .7; font-style: normal; }
-.fg-pose-item select { max-width: 50%; }
+/* 「动作 × 情绪」的表（PoseMatrix.jsx）：上面一排动作卡片，下面一列一个动作、一行一个情绪；横着放不下时表自己左右滑，情绪名那一列钉在左边 */
+.fg-pm { display: grid; gap: .8cqw; min-width: 0; }
+.fg-pm .fg-input { padding: .45cqw .8cqw; font-size: 1cqw; }
+.fg-pm-poses { display: grid; grid-template-columns: repeat(auto-fill, minmax(21cqw, 1fr)); gap: .7cqw; }
+.fg-pm-pose { display: grid; gap: .4cqw; align-content: start; padding: .7cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
+.fg-pm-pose > .fg-row { flex-wrap: nowrap; gap: .5cqw; }
+.fg-pm-id { font-family: var(--font-latin); font-size: .85cqw; opacity: .55; min-width: 2.4cqw; }
+.fg-pm-label { flex: 1; font-weight: 600; letter-spacing: .04em; }
+.fg-pm-add { min-height: 8cqw; border-radius: .8cqw; border: 1px dashed var(--box-border); background: none; color: var(--ink-dim); font: inherit; font-size: 1.1cqw; letter-spacing: .1em; cursor: pointer; }
+.fg-pm-add:hover { border-color: var(--accent); color: var(--ink); }
+.fg-pm-scroll { max-width: 100%; max-height: 62cqh; overflow: auto; border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); }
+.fg-pm-table { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: 1cqw; }
+.fg-pm-table th, .fg-pm-table td { padding: .35cqw .6cqw; border-bottom: 1px solid rgba(255, 255, 255, .05); text-align: center; vertical-align: middle; }
+.fg-pm-table thead th { position: sticky; top: 0; z-index: 2; background: rgb(18, 15, 38); font-weight: 600; white-space: nowrap; }
+.fg-pm-table thead th.fg-pm-corner { left: 0; z-index: 3; text-align: left; color: var(--ink-dim); font-weight: 400; }
+.fg-pm-head { display: flex; align-items: center; justify-content: center; gap: .4cqw; }
+.fg-pm-head b { max-width: 9cqw; overflow: hidden; text-overflow: ellipsis; letter-spacing: .04em; }
+.fg-pm-emo { position: sticky; left: 0; z-index: 1; background: rgb(15, 12, 33); text-align: left !important; white-space: nowrap; }
+.fg-pm-emo > * + * { margin-left: .4cqw; }
+.fg-pm-name { padding: 0; font: inherit; font-weight: 600; letter-spacing: .04em; color: inherit; background: none; border: 0; cursor: pointer; }
+button.fg-pm-name:hover { color: var(--accent); }
+.fg-pm-emo small { font-size: .8cqw; opacity: .55; }
+.fg-pm-row.is-loose .fg-pm-name { opacity: .6; }
+.fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 10%, rgb(15, 12, 33)); }
+.fg-pm-cat td { position: sticky; left: 0; text-align: left !important; background: rgba(0, 0, 0, .25); }
+.fg-pm-cat button { display: inline-flex; align-items: baseline; gap: .8cqw; padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.fg-pm-cat b { font-family: var(--font-display); font-size: 1.15cqw; letter-spacing: .16em; color: var(--accent); }
+.fg-pm-cell { white-space: nowrap; }
+.fg-pm-cell > * { vertical-align: middle; }
+.fg-pm-cell.is-on { background: rgba(255, 255, 255, .03); }
+.fg-pm-cell.is-anchor { background: color-mix(in oklab, var(--accent) 14%, transparent); }
+.fg-pm-cell input { width: 1.2cqw; height: 1.2cqw; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.fg-pm-star { padding: 0 .2cqw; font-size: 1.15cqw; line-height: 1; color: var(--accent); background: none; border: 0; cursor: pointer; }
+.fg-pm-star[disabled] { cursor: default; opacity: 1; }
+.fg-pm-cell:not(.is-anchor) .fg-pm-star { opacity: .45; } .fg-pm-cell:not(.is-anchor) .fg-pm-star:hover:not([disabled]) { opacity: 1; }
+.fg-pm-thumb { display: inline-grid; place-items: center; width: 2.8cqw; height: 3.6cqw; margin-left: .3cqw; padding: 0; overflow: hidden; border-radius: .4cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink-dim); font-size: .9cqw; cursor: pointer; }
+.fg-pm-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
+.fg-pm-thumb:hover { border-color: var(--accent); }
+.fg-pm-thumb.is-busy { border-color: var(--accent2); animation: fg-pulse 1.4s ease-in-out infinite; }
+.fg-pm-thumb.is-failed { border-color: #ff6b6b; color: #ff9b9b; }
+.fg-pm-open td { text-align: left !important; background: color-mix(in oklab, var(--accent) 6%, transparent); }
+.fg-pm-face { position: sticky; left: .6cqw; display: grid; grid-template-columns: auto 1fr 1fr; gap: .6cqw; align-items: center; max-width: 70cqw; }
+.fg-pose-groups { display: grid; gap: .6cqw; min-width: 0; }
+.fg-field:has(.fg-pose-groups) { align-items: start; } .fg-field:has(.fg-pose-groups) > div { min-width: 0; }
 .fg-aa-box text { fill: currentColor; paint-order: stroke; stroke: rgba(0, 0, 0, .75); stroke-width: 3px; pointer-events: none; }
 .fg-aa-play > canvas, .fg-aa-play > img { position: absolute; left: 50%; top: 0; height: 100%; width: auto; transform: translateX(-50%); }
 .fg-aa-play.is-close { width: 34cqw; height: auto; aspect-ratio: 1; align-self: center; }
@@ -1556,8 +1590,16 @@
   .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }
   .fg-aa-grid { grid-template-columns: 1fr; } .fg-aa-list { max-height: 50cqw; }
   .fg-aa-vision { font-size: 2.6cqw; } .fg-aa-badge { font-size: 2.2cqw; } .fg-aa-vision progress { height: 1.6cqw; }
-  .fg-pose-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .fg-acting .fg-field, .fg-acting-emo { grid-template-columns: 1fr; } .fg-acting-head { flex-wrap: wrap; } .fg-acting-head > input:first-child { flex: 1 1 100%; }
+  .fg-acting .fg-field { grid-template-columns: 1fr; }
+  .fg-pm .fg-input { font-size: 3cqw; padding: 1cqw 1.6cqw; }
+  .fg-pm-poses { grid-template-columns: 1fr; gap: 1.6cqw; } .fg-pm-pose { padding: 1.8cqw; gap: 1cqw; border-radius: 2cqw; }
+  .fg-pm-id { font-size: 2.4cqw; min-width: 5cqw; } .fg-pm-add { min-height: 10cqw; font-size: 3cqw; border-radius: 2cqw; }
+  .fg-pm-scroll { max-height: 120cqw; border-radius: 2cqw; }
+  .fg-pm-table { font-size: 3cqw; } .fg-pm-table th, .fg-pm-table td { padding: 1cqw 1.4cqw; }
+  .fg-pm-head b { max-width: 22cqw; } .fg-pm-emo small { font-size: 2.4cqw; } .fg-pm-cat b { font-size: 3.2cqw; }
+  .fg-pm-cell input { width: 3.6cqw; height: 3.6cqw; } .fg-pm-star { font-size: 3.6cqw; padding: 0 .6cqw; }
+  .fg-pm-thumb { width: 7cqw; height: 9cqw; font-size: 2.6cqw; border-radius: 1cqw; }
+  .fg-pm-face { grid-template-columns: 1fr; max-width: 80cqw; }
   .fg-face-editor .fg-aa-frame { height: 80cqw; }
   .fg-aa-frame, .fg-aa-play { height: 90cqw; } .fg-aa-play.is-close { width: 90cqw; }
   .fg-aa-item img { width: 9cqw; height: 11cqw; } .fg-aa-item { grid-template-columns: auto 9cqw 1fr; }

@@ -7,6 +7,7 @@ import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, HIT_IMPACT_MS
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
 import { resolveEmotion, standIns } from '../../../lib/emotions.js'
+import { sheetOf, slotKeys } from '../../../lib/poses.js'
 import { heightOf, placeSprite, usualFace, faceCrop, FACE_RATIO } from '../../../lib/stature.js'
 import { aimCamera } from '../../../lib/camera.js'
 import { reactKind, stackLayers } from '../../../lib/blocking.js'
@@ -206,14 +207,18 @@ export function Silhouette({ name, color, appearance, gender }) {
  * （并进它的情绪以前画的、替身、它那一类的代表情绪、平静，见 standIns）。
  * 段落里导演写了这个人当时的样子（then）就按当时的找；还没画好时先显示剪影，不借现在那套。
  * 这一轮中途才变的样子（pending：后面才缠上发带、才换衣服）还没发生时，按变化之前的样子找。
+ * 分动作的人（lib/poses.js）：pose 是他此刻所在的动作（节拍里的 postures），先找这个动作上的这张脸，没画好再看主动作、别的动作上的。
+ * groups 是没有设计的人用的通用动作组（视图里的 poseGroups）。
  */
-function spriteFor(person, turn, emo, emotions, then = null, pending = null) {
+function spriteFor(person, turn, emo, emotions, then = null, pending = null, { pose = '', groups = [] } = {}) {
   if (!person || !person.timeline) return ''
   const lib = emotions || []
   const now = lookAt(person.timeline, turn)
   const over = then || (pending ? undoShifts(now, pending) : null)
   const look = over ? thenLook(now, over, person.timeline.outfits) : now
-  return pickSprite(person.sprites, look, resolveEmotion(emo, lib) || emo, standIns(emo, lib), { strict: Boolean(then) })
+  const sheet = sheetOf(person, groups || [])
+  const keys = sheet ? e => slotKeys(person.sprites, look, sheet, pose, e, lib) : null
+  return pickSprite(person.sprites, look, resolveEmotion(emo, lib) || emo, standIns(emo, lib), { strict: Boolean(then), keys })
 }
 
 /** 登场从靠近的那一侧滑进来，退场往同一侧淡出。 */
@@ -287,7 +292,7 @@ const SIZES = new Map()
 /** 剧场给台上所有人（主舞台、分屏、短闪回）的开关：aa 逆转式立绘的眨眼和口型（特效开关里关掉了就只显示原图）。 */
 export const StageFlags = React.createContext({ aa: true })
 
-function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
+function Actor({ entry, person, beat, emo, emotions, groups = [], leaving = false, talk = null }) {
   const flags = React.useContext(StageFlags)
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name)
   const reaction = !leaving && !speaking && beat.reacts ? beat.reacts.find(r => r.name === entry.name) : null
@@ -328,7 +333,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
     const t = setTimeout(() => { const [frames, ms] = TOUCH_FRAMES[touched]; el.animate(frames, { duration: ms, easing: 'cubic-bezier(.3, .7, .3, 1)' }) }, 150)
     return () => clearTimeout(t)
   }, [beat.key])
-  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name])
+  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name], { pose: beat.postures && beat.postures[entry.name], groups })
   const src = sprite ? assetUrl(sprite) : ''
   const color = (person && person.color) || '#9b7bff'
   // 显示中的那张（cur）和刚换下、正在淡出的那张（prev），都带着图的原始宽高（按脸框缩放要用）。
@@ -451,10 +456,10 @@ export function Cast({ beat, view, talk, max = 8, dof = true }) {
   return (
     <div className="fg-cast" data-split={split ? 'on' : undefined} data-veil={veiled ? '' : undefined} data-talk={talking ? '' : undefined}>
       {cast.map(entry => (
-        <Actor key={entry.id} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={talk} />
+        <Actor key={entry.id} entry={entry} person={people.get(entry.name)} beat={beat} emo={beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} groups={view && view.poseGroups} talk={talk} />
       ))}
       {leaving.map(entry => (
-        <Actor key={entry.id} entry={entry} person={people.get(entry.name)} beat={entry.seen} emo={entry.seen.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} leaving />
+        <Actor key={entry.id} entry={entry} person={people.get(entry.name)} beat={entry.seen} emo={entry.seen.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} groups={view && view.poseGroups} leaving />
       ))}
     </div>
   )
@@ -502,7 +507,7 @@ export function SplitPanel({ beat, view, talk }) {
         <div className="fg-split-bg" style={src ? { backgroundImage: `url("${src}")` } : null}>{!src && <Sky scene={{ time: beat.scene.time, location: location || who[0] }} />}</div>
         <div className="fg-split-cast">
           {who.map((name, i) => (
-            <Actor key={name} entry={{ name, pos: slots[i] || 'center' }} person={people.get(name)} beat={beat} emo={beat.emotions[name] || 'neutral'} emotions={view && view.emotions} talk={talk} />
+            <Actor key={name} entry={{ name, pos: slots[i] || 'center' }} person={people.get(name)} beat={beat} emo={beat.emotions[name] || 'neutral'} emotions={view && view.emotions} groups={view && view.poseGroups} talk={talk} />
           ))}
         </div>
         {location && <div className="fg-split-label"><i />{location}</div>}
@@ -545,7 +550,7 @@ export function RecallLayer({ beat, view, talk, light = false, tone = '' }) {
     <div className={`fg-recall${leaving ? ' is-leave' : ''}`} data-tone={mood} style={{ '--fade': (leaving ? RECALL_LEAVE_MS : RECALL_IN_MS) + 'ms' }} aria-hidden="true">
       <div className="fg-recall-veil" />
       {ghosts.map(entry => (
-        <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={ghostBeat} emo={shown.beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} talk={leaving ? null : talk} />
+        <Actor key={entry.name} entry={entry} person={people.get(entry.name)} beat={ghostBeat} emo={shown.beat.emotions[entry.name] || 'neutral'} emotions={view && view.emotions} groups={view && view.poseGroups} talk={leaving ? null : talk} />
       ))}
     </div>
   )
@@ -558,7 +563,7 @@ export function RecallLayer({ beat, view, talk, light = false, tone = '' }) {
 /** 这个人这一拍的脸（小头像用）：立绘的地址和裁成正方形小格的位置（faceCrop）；没有立绘时 src 为空。 */
 function useFace(person, beat, view, then = null) {
   const name = person ? person.name : ''
-  const sprite = person ? spriteFor(person, beat.turn, beat.emotions[name] || 'neutral', view && view.emotions, then) : ''
+  const sprite = person ? spriteFor(person, beat.turn, beat.emotions[name] || 'neutral', view && view.emotions, then, null, { pose: beat.postures && beat.postures[name], groups: view && view.poseGroups }) : ''
   const src = sprite ? assetUrl(sprite) : ''
   const [size, setSize] = React.useState(null)
   React.useEffect(() => {

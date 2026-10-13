@@ -107,7 +107,7 @@ export function directorReply(turn, units) {
       L('你终于来了', { sp: '林岚', emo: 'smile', sym: 'sparkle', cam: 'zoom' }),
       L('抱歉，社团活动', { sp: '我', emo: 'neutral', sym: 'sweat', say: 'hesitant' }),
       L('好像有点不一样', { sp: '我', textfx: [{ text: '好像有点不一样', style: 'dwindle' }] }),
-      L('林岚回过头', { sp: '林岚', emo: 'smile', scene: { romance: 'ambiguous' } }),
+      L('林岚回过头', { sp: '林岚', emo: 'smile', pose: 'p2', scene: { romance: 'ambiguous' } }), // 导演点名换动作：手背在身后歪头
       L('那就罚你', { sp: '林岚', emo: 'teasing', sym: 'heart' }),
       L('她把一缕头发', { sp: '林岚', emo: 'shy' }),
       L('不许走神', { sp: '林岚', emo: 'pout', sym: 'anger', say: 'menace', cam: 'focus' }),
