@@ -282,8 +282,11 @@ const EXIT_MS = { storm: 650, run: 420, slow: 1300 }
 const SWAP_MS = 280
 /** 立绘图片的原始宽高（按图片地址）：读过的记下来，换回这张时不用再等它读完。 */
 const SIZES = new Map()
+/** 剧场给台上所有人（主舞台、分屏、短闪回）的开关：aa 逆转式立绘的眨眼和口型（特效开关里关掉了就只显示原图）。 */
+export const StageFlags = React.createContext({ aa: true })
 
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
+  const flags = React.useContext(StageFlags)
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name)
   const reaction = !leaving && !speaking && beat.reacts ? beat.reacts.find(r => r.name === entry.name) : null
   const move = !leaving && beat.moves ? beat.moves.find(m => m.name === entry.name) : null
@@ -353,7 +356,7 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const records = Object.values((person && person.sprites) || {})
   const uploaded = records.some(r => r && r.assetId === sprite && r.uploaded)
   // 立绘记录带逆转式素材包时，用分层画布（眨眼 + 口型），原图作读包前的后备
-  const aa = (records.find(r => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null
+  const aa = (flags.aa && records.find(r => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest)))?.aa || null
   // 头一样大、按身高站：每张图按自己的脸框缩放，按这个人的身高抬高或压低（lib/stature.js）；
   // 生成的立绘脸框跟这个人平常的差太多（侧身、低头那张认小了）时按平常的算，换到那张时人不会突然大一圈
   const cm = heightOf(person).cm
@@ -422,7 +425,7 @@ function useLeaving(cast, beat) {
   return [...leaving.current.values()].map(l => l.entry)
 }
 
-export function Cast({ beat, view, talk, max = 5 }) {
+export function Cast({ beat, view, talk, max = 5, dof = true }) {
   const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
   let cast = beat.cast || []
   // 导演还没整理、也没有上一幕站位时：说话的已知人物临时站到中间。整理过的轮次台上没人就是没人（便条、画外音）。
@@ -440,8 +443,8 @@ export function Cast({ beat, view, talk, max = 5 }) {
   // 插画全屏盖住舞台：立绘照常在下面，插画收起时直接露出来。
   // 亲密场面（scene.eros 开着）里立绘退下：有插画演插画，还没有就只留背景，不让两个人站着说话；这段结束再回来。
   const veiled = Boolean(beat.scene && beat.scene.eros && beat.scene.eros !== 'none')
-  // 浅景深：台上不止一个人、其中有人在说话时，没说话也没反应的人微微虚一点（theater.css 的 [data-talk]）；旁白时谁都不虚
-  const talking = cast.length > 1 && cast.some(c => (beat.speakers ? beat.speakers.includes(c.name) : beat.speaker === c.name))
+  // 浅景深：台上不止一个人、其中有人在说话时，没说话也没反应的人微微虚一点（theater.css 的 [data-talk]）；旁白时谁都不虚；特效开关关掉了（dof）也不虚
+  const talking = dof && cast.length > 1 && cast.some(c => (beat.speakers ? beat.speakers.includes(c.name) : beat.speaker === c.name))
   return (
     <div className="fg-cast" data-split={split ? 'on' : undefined} data-veil={veiled ? '' : undefined} data-talk={talking ? '' : undefined}>
       {cast.map(entry => (
@@ -1074,14 +1077,15 @@ const RECALL_ENTRY = { sweet: 'is-bloom', dread: 'is-dread', flash: 'is-snap', h
  * recallStyle 是设置里短闪回的演法（「压暗画面」进出都起薄雾），tone 是设置里固定的基调（不固定时用导演写的 / 剧场挑的）。
  * wake：从回忆里醒过来的那一句（playback.js 的 beatHold），rising 时回忆正在褪白，之后白慢慢散开、露出现在的画面。
  * changed：这一拍演一次换场（changePlan），黑场、白闪、闭眼这些由 SceneCover 在换场时间线上演，这里不再叠一层。
+ * recallFx：短闪回的画面开着（特效开关），关掉了进出闪回时不起光、不起雾。
  */
-export function Flash({ beat, recallStyle = 'text', tone = '', wake = false, rising = false, changed = false }) {
+export function Flash({ beat, recallStyle = 'text', tone = '', wake = false, rising = false, changed = false, recallFx = true }) {
   if (!beat) return null
   if (wake) return <div key={beat.key} className={`fg-flash is-wake${rising ? ' is-rising' : ''}`} style={{ '--rise': WAKE_SWAP_MS + 'ms', '--clear': WAKE_MS - WAKE_SWAP_MS + 'ms' }} />
   const kind = beat.cam === 'flash' ? '' : beat.cam === 'redflash' ? 'is-red' : beat.cam === 'fadeblack' ? 'is-black' : null
   const tr = changed ? null : TRANSITION_OVERLAY[beat.transition] ?? null // 换场时盖住画面的那一层由 SceneCover 演
-  const entry = beat.recallEdge === 'in' ? RECALL_ENTRY[tone || (beat.recall && beat.recall.tone)] : null
-  const cls = kind ?? tr ?? entry ?? (beat.recallEdge && recallStyle === 'ghost' ? 'is-mist' : null)
+  const entry = recallFx && beat.recallEdge === 'in' ? RECALL_ENTRY[tone || (beat.recall && beat.recall.tone)] : null
+  const cls = kind ?? tr ?? entry ?? (recallFx && beat.recallEdge && recallStyle === 'ghost' ? 'is-mist' : null)
   if (cls === null) return null
   return <div key={beat.key} className={`fg-flash ${cls}`} />
 }

@@ -377,14 +377,15 @@ const OWN_WAY = new Set(['haze', 'wake'])
  * → cast 新画面里的人上来、出地点标题 → 停一小拍 → 出字。整段对话框让开，点鼠标、按键不跳过，快进时不演。
  * 没有盖的转场（溶解、慢慢变化、横扫……）也先清场：旧背景上的人退下去，新背景过渡完，人再上来。
  * was：故事里上一拍的 { place, mode }（从 log 跳过来时也是故事里的上一拍，这一句的进场照样演）；opening：剧场刚打开、这是画面上的第一拍。
+ * wake：从回忆里出来时演「醒过来」（设置的特效开关里关掉了就当普通的换场演）。
  * 返回 { tr, cover, clear, up, hold, down, steps: [[阶段, 开始的毫秒]...], swap 换画面的时刻, total, cut, opening }。
  */
-export function changePlan(beat, was = {}, { opening = false } = {}) {
+export function changePlan(beat, was = {}, { opening = false, wake = true } = {}) {
   if (!beat || !beat.scene) return null
   const moved = !opening && beat.sceneEnter && (beat.scene.location !== was.place || (beat.mode || '') !== (was.mode || ''))
   const tr = beat.transition || ''
   if (!opening && !beat.cut && (!moved || tr === 'none' || OWN_WAY.has(tr))) return null
-  if (!opening && !beat.cut && was.mode === 'memory' && (beat.mode || '') !== 'memory' && WAKE_FROM.has(tr)) return null // 从回忆里醒过来
+  if (wake && !opening && !beat.cut && was.mode === 'memory' && (beat.mode || '') !== 'memory' && WAKE_FROM.has(tr)) return null // 从回忆里醒过来
   if (opening && tr === 'none' && !beat.cut) return null
   // 开场就是过场字卡（第一章……）：从黑里直接出字卡，字卡照样停够
   const shape = opening ? (beat.cut ? { ...CUT_COVER, up: 0 } : OPEN_COVER) : beat.cut ? CUT_COVER : COVERS[tr] || { cover: '', clear: true, up: 0, hold: 0, down: TRANSITION_MS[tr] || TRANSITION_MS.dissolve }
@@ -416,12 +417,13 @@ export function changePhase(plan, ms) {
  * - 导演写了 pause：beat 顿一拍，silence 让开对话框沉默一会儿；
  * - 从回忆里醒过来（导演没挑别的出法时）：对话框让开，等回忆褪白、现在的画面清晰过来（WAKE_MS），这时多一个 wake: true。
  * 几样同时有取最长的。有过场字卡的那一句字卡在换场里演（暗下去、字卡、亮起来），插画和醒过来都不再另停。
- * cg：这一拍画面上的插画（还没画好为空）；was：上一拍画面上的 { cg, place, mode }；opening：剧场刚打开、画面上还没有上一拍；eros：亲密场面的演出开着（关了高潮那一下不等）。
+ * cg：这一拍画面上的插画（还没画好为空）；was：上一拍画面上的 { cg, place, mode }；opening：剧场刚打开、画面上还没有上一拍；eros：亲密场面的演出开着（关了高潮那一下不等）；
+ * wake：醒过来的演法开着（特效开关）。
  */
-export function beatHold(beat, { cg = '', was = {}, eros = true, opening = false } = {}) {
+export function beatHold(beat, { cg = '', was = {}, eros = true, opening = false, wake: waking = true } = {}) {
   let ms = 0, away = false
   if (cg && cg !== was.cg && !beat.cut) { ms = Math.max(ms, cgHoldMs(beat.cg, beat.scene.mood)); away = true }
-  const change = changePlan(beat, was, { opening })
+  const change = changePlan(beat, was, { opening, wake: waking })
   if (change) { ms = Math.max(ms, change.total); away = true }
   if (PAUSE_MS[beat.pause]) { ms = Math.max(ms, PAUSE_MS[beat.pause]); if (beat.pause === 'silence') away = true }
   if (beat.hit) ms = Math.max(ms, HIT_LEAD_MS)
@@ -429,7 +431,7 @@ export function beatHold(beat, { cg = '', was = {}, eros = true, opening = false
   if (beat.phone) ms = Math.max(ms, PHONE_LEAD_MS[beat.phone.kind] || 0)
   if (beat.hush === 'start') ms = Math.max(ms, HUSH_LEAD_MS)
   if (eros && beat.peak) ms = Math.max(ms, PEAK_LEAD_MS[beat.peak] || 0)
-  const wake = !opening && was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
+  const wake = waking && !opening && was.mode === 'memory' && (beat.mode || '') !== 'memory' && !beat.cut && WAKE_FROM.has(beat.transition)
   if (wake) { ms = Math.max(ms, WAKE_MS); away = true }
   return { ms, away, ...(wake ? { wake } : {}), ...(change ? { change } : {}) }
 }
