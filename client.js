@@ -525,19 +525,23 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 /* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */
 .fg-actor.is-aa .fg-actor-body { animation: none; }
 .fg-actor.is-aa.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }
-/* --k 按脸框缩放（头一样大），--lift 按身高抬高或压低（lib/stature.js）；都按立绘框的高度算 */
+/* --k 按脸框缩放（头一样大），--lift 按身高抬高或压低（lib/stature.js）；都按立绘框的高度算。每张图带着自己的（Stage.jsx 写在 img 上），
+   换图时新图从第一帧起就是自己的大小；过渡只在同一张图后来才量好脸框、改了身高时缓过去 */
 .fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: calc(var(--k, 1) * 100%); width: auto; max-width: none; transform: translateX(-50%);
   transition: height .4s ease, bottom .4s ease;
   -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 99%), radial-gradient(120% 100% at 50% 40%, #000 62%, transparent 82%);
   -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, #000 78%, transparent 99%); }
 .fg-actor.is-upload img, .fg-actor.is-upload .fg-aa { -webkit-mask-image: none; mask-image: none; }
-.fg-actor img.is-swap { animation: fg-expr-swap .25s ease; }
+/* 换立绘（换表情、换动作）：新图盖在旧图上淡入，旧图过了一小半才开始淡出，两张重叠的地方不透出背景。时长对上 Stage.jsx 的 SWAP_MS */
+.fg-actor img.is-in { animation: fg-sprite-in .28s ease-out both; }
+.fg-actor img.is-out { animation: fg-sprite-out .28s ease-in both; }
 /* 登场从靠近的一侧滑进来，退场往同一侧淡出（--side 由站位决定）。 */
 @keyframes fg-actor-in { from { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(3%); } }
 @keyframes fg-actor-out { to { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(2%); } }
 @keyframes fg-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.008) translateY(-.25%); } }
 @keyframes fg-speak-hop { 0% { transform: translateY(0); } 40% { transform: translateY(-1.6%); } 100% { transform: translateY(0); } }
-@keyframes fg-expr-swap { from { opacity: .4; filter: brightness(1.4); } }
+@keyframes fg-sprite-in { from { opacity: 0; } }
+@keyframes fg-sprite-out { 0%, 40% { opacity: 1; } 100% { opacity: 0; } }
 
 /* 没有立绘时的剪影立绘：角色色渐变 + 轮廓光。 */
 .fg-silhouette { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: 94%; aspect-ratio: 0.52; transform: translateX(-50%); }
@@ -2638,9 +2642,18 @@ var FACE_RATIO = 0.13;
 var FACE_CENTER = 0.24;
 var PER_CM = 6e-3;
 var clamp2 = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-function placeSprite({ box = null, size = null, cm = BASE_HEIGHT.female } = {}) {
+var FACE_SPREAD = 1.15;
+function usualFace(boxes, height) {
+  if (!(height > 0)) return 0;
+  const ratios = (boxes || []).filter((b) => Array.isArray(b) && b.length === 4 && b.every(Number.isFinite) && b[3] > b[1]).map((b) => (b[3] - b[1]) / height).sort((a, b) => a - b);
+  if (ratios.length < 2) return 0;
+  const mid = ratios.length >> 1;
+  return ratios.length % 2 ? ratios[mid] : (ratios[mid - 1] + ratios[mid]) / 2;
+}
+function placeSprite({ box = null, size = null, cm = BASE_HEIGHT.female, usual = 0 } = {}) {
   const ok = Array.isArray(box) && box.length === 4 && box.every(Number.isFinite) && box[3] > box[1] && Array.isArray(size) && size[1] > 0;
-  const ratio = ok ? (box[3] - box[1]) / size[1] : FACE_RATIO;
+  const measured = ok ? (box[3] - box[1]) / size[1] : FACE_RATIO;
+  const ratio = ok && usual > 0 ? clamp2(measured, usual / FACE_SPREAD, usual * FACE_SPREAD) : measured;
   const center2 = ok ? (box[1] + box[3]) / 2 / size[1] : FACE_CENTER;
   const top = ok ? box[1] / size[1] : FACE_CENTER - FACE_RATIO / 2;
   const k = clamp2(FACE_RATIO / ratio, 0.6, 1.4);
@@ -5671,6 +5684,8 @@ var TOUCH_FRAMES = {
 };
 var DEPTH = { 1: [1.1, "-6%"], [-1]: [0.88, "3%"] };
 var EXIT_MS = { storm: 650, run: 420, slow: 1300 };
+var SWAP_MS = 280;
+var SIZES = /* @__PURE__ */ new Map();
 function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = null }) {
   const speaking = !leaving && (beat.speakers ? beat.speakers.includes(entry.name) : beat.speaker === entry.name);
   const reaction = !leaving && !speaking && beat.reacts ? beat.reacts.find((r) => r.name === entry.name) : null;
@@ -5718,42 +5733,54 @@ function Actor({ entry, person, beat, emo, emotions, leaving = false, talk = nul
   const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name]);
   const src = sprite ? assetUrl(sprite) : "";
   const color = person && person.color || "#9b7bff";
-  const [shown, setShown] = import_react4.default.useState(src);
-  const [swap, setSwap] = import_react4.default.useState(false);
-  const [size, setSize] = import_react4.default.useState(null);
+  const [pics, setPics] = import_react4.default.useState(() => ({ cur: src && SIZES.has(src) ? { src, size: SIZES.get(src) } : null, prev: null, broken: "" }));
   import_react4.default.useEffect(() => {
-    if (!shown) return void 0;
+    if (!src) {
+      setPics({ cur: null, prev: null, broken: "" });
+      return void 0;
+    }
+    if (pics.cur && pics.cur.src === src) return void 0;
+    const show = (size) => setPics((p4) => ({ cur: { src, size }, prev: p4.cur && p4.cur.src !== src ? p4.cur : null, broken: "" }));
+    if (SIZES.has(src)) {
+      show(SIZES.get(src));
+      return void 0;
+    }
     let live = true;
     const img = new Image();
     img.onload = () => {
-      if (live && img.naturalHeight) setSize([img.naturalWidth, img.naturalHeight]);
+      if (!live || !img.naturalHeight) return;
+      SIZES.set(src, [img.naturalWidth, img.naturalHeight]);
+      show(SIZES.get(src));
     };
-    img.src = shown;
+    img.onerror = () => {
+      if (live) setPics({ cur: null, prev: null, broken: src });
+    };
+    img.src = src;
     return () => {
       live = false;
     };
-  }, [shown]);
-  import_react4.default.useEffect(() => {
-    if (src === shown) return void 0;
-    if (!src) {
-      setShown("");
-      return void 0;
-    }
-    const img = new Image();
-    img.onload = () => {
-      setShown(src);
-      setSwap(true);
-    };
-    img.src = src;
-    const t = setTimeout(() => setSwap(false), 300);
-    return () => clearTimeout(t);
   }, [src]);
+  import_react4.default.useEffect(() => {
+    if (!pics.prev) return void 0;
+    const t = setTimeout(() => setPics((p4) => p4.prev ? { ...p4, prev: null } : p4), SWAP_MS);
+    return () => clearTimeout(t);
+  }, [pics.prev]);
   const records = Object.values(person && person.sprites || {});
   const uploaded = records.some((r) => r && r.assetId === sprite && r.uploaded);
   const aa = records.find((r) => r && r.assetId === sprite && (r.aa?.pack || r.aa?.manifest))?.aa || null;
-  const record = shown ? records.find((r) => r && shown === assetUrl(r.assetId)) : null;
-  const place = placeSprite({ box: faceBoxOf(record, size), size, cm: heightOf(person).cm });
-  const still2 = shown ? /* @__PURE__ */ import_react4.default.createElement("img", { src: shown, alt: entry.name, className: swap ? "is-swap" : "", draggable: "false", onError: () => setShown("") }) : /* @__PURE__ */ import_react4.default.createElement(Silhouette, { name: entry.name, color, appearance: person && person.appearance, gender: person && person.gender });
+  const cm = heightOf(person).cm;
+  const faces = records.filter((r) => r && r.faceBox && !r.uploaded).map((r) => r.faceBox);
+  const placeOf = (pic) => {
+    const record = pic ? records.find((r) => r && pic.src === assetUrl(r.assetId)) : null;
+    return placeSprite({ box: faceBoxOf(record, pic && pic.size), size: pic && pic.size, cm, usual: record && !record.uploaded ? usualFace(faces, pic.size[1]) : 0 });
+  };
+  const place = placeOf(pics.cur);
+  const picture = (pic) => {
+    const at2 = pic === pics.cur ? place : placeOf(pic);
+    const fade2 = pic === pics.cur ? pics.prev ? "is-in" : "" : "is-out";
+    return /* @__PURE__ */ import_react4.default.createElement("img", { key: pic.src, src: pic.src, alt: entry.name, className: fade2 || void 0, style: { "--k": at2.k, "--lift": at2.lift }, draggable: "false", onError: () => setPics((p4) => p4.cur && p4.cur.src === pic.src ? { cur: null, prev: null, broken: pic.src } : { ...p4, prev: null }) });
+  };
+  const still2 = pics.cur ? /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, pics.prev && picture(pics.prev), picture(pics.cur)) : !src || pics.broken === src ? /* @__PURE__ */ import_react4.default.createElement(Silhouette, { name: entry.name, color, appearance: person && person.appearance, gender: person && person.gender }) : null;
   const [d, db] = DEPTH[entry.depth] || [1, "0%"];
   const cls = ["fg-actor", speaking && "is-speaking", reaction && "is-reacting", uploaded && "is-upload", leaving && "is-leaving", aa && "is-aa", entry.away && "is-away", entry.peek && "is-peek", entry.down && "is-down"].filter(Boolean).join(" ");
   return /* @__PURE__ */ import_react4.default.createElement(
