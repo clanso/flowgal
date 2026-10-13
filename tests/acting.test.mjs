@@ -5,8 +5,8 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { cleanActing, mergeActing, completeActing, actingPose, actingFace, actingEmotions, poseTags, unplacedEmotions, MAX_POSES } from '../lib/acting.js'
-import { writeActing, writeSpritePrompts } from '../lib/sprites.js'
+import { cleanActing, mergeActing, completeActing, actingPose, actingFace, actingEmotions, actingNoteOf, poseTags, unplacedEmotions, NOTE_CHARS } from '../lib/acting.js'
+import { writeActing, writeActingNote, writeSpritePrompts, writerBatch } from '../lib/sprites.js'
 import { resolveConfig } from '../lib/config.js'
 import { variantKey } from '../lib/look.js'
 import { encodePng } from '../lib/image/png.js'
@@ -39,7 +39,7 @@ function spriteReply(request) {
   })
 }
 
-// 嘴硬心软的学生会长：平时背着手，嘴硬时抱着胳膊别过脸（侧身），担心时按着胸口。
+// 嘴硬心软的学生会长：平时背着手，嘴硬时抱着胳膊别过脸，担心时按着胸口。（第二个动作标着老存档里的侧身，整理时去掉）
 const SHEET = {
   read: '嘴硬心软的学生会长：情绪不上脸，开心时嘴角压不住，生气时反而安静下来。',
   poses: [
@@ -55,13 +55,14 @@ const SHEET = {
   ],
 }
 
-test('gate: 整理设计：动作最多 5 个、每个情绪只在一个动作里、平静在第一个动作的第一个；动作只留身体，表情只留脸', () => {
+test('gate: 整理设计：动作不设上限、每个情绪只在一个动作里、平静在第一个动作的第一个；动作只留身体，表情只留脸；侧身标记去掉', () => {
   const sheet = cleanActing(SHEET, { allowed: ['neutral', 'smile', 'happy', 'sad', 'pout', 'angry', 'shy', 'worried'] })
-  assert.deepEqual(sheet.poses.map(p => [p.id, p.label, p.side, p.emotions]), [
-    ['p1', '背手站着', false, ['neutral', 'smile', 'happy', 'sad']],
-    ['p2', '抱着胳膊别过脸', true, ['pout', 'angry', 'shy']],
-    ['p3', '按着胸口', false, ['worried']],
+  assert.deepEqual(sheet.poses.map(p => [p.id, p.label, p.emotions]), [
+    ['p1', '背手站着', ['neutral', 'smile', 'happy', 'sad']],
+    ['p2', '抱着胳膊别过脸', ['pout', 'angry', 'shy']],
+    ['p3', '按着胸口', ['worried']],
   ], '编号按顺序重编；平静挪到第一个；第二次出现的平静、清单外的情绪丢掉')
+  assert.ok(sheet.poses.every(p => !('side' in p)), '立绘都按正面画')
   assert.equal(sheet.poses[0].tags, 'hands behind back, straight posture', '动作里的表情、外貌、构图去掉')
   assert.equal(sheet.faces.angry.tags, 'expressionless, narrowed eyes, cold eyes, closed mouth', '表情里的手、外貌去掉')
   assert.equal(sheet.faces.angry.desc, '生气时反而不说话，眼神冷下来')
@@ -71,28 +72,30 @@ test('gate: 整理设计：动作最多 5 个、每个情绪只在一个动作�
   assert.deepEqual(moved.poses.map(p => [p.label, p.emotions]), [['B', ['neutral', 'smile']], ['A', ['angry']]])
   // 没分平静：放进第一个动作
   assert.deepEqual(cleanActing({ poses: [{ label: 'A', emotions: ['angry'] }] }).poses[0].emotions, ['neutral', 'angry'])
-  const many = cleanActing({ poses: Array.from({ length: 9 }, (_, i) => ({ label: '动作' + i, emotions: ['e' + i] })) })
-  assert.equal(many.poses.length, MAX_POSES)
+  const many = cleanActing({ poses: Array.from({ length: 30 }, (_, i) => ({ label: '动作' + i, emotions: ['e' + i] })) })
+  assert.equal(many.poses.length, 30, '动作数不设上限')
+  assert.equal(cleanActing({ read: '长'.repeat(5000), poses: [{ label: 'A', emotions: ['neutral'] }] }).read.length, NOTE_CHARS, '表演笔记 2000 字')
   assert.equal(cleanActing({ poses: [{ label: '', emotions: ['smile'] }, { label: 'A', emotions: [] }] }), null, '一个能用的动作都没有')
   assert.equal(cleanActing(null), null)
   // 玩家改过的：留着原来的编号
   assert.deepEqual(cleanActing({ poses: [{ id: 'p3', label: 'A', emotions: ['neutral'] }, { id: 'p3', label: 'B', emotions: ['angry'] }] }, { keepIds: true }).poses.map(p => p.id), ['p3', 'p1'])
 })
 
-test('gate: 补设计：已经在动作里的不挪；新情绪按写的动作编号放，不认识的编号新加一个动作，到顶了并进第一个；没分到的跟着最接近的内置情绪', () => {
+test('gate: 补设计：已经在动作里的不挪；新情绪按写的动作编号放，不认识的编号新加一个动作（不设上限）；没分到的跟着最接近的内置情绪', () => {
   const sheet = cleanActing(SHEET)
   const { sheet: next, touched } = mergeActing(sheet, {
     poses: [{ id: 'p2', emotions: ['angry', '赌气地道谢'] }, { id: 'new1', label: '捂着脸', tags: 'hands on own face', emotions: ['blush'] }],
     faces: [{ emotion: '赌气地道谢', desc: '嘴上说谢谢，脸别过去', tags: 'pout, blush, looking away' }, { emotion: 'angry', tags: 'angry, glaring' }],
   })
   assert.deepEqual(next.poses.find(p => p.id === 'p2').emotions, ['pout', 'angry', 'shy', '赌气地道谢'], '生气本来就在，不重复')
-  assert.deepEqual(next.poses.at(-1), { id: 'p4', label: '捂着脸', desc: '', tags: 'hands on own face', side: false, emotions: ['blush'] })
+  assert.deepEqual(next.poses.at(-1), { id: 'p4', label: '捂着脸', desc: '', tags: 'hands on own face', emotions: ['blush'] })
   assert.equal(next.faces.angry.tags, 'angry, narrowed eyes', '重写了表情（太用力的词换轻一档）')
   assert.deepEqual([...touched].sort(), ['angry', '赌气地道谢'])
   assert.equal(sheet.poses.length, 4 - 1, '原设计不动')
-  // 到顶了：新动作并进第一个
-  const full = cleanActing({ poses: Array.from({ length: 5 }, (_, i) => ({ label: '动作' + i, emotions: [i ? 'e' + i : 'neutral'] })) })
-  assert.ok(mergeActing(full, { poses: [{ id: 'new1', label: '再来一个', emotions: ['cry'] }] }).sheet.poses[0].emotions.includes('cry'))
+  // 已经有很多个动作：照样新加一个
+  const full = cleanActing({ poses: Array.from({ length: 12 }, (_, i) => ({ label: '动作' + i, emotions: [i ? 'e' + i : 'neutral'] })) })
+  const grown = mergeActing(full, { poses: [{ id: 'new1', label: '再来一个', emotions: ['cry'] }] }).sheet
+  assert.deepEqual([grown.poses.length, grown.poses.at(-1).label, grown.poses.at(-1).emotions], [13, '再来一个', ['cry']])
   // 设计里没分到的：新情绪跟着最接近的内置情绪，内置的进默认站姿
   const custom = [{ id: '苦笑', base: 'smile' }, { id: '委屈', base: 'pout' }]
   const done = completeActing(cleanActing(SHEET), ['苦笑', '委屈', 'laugh'], custom)
@@ -120,12 +123,15 @@ test('gate: 动作与表情设计师：读完资料、剧情和档案再设计�
   const person = { name: '林岚', gender: 'female', appearance: '1girl, long black hair', outfit: '校服', states: [], note: '别画眼镜', timeline: { outfits: { 校服: { tags: 'school uniform' } } } }
   const context = { description: '林岚：学生会长，嘴硬心软。', lore: [{ title: '过去', content: '小时候被同学孤立过。' }] }
   const story = [{ turn: 1, text: '“哼，我才没有在等你。”林岚别过脸。' }]
-  const sheet = await writeActing({ llm, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', context, story, turn: 1, person, emotions: ['neutral', 'smile', 'happy', 'sad', 'pout', 'angry', 'shy', 'worried', '赌气地道谢'], custom: [{ id: '赌气地道谢', desc: '嘴上道谢，脸别过去', base: 'pout' }] })
+  const sheet = await writeActing({ llm, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', context, story, turn: 1, person, emotions: ['neutral', 'smile', 'happy', 'sad', 'pout', 'angry', 'shy', 'worried', '赌气地道谢'], custom: [{ id: '赌气地道谢', desc: '老存档里导演写的描述', base: 'pout' }] })
   const { system } = calls[0]
   const user = calls[0].messages[0].content[0].text
   assert.match(system, /角色表演设计师[\s\S]*先读人[\s\S]*动作表 poses[\s\S]*表情表 faces/)
-  assert.match(system, /2～5 个/)
-  for (const part of [/学生会长，嘴硬心软/, /被同学孤立过/, /我才没有在等你/, /名字：林岚（女）/, /立绘备注（玩家写的，必须遵守）：别画眼镜/, /- angry（生气）/, /- 赌气地道谢（新情绪：嘴上道谢，脸别过去；接近 pout 赌气）/, /给这个人设计一套动作表/]) assert.match(user, part)
+  assert.match(system, /不设上限/)
+  assert.doesNotMatch(system, /"side"|side: true|侧身/)
+  assert.match(system, /表演笔记（玩家写的，必须遵守）」时[\s\S]*read 照抄那一条/)
+  for (const part of [/学生会长，嘴硬心软/, /被同学孤立过/, /我才没有在等你/, /名字：林岚（女）/, /立绘备注（玩家写的，必须遵守）：别画眼镜/, /- angry（生气）/, /- 赌气地道谢（新情绪，接近 pout 赌气）/, /给这个人设计一套动作表/]) assert.match(user, part)
+  assert.doesNotMatch(user, /老存档里导演写的描述/, '情绪库的描述不进提示词')
   assert.doesNotMatch(user, /已有的动作与表情设计/)
   assert.deepEqual(sheet.poses.map(p => p.emotions[0]), ['neutral', 'pout', 'worried'])
   assert.ok(sheet.poses[0].emotions.includes('赌气地道谢') === false && sheet.poses[1].emotions.includes('赌气地道谢'), '没分到的新情绪跟着最接近的赌气')
@@ -137,7 +143,8 @@ test('gate: 动作与表情设计师：读完资料、剧情和档案再设计�
   const llm2 = { stream(request) { more.push(request); return reply(JSON.stringify({ poses: [{ id: 'p2', emotions: ['委屈'] }], faces: [{ emotion: '委屈', desc: '咬着嘴唇不吭声', tags: 'biting lip, teary eyes, looking down' }, { emotion: 'angry', desc: '冷下来', tags: 'cold eyes, closed mouth' }] })).stream() } }
   const next = await writeActing({ llm: llm2, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', context, story, turn: 2, person, emotions: ['委屈', 'angry'], current: sheet, custom: [] })
   const addUser = more[0].messages[0].content[0].text
-  assert.match(addUser, /【已有的动作与表情设计】\n怎么流露情绪：嘴硬心软的学生会长[\s\S]*- p2「抱着胳膊别过脸」（侧身）：嘴硬的时候；身体 arms crossed, head turned away；情绪：赌气（底图）、生气、害羞/)
+  assert.match(addUser, /【已有的动作与表情设计】\n表演笔记：嘴硬心软的学生会长[\s\S]*- p2「抱着胳膊别过脸」：嘴硬的时候；身体 arms crossed, head turned away；情绪：赌气（底图）、生气、害羞/)
+  assert.doesNotMatch(addUser, /新加一个动作（id 写 new1，总共不超过/)
   assert.match(addUser, /- 委屈（新情绪）\n- angry（生气）：已在动作 p2「抱着胳膊别过脸」里，只重新设计表情/)
   assert.match(addUser, /还没分组的放进最合适的已有动作/)
   assert.equal(more.length, 1)
@@ -145,26 +152,61 @@ test('gate: 动作与表情设计师：读完资料、剧情和档案再设计�
   assert.equal(next.faces.angry.tags, 'cold eyes, closed mouth')
   assert.equal(sheet.faces.angry.tags, 'expressionless, narrowed eyes, cold eyes, closed mouth', '原设计不动')
 
+  // 玩家写了表演笔记：设计师那边当硬规矩，已有设计里设计师起草的那条不再带
+  const noted = []
+  const llm3 = { stream(request) { noted.push(request); return reply(JSON.stringify({ faces: [{ emotion: 'angry', tags: 'cold eyes' }] })).stream() } }
+  await writeActing({ llm: llm3, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', context, story, turn: 2, person: { ...person, actingNote: '生气时会笑，越生气笑得越甜' }, emotions: ['angry'], current: sheet, custom: [] })
+  const notedUser = noted[0].messages[0].content[0].text
+  assert.match(notedUser, /表演笔记（玩家写的，必须遵守）：生气时会笑，越生气笑得越甜/)
+  assert.doesNotMatch(notedUser, /表演笔记：嘴硬心软/)
+
   // 写不出能用的：回 null（调用方按已有的或通用动作组画）
   assert.equal(await writeActing({ llm: { stream: () => reply('{}').stream() }, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', person, emotions: ['neutral'] }), null)
 })
 
-test('gate: 立绘设计师照设计写：底图写这个人的动作和表情，不再给通用动作参考；档案里带上他怎么流露情绪', async () => {
+test('gate: 表演笔记：玩家写的优先、设计师起草的垫底；让设计师重写时只要 read，玩家写的那条不给它看', async () => {
+  assert.deepEqual(actingNoteOf({ actingNote: ' 我写的 ', acting: { read: '设计师的' } }), { text: '我写的', by: 'user' })
+  assert.deepEqual(actingNoteOf({ acting: { read: '设计师的' } }), { text: '设计师的', by: 'ai' })
+  assert.deepEqual(actingNoteOf({}), { text: '', by: '' })
+  const calls = []
+  const llm = { stream(request) { calls.push(request); return reply(JSON.stringify({ read: '新的笔记：嘴硬，眼神先软下来。', poses: [{ id: 'p9', label: '不该收', emotions: ['cry'] }] })).stream() } }
+  const sheet = cleanActing(SHEET)
+  const person = { name: '林岚', gender: 'female', appearance: '1girl', states: [], actingNote: '玩家写的旧笔记', acting: sheet, timeline: {} }
+  const read = await writeActingNote({ llm, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', context: {}, story: [], turn: 3, person, current: sheet })
+  assert.equal(read, '新的笔记：嘴硬，眼神先软下来。')
+  const user = calls[0].messages[0].content[0].text
+  assert.match(user, /这次只重写这个人的表演笔记（read）/)
+  assert.match(user, /【已有的动作与表情设计】[\s\S]*- p2「抱着胳膊别过脸」/)
+  assert.doesNotMatch(user, /玩家写的旧笔记|表演笔记：嘴硬心软/)
+  assert.equal(calls.length, 1)
+})
+
+test('gate: 立绘设计师一次写几张：按最大输出算，默认一次一百多张；填了小的最大输出就分批', () => {
+  assert.equal(writerBatch(resolveConfig({})), 128)
+  assert.equal(writerBatch(resolveConfig({ director: { maxTokens: 8192 } })), 8)
+  assert.equal(writerBatch(resolveConfig({ director: { maxTokens: 1000 } })), 1)
+})
+
+test('gate: 立绘设计师照设计写：底图写这个人的动作和表情，不再给通用动作参考；档案里带上他的表演笔记', async () => {
   const calls = []
   const llm = { stream(request) { calls.push(request); return reply(JSON.stringify({ sprites: [{ key: 's1', tags: '1girl, long black hair, arms crossed' }, { key: 's2', tags: '1girl, smile' }] })).stream() } }
   const acting = cleanActing(SHEET)
   const look = { appearance: '1girl, long black hair', outfit: '校服', states: [] }
   const targets = [
-    { key: variantKey(look, 'pout'), emotion: 'pout', outfit: '校服', outfitTags: 'school uniform', states: [], look: acting.faces.pout, pose: { id: 'p2', label: '抱着胳膊别过脸', desc: '嘴硬的时候', tags: 'arms crossed, head turned away', side: true, designed: true, members: ['生气', '害羞'] } },
-    { key: variantKey(look, 'happy'), emotion: 'happy', outfit: '校服', outfitTags: 'school uniform', states: [], pose: { id: 'p1', label: '背手站着', desc: '背着手站得笔直', tags: 'hands behind back', side: false, designed: true, members: null } },
+    { key: variantKey(look, 'pout'), emotion: 'pout', outfit: '校服', outfitTags: 'school uniform', states: [], look: acting.faces.pout, pose: { id: 'p2', label: '抱着胳膊别过脸', desc: '嘴硬的时候', tags: 'arms crossed, head turned away', designed: true, members: ['生气', '害羞'] } },
+    { key: variantKey(look, 'happy'), emotion: 'happy', outfit: '校服', outfitTags: 'school uniform', states: [], pose: { id: 'p1', label: '背手站着', desc: '背着手站得笔直', tags: 'hands behind back', designed: true, members: null } },
   ]
   await writeSpritePrompts({ llm, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', person: { name: '林岚', gender: 'female', appearance: '1girl, long black hair', acting, timeline: {} }, targets })
   const user = calls[0].messages[0].content[0].text
-  assert.match(user, /怎么流露情绪（动作与表情设计里写的）：嘴硬心软的学生会长/)
-  assert.match(user, /- s1：.*情绪「赌气」；这个人的动作「抱着胳膊别过脸」（侧身）：嘴硬的时候（身体 arms crossed, head turned away）；这个人的表情：鼓着脸不看人（脸 pout, puffed cheeks, looking to the side）；这张是「抱着胳膊别过脸」动作的底图：同一个动作的生气、害羞会在这张上只换脸/)
+  assert.match(user, /表演笔记（表演设计师读完资料写的）：嘴硬心软的学生会长/)
+  assert.match(user, /- s1：.*情绪「赌气」；这个人的动作「抱着胳膊别过脸」：嘴硬的时候（身体 arms crossed, head turned away）；这个人的表情：鼓着脸不看人（脸 pout, puffed cheeks, looking to the side）；这张是「抱着胳膊别过脸」动作的底图：同一个动作的生气、害羞会在这张上只换脸/)
   assert.match(user, /- s2：.*情绪「开心」；这个人的动作「背手站着」：背着手站得笔直（身体 hands behind back）$/m, '整张画（不换脸）的也照设计的动作，没设计表情的不硬塞')
   assert.doesNotMatch(user, /动作参考/)
   assert.match(calls[0].system, /写了「这个人的动作」「这个人的表情」的，是读完资料和剧情专门为他设计好的/)
+  // 玩家写了表演笔记：用玩家的，当硬规矩
+  await writeSpritePrompts({ llm, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', person: { name: '林岚', gender: 'female', appearance: '1girl, long black hair', acting, actingNote: '笑的时候总先低头', timeline: {} }, targets })
+  assert.match(calls[1].messages[0].content[0].text, /表演笔记（玩家写的，必须遵守）：笑的时候总先低头/)
+  assert.doesNotMatch(calls[1].messages[0].content[0].text, /嘴硬心软的学生会长/)
 })
 
 // ───────────────────────── 引擎：整条流程 ─────────────────────────
@@ -198,7 +240,7 @@ async function settle(engine, gameId, done, what = '') {
 
 const charOf = r => r.parameters?.v4_prompt?.caption?.char_captions?.[0]?.char_caption || ''
 
-test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整套 → 画这个人「抱着胳膊别过脸」的侧身底图 → 生气的脸由立绘设计师以设计好的为底写、再换 → 新情绪补设计 → 玩家改设计 → 重写表情时重新设计那张脸', async () => {
+test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整套 → 画这个人「抱着胳膊别过脸」的底图（正面） → 生气的脸由立绘设计师以设计好的为底写、再换 → 新情绪补设计 → 玩家改设计 → 重写表情时重新设计那张脸', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-acting-'))
   try {
     const store = createStore(dir)
@@ -230,12 +272,12 @@ test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整�
     assert.equal(writer.length, 1)
     const writerUser = writer[0].messages[0].content[0].text
     assert.match(writerUser, /- s1：只换脸——在「赌气」那张「抱着胳膊别过脸」动作底图上只重画脸.*情绪「生气」.*这个人的表情：生气时反而不说话，眼神冷下来（脸 expressionless, narrowed eyes, cold eyes, closed mouth）/)
-    assert.match(writerUser, /- s2：.*情绪「赌气」；这个人的动作「抱着胳膊别过脸」（侧身）：嘴硬的时候（身体 arms crossed, head turned away）；这个人的表情：鼓着脸不看人.*同一个动作的生气、害羞会在这张上只换脸/)
+    assert.match(writerUser, /- s2：.*情绪「赌气」；这个人的动作「抱着胳膊别过脸」：嘴硬的时候（身体 arms crossed, head turned away）；这个人的表情：鼓着脸不看人.*同一个动作的生气、害羞会在这张上只换脸/)
     assert.match(writerUser, /【剧情（到第/)
     assert.match(writer[0].system, /标着「只换脸」的.*跟整张画的一样读完资料和剧情再写，不要照抄设计好的表情/)
     assert.equal(requests.length, 1)
-    assert.match(charOf(requests[0]), /from side, profile, looking to the side/, '侧身动作整张按侧身构图画')
-    assert.deepEqual([lin.sprites[pout].pose, lin.sprites[pout].side, lin.sprites[pout].poseLabel], ['p2', true, '抱着胳膊别过脸'])
+    assert.doesNotMatch(charOf(requests[0]), /from side|profile/, '老存档里标着侧身的动作也按正面画')
+    assert.deepEqual([lin.sprites[pout].pose, lin.sprites[pout].side, lin.sprites[pout].poseLabel], ['p2', undefined, '抱着胳膊别过脸'])
     assert.deepEqual(lin.sprites[angry].face, { from: pout, pose: 'p2' })
     assert.deepEqual([lin.sprites[angry].tags, lin.sprites[angry].writer], ['expressionless, narrowed eyes, cold eyes, closed mouth, half-closed eyes', 'ai'])
 
@@ -256,7 +298,7 @@ test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整�
     assert.equal(llm.calls.filter(isActingWriter).length, 3)
     assert.ok(lin.acting.poses[0].emotions.includes('强忍泪水微笑'))
     assert.deepEqual([lin.sprites[tearful].face.from, lin.sprites[tearful].tags], [neutral, 'smile, tearing up, trembling lips, half-closed eyes'])
-    assert.equal(lin.sprites[neutral].side, false)
+    assert.equal(lin.sprites[neutral].side, undefined)
     assert.doesNotMatch(charOf(requests.at(-1)), /from side/)
 
     // 玩家改设计：把开心挪进「按着胸口」，改生气的脸；编号留着
@@ -270,7 +312,16 @@ test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整�
     assert.deepEqual(lin.acting.poses.map(p => p.id), ['p1', 'p2', 'p3'])
     assert.ok(lin.acting.poses[2].emotions.includes('happy') && !lin.acting.poses[0].emotions.includes('happy'))
     assert.equal(lin.acting.faces.angry.tags, 'angry, clenched teeth')
+    assert.match(lin.acting.read, /嘴硬心软/, '动作与表情这边存不改表演笔记')
     await assert.rejects(engine.castAction('g', 'acting-save', { name: '林岚', acting: { poses: [] } }), /至少要有一个/)
+    // 边改边存：编辑器里那份是旧的（少了后来补进来的情绪和表情），存的时候补进来的不丢
+    const stalePoses = structuredClone(edited)
+    stalePoses.poses[0].emotions = stalePoses.poses[0].emotions.filter(e => e !== '强忍泪水微笑')
+    delete stalePoses.faces['强忍泪水微笑']
+    await engine.castAction('g', 'acting-save', { name: '林岚', acting: stalePoses })
+    lin = (await engine.gameView('g')).cast.find(p => p.name === '林岚')
+    assert.ok(lin.acting.poses.flatMap(p => p.emotions).includes('强忍泪水微笑'))
+    assert.equal(lin.acting.faces['强忍泪水微笑'].tags, 'smile, tearing up, trembling lips')
 
     // 「让设计师重写并重画」生气：只重新设计这张脸（不挪动作），再在原来的底图上换
     addReply = { faces: [{ emotion: 'angry', desc: '咬着嘴唇忍着', tags: 'biting lip, glaring' }] }
@@ -332,8 +383,8 @@ test('gate: 设计不出来时按通用动作组画；关掉立绘设计师不�
     lin = await settle(engine, 'g', p => p.sprites[pout]?.assetId && p.sprites[neutral]?.assetId && p.sprites[angry]?.face?.from === pout && p.sprites[cold]?.face?.from === neutral, '按新设计重画')
     assert.equal(llm.calls.filter(isActingWriter).length, designs, '不重新设计')
     assert.equal(lin.sprites[angry].tags, 'expressionless, narrowed eyes, cold eyes, closed mouth, half-closed eyes')
-    assert.deepEqual([lin.sprites[cold].side, lin.sprites[cold].poseLabel], [false, '背手站着'], '冷淡在设计里没分到：进默认站姿，在平静的底图上换脸')
-    assert.ok(requests.some(r => /from side/.test(charOf(r))), '侧身底图')
+    assert.deepEqual([lin.sprites[cold].side, lin.sprites[cold].poseLabel], [undefined, '背手站着'], '冷淡在设计里没分到：进默认站姿，在平静的底图上换脸')
+    assert.ok(!requests.some(r => /from side/.test(charOf(r))), '没有侧身底图')
 
     // 关掉立绘设计师：不再设计，已有的设计照用
     await engine.patchConfig({ images: { spriteWriter: false } })

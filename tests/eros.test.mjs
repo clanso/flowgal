@@ -4,9 +4,10 @@ import assert from 'node:assert/strict'
 import { normalizeScript, direct } from '../lib/director.js'
 import { DEFAULT_CONFIG, resolveConfig } from '../lib/config.js'
 import { DIRECTOR_EROS } from '../lib/prompts.js'
-import { MAX_SFX_PER_TURN } from '../lib/soundlib.js'
+// 设置里限了数时（默认不限）
+const MAX_SFX_PER_TURN = 6, MAX_EROS_SFX_PER_TURN = 14, MAX_PEAKS_PER_TURN = 6
 import { ONOMATOPOEIA } from '../lib/foley.js'
-import { EROS_FOLEY, EROS_SFX, EROS_ALIAS, EROS_LOOPS, TENTACLE_LOOPS, TENTACLE_SWAP, PEAK_FOLEY, PEAKS, EROS_PACES, TENTACLE, erosSfx, peakOf, MAX_EROS_SFX_PER_TURN, MAX_PEAKS_PER_TURN } from '../lib/eros.js'
+import { EROS_FOLEY, EROS_SFX, EROS_ALIAS, EROS_LOOPS, TENTACLE_LOOPS, TENTACLE_SWAP, PEAK_FOLEY, PEAKS, EROS_PACES, TENTACLE, erosSfx, peakOf } from '../lib/eros.js'
 import { buildBeats, beatHold, PEAK_LEAD_MS } from '../src/client/theater/playback.js'
 
 const unitsOf = n => Array.from({ length: n }, (_, i) => ({ id: 'U' + (i + 1), type: 'narration', text: '句' + i }))
@@ -35,13 +36,13 @@ test('gate: 导演写的亲密音效照收（名字、日文拟声），跟普�
   const n = MAX_EROS_SFX_PER_TURN + MAX_SFX_PER_TURN + 4
   const units = unitsOf(n)
   const lines = units.map((u, i) => ({ u: u.id, sfx: i < MAX_EROS_SFX_PER_TURN + 2 ? (i % 2 ? '插入' : 'ずちゅ') : '砰' }))
-  const script = normalizeScript({ scene: {}, cast: [], lines }, units)
+  const script = normalizeScript({ scene: {}, cast: [], lines }, units, { limits: { sfx: MAX_SFX_PER_TURN, erosSfx: MAX_EROS_SFX_PER_TURN } })
   const kept = units.map(u => script.lines[u.id] && script.lines[u.id].sfx).filter(Boolean)
   assert.equal(kept.filter(s => EROS_SFX[s]).length, MAX_EROS_SFX_PER_TURN)
   assert.equal(kept.filter(s => ONOMATOPOEIA[s]).length, Math.min(MAX_SFX_PER_TURN, n - MAX_EROS_SFX_PER_TURN - 2))
   assert.deepEqual(['climax', '高潮', '絶頂', 'cum', '内射', 'both', '一起', 'nope', ''].map(peakOf), ['climax', 'climax', 'climax', 'cum', 'cum', 'both', 'both', '', ''])
   const many = unitsOf(MAX_PEAKS_PER_TURN + 2)
-  const peaks = normalizeScript({ scene: {}, cast: [], lines: many.map(u => ({ u: u.id, peak: '高潮' })) }, many)
+  const peaks = normalizeScript({ scene: {}, cast: [], lines: many.map(u => ({ u: u.id, peak: '高潮' })) }, many, { limits: { peaks: MAX_PEAKS_PER_TURN } })
   assert.equal(many.filter(u => peaks.lines[u.id] && peaks.lines[u.id].peak).length, MAX_PEAKS_PER_TURN)
 })
 

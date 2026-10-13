@@ -157,9 +157,10 @@ test('gate: 重新整理后新脚本里没有的插画从聊天里撤下：画�
   }
 }))
 
-test('gate: 剧场画面默认跟横版插画一样的比例（NovelAI 1216×832），可选 16:9，尺寸填得离谱时退回 16:9；出图尺寸按 64 取整', () => {
-  const sizes = resolveConfig({ images: { sizes: { landscape: [1200, 800], portrait: [99999, 'x'], square: [100, 3000] } } }).images.sizes
-  assert.deepEqual(sizes, { landscape: [1216, 832], portrait: [832, 1216], square: [256, 2048] })
+test('gate: 剧场画面默认跟横版插画一样的比例（NovelAI 1216×832），可选 16:9，尺寸填得离谱时退回 16:9；出图尺寸按 64 取整，最大 4096', () => {
+  const sizes = resolveConfig({ images: { sizes: { landscape: [1200, 800], portrait: [99999, 'x'], square: [100, 5000] } } }).images.sizes
+  assert.deepEqual(sizes, { landscape: [1216, 832], portrait: [832, 1216], square: [256, 4096] })
+  assert.deepEqual(resolveConfig({ images: { sizes: { square: [3072, 3072] } } }).images.sizes.square, [3072, 3072], '本地 ComfyUI / WebUI 能画这么大')
   assert.equal(resolveConfig({ ui: { ratio: 'tall' } }).ui.ratio, 'cg')
   assert.equal(stageRatio(undefined), 1216 / 832)
   assert.equal(stageRatio({ ui: { ratio: 'cg' }, images: { sizes: { landscape: [1344, 768] } } }), 1344 / 768)

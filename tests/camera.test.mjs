@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normalizeScript } from '../lib/director.js'
 import { aimCamera, CAM_CENTER } from '../lib/camera.js'
-import { MAX_CAMS_PER_TURN } from '../lib/vocab.js'
+const MAX_CAMS_PER_TURN = 14 // 设置里限了数时（默认不限）
 import { buildBeats } from '../src/client/theater/playback.js'
 
 test('gate: 导演写的镜头：新镜头收下；camOn 只给对准人的镜头留，写的就是说话人时省掉；一轮有上限', () => {
@@ -23,7 +23,9 @@ test('gate: 导演写的镜头：新镜头收下；camOn 只给对准人的镜�
   assert.equal(script.lines.U4.cam, undefined)
 
   const many = Array.from({ length: MAX_CAMS_PER_TURN + 5 }, (_, i) => ({ id: 'U' + (i + 1), type: 'dialogue', text: '句' + i }))
-  const crowded = normalizeScript({ scene: {}, cast: [], lines: many.map(u => ({ u: u.id, sp: '林岚', cam: 'empty' })) }, many)
+  const raw = { scene: {}, cast: [], lines: many.map(u => ({ u: u.id, sp: '林岚', cam: 'empty' })) }
+  assert.equal(Object.values(normalizeScript(raw, many).lines).filter(l => l.cam).length, many.length, '默认不限')
+  const crowded = normalizeScript(raw, many, { limits: { cams: MAX_CAMS_PER_TURN } })
   assert.equal(Object.values(crowded.lines).filter(l => l.cam).length, MAX_CAMS_PER_TURN)
   assert.equal(crowded.lines['U' + (MAX_CAMS_PER_TURN + 1)].cam, undefined, '按正文顺序留前面的')
 })

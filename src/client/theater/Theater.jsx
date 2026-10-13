@@ -482,7 +482,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
               {!off.has('look.time') && <div className={`fg-grade${backgroundFor(stageScene, view).src ? ' is-drawn' : ''}`} data-time={stageScene.time} />}
               {beat && !title && beat.moment && beat.moment.kind === 'fireworks' && <Fireworks key={beat.key} sound={sfxOn} />}
               {/* 短闪回时说话的是闪回里的人：现在台上的人不高亮、不对口型 */}
-              {stageBeat && <Cast beat={title || stageBeat.recall || waking ? { ...stageBeat, speaker: '', speakers: null, sym: '' } : stageBeat} view={view} talk={title || stageBeat.recall || waking ? null : talk} max={ui0.maxOnStage ?? 5} dof={!off.has('actor.dof')} />}
+              {stageBeat && <Cast beat={title || stageBeat.recall || waking ? { ...stageBeat, speaker: '', speakers: null, sym: '' } : stageBeat} view={view} talk={title || stageBeat.recall || waking ? null : talk} max={ui0.maxOnStage ?? 8} dof={!off.has('actor.dof')} />}
               <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' && !off.has('look.tone') ? stageScene.mood : ''} ms={1600} />
               <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} />
               <FadeLayer name="romance" value={atmosphere ? romance : ''} ms={1600} />

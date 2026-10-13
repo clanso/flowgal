@@ -193,6 +193,10 @@ try {
   await click('.fg-btn:has-text("衣橱与状态")', 800)
   await page.locator('.fg-wardrobe').scrollIntoViewIfNeeded(); await sleep(300)
   await shot('32-wardrobe')
+  // 表演笔记：在档案里，设计师写的、玩家写的（锁住）
+  await click('.fg-btn:has-text("档案 ·")', 800)
+  await page.locator('.fg-field', { hasText: '表演笔记' }).scrollIntoViewIfNeeded(); await sleep(300)
+  await shot('48-acting-note')
   // 动作与表情：画立绘前给林岚设计的专属动作（每个动作一张底图）和每种情绪的表情
   await click('.fg-btn:has-text("动作与表情")', 800)
   await page.locator('.fg-acting').scrollIntoViewIfNeeded(); await sleep(300)
@@ -207,6 +211,7 @@ try {
   // NovelAI V5：透明底立绘、引导缩放、种子
   await click('.fg-quick button:has-text("CONFIG")', 800)
   await click('.fg-tab:has-text("导演")', 800); await shot('25-settings-director')
+  await page.locator('.fg-section', { hasText: '每轮上限' }).scrollIntoViewIfNeeded(); await sleep(300); await shot('49-director-limits')
   await click('.fg-tab:has-text("生图渠道")', 800)
   await page.locator('.fg-field', { hasText: '模型' }).locator('select').first().selectOption('nai-diffusion-5-full')
   await sleep(1200)

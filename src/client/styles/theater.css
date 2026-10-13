@@ -1353,9 +1353,9 @@
 .fg-aa-play.is-big.is-close { width: min(46cqw, 76cqh); height: auto; aspect-ratio: 1; }
 .fg-variant-body { display: grid; gap: .6cqw; align-content: start; min-width: 0; }
 .fg-variant-body b { font-size: 1.15cqw; letter-spacing: .08em; }
-.fg-emotion-row { display: grid; grid-template-columns: 12cqw 1fr 9cqw auto auto; gap: .8cqw; align-items: center; padding: .6cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .05); }
+.fg-emotion-row { display: grid; grid-template-columns: 12cqw 9cqw 1fr auto; gap: .8cqw; align-items: center; padding: .6cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .05); }
 .fg-emotion-row b { font-size: 1.15cqw; letter-spacing: .06em; }
-.fg-emotion-row.is-new { grid-template-columns: 12cqw 1fr 9cqw auto; border-bottom: 0; margin-top: .6cqw; }
+.fg-emotion-row.is-new { grid-template-columns: 1fr 9cqw auto; border-bottom: 0; margin-top: .6cqw; }
 .fg-chip small { margin-left: .3em; opacity: .55; font-size: .85em; }
 
 /* 表单 */

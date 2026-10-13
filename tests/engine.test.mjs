@@ -381,7 +381,7 @@ test('gate: 导演新造的复合情绪进情绪库，按这身衣服和长期�
     await engine.setSecret('novelai', 'official', 'k')
     await engine.onTurnSettled({ gameId: 'g', turn: 3, textVersion: 'v', text: '“又是这样……”\n“算了。”' })
     const lib = (await engine.emotions()).list
-    assert.deepEqual(lib.map(e => [e.id, e.desc, e.base, e.source]), [['带着烦躁思考', '皱眉撇嘴，手托下巴', 'thinking', 'director']])
+    assert.deepEqual(lib.map(e => [e.id, e.desc, e.base, e.source]), [['带着烦躁思考', undefined, 'thinking', 'director']], '导演写了描述也不存，情绪库里只有这个词')
     const look = { appearance: '1girl, long black hair', outfit: '睡衣', states: [{ name: '怀孕' }] }
     const key = variantKey(look, '带着烦躁思考')
     assert.match(key, /\|睡衣\|怀孕\|带着烦躁思考$/)
@@ -390,11 +390,13 @@ test('gate: 导演新造的复合情绪进情绪库，按这身衣服和长期�
     assert.equal(view.turns[0].script.lines.U2.emo, undefined, '没声明的英文乱词丢掉')
     assert.deepEqual(view.cast[0].states, [{ name: '怀孕', tags: 'pregnant, round belly' }])
     const writer = llm.calls.find(c => c.system.includes('立绘设计师')).messages[0].content[0].text
-    assert.match(writer, /睡衣」（pajamas）；长期状态 怀孕（pregnant, round belly）；情绪「带着烦躁思考」：皱眉撇嘴，手托下巴；接近 思考/)
+    assert.match(writer, /睡衣」（pajamas）；长期状态 怀孕（pregnant, round belly）；情绪「带着烦躁思考」；接近 思考/)
+    assert.doesNotMatch(writer, /皱眉撇嘴/)
     // 导演下一轮能在情绪库里看到它。
     await engine.onTurnSettled({ gameId: 'g', turn: 4, textVersion: 'v4', text: '“嗯。”' })
     const next = llm.calls.filter(c => c.system.includes('后台导演')).at(-1).messages[0].content[0].text
-    assert.match(next, /【情绪库】[\s\S]*- 带着烦躁思考：皱眉撇嘴，手托下巴/)
+    assert.match(next, /【情绪库】[\s\S]*新加的（直接写原词）：带着烦躁思考/)
+    assert.doesNotMatch(next, /皱眉撇嘴/)
     engine.dispose()
   } finally {
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })

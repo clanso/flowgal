@@ -47,7 +47,7 @@ const ACTING = {
     poses: [
       { label: '指尖搭在琴凳边', desc: '弹琴的人的习惯：一只手垂着，指尖轻轻搭着，站得很稳', tags: 'one hand at side, fingers slightly curled, relaxed shoulders, weight on one leg', emotions: ['neutral', 'smile', 'happy', 'laugh', 'thinking', 'serious', 'tired', 'sad', 'cry'] },
       { label: '手背在身后歪头', desc: '捉弄人、等你上钩的时候', tags: 'hands behind back, head tilt, weight on one leg', emotions: ['teasing', 'smug', 'love', 'confused', 'surprised'] },
-      { label: '别过脸按着胸口', desc: '被说中心事、强装镇定的时候', tags: 'hand on own chest, head turned away, shoulders drawn in', side: true, emotions: ['shy', 'blush', 'pout', '害羞地强装镇定', 'worried', 'scared'] },
+      { label: '别过脸按着胸口', desc: '被说中心事、强装镇定的时候', tags: 'hand on own chest, head turned away, shoulders drawn in', emotions: ['shy', 'blush', 'pout', '害羞地强装镇定', 'worried', 'scared'] },
       { label: '抱着胳膊', desc: '冷下来、拒绝再说下去的时候', tags: 'arms crossed, straight posture', emotions: ['cold', 'angry', 'determined'] },
     ],
     faces: {
@@ -75,6 +75,8 @@ const ACTING = {
 function actingWriterReply(prompt) {
   const name = (prompt.slice(prompt.indexOf('【角色档案】\n')).match(/名字：([^（\n]+)/) || [])[1] || ''
   const plan = ACTING[name] || { read: '', poses: [{ label: '站着', desc: '', tags: 'hands at sides', emotions: ['neutral'] }], faces: {} }
+  // 只重写表演笔记（人物志里「让设计师重写」）：换一种说法，看得出是新写的
+  if (prompt.includes('这次只重写这个人的表演笔记')) return JSON.stringify({ read: plan.read ? '（重读资料后）' + plan.read : '情绪都写在脸上，来得快去得快。' })
   const list = prompt.slice(prompt.indexOf('【要设计的情绪】\n')).split('\n').map(line => (line.match(/^- ([^（：]+)（/) || [])[1]).filter(Boolean)
   const adding = prompt.includes('【已有的动作与表情设计】')
   const faces = list.map(e => ({ emotion: e, ...(plan.faces[e] || { desc: '', tags: EXPRESSIONS[e] || EMOTION_TAGS[e] || 'calm, closed mouth' }) }))

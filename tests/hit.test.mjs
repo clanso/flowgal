@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normalizeScript } from '../lib/director.js'
-import { MAX_HITS_PER_TURN } from '../lib/vocab.js'
+const MAX_HITS_PER_TURN = 12 // 设置里限了数时（默认不限）
 import { buildBeats, beatHold, HIT_LEAD_MS } from '../src/client/theater/playback.js'
 
 test('gate: 导演写的出手要有目标或招式名，效果认不出按命中；一轮有上限；写了开战、结束也不留', () => {
@@ -24,7 +24,9 @@ test('gate: 导演写的出手要有目标或招式名，效果认不出按命�
   assert.deepEqual(L.U4.hit, { to: '我', effect: 'hit' })
 
   const many = Array.from({ length: MAX_HITS_PER_TURN + 3 }, (_, i) => ({ id: 'U' + (i + 1), type: 'dialogue', text: '句' + i }))
-  const crowded = normalizeScript({ scene: {}, cast: [], lines: many.map(u => ({ u: u.id, sp: '林岚', hit: { to: '我', move: '斩' } })) }, many)
+  const raw = { scene: {}, cast: [], lines: many.map(u => ({ u: u.id, sp: '林岚', hit: { to: '我', move: '斩' } })) }
+  assert.equal(Object.values(normalizeScript(raw, many).lines).filter(l => l.hit).length, many.length, '默认不限')
+  const crowded = normalizeScript(raw, many, { limits: { hits: MAX_HITS_PER_TURN } })
   assert.equal(Object.values(crowded.lines).filter(l => l.hit).length, MAX_HITS_PER_TURN)
 })
 

@@ -4,7 +4,7 @@
 // 认脸模型只能在浏览器里跑（宿主没有），所以这一步放在剧场页面上。
 import React from 'react'
 import { api, assetUrl, toast } from '../api.js'
-import { visionApi, frameSprite, holdVision, releaseVisionLater } from './vision.js'
+import { visionApi, frameSprite, bigReady, holdVision, releaseVisionLater } from './vision.js'
 
 /** 这一局里等认脸的动作底图：[{ name, key, assetId }]（同一张底图只列一次）。 */
 export function facesToFrame(view) {
@@ -38,6 +38,7 @@ const tried = new Map()
 /** 某张底图自动认脸的结果（人物志里显示）。 */
 export const framedResult = assetId => tried.get(assetId) || ''
 let noModelAt = 0
+let toldSmall = false // 大模型没下、这次只用小模型认：一个页面里说一次
 
 /** 剧场开着时挂上：有等认脸的底图就认（一次一张，认完放掉大模型）。 */
 export function useFaceFramer(gameId, view) {
@@ -53,10 +54,14 @@ export function useFaceFramer(gameId, view) {
       const status = await visionApi.status().catch(() => null)
       if (!status || !status.packs.basic.ready) { noModelAt = Date.now(); return }
       holdVision()
+      if (!bigReady(status) && !toldSmall) {
+        toldSmall = true
+        toast('认脸大模型还没下载，这次先用小模型认脸；在人物志的逆转式工作台里下载大模型，认得更准')
+      }
       try {
         for (const w of work) {
           let r = null
-          try { r = await frameSprite(status, assetUrl(w.assetId), { big: !w.measure }) } catch {}
+          try { r = await frameSprite(status, assetUrl(w.assetId)) } catch {}
           if (r && r.confidence !== 'low') {
             try {
               await api.cast(gameId, 'face-box', { name: w.name, key: w.key, rects: r.rects, measure: Boolean(w.measure) })

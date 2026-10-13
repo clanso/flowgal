@@ -2,8 +2,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normalizeScript, playingAfter } from '../lib/director.js'
-import { DIRECTOR_MUSIC } from '../lib/prompts.js'
-import { MAX_HUSH_PER_TURN } from '../lib/vocab.js'
+import { DIRECTOR_MUSIC, fill } from '../lib/prompts.js'
+import { limitPhrases } from '../lib/limits.js'
+const MAX_HUSH_PER_TURN = 2 // 设置里限了数时（默认不限）
 import { buildBeats, beatHold, HUSH_BEATS, HUSH_LEAD_MS } from '../src/client/theater/playback.js'
 
 const unitsOf = n => Array.from({ length: n }, (_, i) => ({ id: 'U' + (i + 1), type: 'dialogue', text: '句' + i }))
@@ -12,9 +13,10 @@ const trackIds = ['a', 'b']
 test('gate: 导演写的留白：认中文写法，不算换歌，一轮有上限；没在放、没有曲库、写在开场上的不收；留白之后写回原来的、换别的照收', () => {
   const list = ['b', 'hush', 'b', '无声', 'a', 'hush', 'b']
   const units = unitsOf(list.length)
-  const script = normalizeScript({ scene: { bgm: 'a' }, cast: [], lines: list.map((bgm, i) => ({ u: units[i].id, sp: '林岚', bgm })) }, units, { trackIds })
-  assert.equal(MAX_HUSH_PER_TURN, 2)
+  const raw = { scene: { bgm: 'a' }, cast: [], lines: list.map((bgm, i) => ({ u: units[i].id, sp: '林岚', bgm })) }
+  const script = normalizeScript(raw, units, { trackIds, limits: { hush: MAX_HUSH_PER_TURN } })
   assert.deepEqual(units.map(u => script.lines[u.id].bgm), ['b', 'hush', 'b', 'hush', 'a', undefined, undefined])
+  assert.equal(normalizeScript(raw, units, { trackIds }).lines.U6.bgm, 'hush', '默认不限')
   const hushOnly = normalizeScript({ scene: { bgm: 'a' }, cast: [], lines: [{ u: 'U1', sp: '林岚', bgm: 'hush' }] }, unitsOf(1), { trackIds })
   assert.equal(playingAfter(hushOnly), 'a', '留白不是换歌，下一轮接着放原来的')
 
@@ -51,5 +53,6 @@ test('gate: 写回原来的曲子、换歌、换了地方就提前回来；留�
 
 test('gate: 导演的配乐规则里写着留白', () => {
   assert.ok(DIRECTOR_MUSIC.includes('bgm: "hush"'))
-  assert.ok(DIRECTOR_MUSIC.includes(`一轮最多 ${MAX_HUSH_PER_TURN} 次`))
+  assert.ok(fill(DIRECTOR_MUSIC, limitPhrases({ hush: MAX_HUSH_PER_TURN })).includes(`一轮最多 ${MAX_HUSH_PER_TURN} 次，留给真正要静下来的那一下`))
+  assert.ok(fill(DIRECTOR_MUSIC, limitPhrases({})).includes('hush 不算换歌，留给真正要静下来的那一下'), '不限时不写数')
 })

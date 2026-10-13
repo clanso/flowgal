@@ -24,6 +24,8 @@ import { naiModelInfo } from '../../../lib/image/nai-models.js'
 import { CG_MAX_CHARACTERS, EMOTIONS, EMOTION_POSE, POSES } from '../../../lib/vocab.js'
 import { POSE_IDS, poseMembers, anchorOf, faceBoxFrom, cleanFaceBox } from '../../../lib/face.js'
 import { heightOf } from '../../../lib/stature.js'
+import { DIRECTOR_LIMITS } from '../../../lib/limits.js'
+import { STAGE_SIZES, imageConcurrency } from '../../../lib/config.js'
 import { defaultRects } from '../../../lib/aa-sprite.js'
 
 const STATUS_LABEL = { writing: '分镜中', queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消', ready: '' }
@@ -393,8 +395,8 @@ const LOOK_HINTS = {
   other: '分不进上面各格的 tag。旧档案的一整串在这里，照常出图；想整理就挪进上面各格，tag 没变的话已经画好的立绘不用重画',
 }
 
-/** 档案：固定外貌（按字段）、性别、种子、身高、声音、给立绘设计师的备注和负面词。全局角色改的是全局库。cast 是这一局的全部人物（自动分声音时避开别人）。 */
-function ProfileEditor({ gameId, person, cast }) {
+/** 档案：固定外貌（按字段）、性别、种子、身高、声音、给立绘设计师的备注、表演笔记（自己存）和负面词。全局角色改的是全局库。cast 是这一局的全部人物（自动分声音时避开别人）。 */
+function ProfileEditor({ gameId, person, cast, group, turn }) {
   const pick = p => ({
     look: Object.fromEntries(LOOK_FIELDS.map(f => [f, (p.appearanceFields || {})[f] || ''])),
     gender: p.gender || '', note: p.note || '', negative: p.negative || '', seed: p.seedCustom ? String(p.seed) : '', height: p.height ? String(p.height) : '', voice: p.voice || '', voicePitch: String(p.voicePitch || 0),
@@ -462,6 +464,7 @@ function ProfileEditor({ gameId, person, cast }) {
         </div>
       </div>
       <div className="fg-field"><label>立绘备注</label><textarea className="fg-textarea is-short" value={form.note} onChange={set('note')} onKeyDown={e => e.stopPropagation()} placeholder="写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" /></div>
+      <ActingNote gameId={gameId} person={person} group={group} turn={turn} />
       <div className="fg-field"><label>不要出现</label><input className="fg-input" value={form.negative} onChange={set('negative')} onKeyDown={e => e.stopPropagation()} placeholder="glasses, ponytail（每张立绘都加进负面词）" /></div>
       <div className="fg-row" style={{ justifyContent: 'flex-end' }}><button type="button" className="fg-btn is-primary" disabled={!dirty || busy === 'save'} onClick={save}>保存档案</button></div>
     </div>
@@ -672,7 +675,7 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
       {viewing && <SpriteViewer record={record} label={label} onClose={() => setViewing(false)} />}
       <div className="fg-variant-body">
         <div className="fg-row"><b>{label}</b><span className="fg-spacer" /><button type="button" className="fg-btn is-mini" onClick={onClose}>收起</button></div>
-        {entry.desc && <div className="fg-note">情绪：{entry.desc}{entry.base ? `（接近${emotionLabel(entry.base)}）` : ''}</div>}
+        {!entry.builtin && entry.base && <div className="fg-note">新情绪，接近{emotionLabel(entry.base)}（这张还没画好时先用那张）</div>}
         {st && st.error && <div className={`fg-note${st.status === 'face' || st.status === 'writing' ? '' : ' fg-err'}`}>{st.error}</div>}
         <FaceInfo gameId={gameId} person={person} group={group} emotionKey={key} record={record} emotions={emotions} />
         <textarea className="fg-textarea" value={tags} onChange={e => setTags(e.target.value)} onKeyDown={e => e.stopPropagation()} placeholder={record && record.face ? '只换脸：这里只写表情（眉、眼、嘴、脸红、泪、视线）' : '还没有提示词：点「让设计师写」，它会读完资料和剧情来写'} />
@@ -706,26 +709,131 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
 }
 
 /**
- * 动作与表情设计：立绘设计师读完资料和剧情给这个人设计的专属动作（每个动作整张画一张底图），和每种情绪在他脸上的样子。
- * 能看、能改（改动作的名字、描述、身体 tag，把情绪挪到别的动作、设为底图，改表情），能让设计师重新设计，能按这套设计把这一身重画。
+ * 这一身已经画过、或者记过提示词的情绪（「按这套设计重画」「按新笔记重写表情」重画它们）。
+ * at 是画它们要带的参数：现在这一身不用带；段落里当时的样子带 look；以前那一轮的样子带 turn。
+ */
+function drawnIn(person, group, turn) {
+  const drawn = Object.entries(person.sprites || {}).filter(([key, r]) => key.startsWith(group.key + '|') && r && (r.assetId || r.tags)).map(([key]) => key.split('|').pop())
+  const reachable = group.current || turn != null || Boolean(group.era)
+  return { drawn, reachable, at: group.current ? {} : group.era ? { look: group.key } : { turn } }
+}
+
+/**
+ * 表演笔记：这个人怎么流露情绪（性格、经历让他把情绪藏起来还是摆在脸上），表演设计师设计动作和表情、立绘设计师写差分都照它。
+ * 设计师读完资料写一份（acting.read）；玩家写了就用玩家的（actingNote），锁住，重新设计也不改它；清空了回到设计师写的。
+ * 失焦就存。正在改的时候设计师写了新的，不冲掉正在改的，提示一下。
+ */
+function ActingNote({ gameId, person, group, turn }) {
+  const [busy, run] = useBusy()
+  const acting = person.acting
+  const ai = (acting && acting.read) || ''
+  const mine = person.actingNote || ''
+  const shown = mine || ai
+  const [v, setV] = React.useState(shown)
+  const [editing, setEditing] = React.useState(false)
+  const [fresh, setFresh] = React.useState(false) // 改着的时候设计师写了新的一版
+  React.useEffect(() => {
+    if (editing && v !== shown) { setFresh(true); return }
+    setV(shown)
+    setFresh(false)
+  }, [shown])
+  const commit = () => {
+    setEditing(false)
+    const text = v.trim()
+    if (text === shown.trim()) { setV(shown); return }
+    if (!text && !mine) { setV(shown); return }
+    run('note', () => api.cast(gameId, person.global ? 'global-save' : 'save', { name: person.name, patch: { actingNote: text } }), text ? '表演笔记已保存：之后设计和画差分都照你写的' : ai ? '已清空，回到设计师写的那份' : '已清空')
+  }
+  const designing = person.actingBusy || busy === 'rewrite'
+  const rewrite = () => {
+    if (mine && !window.confirm(`换掉你写的表演笔记，让表演设计师重新读一遍资料、剧情和档案，给${person.name}写一份？`)) return
+    run('rewrite', () => api.cast(gameId, 'acting-note', { name: person.name, replace: true }), acting ? '已交给表演设计师：读完资料就写好（导演日志里能看进度）' : '还没设计动作与表情：已交给设计师整套设计，表演笔记一起写')
+  }
+  const { drawn, reachable, at } = drawnIn(person, group, turn)
+  const redraw = () => {
+    if (!window.confirm(`让立绘设计师按现在的表演笔记，重新设计${person.name}「${lookLabel(group.look)}」这 ${drawn.length} 种表情、重写提示词再画？动作不变。`)) return
+    run('redraw', () => api.cast(gameId, 'sprite', { name: person.name, emotions: drawn, rewrite: true, ...at }), '已排队：按新的表演笔记重写表情')
+  }
+  const readTurn = acting ? (acting.readTurn != null ? acting.readTurn : acting.turn) : null
+  const whose = mine ? '你写的（锁住：重新设计也不会改它；清空就回到设计师写的）'
+    : ai ? `表演设计师读到第 ${readTurn != null ? readTurn : '?'} 轮写的，改了就算你写的`
+    : '还没写。第一次设计动作与表情时，表演设计师会读完资料写一份；你也可以自己先写'
+  return (
+    <div className="fg-field"><label>表演笔记</label>
+      <div>
+        <textarea className="fg-textarea" value={v} disabled={busy === 'note'} onFocus={() => setEditing(true)} onChange={e => setV(e.target.value)} onBlur={commit} onKeyDown={e => e.stopPropagation()}
+          placeholder="这个人怎么流露情绪：比如「嘴硬心软，难过时反而笑，只有眼眶会红；生气时声音变轻、不看人」" />
+        {fresh && (
+          <div className="fg-row fg-note">
+            设计师刚写了新的一版，你正在改的没有冲掉。
+            <button type="button" className="fg-btn is-mini" onClick={() => { setV(shown); setFresh(false) }}>换成设计师的新版</button>
+          </div>
+        )}
+        <div className="fg-row">
+          <span className="fg-note">{whose}</span>
+          <span className="fg-spacer" />
+          <button type="button" className="fg-btn is-mini" disabled={designing} onClick={rewrite}>{designing ? '设计师在写…' : '让设计师重写'}</button>
+          <button type="button" className="fg-btn is-mini" disabled={!reachable || !drawn.length || busy === 'redraw'} title="动作不变，按现在的表演笔记重新设计这些表情、重写提示词再画" onClick={redraw}>按新笔记重写表情{drawn.length ? `（「${lookLabel(group.look)}」${drawn.length} 张）` : ''}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 动作与表情设计：表演设计师读完资料和剧情给这个人设计的专属动作（每个动作整张画一张底图），和每种情绪在他脸上的样子。
+ * 能看、能改（改动作的名字、描述、身体 tag，把情绪挪到别的动作、设为底图，改表情），改了自动存；能让设计师重新设计，能按这套设计把这一身重画。
+ * 表演笔记（怎么流露情绪）在档案里改。
+ * 边改边存：后台的设计变了时，是自己刚存的那版就不管；设计师新写的、这边也没有没存的修改就换上；有没存的修改就提示，不冲掉。
  */
 function ActingEditor({ gameId, person, emotions, group, turn }) {
   const [busy, run] = useBusy()
   const acting = person.acting
-  const copy = a => (a ? JSON.parse(JSON.stringify({ read: a.read || '', ...(a.height ? { height: a.height } : {}), poses: a.poses || [], faces: a.faces || {} })) : null)
+  const copy = a => (a ? JSON.parse(JSON.stringify({ ...(a.height ? { height: a.height } : {}), poses: a.poses || [], faces: a.faces || {} })) : null)
   const [draft, setDraft] = React.useState(() => copy(acting))
-  React.useEffect(() => { setDraft(copy(acting)) }, [acting && acting.at])
-  const dirty = Boolean(draft) && JSON.stringify(draft) !== JSON.stringify(copy(acting))
+  const sent = React.useRef(JSON.stringify(copy(acting))) // 最后存上的（或从后台拿到的）那版
+  const ownAt = React.useRef(null) // 自己刚存的那版的 at
+  const inflight = React.useRef(false)
+  const latest = React.useRef(draft)
+  latest.current = draft
+  const [saving, setSaving] = React.useState('') // '' | 'saving' | 'saved' | 出错的原因
+  const [incoming, setIncoming] = React.useState(false) // 改着的时候设计师写了新的一版
+  const unsaved = d => Boolean(d) && JSON.stringify(d) !== sent.current
+  React.useEffect(() => {
+    if (!acting) { setDraft(null); sent.current = JSON.stringify(null); setIncoming(false); return }
+    if (inflight.current || acting.at === ownAt.current) return
+    const next = copy(acting)
+    const text = JSON.stringify(next)
+    if (text === sent.current) return
+    if (!unsaved(draft)) { setDraft(next); sent.current = text; setIncoming(false) }
+    else setIncoming(true)
+  }, [acting && acting.at])
+  const push = (sheet, text) => {
+    inflight.current = true
+    setSaving('saving')
+    return api.cast(gameId, 'acting-save', { name: person.name, acting: sheet })
+      .then(r => { sent.current = text; ownAt.current = r && r.at; setSaving('saved'); setIncoming(false) })
+      .catch(e => setSaving(e.message || '没存上'))
+      .finally(() => { inflight.current = false })
+  }
+  // 停手 1.2 秒就存；折起来、关掉人物志时没存的也存上
+  React.useEffect(() => {
+    if (!unsaved(draft)) return undefined
+    const text = JSON.stringify(draft)
+    const timer = setTimeout(() => push(draft, text), 1200)
+    return () => clearTimeout(timer)
+  }, [draft])
+  React.useEffect(() => () => { const d = latest.current; if (unsaved(d) && !inflight.current) api.cast(gameId, 'acting-save', { name: person.name, acting: d }).catch(() => {}) }, [])
   const label = e => emotionEntry(e, emotions).label
   const design = () => {
-    if (acting && !window.confirm(`让立绘设计师重新读一遍资料和剧情，给${person.name}重新设计整套动作和表情？你改过的会被换掉；已经画好的立绘不动，要换成新设计就点「按这套设计重画」。`)) return
-    run('design', () => api.cast(gameId, 'acting-design', { name: person.name }), '已交给立绘设计师：读完资料和剧情就设计好（导演日志里能看进度）')
+    if (acting && !window.confirm(`让表演设计师重新读一遍资料和剧情，给${person.name}重新设计整套动作和表情？你改过的动作和表情会被换掉（表演笔记里你写的那条不动）；已经画好的立绘不动，要换成新设计就点「按这套设计重画」。`)) return
+    run('design', () => api.cast(gameId, 'acting-design', { name: person.name }), '已交给表演设计师：读完资料和剧情就设计好（导演日志里能看进度）')
   }
   const designing = person.actingBusy || busy === 'design'
   if (!draft) {
     return (
       <div className="fg-person-form fg-acting">
-        <div className="fg-note">还没设计。第一次给{person.name}画立绘之前，立绘设计师会先读完人物卡、世界书、到这一轮为止的全部剧情和档案，按人设、经历和在故事里的处境设计几个专属的动作，以及每种情绪在脸上的样子；之后的底图和表情差分都照着画。没开立绘设计师、或者设计不出来时，用设置里的通用动作组。</div>
+        <div className="fg-note">还没设计。第一次给{person.name}画立绘之前，表演设计师会先读完人物卡、世界书、到这一轮为止的全部剧情和档案，写一份表演笔记（这个人怎么流露情绪，在「档案」里能看能改），按人设、经历和在故事里的处境设计专属的动作，以及每种情绪在脸上的样子；之后的底图和表情差分都照着画。没开立绘设计师、或者设计不出来时，用设置里的通用动作组。</div>
         <div className="fg-row" style={{ justifyContent: 'flex-end' }}><button type="button" className="fg-btn is-primary" disabled={designing} onClick={design}>{designing ? '设计中…' : '现在设计'}</button></div>
       </div>
     )
@@ -735,31 +843,34 @@ function ActingEditor({ gameId, person, emotions, group, turn }) {
   const move = (e, id) => setDraft(d => ({ ...d, poses: d.poses.map(p => (p.id === id ? { ...p, emotions: [...p.emotions.filter(x => x !== e), e] } : { ...p, emotions: p.emotions.filter(x => x !== e) })) }))
   const toFront = e => setDraft(d => ({ ...d, poses: d.poses.map(p => (p.emotions.includes(e) ? { ...p, emotions: [e, ...p.emotions.filter(x => x !== e)] } : p)) }))
   const setFace = (e, patch) => setDraft(d => ({ ...d, faces: { ...d.faces, [e]: { desc: '', tags: '', ...(d.faces[e] || {}), ...patch } } }))
-  const save = () => run('save', () => api.cast(gameId, 'acting-save', { name: person.name, acting: draft }), '已保存：之后画的照这份设计；已经画好的点「按这套设计重画」')
-  // 这一身已经画过、或者记过提示词的情绪：按这套设计重画（身体照设计重写，表情直接用设计好的）
-  const drawn = Object.entries(person.sprites || {}).filter(([key, r]) => key.startsWith(group.key + '|') && r && (r.assetId || r.tags)).map(([key]) => key.split('|').pop())
-  const reachable = group.current || turn != null || Boolean(group.era)
-  const at = group.current ? {} : group.era ? { look: group.key } : { turn }
+  const { drawn, reachable, at } = drawnIn(person, group, turn)
+  const pending = unsaved(draft) || saving === 'saving'
   const redraw = () => {
     if (!window.confirm(`按这套设计重画${person.name}「${lookLabel(group.look)}」的 ${drawn.length} 张差分？每个动作的底图整张重画，其余表情在新底图上换脸。`)) return
     run('redraw', () => api.cast(gameId, 'sprite', { name: person.name, emotions: drawn, rewrite: true, keepFaces: true, ...at }), '已排队：照这套设计重画')
   }
   const input = (value, onChange, placeholder, style) => <input className="fg-input" style={style} value={value || ''} placeholder={placeholder} onChange={e => onChange(e.target.value)} onKeyDown={e => e.stopPropagation()} />
+  const status = pending ? '正在存…' : saving === 'saved' ? '✓ 已自动保存' : saving ? `⚠ 没存上：${saving}` : ''
   return (
     <div className="fg-person-form fg-acting">
       <div className="fg-row">
-        <span className="fg-note">{acting.by === 'user' ? '你改过的设计' : `立绘设计师读到第 ${acting.turn != null ? acting.turn : '?'} 轮设计的`} · {draft.poses.length} 个动作{acting.height ? ` · 估的身高 ${acting.height} 厘米${person.height ? `（档案里写的 ${person.height} 优先）` : '（档案里能改）'}` : ''}</span>
+        <span className="fg-note">{acting.by === 'user' ? '你改过的设计' : `表演设计师读到第 ${acting.turn != null ? acting.turn : '?'} 轮设计的`} · {draft.poses.length} 个动作{acting.height ? ` · 估的身高 ${acting.height} 厘米${person.height ? `（档案里写的 ${person.height} 优先）` : '（档案里能改）'}` : ''}</span>
         <span className="fg-spacer" />
         <button type="button" className="fg-btn is-mini" disabled={designing} onClick={design}>{designing ? '设计中…' : '重新设计'}</button>
-        <button type="button" className="fg-btn is-mini" disabled={!reachable || dirty || !drawn.length || busy === 'redraw'} title={dirty ? '先保存修改' : ''} onClick={redraw}>按这套设计重画「{lookLabel(group.look)}」{drawn.length ? `（${drawn.length} 张）` : ''}</button>
+        <button type="button" className="fg-btn is-mini" disabled={!reachable || pending || !drawn.length || busy === 'redraw'} title={pending ? '等修改存好' : ''} onClick={redraw}>按这套设计重画「{lookLabel(group.look)}」{drawn.length ? `（${drawn.length} 张）` : ''}</button>
       </div>
-      <div className="fg-field"><label>怎么流露情绪</label><textarea className="fg-textarea is-short" value={draft.read} onChange={e => setDraft({ ...draft, read: e.target.value })} onKeyDown={e => e.stopPropagation()} placeholder="这个人的性格、经历让他怎么流露情绪" /></div>
+      {incoming && (
+        <div className="fg-row fg-note">
+          设计师刚改了这份设计，你正在改的没有冲掉（接着改会存成你的这版）。
+          <button type="button" className="fg-btn is-mini" onClick={() => { const next = copy(acting); setDraft(next); sent.current = JSON.stringify(next); setIncoming(false) }}>换成设计师的新版</button>
+        </div>
+      )}
+      <div className="fg-note">表演笔记（这个人怎么流露情绪）在「档案」里看和改。</div>
       {draft.poses.map(p => (
         <div key={p.id} className="fg-acting-pose">
           <div className="fg-acting-head">
             {input(p.label, v => setPose(p.id, { label: v }), '动作名', { width: '13cqw', fontWeight: 600 })}
             {input(p.desc, v => setPose(p.id, { desc: v }), '这个动作什么样、为什么是他', { flex: 1 })}
-            <label className="fg-row fg-note" style={{ gap: '.3em' }} title="整张按侧身画：侧脸、看向一旁"><input type="checkbox" checked={Boolean(p.side)} onChange={e => setPose(p.id, { side: e.target.checked })} />侧身</label>
           </div>
           {input(p.tags, v => setPose(p.id, { tags: v }), '身体的英文 tag：hands behind back, weight on one leg', { width: '100%' })}
           {p.emotions.map((e, i) => {
@@ -774,13 +885,12 @@ function ActingEditor({ gameId, person, emotions, group, turn }) {
               </div>
             )
           })}
-          {!p.emotions.length && <div className="fg-note">（空着：保存时去掉这个动作）</div>}
+          {!p.emotions.length && <div className="fg-note">（空着：存的时候去掉这个动作）</div>}
         </div>
       ))}
       <div className="fg-row" style={{ justifyContent: 'flex-end' }}>
-        <span className="fg-note">改了只影响之后画的；平静总在第一个动作的底图上（登场立绘就是它）。</span>
-        {dirty && <button type="button" className="fg-btn" onClick={() => setDraft(copy(acting))}>撤销修改</button>}
-        <button type="button" className="fg-btn is-primary" disabled={!dirty || busy === 'save'} onClick={save}>保存设计</button>
+        <span className="fg-note">改了自动存，只影响之后画的；平静总在第一个动作的底图上（登场立绘就是它）。</span>
+        {status && <span className="fg-note">{status}</span>}
       </div>
     </div>
   )
@@ -845,7 +955,7 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
           <button type="button" className={`fg-btn${fold === 'wardrobe' ? ' is-on' : ''}`} onClick={() => setFold(fold === 'wardrobe' ? '' : 'wardrobe')}>衣橱与状态 · {Object.keys((person.timeline && person.timeline.outfits) || {}).length} 套</button>
           <button type="button" className={`fg-btn${fold === 'acting' ? ' is-on' : ''}`} onClick={() => setFold(fold === 'acting' ? '' : 'acting')}>动作与表情 · {person.actingBusy ? '设计中…' : person.acting ? `${person.acting.poses.length} 个动作` : '还没设计'}</button>
         </div>
-        {fold === 'profile' && <ProfileEditor gameId={gameId} person={person} cast={cast} />}
+        {fold === 'profile' && <ProfileEditor gameId={gameId} person={person} cast={cast} group={group} turn={turn} />}
         {fold === 'wardrobe' && <WardrobeEditor gameId={gameId} person={person} />}
         {fold === 'acting' && <ActingEditor gameId={gameId} person={person} emotions={emotions} group={group} turn={turn} />}
         <div className="fg-looks">
@@ -879,7 +989,7 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
         )}
         <div className="fg-emos">
           {tiles.map(t => (
-            <button key={t.id} type="button" title={t.st && t.st.error ? t.st.error : t.desc || t.label} disabled={manage && !t.record}
+            <button key={t.id} type="button" title={t.st && t.st.error ? t.st.error : t.label} disabled={manage && !t.record}
               className={`fg-emo${t.st && ['writing', 'queued', 'running'].includes(t.st.status) ? ' is-busy' : ''}${!manage && emotion === t.id ? ' is-on' : ''}${manage && picked.has(t.key) ? ' is-picked' : ''}${t.builtin ? '' : ' is-custom'}`}
               onClick={() => (manage ? pick(t.key) : setEmotion(emotion === t.id ? '' : t.id))}>
               {t.record && t.record.assetId && <img src={assetUrl(t.record.assetId)} alt="" loading="lazy" />}
@@ -909,28 +1019,26 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
 /** 情绪库：内置情绪 + 导演自创的、你加的。新情绪写一句神情姿态，立绘设计师照着画。 */
 function EmotionLibrary({ emotions }) {
   const [busy, run] = useBusy()
-  const [draft, setDraft] = React.useState({ id: '', desc: '', base: '' })
+  const [draft, setDraft] = React.useState({ id: '', base: '' })
   const builtin = allEmotions([]).filter(e => e.builtin)
   const custom = (emotions || [])
   const baseOptions = [['', '（无）'], ...builtin.map(e => [e.id, e.label])]
   const save = (id, patch) => run('e' + id, () => api.emotion('save', { id, ...patch }), '已保存')
   return (
     <>
-      <div className="fg-note">导演给每句台词标情绪；库里没有贴切的词时，它会自创一个（可以是复合情绪，比如「带着烦躁思考」），写一句神情姿态，加进这里。导演新造的情绪只挂在用过它的角色下面，谁用到了才给谁画差分；你自己加的大家都能用。所有对局共用。</div>
+      <div className="fg-note">导演给每句台词标情绪；库里没有贴切的词时，它会自创一个（可以是复合情绪，比如「带着烦躁思考」），加进这里。库里只有这个词本身，不带描述：这种情绪在谁脸上什么样，由表演设计师按那个人的表演笔记设计（人物志 →「动作与表情」）。「接近」是还没画好时先用哪张立绘。导演新造的情绪只挂在用过它的角色下面，谁用到了才给谁画差分；你自己加的大家都能用。所有对局共用。</div>
       <div className="fg-section">新加的情绪 · {custom.length}</div>
       {custom.map(e => (
         <div key={e.id} className="fg-emotion-row">
           <b>{e.id}</b>
-          <Text value={e.desc || ''} placeholder="神情与姿态：眉眼、嘴角、脸色、手和身体" onCommit={v => save(e.id, { desc: v })} />
           <Select value={e.base || ''} options={baseOptions} onChange={v => save(e.id, { base: v })} />
           <span className="fg-note">{e.source === 'user' ? '你加的 · 大家都能用' : `导演加的${e.turn != null ? ` · 第 ${e.turn} 轮` : ''}${e.who && e.who.length ? ` · 用于 ${e.who.join('、')}` : ''}`}</span>
           <button type="button" className="fg-btn" disabled={busy === 'x' + e.id} onClick={() => run('x' + e.id, () => api.emotion('delete', { id: e.id }), '已删除（画好的立绘还在）')}>删除</button>
         </div>
       ))}
       {!custom.length && <div className="fg-note">还没有。导演遇到内置情绪表达不了的瞬间时会自己加。</div>}
-      <form className="fg-emotion-row is-new" onSubmit={e => { e.preventDefault(); if (draft.id.trim()) run('add', () => api.emotion('save', draft), '已加进情绪库').then(() => setDraft({ id: '', desc: '', base: '' })) }}>
-        <input className="fg-input" placeholder="苦闷地表白" value={draft.id} onChange={e => setDraft({ ...draft, id: e.target.value })} onKeyDown={e => e.stopPropagation()} />
-        <input className="fg-input" placeholder="眉头紧锁却脸红，攥着衣角，视线躲开" value={draft.desc} onChange={e => setDraft({ ...draft, desc: e.target.value })} onKeyDown={e => e.stopPropagation()} />
+      <form className="fg-emotion-row is-new" onSubmit={e => { e.preventDefault(); if (draft.id.trim()) run('add', () => api.emotion('save', draft), '已加进情绪库').then(() => setDraft({ id: '', base: '' })) }}>
+        <input className="fg-input" placeholder="新情绪，比如「苦闷地表白」（词本身要能看懂）" value={draft.id} onChange={e => setDraft({ ...draft, id: e.target.value })} onKeyDown={e => e.stopPropagation()} />
         <Select value={draft.base} options={baseOptions} onChange={v => setDraft({ ...draft, base: v })} />
         <button type="submit" className="fg-btn is-primary">加进情绪库</button>
       </form>
@@ -1004,6 +1112,29 @@ function Text({ value, onCommit, type = 'text', placeholder, style }) {
   React.useEffect(() => { setV(value ?? '') }, [value])
   const commit = () => { if (String(v) !== String(value ?? '')) onCommit(type === 'number' ? Number(v) : v) }
   return <input className="fg-input" type={type} value={v} placeholder={placeholder} style={style} onChange={e => setV(e.target.value)} onBlur={commit} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commit() }} />
+}
+/**
+ * 上限：一个数，或者勾上「不限」（存 null，后台就不设上限）。从不限改回限制时先填 fallback（以前写死的那个数）。
+ * free 是勾选框的字：大多是「不限」，并发、最大输出是「自动」。
+ */
+function Limit({ value, onCommit, fallback, min = 0, unit, free = '不限', width = '6cqw' }) {
+  const open = value === null || value === undefined
+  const shown = open ? '' : String(value)
+  const [v, setV] = React.useState(shown)
+  React.useEffect(() => { setV(shown) }, [shown])
+  const commit = () => {
+    const n = Math.max(min, Math.trunc(Number(v)))
+    if (String(v).trim() === '' || !Number.isFinite(n)) { setV(shown); return }
+    if (n !== value) onCommit(n)
+    else setV(shown)
+  }
+  return (
+    <span className="fg-row" style={{ gap: '.5em' }}>
+      {!open && <input className="fg-input" type="number" min={min} style={{ width }} value={v} onChange={e => setV(e.target.value)} onBlur={commit} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commit() }} />}
+      {!open && unit && <span className="fg-note">{unit}</span>}
+      <label className="fg-row fg-note" style={{ gap: '.3em' }}><input type="checkbox" checked={open} onChange={e => onCommit(e.target.checked ? null : fallback)} />{free}</label>
+    </span>
+  )
 }
 function Select({ value, options, onChange, style }) {
   return <select className="fg-select" value={value} style={style} onChange={e => onChange(e.target.value)}>{options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
@@ -1364,16 +1495,25 @@ function DirectorSection({ data, onDirectorLog }) {
             : <Text value={cfg.director.model} placeholder="模型 ID" onCommit={v => p({ model: v })} />)}
         </div>
       </Field>
-      <Field label="最大输出 / 温度" hint="默认 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。"><div className="fg-row"><Text type="number" style={{ width: '9cqw' }} value={cfg.director.maxTokens} onCommit={v => p({ maxTokens: v })} /><Text type="number" style={{ width: '7cqw' }} value={cfg.director.temperature} onCommit={v => p({ temperature: v })} /></div></Field>
-      <Field label="资料长度" hint="给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认 1000000，等于不截断；超出模型窗口时自动缩短。"><Text type="number" value={cfg.director.contextChars} onCommit={v => p({ contextChars: v })} /></Field>
+      <Field label="最大输出" hint="自动：模型报了输出上限就用它报的，没报按 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。导演、立绘设计师、插画分镜师都用这一个。"><Limit value={cfg.director.maxTokens} fallback={128000} min={1000} width="9cqw" free="自动" onCommit={v => p({ maxTokens: v })} /></Field>
+      <Field label="温度"><Text type="number" style={{ width: '7cqw' }} value={cfg.director.temperature} onCommit={v => p({ temperature: v })} /></Field>
+      <Field label="资料长度" hint="给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认不限，整份给；超出模型窗口时自动缩短。"><Limit value={cfg.director.contextChars} fallback={1000000} width="9cqw" unit="字" onCommit={v => p({ contextChars: v })} /></Field>
       <CgModelFields data={data} providers={llm.providers} />
-      <Field label="自定义提示词" hint="留空用内置导演提示词。可用 {{maxImages}} {{styleHint}}。情绪库、配乐曲库附在用户消息里，自定义时也生效。">
+      <div className="fg-section">每轮上限</div>
+      <div className="fg-note">导演一轮里最多写几次。默认都不限：提示词里「只给真正需要的地方」「平常的句子不写」那几句一直在，靠它让导演自己收着用。限了数的，提示词里会写上这个数，导演写多了也只按正文顺序留前面那么多。</div>
+      <div className="fg-limits">
+        {DIRECTOR_LIMITS.map(l => (
+          <Field key={l.key} label={l.label}><Limit value={cfg.director.limits?.[l.key] ?? null} fallback={l.was} unit={l.unit} onCommit={v => p({ limits: { [l.key]: v } })} /></Field>
+        ))}
+      </div>
+      <div className="fg-section">提示词</div>
+      <Field label="自定义提示词" hint={`留空用内置导演提示词。可用 {{styleHint}}，插画张数 {{imageLimit}} {{nsfwRoom}}，每轮上限 ${DIRECTOR_LIMITS.map(l => `{{${l.key}Limit}}`).join(' ')}（限了数是「一轮最多 N 次，」这半句，不限时是空的）。情绪库、配乐曲库附在用户消息里，自定义时也生效。`}>
         <textarea className="fg-textarea" defaultValue={cfg.director.systemPrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.systemPrompt) p({ systemPrompt: e.target.value }) }} />
       </Field>
       <Field label="立绘设计师提示词" hint="留空用内置的。可用 {{styleHint}}。输出格式必须是 {&quot;sprites&quot;:[{&quot;key&quot;,&quot;tags&quot;}]}（负面只用画风里带的，写了也不收）。">
         <textarea className="fg-textarea" defaultValue={cfg.director.spritePrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.spritePrompt) p({ spritePrompt: e.target.value }) }} />
       </Field>
-      <Field label="动作与表情设计提示词" hint="留空用内置的（画立绘前给每个人设计专属动作和表情）。可用 {{styleHint}} {{max}}。输出格式必须是 {&quot;read&quot;,&quot;poses&quot;:[{&quot;id&quot;,&quot;label&quot;,&quot;desc&quot;,&quot;tags&quot;,&quot;side&quot;,&quot;emotions&quot;}],&quot;faces&quot;:[{&quot;emotion&quot;,&quot;desc&quot;,&quot;tags&quot;}]}。">
+      <Field label="动作与表情设计提示词" hint="留空用内置的（画立绘前给每个人设计专属动作和表情，read 是人物志里的「表演笔记」）。可用 {{styleHint}}。输出格式必须是 {&quot;read&quot;,&quot;poses&quot;:[{&quot;id&quot;,&quot;label&quot;,&quot;desc&quot;,&quot;tags&quot;,&quot;emotions&quot;}],&quot;faces&quot;:[{&quot;emotion&quot;,&quot;desc&quot;,&quot;tags&quot;}]}。">
         <textarea className="fg-textarea" defaultValue={cfg.director.actingPrompt} onKeyDown={e => e.stopPropagation()} onBlur={e => { if (e.target.value !== cfg.director.actingPrompt) p({ actingPrompt: e.target.value }) }} />
       </Field>
       <Field label="插画分镜师提示词" hint="留空用内置的（Base + 每人一个角色块的写法）。可用 {{styleHint}}。输出格式必须是 {&quot;images&quot;:[{&quot;key&quot;,&quot;tag&quot;,&quot;nl&quot;,&quot;characters&quot;:[{&quot;name&quot;,&quot;tag&quot;,&quot;nl&quot;}],&quot;size&quot;}]}。">
@@ -1462,7 +1602,7 @@ function ImagesSection({ data }) {
   return (
     <>
       <div className="fg-section">自动配图</div>
-      <Field label="自动插画" hint="导演判断值得画的地方自动出 CG，挂在正文对应段落后。"><div className="fg-row"><Toggle value={cfg.images.auto} onChange={v => p({ auto: v })} /><span className="fg-note">每轮最多</span><Text type="number" style={{ width: '6cqw' }} value={cfg.images.maxPerTurn} onCommit={v => p({ maxPerTurn: v })} /><span className="fg-note">张</span></div></Field>
+      <Field label="自动插画" hint="导演判断值得画的地方自动出 CG，挂在正文对应段落后。"><div className="fg-row"><Toggle value={cfg.images.auto} onChange={v => p({ auto: v })} /><span className="fg-note">每轮最多</span><Limit value={cfg.images.maxPerTurn} fallback={4} unit="张" onCommit={v => p({ maxPerTurn: v })} /></div></Field>
       <Field label="插画方向" hint="横图铺满舞台；竖图在剧场里镜头从上往下慢慢看一遍。交给 AI 时插画分镜师按构图挑（多人铺开、远景出横图，单人、特写、两人贴近出竖图）。只管自动配的插画，鉴赏里还能单张改。">
         <select className="fg-select" style={{ width: 'auto' }} value={cfg.images.cgShape || 'auto'} onChange={e => p({ cgShape: e.target.value })}>
           <option value="auto">AI 自己判断</option>
@@ -1472,11 +1612,13 @@ function ImagesSection({ data }) {
       </Field>
       <Field label="新地点背景"><Toggle value={cfg.images.backgrounds} onChange={v => p({ backgrounds: v })} /></Field>
       <Field label="立绘" hint="角色登场、换装、长期状态变化时，画这一套的平静立绘。"><Toggle value={cfg.images.portraits} onChange={v => p({ portraits: v })} /></Field>
-      <Field label="情绪差分" hint="导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。"><div className="fg-row"><Toggle value={cfg.images.expressions} onChange={v => p({ expressions: v })} /><span className="fg-note">每轮最多</span><Text type="number" style={{ width: '6cqw' }} value={cfg.images.expressionsPerTurn} onCommit={v => p({ expressionsPerTurn: v })} /><span className="fg-note">张</span></div></Field>
-      <Field label="表情只换脸" hint="galgame 的「一个动作 + 一套表情」：同一套衣服每个动作整张画一张底图，同一个动作的其余情绪用 NovelAI 局部重绘只重画脸（眉、眼、两颊、嘴），身体和衣服一个像素都不动。每个人有哪些动作、哪种情绪归哪个动作、脸上什么样，是立绘设计师读完资料和剧情给他设计的（人物志 →「动作与表情」）。底图画好后要认一次脸：剧场开着、认脸小模型下好时自动认，认不准的在人物志里点开底图框一下。只对 NovelAI 有效；关掉就像以前一样每个情绪整张画。已经画好的立绘不会自动重画。"><Toggle value={cfg.images.faceSwap} onChange={v => p({ faceSwap: v })} /></Field>
+      <Field label="情绪差分" hint="导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。"><div className="fg-row"><Toggle value={cfg.images.expressions} onChange={v => p({ expressions: v })} /><span className="fg-note">每轮最多</span><Limit value={cfg.images.expressionsPerTurn} fallback={12} unit="张" onCommit={v => p({ expressionsPerTurn: v })} /></div></Field>
+      <Field label="表情只换脸" hint="galgame 的「一个动作 + 一套表情」：同一套衣服每个动作整张画一张底图，同一个动作的其余情绪用 NovelAI 局部重绘只重画脸（眉、眼、两颊、嘴），身体和衣服一个像素都不动。每个人有哪些动作、哪种情绪归哪个动作、脸上什么样，是立绘设计师读完资料和剧情给他设计的（人物志 →「动作与表情」）。底图画好后要认一次脸：剧场开着、认脸模型下好时自动认（下了认脸大模型就一律用大模型），认不准的在人物志里点开底图框一下。只对 NovelAI 有效；关掉就像以前一样每个情绪整张画。已经画好的立绘不会自动重画。"><Toggle value={cfg.images.faceSwap} onChange={v => p({ faceSwap: v })} /></Field>
       {cfg.images.faceSwap && <PoseGroups poses={cfg.images.poses || {}} onChange={poses => p({ poses })} />}
       <Field label="立绘设计师" hint="给一个人画第一张立绘之前，先读完人物卡、世界书和到这一轮为止的全部剧情，按他的人设和经历设计专属的几个动作和每种情绪的表情（人物志 →「动作与表情」里能看能改）；之后每张差分的提示词也由它读完资料来写，照设计画，只换脸的表情直接用设计好的。一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼、用通用动作组。"><Toggle value={cfg.images.spriteWriter} onChange={v => p({ spriteWriter: v })} /></Field>
-      <Field label="并发"><Text type="number" style={{ width: '6cqw' }} value={cfg.images.concurrency} onCommit={v => p({ concurrency: v })} /></Field>
+      {cfg.images.backend === 'novelai' && (cfg.novelai?.endpoint || 'official') === 'official'
+        ? <Field label="并发"><span className="fg-note">一次画 1 张：NovelAI 官方接口一个账号同时只能画一张（多发的会被它拒绝）。换成自建接入点、ComfyUI、WebUI、OpenAI 兼容时这里能调。</span></Field>
+        : <Field label="并发" hint={`同时画几张。自动：OpenAI 兼容的同时 4 张，本地的 ComfyUI / WebUI 一张（一块显卡本来就一张张画，多发了只是在它那边排队）。现在是 ${imageConcurrency(cfg)} 张。`}><Limit value={cfg.images.concurrency} fallback={imageConcurrency(cfg)} min={1} unit="张" free="自动" onCommit={v => p({ concurrency: v })} /></Field>}
       <div className="fg-section">尺寸</div>
       <Field label="插画、背景、立绘" hint="宽×高，按 64 取整。默认是 NovelAI 常用的三种；超过 1024×1024 面积的尺寸在 NovelAI 上要扣点数。剧场画面默认跟横版一样的比例。">
         <div className="fg-row">
@@ -1522,8 +1664,8 @@ export function LookSection({ data }) {
         </select>
       </Field>
       <Field label="同屏最多几人" hint="台上的人多于这个数时，最久没说话、没登场的先下场，轮到他说话再回来。人越多立绘越小，按站位从左到右排开。">
-        <select className="fg-select" style={{ width: 'auto' }} value={String(cfg.ui.maxOnStage ?? 5)} onChange={e => p({ maxOnStage: Number(e.target.value) })}>
-          {[2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={String(n)}>{n} 人</option>)}
+        <select className="fg-select" style={{ width: 'auto' }} value={String(cfg.ui.maxOnStage ?? 8)} onChange={e => p({ maxOnStage: Number(e.target.value) })}>
+          {STAGE_SIZES.filter(Boolean).map(n => <option key={n} value={String(n)}>{n} 人</option>)}
           <option value="0">不限</option>
         </select>
       </Field>

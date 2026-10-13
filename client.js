@@ -1699,9 +1699,9 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-aa-play.is-big.is-close { width: min(46cqw, 76cqh); height: auto; aspect-ratio: 1; }
 .fg-variant-body { display: grid; gap: .6cqw; align-content: start; min-width: 0; }
 .fg-variant-body b { font-size: 1.15cqw; letter-spacing: .08em; }
-.fg-emotion-row { display: grid; grid-template-columns: 12cqw 1fr 9cqw auto auto; gap: .8cqw; align-items: center; padding: .6cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .05); }
+.fg-emotion-row { display: grid; grid-template-columns: 12cqw 9cqw 1fr auto; gap: .8cqw; align-items: center; padding: .6cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .05); }
 .fg-emotion-row b { font-size: 1.15cqw; letter-spacing: .06em; }
-.fg-emotion-row.is-new { grid-template-columns: 12cqw 1fr 9cqw auto; border-bottom: 0; margin-top: .6cqw; }
+.fg-emotion-row.is-new { grid-template-columns: 1fr 9cqw auto; border-bottom: 0; margin-top: .6cqw; }
 .fg-chip small { margin-left: .3em; opacity: .55; font-size: .85em; }
 
 /* 表单 */
@@ -2070,9 +2070,7 @@ var POSES = {
   daily: { label: "日常", anchor: "neutral" },
   arms: { label: "抱臂", anchor: "cold" },
   chest: { label: "手在胸前", anchor: "worried" },
-  chin: { label: "托腮", anchor: "thinking" },
-  // 原生侧身立绘：底图整张按侧身构图画（侧脸、看向一旁，见 image/style.js），不是转头动画
-  side: { label: "侧身", anchor: "pout" }
+  chin: { label: "托腮", anchor: "thinking" }
 };
 var EMOTION_POSE = {
   neutral: "daily",
@@ -2086,7 +2084,7 @@ var EMOTION_POSE = {
   cold: "arms",
   angry: "arms",
   smug: "arms",
-  pout: "side",
+  pout: "arms",
   worried: "chest",
   shy: "chest",
   blush: "chest",
@@ -2847,6 +2845,77 @@ function faceCrop(box, size) {
   return { width: pct2(w), left: pct2(-((x0 + x1) / 2 - side / 2)), top: pct2(-((y0 + y1) / 2 - side * 0.52)) };
 }
 
+// lib/emotions.js
+var LABEL_TO_KEY = new Map(Object.entries(EMOTIONS).map(([k, v]) => [v, k]));
+var isBuiltinEmotion = (id) => Object.prototype.hasOwnProperty.call(EMOTIONS, id);
+var emotionLabel = (id) => isBuiltinEmotion(id) ? EMOTIONS[id] : String(id || "");
+function emotionEntry(id, custom = []) {
+  if (isBuiltinEmotion(id)) return { id, label: EMOTIONS[id], base: "", builtin: true };
+  const found = custom.find((e) => e.id === id);
+  if (!found) return { id, label: id, base: "", builtin: false };
+  const { desc, ...entry } = found;
+  return { ...entry, label: found.id, base: found.base || "", builtin: false };
+}
+function allEmotions(custom = []) {
+  return [
+    ...Object.keys(EMOTIONS).map((id) => emotionEntry(id)),
+    ...custom.filter((e) => e && e.id && !isBuiltinEmotion(e.id)).map((e) => emotionEntry(e.id, custom))
+  ];
+}
+function personEmotions(name2, custom = [], { used = [], drawn = [] } = {}) {
+  const usedSet = new Set(used);
+  const drawnSet = new Set(drawn);
+  return allEmotions(custom).filter((e) => e.builtin || e.source === "user" && !e.who?.length || e.who?.includes(name2) || usedSet.has(e.id) || drawnSet.has(e.id));
+}
+
+// lib/face.js
+var POSE_IDS = Object.keys(POSES);
+function poseOf(emotion, custom = [], overrides = {}) {
+  if (POSES[overrides?.[emotion]]) return overrides[emotion];
+  if (EMOTION_POSE[emotion]) return EMOTION_POSE[emotion];
+  const base = emotionEntry(emotion, custom).base;
+  if (base && POSES[overrides?.[base]]) return overrides[base];
+  return EMOTION_POSE[base] || "daily";
+}
+function anchorOf(pose, custom = [], overrides = {}) {
+  const preset2 = POSES[pose]?.anchor;
+  if (preset2 && poseOf(preset2, custom, overrides) === pose) return preset2;
+  return Object.keys(EMOTIONS).find((e) => poseOf(e, custom, overrides) === pose) || "";
+}
+var poseMembers = (pose, custom = [], overrides = {}) => Object.keys(EMOTIONS).filter((e) => poseOf(e, custom, overrides) === pose);
+var FACE_PART = new RegExp([
+  "\\b(?:smil(?:e|ing)|smirk(?:ing)?|grin(?:ning)?|frown(?:ing)?|pout(?:ing)?|blush(?:ing)?|tears?|teary|tearing up|teardrops?|crying|sobbing|laugh(?:ing)?|giggl(?:e|ing)|scowl(?:ing)?|sneer(?:ing)?|winc(?:e|ing)|sigh(?:ing)?|gasp(?:ing)?|squint(?:ing)?|yawn(?:ing)?)\\b",
+  "\\b(?:teeth|lips?|mouth|tongue|fangs?|cheeks?|eyebrows?|brows?|glar(?:e|ing)|wink(?:ing)?|star(?:e|ing)|gaze|glance|pupils|sweat(?:drop|ing)?|expression(?:less)?)\\b",
+  "\\b(?:closed|half-closed|narrowed|downcast|squinting|sparkling|empty|half-lidded|watery|teary|rolling|averted|averting|crazy|shaded|cold|gentle|sleepy|tired|wide|dull|glazed|shining|soft|lowered)[ -]eyes?\\b",
+  "\\beyes? (?:closed|open|widened|narrowed|shut|lowered)\\b",
+  "wide-eyed",
+  "bags under eyes",
+  "eye contact",
+  "^looking (?:at viewer|at another|away|down|up|to the side|back|afar)$",
+  "^sideways glance$",
+  "^[:;=>^@x-][a-z3<>^_;@\\-o]{0,2}$"
+].join("|"));
+var snap8 = (v) => Math.round(v / 8) * 8;
+function cleanFaceBox(box, width, height) {
+  const [x0, y0, x1, y1] = (Array.isArray(box) ? box : []).map(Number);
+  if (![x0, y0, x1, y1, width, height].every(Number.isFinite)) return null;
+  const b = [Math.max(0, snap8(Math.min(x0, x1))), Math.max(0, snap8(Math.min(y0, y1))), Math.min(width, snap8(Math.max(x0, x1))), Math.min(height, snap8(Math.max(y0, y1)))];
+  if (b[2] - b[0] < 32 || b[3] - b[1] < 32) return null;
+  if ((b[2] - b[0]) * (b[3] - b[1]) > width * height / 6) return null;
+  return b;
+}
+function faceBoxFrom(rects, width, height) {
+  const ok = (r) => Array.isArray(r) && r.length === 4 && r.every(Number.isFinite) && r[2] > r[0] && r[3] > r[1];
+  const eyes = (rects?.eyes || []).filter(ok).slice(0, 2);
+  if (!eyes.length) return null;
+  const mouth = (rects?.mouth || []).find(ok);
+  const cx = (r) => (r[0] + r[2]) / 2, cy = (r) => (r[1] + r[3]) / 2;
+  const d = eyes.length === 2 ? Math.hypot(cx(eyes[1]) - cx(eyes[0]), cy(eyes[1]) - cy(eyes[0])) : (eyes[0][2] - eyes[0][0]) * 1.5;
+  const eyeBottom = Math.max(...eyes.map((r) => r[3]));
+  const bottom = mouth ? Math.max(mouth[3], eyeBottom) : eyeBottom + 0.75 * d;
+  return cleanFaceBox([Math.min(...eyes.map((r) => r[0])) - 0.15 * d, Math.min(...eyes.map((r) => r[1])) - 0.22 * d, Math.max(...eyes.map((r) => r[2])) + 0.15 * d, bottom + 0.22 * d], width, height);
+}
+
 // lib/cast.js
 var NAME_COLORS = ["#f2739b", "#7aa2ff", "#ffb35c", "#5fd3b3", "#c58bff", "#ff7a6b", "#59c3ff", "#e5c34f", "#9be36b", "#ff8ad8"];
 var nameColor = (name2) => NAME_COLORS[fnv1a(name2) % NAME_COLORS.length];
@@ -2920,6 +2989,7 @@ var BUILTIN_STYLES = [
   preset({ id: "cinematic", name: "电影感厚涂", artist: "cinematic lighting, depth of field, dramatic lighting, detailed background, painterly, thick painting" }),
   preset({ id: "retro90s", name: "90 年代复古", artist: "1990s (style), retro artstyle, cel shading, film grain" })
 ];
+var DEFAULT_SAMPLE = "1girl, solo, long hair, school uniform, smile, looking at viewer, upper body, classroom, window, sunlight";
 var MAX_STYLES = 100;
 function currentStyle(style) {
   const presets = Array.isArray(style?.presets) ? style.presets : BUILTIN_STYLES;
@@ -3147,27 +3217,6 @@ function stackLayers(entries, front = []) {
     waiting = waiting.filter((e) => !ready.includes(e));
   }
   return entries.map((e) => ({ ...e, z: order.indexOf(e.name) + 1 }));
-}
-
-// lib/emotions.js
-var LABEL_TO_KEY = new Map(Object.entries(EMOTIONS).map(([k, v]) => [v, k]));
-var isBuiltinEmotion = (id) => Object.prototype.hasOwnProperty.call(EMOTIONS, id);
-var emotionLabel = (id) => isBuiltinEmotion(id) ? EMOTIONS[id] : String(id || "");
-function emotionEntry(id, custom = []) {
-  if (isBuiltinEmotion(id)) return { id, label: EMOTIONS[id], desc: "", base: "", builtin: true };
-  const found = custom.find((e) => e.id === id);
-  return found ? { ...found, label: found.id, base: found.base || "", builtin: false } : { id, label: id, desc: "", base: "", builtin: false };
-}
-function allEmotions(custom = []) {
-  return [
-    ...Object.keys(EMOTIONS).map((id) => emotionEntry(id)),
-    ...custom.filter((e) => e && e.id && !isBuiltinEmotion(e.id)).map((e) => emotionEntry(e.id, custom))
-  ];
-}
-function personEmotions(name2, custom = [], { used = [], drawn = [] } = {}) {
-  const usedSet = new Set(used);
-  const drawnSet = new Set(drawn);
-  return allEmotions(custom).filter((e) => e.builtin || e.source === "user" && !e.who?.length || e.who?.includes(name2) || usedSet.has(e.id) || drawnSet.has(e.id));
 }
 
 // src/client/theater/playback.js
@@ -3948,54 +3997,6 @@ function Particles({ weather, enabled = true, speed = 1, depth = true, gust: win
     };
   }, [weather, enabled, depth, windy]);
   return import_react2.default.createElement("canvas", { ref, className: "fg-particles", "aria-hidden": true });
-}
-
-// lib/face.js
-var POSE_IDS = Object.keys(POSES);
-function poseOf(emotion, custom = [], overrides = {}) {
-  if (POSES[overrides?.[emotion]]) return overrides[emotion];
-  if (EMOTION_POSE[emotion]) return EMOTION_POSE[emotion];
-  const base = emotionEntry(emotion, custom).base;
-  if (base && POSES[overrides?.[base]]) return overrides[base];
-  return EMOTION_POSE[base] || "daily";
-}
-function anchorOf(pose, custom = [], overrides = {}) {
-  const preset2 = POSES[pose]?.anchor;
-  if (preset2 && poseOf(preset2, custom, overrides) === pose) return preset2;
-  return Object.keys(EMOTIONS).find((e) => poseOf(e, custom, overrides) === pose) || "";
-}
-var poseMembers = (pose, custom = [], overrides = {}) => Object.keys(EMOTIONS).filter((e) => poseOf(e, custom, overrides) === pose);
-var FACE_PART = new RegExp([
-  "\\b(?:smil(?:e|ing)|smirk(?:ing)?|grin(?:ning)?|frown(?:ing)?|pout(?:ing)?|blush(?:ing)?|tears?|teary|tearing up|teardrops?|crying|sobbing|laugh(?:ing)?|giggl(?:e|ing)|scowl(?:ing)?|sneer(?:ing)?|winc(?:e|ing)|sigh(?:ing)?|gasp(?:ing)?|squint(?:ing)?|yawn(?:ing)?)\\b",
-  "\\b(?:teeth|lips?|mouth|tongue|fangs?|cheeks?|eyebrows?|brows?|glar(?:e|ing)|wink(?:ing)?|star(?:e|ing)|gaze|glance|pupils|sweat(?:drop|ing)?|expression(?:less)?)\\b",
-  "\\b(?:closed|half-closed|narrowed|downcast|squinting|sparkling|empty|half-lidded|watery|teary|rolling|averted|averting|crazy|shaded|cold|gentle|sleepy|tired|wide|dull|glazed|shining|soft|lowered)[ -]eyes?\\b",
-  "\\beyes? (?:closed|open|widened|narrowed|shut|lowered)\\b",
-  "wide-eyed",
-  "bags under eyes",
-  "eye contact",
-  "^looking (?:at viewer|at another|away|down|up|to the side|back|afar)$",
-  "^sideways glance$",
-  "^[:;=>^@x-][a-z3<>^_;@\\-o]{0,2}$"
-].join("|"));
-var snap8 = (v) => Math.round(v / 8) * 8;
-function cleanFaceBox(box, width, height) {
-  const [x0, y0, x1, y1] = (Array.isArray(box) ? box : []).map(Number);
-  if (![x0, y0, x1, y1, width, height].every(Number.isFinite)) return null;
-  const b = [Math.max(0, snap8(Math.min(x0, x1))), Math.max(0, snap8(Math.min(y0, y1))), Math.min(width, snap8(Math.max(x0, x1))), Math.min(height, snap8(Math.max(y0, y1)))];
-  if (b[2] - b[0] < 32 || b[3] - b[1] < 32) return null;
-  if ((b[2] - b[0]) * (b[3] - b[1]) > width * height / 6) return null;
-  return b;
-}
-function faceBoxFrom(rects, width, height) {
-  const ok = (r) => Array.isArray(r) && r.length === 4 && r.every(Number.isFinite) && r[2] > r[0] && r[3] > r[1];
-  const eyes = (rects?.eyes || []).filter(ok).slice(0, 2);
-  if (!eyes.length) return null;
-  const mouth = (rects?.mouth || []).find(ok);
-  const cx = (r) => (r[0] + r[2]) / 2, cy = (r) => (r[1] + r[3]) / 2;
-  const d = eyes.length === 2 ? Math.hypot(cx(eyes[1]) - cx(eyes[0]), cy(eyes[1]) - cy(eyes[0])) : (eyes[0][2] - eyes[0][0]) * 1.5;
-  const eyeBottom = Math.max(...eyes.map((r) => r[3]));
-  const bottom = mouth ? Math.max(mouth[3], eyeBottom) : eyeBottom + 0.75 * d;
-  return cleanFaceBox([Math.min(...eyes.map((r) => r[0])) - 0.15 * d, Math.min(...eyes.map((r) => r[1])) - 0.22 * d, Math.max(...eyes.map((r) => r[2])) + 0.15 * d, bottom + 0.22 * d], width, height);
 }
 
 // lib/camera.js
@@ -6199,7 +6200,7 @@ function useLeaving(cast, beat) {
   });
   return [...leaving.current.values()].map((l) => l.entry);
 }
-function Cast({ beat, view, talk, max = 5, dof = true }) {
+function Cast({ beat, view, talk, max = 8, dof = true }) {
   const people = new Map((view && view.cast || []).map((p4) => [p4.name, p4]));
   let cast = beat.cast || [];
   if (!beat.directed && !cast.length && beat.speaker && beat.speaker !== "我" && people.has(beat.speaker)) cast = [{ name: beat.speaker, pos: "center" }];
@@ -7285,6 +7286,18 @@ function readGrounding(list3, view) {
   }
   return { face: faces.sort((p4, q) => area(q) - area(p4))[0] || null, eyes, mouths: of(/mouth|lip/i).filter(small) };
 }
+function plausibleEyes(eyes, face) {
+  if (eyes.length !== 2) return false;
+  const near = grow(face, 1.3);
+  const inside = (b2) => {
+    const [x, y] = center(b2);
+    return x >= near[0] && x <= near[2] && y >= near[1] && y <= near[3];
+  };
+  const [a, b] = eyes;
+  const gap = Math.abs(center(a)[0] - center(b)[0]);
+  const ratio = area(a) / Math.max(1e-6, area(b));
+  return inside(a) && inside(b) && gap > (face[2] - face[0]) * 0.15 && ratio < 3 && ratio > 1 / 3;
+}
 function plausibleMouth(m, eyes) {
   const [a, b] = eyes.map(center);
   const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -7347,7 +7360,10 @@ async function autoFrame(img, run, { ground = null, fine = false } = {}) {
   }
   let eyeBoxes;
   let confidence = faceScore >= 0.5 ? "high" : "mid";
-  if (eyes.length === 2) {
+  if (fine && g && g.eyes.length === 2 && plausibleEyes(g.eyes, face)) {
+    eyeBoxes = g.eyes;
+    notes.push("大模型认到两只眼睛");
+  } else if (eyes.length === 2) {
     eyeBoxes = eyes.map((e) => e.box);
     notes.push("认到两只眼睛");
   } else if (g && g.eyes.length === 2) {
@@ -7607,12 +7623,13 @@ function grounder(status, img) {
     return (out.bboxes || []).map((b, i) => ({ label: String(out.labels[i] || ""), box: [x0 + b[0] * kx, y0 + b[1] * ky, x0 + b[2] * kx, y0 + b[3] * ky] }));
   };
 }
-async function frameSprite(status, src, { big = true, fine = false } = {}) {
+var bigReady = (status) => Boolean(status && status.packs && status.packs.fine && status.packs.fine.ready);
+async function frameSprite(status, src) {
   const img = await pixelsOf(src);
-  const ground = big && status.packs.fine && status.packs.fine.ready ? grounder(status, img) : null;
+  const ground = bigReady(status) ? grounder(status, img) : null;
   if (!ground) return autoFrame(img, runner(status, img));
   try {
-    return await autoFrame(img, runner(status, img), { ground, fine });
+    return await autoFrame(img, runner(status, img), { ground, fine: true });
   } catch (error) {
     const r = await autoFrame(img, runner(status, img));
     if (r) r.notes.push("大模型没跑起来（" + String(error && error.message || error).slice(0, 80) + "），这次只用了小模型");
@@ -7935,14 +7952,14 @@ function RectEditor({ src, width, height, rects, onChange, zoom, parts = ["eyes"
 var mb = (n) => `${(n / 1048576).toFixed(n >= 100 * 1048576 ? 0 : 1)} MB`;
 var SOURCES = [["auto", "自动（先官网，连不上换镜像）"], ["official", "只用官网"], ["mirror", "先用镜像"]];
 var AUTO_BADGE = { high: ["准", "is-ok"], mid: ["看一眼", "is-warn"], low: ["不准", "is-bad"], none: ["没认出", "is-bad"] };
-function VisionBar({ status, setStatus, fine, setFine }) {
+function VisionBar({ status, setStatus }) {
   const act = (promise) => promise.then(setStatus, (e) => toast(e.message, "error"));
   if (!status) return /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, "正在看认脸模型下好没有…");
   const { basic, fine: big } = status.packs;
   const job = status.job;
   const busy = job && job.state === "running";
   const label = (pack) => status.packs[pack] ? status.packs[pack].label : pack;
-  return /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-aa-vision" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react7.default.createElement("b", null, "自动框"), basic.ready ? /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-pill" }, "✓ 认脸小模型") : !busy && /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini is-primary", onClick: () => act(visionApi.download("basic")) }, "下载认脸小模型（", mb(basic.missing), "）"), big.ready ? /* @__PURE__ */ import_react7.default.createElement("label", { className: "fg-check", title: big.note }, /* @__PURE__ */ import_react7.default.createElement("input", { type: "checkbox", checked: fine, onChange: (e) => setFine(e.target.checked) }), "精细模式（每张都让大模型找嘴，多 7~15 秒）") : basic.ready && !busy && /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", title: big.note, onClick: () => act(visionApi.download("fine")) }, "下载精细模式大模型（", mb(big.missing), "）"), /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react7.default.createElement("label", { className: "fg-note" }, "下载来源 ", /* @__PURE__ */ import_react7.default.createElement("select", { value: status.source, onChange: (e) => api.patchConfig({ vision: { source: e.target.value } }).then(() => act(visionApi.status()), (err) => toast(err.message, "error")) }, SOURCES.map(([v, t]) => /* @__PURE__ */ import_react7.default.createElement("option", { key: v, value: v }, t)))), big.ready && /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", title: "删掉大模型的文件，腾出约 300 MB", onClick: () => act(visionApi.remove("fine")) }, "删掉大模型")), busy && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-pill is-busy" }, "下载", label(job.pack), "：", mb(job.received), " / ", mb(job.total), job.source ? ` · 来自 ${job.source}` : ""), /* @__PURE__ */ import_react7.default.createElement("progress", { max: job.total || 1, value: job.received }), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => act(visionApi.cancel()) }, "取消")), job && job.state === "failed" && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note fg-err" }, "下载", label(job.pack), "失败：", job.error, "（可以换个下载来源再点下载，下好的部分不会重下）"), !basic.ready && !busy && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, "自动框要先下载认脸小模型：二次元的脸、头、眼睛识别（deepghs，MIT / OpenRAIL 许可），只下一次，存在", hostName() === "st" ? "这个浏览器的缓存里（换浏览器、清浏览器数据要重下）" : " FlowGal 数据目录的 models 文件夹", "，在你自己电脑上跑、不上传图片。"));
+  return /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-aa-vision" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react7.default.createElement("b", null, "自动框"), basic.ready ? /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-pill" }, "✓ 认脸小模型") : !busy && /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini is-primary", onClick: () => act(visionApi.download("basic")) }, "下载认脸小模型（", mb(basic.missing), "）"), big.ready ? /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-pill", title: big.note }, "✓ 认脸大模型（每张都用，一张多 7~15 秒）") : basic.ready && !busy && /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini is-primary", title: big.note, onClick: () => act(visionApi.download("fine")) }, "下载认脸大模型（更准，", mb(big.missing), "）"), /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react7.default.createElement("label", { className: "fg-note" }, "下载来源 ", /* @__PURE__ */ import_react7.default.createElement("select", { value: status.source, onChange: (e) => api.patchConfig({ vision: { source: e.target.value } }).then(() => act(visionApi.status()), (err) => toast(err.message, "error")) }, SOURCES.map(([v, t]) => /* @__PURE__ */ import_react7.default.createElement("option", { key: v, value: v }, t)))), big.ready && /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", title: "删掉大模型的文件，腾出约 300 MB", onClick: () => act(visionApi.remove("fine")) }, "删掉大模型")), busy && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-pill is-busy" }, "下载", label(job.pack), "：", mb(job.received), " / ", mb(job.total), job.source ? ` · 来自 ${job.source}` : ""), /* @__PURE__ */ import_react7.default.createElement("progress", { max: job.total || 1, value: job.received }), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => act(visionApi.cancel()) }, "取消")), job && job.state === "failed" && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note fg-err" }, "下载", label(job.pack), "失败：", job.error, "（可以换个下载来源再点下载，下好的部分不会重下）"), !basic.ready && !busy && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, "自动框要先下载认脸小模型：二次元的脸、头、眼睛识别（deepghs，MIT / OpenRAIL 许可），只下一次，存在", hostName() === "st" ? "这个浏览器的缓存里（换浏览器、清浏览器数据要重下）" : " FlowGal 数据目录的 models 文件夹", "，在你自己电脑上跑、不上传图片。"));
 }
 function StateThumb({ still: still2, patch, box }) {
   const ref = import_react7.default.useRef(null);
@@ -7978,13 +7995,6 @@ function AaWorkbench({ gameId, person, onClose }) {
   const [tab, setTab] = import_react7.default.useState("frame");
   const [viewing, setViewing] = import_react7.default.useState(null);
   const [vision, setVision] = import_react7.default.useState(null);
-  const [fine, setFineState] = import_react7.default.useState(() => {
-    try {
-      return localStorage.getItem("flowgal.aa.fine") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [lite, setLiteState] = import_react7.default.useState(() => {
     try {
       return localStorage.getItem("flowgal.aa.lite") === "1";
@@ -7997,13 +8007,6 @@ function AaWorkbench({ gameId, person, onClose }) {
   const touched = import_react7.default.useRef(/* @__PURE__ */ new Set());
   const stop = import_react7.default.useRef(false);
   const job = (key, patch) => setJobs((j) => ({ ...j, [key]: { ...j[key] || {}, ...patch } }));
-  const setFine = (on) => {
-    setFineState(on);
-    try {
-      localStorage.setItem("flowgal.aa.fine", on ? "1" : "0");
-    } catch {
-    }
-  };
   const setLite = (on) => {
     setLiteState(on);
     try {
@@ -8091,7 +8094,7 @@ function AaWorkbench({ gameId, person, onClose }) {
       const src = assetUrl(v.record.assetId);
       let info;
       try {
-        let r = await frameSprite(vision, src, { fine });
+        let r = await frameSprite(vision, src);
         const ref = !r && refFor(v);
         if (ref) {
           const f = await followSprite(assetUrl(ref.record.assetId), ref.rects, src);
@@ -8181,7 +8184,7 @@ function AaWorkbench({ gameId, person, onClose }) {
     const m = 24;
     return [Math.max(0, x0 - m), Math.max(0, y0 - m), x1 + m, y1 + m];
   })() : null;
-  return /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-aa-bench" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react7.default.createElement("b", null, person.name, " · 逆转式立绘工作台"), /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn", onClick: onClose }, "返回人物列表")), /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, "给差分做眨眼和说话的口型：框好两只眼睛和嘴，每张差分用 NovelAI 局部重绘 6 次（眼睛半闭、闭；嘴齿缝、小开、开、圆），只重画框里那一小块，原图不动； 重画的结果会洗干净（颜色对齐原图、刘海用原图），眨眼时不闪色、头发不跳。路人可以勾「精简版」：只做闭眼和一个张嘴，每张 2 次。 同一个角色的差分姿势相同，框一次可以「套用到所选」。嘴框尽量扁：框多高，嘴最多张多大。生成要用 NovelAI 的额度（试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。"), variants.length > 0 && /* @__PURE__ */ import_react7.default.createElement(VisionBar, { status: vision, setStatus: setVision, fine, setFine }), !variants.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "这个角色还没有画好的差分。先在人物志里画几张。"), variants.length > 0 && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-aa-grid" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-aa-list" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.map((v) => v.key))) }, "全选"), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(/* @__PURE__ */ new Set()) }, "全不选"), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.filter((v) => !v.record.aa).map((v) => v.key))) }, "选还没做的"), /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-note" }, "已选 ", picked.size), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !visionReady || !picked.size || running || Boolean(framing), title: visionReady ? "用认脸模型给所选的差分框好眼睛和嘴" : "先在上面下载认脸小模型", onClick: () => autoFrameList(pickedList) }, "🪄 自动框所选")), variants.map((v) => /* @__PURE__ */ import_react7.default.createElement("div", { key: v.key, className: `fg-aa-item${v.key === focus ? " is-on" : ""}`, onClick: () => setFocus(v.key) }, /* @__PURE__ */ import_react7.default.createElement("input", { type: "checkbox", checked: picked.has(v.key), onClick: (e) => e.stopPropagation(), onChange: () => toggle(v.key), "aria-label": `选择 ${v.label}` }), /* @__PURE__ */ import_react7.default.createElement("img", { src: assetUrl(v.record.assetId), alt: "", loading: "lazy", title: "双击放大看", onDoubleClick: (e) => {
+  return /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-aa-bench" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react7.default.createElement("b", null, person.name, " · 逆转式立绘工作台"), /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn", onClick: onClose }, "返回人物列表")), /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note" }, "给差分做眨眼和说话的口型：框好两只眼睛和嘴，每张差分用 NovelAI 局部重绘 6 次（眼睛半闭、闭；嘴齿缝、小开、开、圆），只重画框里那一小块，原图不动； 重画的结果会洗干净（颜色对齐原图、刘海用原图），眨眼时不闪色、头发不跳。路人可以勾「精简版」：只做闭眼和一个张嘴，每张 2 次。 同一个角色的差分姿势相同，框一次可以「套用到所选」。嘴框尽量扁：框多高，嘴最多张多大。生成要用 NovelAI 的额度（试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。"), variants.length > 0 && /* @__PURE__ */ import_react7.default.createElement(VisionBar, { status: vision, setStatus: setVision }), !variants.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "这个角色还没有画好的差分。先在人物志里画几张。"), variants.length > 0 && /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-aa-grid" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-aa-list" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.map((v) => v.key))) }, "全选"), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(/* @__PURE__ */ new Set()) }, "全不选"), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.filter((v) => !v.record.aa).map((v) => v.key))) }, "选还没做的"), /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-note" }, "已选 ", picked.size), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !visionReady || !picked.size || running || Boolean(framing), title: visionReady ? "用认脸模型给所选的差分框好眼睛和嘴" : "先在上面下载认脸小模型", onClick: () => autoFrameList(pickedList) }, "🪄 自动框所选")), variants.map((v) => /* @__PURE__ */ import_react7.default.createElement("div", { key: v.key, className: `fg-aa-item${v.key === focus ? " is-on" : ""}`, onClick: () => setFocus(v.key) }, /* @__PURE__ */ import_react7.default.createElement("input", { type: "checkbox", checked: picked.has(v.key), onClick: (e) => e.stopPropagation(), onChange: () => toggle(v.key), "aria-label": `选择 ${v.label}` }), /* @__PURE__ */ import_react7.default.createElement("img", { src: assetUrl(v.record.assetId), alt: "", loading: "lazy", title: "双击放大看", onDoubleClick: (e) => {
     e.stopPropagation();
     setViewing(v);
   } }), /* @__PURE__ */ import_react7.default.createElement("div", null, /* @__PURE__ */ import_react7.default.createElement("b", null, v.label, auto[v.key] && /* @__PURE__ */ import_react7.default.createElement("i", { className: `fg-aa-badge ${AUTO_BADGE[auto[v.key].confidence][1]}`, title: auto[v.key].notes.join("；") }, "自动框·", AUTO_BADGE[auto[v.key].confidence][0])), /* @__PURE__ */ import_react7.default.createElement("small", null, v.look), /* @__PURE__ */ import_react7.default.createElement("small", { className: jobs[v.key] && jobs[v.key].status === "failed" ? "fg-err" : "" }, statusText(v)))))), /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-aa-stage" }, current && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: `fg-btn is-mini${tab === "frame" ? " is-on" : ""}`, onClick: () => setTab("frame") }, "框眼睛和嘴"), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: `fg-btn is-mini${tab === "play" ? " is-on" : ""}`, disabled: !current.record.aa, title: current.record.aa ? "" : "这张还没做，生成后才能看动起来的样子", onClick: () => setTab("play") }, "看效果"), /* @__PURE__ */ import_react7.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setViewing(current) }, "🔍 放大看"), /* @__PURE__ */ import_react7.default.createElement("span", { className: "fg-note" }, current.label, current.look ? " · " + current.look : "")), tab === "frame" && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement(RectEditor, { src: assetUrl(current.record.assetId), width: sizeOf(current.key).w, height: sizeOf(current.key).h, rects: rectsOf(current.key), zoom, onChange: (r) => {
@@ -8225,6 +8228,7 @@ function facesToMeasure(view) {
 var tried = /* @__PURE__ */ new Map();
 var framedResult = (assetId) => tried.get(assetId) || "";
 var noModelAt = 0;
+var toldSmall = false;
 function useFaceFramer(gameId, view) {
   const busy = import_react8.default.useRef(false);
   import_react8.default.useEffect(() => {
@@ -8240,11 +8244,15 @@ function useFaceFramer(gameId, view) {
         return;
       }
       holdVision();
+      if (!bigReady(status) && !toldSmall) {
+        toldSmall = true;
+        toast("认脸大模型还没下载，这次先用小模型认脸；在人物志的逆转式工作台里下载大模型，认得更准");
+      }
       try {
         for (const w of work) {
           let r = null;
           try {
-            r = await frameSprite(status, assetUrl(w.assetId), { big: !w.measure });
+            r = await frameSprite(status, assetUrl(w.assetId));
           } catch {
           }
           if (r && r.confidence !== "low") {
@@ -8397,6 +8405,233 @@ function writeSoundSidecar(sounds2, note = "") {
       ...s.volume !== void 0 && s.volume !== 1 ? { volume: s.volume } : {}
     }))
   }, null, 2) + "\n";
+}
+
+// lib/limits.js
+var DIRECTOR_LIMITS = [
+  { key: "cams", label: "镜头", unit: "次", was: 14, phrase: (n) => `一轮最多 ${n} 次，` },
+  { key: "hits", label: "打斗出手", unit: "次", was: 12, phrase: (n) => `一轮最多 ${n} 次，` },
+  { key: "moments", label: "小瞬间", unit: "个", was: 4, phrase: (n) => `一轮最多 ${n} 个，` },
+  { key: "phone", label: "手机", unit: "个", was: 8, phrase: (n) => `一轮最多 ${n} 个。` },
+  { key: "stress", label: "重音", unit: "处", was: 3, phrase: (n) => `一轮最多 ${n} 处，` },
+  { key: "pauses", label: "停顿", unit: "处", was: 6, phrase: (n) => `一轮最多 ${n} 处，` },
+  { key: "hush", label: "配乐留白", unit: "次", was: 2, phrase: (n) => `一轮最多 ${n} 次，` },
+  { key: "textFx", label: "文字效果", unit: "处", was: 16, phrase: (n) => `一轮最多 ${n} 处，` },
+  { key: "textFxPerLine", label: "一句里的文字效果", unit: "处", was: 2, phrase: (n) => `一句最多 ${n} 处，` },
+  { key: "sfx", label: "剧情音效", unit: "个", was: 6, phrase: (n) => `一轮最多 ${n} 个，` },
+  { key: "erosSfx", label: "R18 音效", unit: "个", was: 14, phrase: (n) => `，一轮最多 ${n} 个` },
+  { key: "peaks", label: "高潮", unit: "次", was: 6, phrase: (n) => `；一轮最多 ${n} 次` },
+  { key: "newEmotions", label: "新造情绪", unit: "个", was: 6, phrase: (n) => `一轮最多新造 ${n} 个；` }
+];
+var DEFAULT_DIRECTOR_LIMITS = Object.freeze(Object.fromEntries(DIRECTOR_LIMITS.map((l) => [l.key, null])));
+
+// lib/image/http.js
+var MAX_IMAGE_BYTES = 40 * 1024 * 1024;
+
+// lib/image/novelai.js
+var NAI_OFFICIAL = { id: "official", name: "NovelAI 官方", baseURL: "https://image.novelai.net" };
+
+// lib/vision.js
+var DEFAULT_MIRROR = "https://hf-mirror.com";
+var ORT = "onnxruntime-web-1.20.1";
+var TJS = "transformers-3.8.1";
+var FLORENCE = "onnx-community/Florence-2-base-ft";
+var VISION_FILES = [
+  { id: "ort", pack: "basic", npm: ["onnxruntime-web", "1.20.1", "dist/ort.wasm.min.mjs"], local: `${ORT}/ort.wasm.min.mjs`, size: 48904, sha256: "f53ed4792e758e7232f779d479eb8931b97ff3ab2e3b9a33ee00d1251ffdaad6" },
+  { id: "ort-glue", pack: "basic", npm: ["onnxruntime-web", "1.20.1", "dist/ort-wasm-simd-threaded.mjs"], local: `${ORT}/ort-wasm-simd-threaded.mjs`, size: 24618, sha256: "745eb7c0ce6f18a6aa521971b2877babc7ffb27eecb58ab3bc6e5ef4692672e8" },
+  { id: "ort-wasm", pack: "basic", npm: ["onnxruntime-web", "1.20.1", "dist/ort-wasm-simd-threaded.wasm"], local: `${ORT}/ort-wasm-simd-threaded.wasm`, size: 11246032, sha256: "207d02be4591c156b0a98f024f3d58005b5b04c92274d759fb390338c63559ea" },
+  { id: "face", pack: "basic", hf: ["deepghs/anime_face_detection", "784dc4c0bb692351ddcdbe6131a050b17d3025d5", "face_detect_v1.4_n/model.onnx"], local: "deepghs/face_detect_v1.4_n.onnx", size: 12102558, sha256: "fd860b650a4377046842c3cd80d01b0b408bdfbdb4acee5759630f82c6ef04a9", threshold: 0.278 },
+  { id: "head", pack: "basic", hf: ["deepghs/anime_head_detection", "06604feee81983792a57c21081e539c0ae229833", "head_detect_v1.6_n_yv11/model.onnx"], local: "deepghs/head_detect_v1.6_n_yv11.onnx", size: 10481375, sha256: "59965ef74e3630da8a82efc9e05b7c9e56cb4bcb79c9feff1c982a1dcc15153b", threshold: 0.385 },
+  { id: "eye", pack: "basic", hf: ["deepghs/anime_eye_detection", "ba69e3ee3b0b23e7c948994e182f06cd46e534f1", "eye_detect_v1.0_n/model.onnx"], local: "deepghs/eye_detect_v1.0_n.onnx", size: 12102557, sha256: "a96515cdf4ca0a4caf56778d93ba7fc28b4582727ff32645844cd89d39cdee29", threshold: 0.258 },
+  // 大模型：Florence-2（微软的看图找东西模型，onnx-community 转的 8 位量化版）+ 跑它用的 transformers.js（自带一份 onnxruntime）。
+  // local 的路径照 transformers.js 读本地模型的规矩：<模型名>/<文件>
+  ...[
+    ["transformers.min.js", 888173, "aa5002b70e789798da263f5f99c62bd3e8fcd0c119258a493c40c180648365fa"],
+    ["ort-wasm-simd-threaded.jsep.mjs", 44484, "08fb86ec433c78bfb032c5d84a68b8e8e5a8d81268fa39e24314179a5767a5b9"],
+    ["ort-wasm-simd-threaded.jsep.wasm", 21596019, "c46655e8a94afc45338d4cb2b840475f88e5012d524509916e505079c00bfa39"]
+  ].map(([name2, size, sha256]) => ({ id: "tjs-" + name2, pack: "fine", npm: ["@huggingface/transformers", "3.8.1", "dist/" + name2], local: `${TJS}/${name2}`, size, sha256 })),
+  ...[
+    ["config.json", 5432, "d90c22ed72eb55291f183fcd9b98ebd3bd3d92bfcffb6c7f6e1606085e793525"],
+    ["generation_config.json", 292, "7b8eb17bbd6cf8a07f619ad83ae03881eff05b6b9237bab89005b40e77783c29"],
+    ["preprocessor_config.json", 2673, "c892857e34a7082284983a7717717d39c9bf7e574f1f41d80d4c918c97502efa"],
+    ["tokenizer.json", 2297961, "d69dcdb2323e124ac4f800cb9863ddccea0d7bb11e16125e8df3bd60f2f8aeac"],
+    ["tokenizer_config.json", 197658, "d8e64607233cb53b619fb46664f6cad08176c26e0e8735b2d30d888364f19600"],
+    ["onnx/vision_encoder_quantized.onnx", 93746540, "3b79d54f23f666f731549db23cb070c35a979ce19cbd9720e90e67a78dc9768c"],
+    ["onnx/encoder_model_quantized.onnx", 43651493, "f4ad7a68f1fb875d3bcf735ea14a7021b7ba7e83baf7cf10289881b4ed6d9b85"],
+    ["onnx/decoder_model_merged_quantized.onnx", 98177697, "f22f52f980c33df0efa15932c2f3db6d9d3595ce6387eca938b8cfe23dc4c641"],
+    ["onnx/embed_tokens_quantized.onnx", 39390433, "6b2258db1c8ee9b160576ccde3cd3814d83a2edaed0dd1c6ca9ff3c38fa62214"]
+  ].map(([path, size, sha256]) => ({ id: "florence-" + path, pack: "fine", hf: [FLORENCE, "e88a44eaf3791a35eae0c5a47b3dbcd36e67eb6f", path], local: `${FLORENCE}/${path}`, size, sha256 }))
+];
+var VISION_PATHS = { ort: `${ORT}/ort.wasm.min.mjs`, ortDir: `${ORT}/`, tjs: `${TJS}/transformers.min.js`, tjsDir: `${TJS}/`, florence: FLORENCE };
+
+// lib/config.js
+var DEFAULT_CONFIG = {
+  enabled: true,
+  director: {
+    auto: true,
+    // 每轮正文写完后自动整理成场景
+    provider: "",
+    model: "",
+    // 留空跟随 Tavern 后台模型
+    maxTokens: null,
+    // 最大输出：null 自动（模型报了上限就用它，不然 128000）；填了数就用这个数。模型窗口装不下或模型拒绝时自动降
+    temperature: 0.7,
+    contextChars: null,
+    // 给导演看多少人物卡 / 世界书资料（字）：null 不限（全给）；超出模型窗口时自动缩
+    limits: { ...DEFAULT_DIRECTOR_LIMITS },
+    // 每轮各种演出最多几次（lib/limits.js）：null 不限
+    systemPrompt: "",
+    // 留空用内置导演提示词
+    spritePrompt: "",
+    // 留空用内置立绘提示词（立绘设计师）
+    cgPrompt: "",
+    // 留空用内置插画提示词（插画分镜师）
+    actingPrompt: "",
+    // 留空用内置的动作与表情设计提示词（画立绘前给每个人设计专属动作和表情）
+    // 插画分镜师用的模型：'' 跟导演一样；host 在宿主的模型里另选一个；custom 自己接一个 OpenAI 兼容接口（Key 存在宿主，见 secrets.js）
+    cgLlm: { source: "", provider: "", model: "", baseURL: "", contextWindow: 128e3 }
+  },
+  images: {
+    backend: "novelai",
+    auto: true,
+    // 每轮自动配 CG（导演判断值得画时）
+    maxPerTurn: null,
+    // 每轮最多几张：null 不限（导演挑值得画的）
+    cgShape: "auto",
+    // 插画方向：auto 插画分镜师按构图挑 / landscape 都出横图 / portrait 都出竖图（vocab.js 的 CG_ORIENTATIONS）
+    backgrounds: true,
+    // 新地点自动生成背景
+    portraits: true,
+    // 角色登场、换装、长期状态变化时生成这一套的平静立绘
+    expressions: true,
+    // 情绪差分：导演用到新情绪时补画（每种一张）
+    expressionsPerTurn: null,
+    // 每轮最多补几张：null 不限（这一轮用到的都画）
+    faceSwap: true,
+    // 表情只换脸（NovelAI）：每套衣服每个动作整张画一张底图，同一个动作的其余情绪在底图上只重画脸
+    poses: {},
+    // 通用动作组的改动（情绪 → 动作组；不写的按 vocab.js 的默认分组）：没给某个人设计出动作表时用
+    spriteWriter: true,
+    // 立绘设计师：画立绘前先给每个人设计专属的动作和表情，再读完资料和剧情写提示词；关掉则按档案机械拼、用通用动作组
+    concurrency: null,
+    // 同时画几张：null 自动（见 imageConcurrency）；NovelAI 官方一个账号同时只能画一张，填多少都是 1
+    seed: -1,
+    // 固定种子；-1 每张随机（鉴赏里改词时仍可给单张指定种子）
+    transparentSprites: true,
+    // 立绘用透明底（目前只有 NovelAI V5 支持，其他模型忽略）
+    sizes: { landscape: [1216, 832], portrait: [832, 1216], square: [1024, 1024] },
+    library: true,
+    // 画好的图按名字另存一份到图片文件夹
+    libraryDir: ""
+    // 图片文件夹的位置（绝对路径）；留空是数据目录下的「图片」
+  },
+  style: {
+    current: "galgame",
+    // 正在用的画风
+    presets: BUILTIN_STYLES,
+    // 一套套画风 [{ id, name, artist, positive, negative, cfg, cfgRescale, cover }]，见 image/style.js
+    sample: DEFAULT_SAMPLE
+    // 「试画」画的内容
+  },
+  novelai: {
+    endpoint: "official",
+    endpoints: [NAI_OFFICIAL],
+    model: "nai-diffusion-4-5-full",
+    sampler: "k_euler_ancestral",
+    noiseSchedule: "karras",
+    steps: 23,
+    scale: 5,
+    cfgRescale: 0,
+    variety: false
+  },
+  comfyui: {
+    baseURL: "http://127.0.0.1:8188",
+    authType: "none",
+    mode: "simple",
+    checkpoint: "",
+    sampler: "euler_ancestral",
+    scheduler: "normal",
+    steps: 24,
+    cfg: 6,
+    workflows: [],
+    workflow: "",
+    timeoutSec: 600
+  },
+  openai: {
+    baseURL: "https://api.openai.com/v1",
+    authType: "bearer",
+    mode: "images",
+    model: "gpt-image-1",
+    quality: "",
+    landscapeSize: "1536x1024",
+    portraitSize: "1024x1536",
+    squareSize: "1024x1024",
+    sizeMode: "preset"
+  },
+  webui: { baseURL: "http://127.0.0.1:7860", authType: "none", model: "", steps: 24, cfg: 6, sampler: "Euler a", scheduler: "", hires: false },
+  ui: {
+    skin: "stellar",
+    ratio: "cg",
+    // 剧场画面比例：cg 跟横版插画一样（默认 NovelAI 1216×832）；wide 是 16:9
+    maxOnStage: 8,
+    // 同屏最多站几个人（2~12，0 不限）：超出的，最久没说话的先下场
+    recall: "text",
+    // 短闪回怎么演：text 画面不动、对话框换成回忆的样子；ghost 画面压暗、人浮到台前；portrait 对话框旁再出说话人的小头像
+    recallName: "blur",
+    // 短闪回里的名牌：blur 模糊压暗（认得出、看不清）；hide 不显示；show 照常
+    recallTone: "auto",
+    // 短闪回的基调：auto 导演按剧情选、没选时按情绪和氛围挑；或固定一种（见 lib/vocab.js 的 RECALL_TONES）
+    textSpeed: 30,
+    // 每字毫秒
+    autoDelay: 1400,
+    blip: true,
+    // 打字音
+    blipVolume: 1,
+    // 打字音音量（倍数，0~2）
+    voiceDefault: "auto",
+    // 档案里没指定声音的角色：auto 按性别分；或统一用某个音色（见 lib/sounds.js）
+    narrationVoice: "classic",
+    narrationPitch: -6,
+    // 旁白的打字音；off 不出声
+    sfx: true,
+    // 落字音效和界面音
+    sfxVolume: 1,
+    // 音效音量（倍数，0~2）
+    sounds: { ...DEFAULT_SOUNDS },
+    // 每种音效用哪个版本；off 关掉；custom 用上传的那个
+    customSounds: {},
+    // 上传的音效 { 槽: { assetId, name } }，只经上传接口改
+    bgm: true,
+    // 配乐：从「我的配乐」里按场景情绪选曲
+    bgmVolume: 0.45,
+    eros: true,
+    // 亲密场面（R18）的声音与演出：触手、性爱的音效，节奏底，高潮那一下（lib/eros.js）；关掉后导演也不再写
+    amb: true,
+    // 环境音：导演从音效库里给每一幕配的循环背景声
+    ambVolume: 0.35,
+    storySfx: true,
+    // 剧情音效：导演给发出声音的那句配的（音效库里的，或者内置的拟声：砰、咚、叮……）
+    storySfxVolume: 0.8,
+    // 网页字体从 npm CDN 读取（jsDelivr、unpkg 等目录结构相同，可换成镜像）；留空只用系统字体。
+    fontBase: "https://cdn.jsdelivr.net/npm/",
+    effects: {},
+    // 特效开关：关掉的写 false（{ 'cam.shake': false }，编号见 src/client/theater/effects.js），没写的都开着
+    fontScale: 1,
+    autoOpen: false,
+    // 新一轮写完后自动打开剧场
+    updateCheck: true
+    // 打开剧场时检查插件更新（最多 12 小时一次，只在插件是 git 克隆时生效）
+  },
+  // 认脸模型（立绘工作台的自动框）从哪下：auto 先 HuggingFace 官网、连不上换镜像；official 只官网；mirror 先镜像
+  vision: { source: "auto", mirror: DEFAULT_MIRROR }
+};
+var STAGE_SIZES = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+function imageConcurrency(config) {
+  const backend = config?.images?.backend;
+  if (backend === "novelai" && (config?.novelai?.endpoint || "official") === "official") return 1;
+  const set = Number(config?.images?.concurrency);
+  if (Number.isFinite(set) && set >= 1) return Math.trunc(set);
+  return backend === "openai" ? 4 : 1;
 }
 
 // src/client/theater/Panels.jsx
@@ -8585,7 +8820,7 @@ var LOOK_HINTS = {
   extra: "glasses, mole under eye（可不填）",
   other: "分不进上面各格的 tag。旧档案的一整串在这里，照常出图；想整理就挪进上面各格，tag 没变的话已经画好的立绘不用重画"
 };
-function ProfileEditor({ gameId, person, cast }) {
+function ProfileEditor({ gameId, person, cast, group, turn }) {
   const pick = (p4) => ({
     look: Object.fromEntries(LOOK_FIELDS.map((f) => [f, (p4.appearanceFields || {})[f] || ""])),
     gender: p4.gender || "",
@@ -8615,7 +8850,7 @@ function ProfileEditor({ gameId, person, cast }) {
   const voiceNow = castVoices([...others, draft], ui2).get(person.name);
   const guess = heightOf({ ...person, gender: form.gender, height: null });
   const autoVoice2 = castVoices([...others, { ...draft, voice: "" }], ui2).get(person.name);
-  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "固定外貌"), /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-look-grid" }, LOOK_FIELDS.map((f) => /* @__PURE__ */ import_react9.default.createElement("label", { key: f, className: `fg-look-field${f === "other" ? " is-wide" : ""}` }, /* @__PURE__ */ import_react9.default.createElement("span", null, LOOK_FIELD_LABELS[f]), f === "other" ? /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] }) : /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] })))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: ".5cqw" } }, "出图时用：", lookTags(form.look, person.appearance) || "（空）", person.appearance && lookTags(form.look, person.appearance) === person.appearance ? "（tag 没变，已画好的立绘照用）" : "", "　衣服不写在这里，走「衣橱与状态」。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "性别 / 种子"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.gender, onChange: set("gender") }, GENDERS.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.seed, placeholder: `默认 ${person.seed}`, onChange: (e) => setForm({ ...form, seed: e.target.value.replace(/\D/g, "") }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", title: "换一个随机种子", onClick: () => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) }) }, "🎲"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "所有立绘差分共用这个种子"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "身高"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.height, placeholder: `约 ${guess.cm}`, onChange: (e) => setForm({ ...form, height: e.target.value.replace(/\D/g, "").slice(0, 3) }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "厘米。剧场里大家的头缩放到一样大，高的人站得高、矮的站得低。留空用", guess.from === "acting" ? "设计师读资料估的" : "按性别和外貌估的", "（", guess.cm, "）。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "声音"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voice, onChange: set("voice"), "aria-label": "打字音音色" }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "" }, "自动（", voiceText(autoVoice2), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "off" }, "不出声"), VOICE_GROUPS.map(([g, label]) => /* @__PURE__ */ import_react9.default.createElement("optgroup", { key: g, label }, VOICES2.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v.id, value: v.id }, v.label))))), /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voicePitch, onChange: set("voicePitch"), "aria-label": "音高", title: "升降几个半音" }, PITCHES.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !voiceNow, onClick: () => previewVoice(voiceNow, ui2 || void 0) }, "▶ 试听"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "这个角色说话时的打字音"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "立绘备注"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.note, onChange: set("note"), onKeyDown: (e) => e.stopPropagation(), placeholder: "写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "不要出现"), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.negative, onChange: set("negative"), onKeyDown: (e) => e.stopPropagation(), placeholder: "glasses, ponytail（每张立绘都加进负面词）" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存档案")));
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "固定外貌"), /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-look-grid" }, LOOK_FIELDS.map((f) => /* @__PURE__ */ import_react9.default.createElement("label", { key: f, className: `fg-look-field${f === "other" ? " is-wide" : ""}` }, /* @__PURE__ */ import_react9.default.createElement("span", null, LOOK_FIELD_LABELS[f]), f === "other" ? /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] }) : /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.look[f], onChange: setLook(f), onKeyDown: (e) => e.stopPropagation(), placeholder: LOOK_HINTS[f] })))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note", style: { marginTop: ".5cqw" } }, "出图时用：", lookTags(form.look, person.appearance) || "（空）", person.appearance && lookTags(form.look, person.appearance) === person.appearance ? "（tag 没变，已画好的立绘照用）" : "", "　衣服不写在这里，走「衣橱与状态」。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "性别 / 种子"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.gender, onChange: set("gender") }, GENDERS.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.seed, placeholder: `默认 ${person.seed}`, onChange: (e) => setForm({ ...form, seed: e.target.value.replace(/\D/g, "") }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", title: "换一个随机种子", onClick: () => setForm({ ...form, seed: String(Math.floor(Math.random() * 2 ** 31)) }) }, "🎲"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "所有立绘差分共用这个种子"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "身高"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style: { width: "12cqw" }, inputMode: "numeric", value: form.height, placeholder: `约 ${guess.cm}`, onChange: (e) => setForm({ ...form, height: e.target.value.replace(/\D/g, "").slice(0, 3) }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "厘米。剧场里大家的头缩放到一样大，高的人站得高、矮的站得低。留空用", guess.from === "acting" ? "设计师读资料估的" : "按性别和外貌估的", "（", guess.cm, "）。"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "声音"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voice, onChange: set("voice"), "aria-label": "打字音音色" }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "" }, "自动（", voiceText(autoVoice2), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "off" }, "不出声"), VOICE_GROUPS.map(([g, label]) => /* @__PURE__ */ import_react9.default.createElement("optgroup", { key: g, label }, VOICES2.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v.id, value: v.id }, v.label))))), /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: form.voicePitch, onChange: set("voicePitch"), "aria-label": "音高", title: "升降几个半音" }, PITCHES.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l))), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !voiceNow, onClick: () => previewVoice(voiceNow, ui2 || void 0) }, "▶ 试听"), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "这个角色说话时的打字音"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "立绘备注"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: form.note, onChange: set("note"), onKeyDown: (e) => e.stopPropagation(), placeholder: "写给立绘设计师，比如「右眼下有泪痣」「笑起来露虎牙」「总是抱着一本书」" })), /* @__PURE__ */ import_react9.default.createElement(ActingNote, { gameId, person, group, turn }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "不要出现"), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", value: form.negative, onChange: set("negative"), onKeyDown: (e) => e.stopPropagation(), placeholder: "glasses, ponytail（每张立绘都加进负面词）" })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存档案")));
 }
 function WardrobeEditor({ gameId, person }) {
   const [, run] = useBusy();
@@ -8725,7 +8960,7 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
   const at2 = group.current ? {} : group.era ? { look: group.key } : { turn };
   const label = `${person.name} · ${lookLabel(group.look)} · ${entry.label}`;
   const [viewing, setViewing] = import_react9.default.useState(false);
-  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-variant" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-variant-art" }, record && record.assetId ? /* @__PURE__ */ import_react9.default.createElement(SpriteArt, { record, label, onOpen: () => setViewing(true) }) : /* @__PURE__ */ import_react9.default.createElement("span", null, st ? SPRITE_STATUS[st.status] : "还没画")), viewing && /* @__PURE__ */ import_react9.default.createElement(SpriteViewer, { record, label, onClose: () => setViewing(false) }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-variant-body" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("b", null, label), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: onClose }, "收起")), entry.desc && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "情绪：", entry.desc, entry.base ? `（接近${emotionLabel(entry.base)}）` : ""), st && st.error && /* @__PURE__ */ import_react9.default.createElement("div", { className: `fg-note${st.status === "face" || st.status === "writing" ? "" : " fg-err"}` }, st.error), /* @__PURE__ */ import_react9.default.createElement(FaceInfo, { gameId, person, group, emotionKey: key, record, emotions }), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", value: tags, onChange: (e) => setTags(e.target.value), onKeyDown: (e) => e.stopPropagation(), placeholder: record && record.face ? "只换脸：这里只写表情（眉、眼、嘴、脸红、泪、视线）" : "还没有提示词：点「让设计师写」，它会读完资料和剧情来写" }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, record && record.writer ? WRITER_LABEL[record.writer] || record.writer : "", record && record.seed != null ? ` · 种子 ${record.seed}` : "", !reachable ? " · 这套样子在剧情里已经不会再出现（外貌改过），只能删除或上传" : ""), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !reachable || busy === "w", onClick: () => run("w", () => api.cast(gameId, "sprite", { name: person.name, emotion, rewrite: true, ...at2 }), "已交给立绘设计师：写好词就画") }, record && record.assetId ? "让设计师重写并重画" : "让设计师写并画"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !reachable || !tags.trim() || busy === "u", onClick: () => run("u", () => api.cast(gameId, "sprite", { name: person.name, emotion, tags, ...at2 }), "已排队：按这些词画") }, "按这些词画"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !reachable, onClick: () => fileRef.current && fileRef.current.click() }, "上传到这张"), record && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => run("d", () => api.cast(gameId, "sprite-delete", { name: person.name, key }), "已删除").then(onClose) }, "删除"), /* @__PURE__ */ import_react9.default.createElement("input", { ref: fileRef, type: "file", accept: "image/png,image/jpeg,image/webp", hidden: true, onChange: async (e) => {
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-variant" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-variant-art" }, record && record.assetId ? /* @__PURE__ */ import_react9.default.createElement(SpriteArt, { record, label, onOpen: () => setViewing(true) }) : /* @__PURE__ */ import_react9.default.createElement("span", null, st ? SPRITE_STATUS[st.status] : "还没画")), viewing && /* @__PURE__ */ import_react9.default.createElement(SpriteViewer, { record, label, onClose: () => setViewing(false) }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-variant-body" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("b", null, label), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: onClose }, "收起")), !entry.builtin && entry.base && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "新情绪，接近", emotionLabel(entry.base), "（这张还没画好时先用那张）"), st && st.error && /* @__PURE__ */ import_react9.default.createElement("div", { className: `fg-note${st.status === "face" || st.status === "writing" ? "" : " fg-err"}` }, st.error), /* @__PURE__ */ import_react9.default.createElement(FaceInfo, { gameId, person, group, emotionKey: key, record, emotions }), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", value: tags, onChange: (e) => setTags(e.target.value), onKeyDown: (e) => e.stopPropagation(), placeholder: record && record.face ? "只换脸：这里只写表情（眉、眼、嘴、脸红、泪、视线）" : "还没有提示词：点「让设计师写」，它会读完资料和剧情来写" }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, record && record.writer ? WRITER_LABEL[record.writer] || record.writer : "", record && record.seed != null ? ` · 种子 ${record.seed}` : "", !reachable ? " · 这套样子在剧情里已经不会再出现（外貌改过），只能删除或上传" : ""), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !reachable || busy === "w", onClick: () => run("w", () => api.cast(gameId, "sprite", { name: person.name, emotion, rewrite: true, ...at2 }), "已交给立绘设计师：写好词就画") }, record && record.assetId ? "让设计师重写并重画" : "让设计师写并画"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !reachable || !tags.trim() || busy === "u", onClick: () => run("u", () => api.cast(gameId, "sprite", { name: person.name, emotion, tags, ...at2 }), "已排队：按这些词画") }, "按这些词画"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: !reachable, onClick: () => fileRef.current && fileRef.current.click() }, "上传到这张"), record && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => run("d", () => api.cast(gameId, "sprite-delete", { name: person.name, key }), "已删除").then(onClose) }, "删除"), /* @__PURE__ */ import_react9.default.createElement("input", { ref: fileRef, type: "file", accept: "image/png,image/jpeg,image/webp", hidden: true, onChange: async (e) => {
     const file2 = e.target.files && e.target.files[0];
     e.target.value = "";
     if (!file2) return;
@@ -8740,41 +8975,153 @@ function VariantEditor({ gameId, person, group, emotion, emotions, turn, onClose
     }, "素材包已导入：这张立绘会呼吸、眨眼、动嘴了");
   } }))));
 }
+function drawnIn(person, group, turn) {
+  const drawn = Object.entries(person.sprites || {}).filter(([key, r]) => key.startsWith(group.key + "|") && r && (r.assetId || r.tags)).map(([key]) => key.split("|").pop());
+  const reachable = group.current || turn != null || Boolean(group.era);
+  return { drawn, reachable, at: group.current ? {} : group.era ? { look: group.key } : { turn } };
+}
+function ActingNote({ gameId, person, group, turn }) {
+  const [busy, run] = useBusy();
+  const acting = person.acting;
+  const ai = acting && acting.read || "";
+  const mine = person.actingNote || "";
+  const shown = mine || ai;
+  const [v, setV] = import_react9.default.useState(shown);
+  const [editing, setEditing] = import_react9.default.useState(false);
+  const [fresh, setFresh] = import_react9.default.useState(false);
+  import_react9.default.useEffect(() => {
+    if (editing && v !== shown) {
+      setFresh(true);
+      return;
+    }
+    setV(shown);
+    setFresh(false);
+  }, [shown]);
+  const commit = () => {
+    setEditing(false);
+    const text = v.trim();
+    if (text === shown.trim()) {
+      setV(shown);
+      return;
+    }
+    if (!text && !mine) {
+      setV(shown);
+      return;
+    }
+    run("note", () => api.cast(gameId, person.global ? "global-save" : "save", { name: person.name, patch: { actingNote: text } }), text ? "表演笔记已保存：之后设计和画差分都照你写的" : ai ? "已清空，回到设计师写的那份" : "已清空");
+  };
+  const designing = person.actingBusy || busy === "rewrite";
+  const rewrite = () => {
+    if (mine && !window.confirm(`换掉你写的表演笔记，让表演设计师重新读一遍资料、剧情和档案，给${person.name}写一份？`)) return;
+    run("rewrite", () => api.cast(gameId, "acting-note", { name: person.name, replace: true }), acting ? "已交给表演设计师：读完资料就写好（导演日志里能看进度）" : "还没设计动作与表情：已交给设计师整套设计，表演笔记一起写");
+  };
+  const { drawn, reachable, at: at2 } = drawnIn(person, group, turn);
+  const redraw = () => {
+    if (!window.confirm(`让立绘设计师按现在的表演笔记，重新设计${person.name}「${lookLabel(group.look)}」这 ${drawn.length} 种表情、重写提示词再画？动作不变。`)) return;
+    run("redraw", () => api.cast(gameId, "sprite", { name: person.name, emotions: drawn, rewrite: true, ...at2 }), "已排队：按新的表演笔记重写表情");
+  };
+  const readTurn = acting ? acting.readTurn != null ? acting.readTurn : acting.turn : null;
+  const whose = mine ? "你写的（锁住：重新设计也不会改它；清空就回到设计师写的）" : ai ? `表演设计师读到第 ${readTurn != null ? readTurn : "?"} 轮写的，改了就算你写的` : "还没写。第一次设计动作与表情时，表演设计师会读完资料写一份；你也可以自己先写";
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "表演笔记"), /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement(
+    "textarea",
+    {
+      className: "fg-textarea",
+      value: v,
+      disabled: busy === "note",
+      onFocus: () => setEditing(true),
+      onChange: (e) => setV(e.target.value),
+      onBlur: commit,
+      onKeyDown: (e) => e.stopPropagation(),
+      placeholder: "这个人怎么流露情绪：比如「嘴硬心软，难过时反而笑，只有眼眶会红；生气时声音变轻、不看人」"
+    }
+  ), fresh && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row fg-note" }, "设计师刚写了新的一版，你正在改的没有冲掉。", /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => {
+    setV(shown);
+    setFresh(false);
+  } }, "换成设计师的新版")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, whose), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: designing, onClick: rewrite }, designing ? "设计师在写…" : "让设计师重写"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !reachable || !drawn.length || busy === "redraw", title: "动作不变，按现在的表演笔记重新设计这些表情、重写提示词再画", onClick: redraw }, "按新笔记重写表情", drawn.length ? `（「${lookLabel(group.look)}」${drawn.length} 张）` : ""))));
+}
 function ActingEditor({ gameId, person, emotions, group, turn }) {
   const [busy, run] = useBusy();
   const acting = person.acting;
-  const copy2 = (a) => a ? JSON.parse(JSON.stringify({ read: a.read || "", ...a.height ? { height: a.height } : {}, poses: a.poses || [], faces: a.faces || {} })) : null;
+  const copy2 = (a) => a ? JSON.parse(JSON.stringify({ ...a.height ? { height: a.height } : {}, poses: a.poses || [], faces: a.faces || {} })) : null;
   const [draft, setDraft] = import_react9.default.useState(() => copy2(acting));
+  const sent = import_react9.default.useRef(JSON.stringify(copy2(acting)));
+  const ownAt = import_react9.default.useRef(null);
+  const inflight = import_react9.default.useRef(false);
+  const latest = import_react9.default.useRef(draft);
+  latest.current = draft;
+  const [saving, setSaving] = import_react9.default.useState("");
+  const [incoming, setIncoming] = import_react9.default.useState(false);
+  const unsaved = (d) => Boolean(d) && JSON.stringify(d) !== sent.current;
   import_react9.default.useEffect(() => {
-    setDraft(copy2(acting));
+    if (!acting) {
+      setDraft(null);
+      sent.current = JSON.stringify(null);
+      setIncoming(false);
+      return;
+    }
+    if (inflight.current || acting.at === ownAt.current) return;
+    const next = copy2(acting);
+    const text = JSON.stringify(next);
+    if (text === sent.current) return;
+    if (!unsaved(draft)) {
+      setDraft(next);
+      sent.current = text;
+      setIncoming(false);
+    } else setIncoming(true);
   }, [acting && acting.at]);
-  const dirty = Boolean(draft) && JSON.stringify(draft) !== JSON.stringify(copy2(acting));
+  const push = (sheet, text) => {
+    inflight.current = true;
+    setSaving("saving");
+    return api.cast(gameId, "acting-save", { name: person.name, acting: sheet }).then((r) => {
+      sent.current = text;
+      ownAt.current = r && r.at;
+      setSaving("saved");
+      setIncoming(false);
+    }).catch((e) => setSaving(e.message || "没存上")).finally(() => {
+      inflight.current = false;
+    });
+  };
+  import_react9.default.useEffect(() => {
+    if (!unsaved(draft)) return void 0;
+    const text = JSON.stringify(draft);
+    const timer = setTimeout(() => push(draft, text), 1200);
+    return () => clearTimeout(timer);
+  }, [draft]);
+  import_react9.default.useEffect(() => () => {
+    const d = latest.current;
+    if (unsaved(d) && !inflight.current) api.cast(gameId, "acting-save", { name: person.name, acting: d }).catch(() => {
+    });
+  }, []);
   const label = (e) => emotionEntry(e, emotions).label;
   const design = () => {
-    if (acting && !window.confirm(`让立绘设计师重新读一遍资料和剧情，给${person.name}重新设计整套动作和表情？你改过的会被换掉；已经画好的立绘不动，要换成新设计就点「按这套设计重画」。`)) return;
-    run("design", () => api.cast(gameId, "acting-design", { name: person.name }), "已交给立绘设计师：读完资料和剧情就设计好（导演日志里能看进度）");
+    if (acting && !window.confirm(`让表演设计师重新读一遍资料和剧情，给${person.name}重新设计整套动作和表情？你改过的动作和表情会被换掉（表演笔记里你写的那条不动）；已经画好的立绘不动，要换成新设计就点「按这套设计重画」。`)) return;
+    run("design", () => api.cast(gameId, "acting-design", { name: person.name }), "已交给表演设计师：读完资料和剧情就设计好（导演日志里能看进度）");
   };
   const designing = person.actingBusy || busy === "design";
   if (!draft) {
-    return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form fg-acting" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "还没设计。第一次给", person.name, "画立绘之前，立绘设计师会先读完人物卡、世界书、到这一轮为止的全部剧情和档案，按人设、经历和在故事里的处境设计几个专属的动作，以及每种情绪在脸上的样子；之后的底图和表情差分都照着画。没开立绘设计师、或者设计不出来时，用设置里的通用动作组。"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: designing, onClick: design }, designing ? "设计中…" : "现在设计")));
+    return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form fg-acting" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "还没设计。第一次给", person.name, "画立绘之前，表演设计师会先读完人物卡、世界书、到这一轮为止的全部剧情和档案，写一份表演笔记（这个人怎么流露情绪，在「档案」里能看能改），按人设、经历和在故事里的处境设计专属的动作，以及每种情绪在脸上的样子；之后的底图和表情差分都照着画。没开立绘设计师、或者设计不出来时，用设置里的通用动作组。"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: designing, onClick: design }, designing ? "设计中…" : "现在设计")));
   }
   const setPose = (id, patch) => setDraft((d) => ({ ...d, poses: d.poses.map((p4) => p4.id === id ? { ...p4, ...patch } : p4) }));
   const move = (e, id) => setDraft((d) => ({ ...d, poses: d.poses.map((p4) => p4.id === id ? { ...p4, emotions: [...p4.emotions.filter((x) => x !== e), e] } : { ...p4, emotions: p4.emotions.filter((x) => x !== e) }) }));
   const toFront = (e) => setDraft((d) => ({ ...d, poses: d.poses.map((p4) => p4.emotions.includes(e) ? { ...p4, emotions: [e, ...p4.emotions.filter((x) => x !== e)] } : p4) }));
   const setFace = (e, patch) => setDraft((d) => ({ ...d, faces: { ...d.faces, [e]: { desc: "", tags: "", ...d.faces[e] || {}, ...patch } } }));
-  const save = () => run("save", () => api.cast(gameId, "acting-save", { name: person.name, acting: draft }), "已保存：之后画的照这份设计；已经画好的点「按这套设计重画」");
-  const drawn = Object.entries(person.sprites || {}).filter(([key, r]) => key.startsWith(group.key + "|") && r && (r.assetId || r.tags)).map(([key]) => key.split("|").pop());
-  const reachable = group.current || turn != null || Boolean(group.era);
-  const at2 = group.current ? {} : group.era ? { look: group.key } : { turn };
+  const { drawn, reachable, at: at2 } = drawnIn(person, group, turn);
+  const pending = unsaved(draft) || saving === "saving";
   const redraw = () => {
     if (!window.confirm(`按这套设计重画${person.name}「${lookLabel(group.look)}」的 ${drawn.length} 张差分？每个动作的底图整张重画，其余表情在新底图上换脸。`)) return;
     run("redraw", () => api.cast(gameId, "sprite", { name: person.name, emotions: drawn, rewrite: true, keepFaces: true, ...at2 }), "已排队：照这套设计重画");
   };
   const input = (value, onChange, placeholder, style) => /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", style, value: value || "", placeholder, onChange: (e) => onChange(e.target.value), onKeyDown: (e) => e.stopPropagation() });
-  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form fg-acting" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, acting.by === "user" ? "你改过的设计" : `立绘设计师读到第 ${acting.turn != null ? acting.turn : "?"} 轮设计的`, " · ", draft.poses.length, " 个动作", acting.height ? ` · 估的身高 ${acting.height} 厘米${person.height ? `（档案里写的 ${person.height} 优先）` : "（档案里能改）"}` : ""), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: designing, onClick: design }, designing ? "设计中…" : "重新设计"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !reachable || dirty || !drawn.length || busy === "redraw", title: dirty ? "先保存修改" : "", onClick: redraw }, "按这套设计重画「", lookLabel(group.look), "」", drawn.length ? `（${drawn.length} 张）` : "")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react9.default.createElement("label", null, "怎么流露情绪"), /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea is-short", value: draft.read, onChange: (e) => setDraft({ ...draft, read: e.target.value }), onKeyDown: (e) => e.stopPropagation(), placeholder: "这个人的性格、经历让他怎么流露情绪" })), draft.poses.map((p4) => /* @__PURE__ */ import_react9.default.createElement("div", { key: p4.id, className: "fg-acting-pose" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-acting-head" }, input(p4.label, (v) => setPose(p4.id, { label: v }), "动作名", { width: "13cqw", fontWeight: 600 }), input(p4.desc, (v) => setPose(p4.id, { desc: v }), "这个动作什么样、为什么是他", { flex: 1 }), /* @__PURE__ */ import_react9.default.createElement("label", { className: "fg-row fg-note", style: { gap: ".3em" }, title: "整张按侧身画：侧脸、看向一旁" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "checkbox", checked: Boolean(p4.side), onChange: (e) => setPose(p4.id, { side: e.target.checked }) }), "侧身")), input(p4.tags, (v) => setPose(p4.id, { tags: v }), "身体的英文 tag：hands behind back, weight on one leg", { width: "100%" }), p4.emotions.map((e, i) => {
+  const status = pending ? "正在存…" : saving === "saved" ? "✓ 已自动保存" : saving ? `⚠ 没存上：${saving}` : "";
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-form fg-acting" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, acting.by === "user" ? "你改过的设计" : `表演设计师读到第 ${acting.turn != null ? acting.turn : "?"} 轮设计的`, " · ", draft.poses.length, " 个动作", acting.height ? ` · 估的身高 ${acting.height} 厘米${person.height ? `（档案里写的 ${person.height} 优先）` : "（档案里能改）"}` : ""), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: designing, onClick: design }, designing ? "设计中…" : "重新设计"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !reachable || pending || !drawn.length || busy === "redraw", title: pending ? "等修改存好" : "", onClick: redraw }, "按这套设计重画「", lookLabel(group.look), "」", drawn.length ? `（${drawn.length} 张）` : "")), incoming && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row fg-note" }, "设计师刚改了这份设计，你正在改的没有冲掉（接着改会存成你的这版）。", /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => {
+    const next = copy2(acting);
+    setDraft(next);
+    sent.current = JSON.stringify(next);
+    setIncoming(false);
+  } }, "换成设计师的新版")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "表演笔记（这个人怎么流露情绪）在「档案」里看和改。"), draft.poses.map((p4) => /* @__PURE__ */ import_react9.default.createElement("div", { key: p4.id, className: "fg-acting-pose" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-acting-head" }, input(p4.label, (v) => setPose(p4.id, { label: v }), "动作名", { width: "13cqw", fontWeight: 600 }), input(p4.desc, (v) => setPose(p4.id, { desc: v }), "这个动作什么样、为什么是他", { flex: 1 })), input(p4.tags, (v) => setPose(p4.id, { tags: v }), "身体的英文 tag：hands behind back, weight on one leg", { width: "100%" }), p4.emotions.map((e, i) => {
     const face = draft.faces[e] || {};
     return /* @__PURE__ */ import_react9.default.createElement("div", { key: e, className: "fg-acting-emo" }, /* @__PURE__ */ import_react9.default.createElement("b", null, label(e), i === 0 ? /* @__PURE__ */ import_react9.default.createElement("i", null, "底图") : null), /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", value: p4.id, onChange: (ev) => move(e, ev.target.value), title: "挪到别的动作" }, draft.poses.map((q) => /* @__PURE__ */ import_react9.default.createElement("option", { key: q.id, value: q.id }, q.label || q.id))), input(face.desc, (v) => setFace(e, { desc: v }), "他的这种情绪什么样"), input(face.tags, (v) => setFace(e, { tags: v }), "脸上的英文 tag（没写就用内置的）"), i > 0 && !p4.emotions.includes("neutral") ? /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => toFront(e), title: "这个动作的底图整张画这个情绪" }, "设为底图") : /* @__PURE__ */ import_react9.default.createElement("span", null));
-  }), !p4.emotions.length && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "（空着：保存时去掉这个动作）"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "改了只影响之后画的；平静总在第一个动作的底图上（登场立绘就是它）。"), dirty && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setDraft(copy2(acting)) }, "撤销修改"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: !dirty || busy === "save", onClick: save }, "保存设计")));
+  }), !p4.emotions.length && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "（空着：存的时候去掉这个动作）"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "改了自动存，只影响之后画的；平静总在第一个动作的底图上（登场立绘就是它）。"), status && /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, status)));
 }
 function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
   const [busy, run] = useBusy();
@@ -8824,7 +9171,7 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
   };
   const mainRecord = main ? Object.values(person.sprites || {}).find((r) => r && r.assetId === main) : null;
   const [viewing, setViewing] = import_react9.default.useState(false);
-  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person", style: { "--c": person.color } }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-art" }, mainRecord ? /* @__PURE__ */ import_react9.default.createElement(SpriteArt, { record: mainRecord, label: person.name, onOpen: () => setViewing(true) }) : /* @__PURE__ */ import_react9.default.createElement(Silhouette, { name: person.name, color: person.color, appearance: person.appearance, gender: person.gender })), viewing && mainRecord && /* @__PURE__ */ import_react9.default.createElement(SpriteViewer, { record: mainRecord, label: `${person.name} · ${lookLabel(now)}`, onClose: () => setViewing(false) }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-main" }, /* @__PURE__ */ import_react9.default.createElement("h3", null, /* @__PURE__ */ import_react9.default.createElement("span", { style: { color: person.color } }, person.name), person.global ? /* @__PURE__ */ import_react9.default.createElement("small", null, "全局 · 外貌冻结") : /* @__PURE__ */ import_react9.default.createElement("small", null, "本局", person.createdTurn != null ? ` · 第 ${person.createdTurn} 轮登场` : ""), /* @__PURE__ */ import_react9.default.createElement("small", { title: "此刻的样子" }, lookLabel(now)), person.temp && /* @__PURE__ */ import_react9.default.createElement("small", { title: "临时状态，只进插画" }, "临时：", person.temp)), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-tags" }, person.appearance ? LOOK_FIELDS.filter((f) => (person.appearanceFields || {})[f]).map((f) => /* @__PURE__ */ import_react9.default.createElement("span", { key: f, className: "fg-look-chip", title: LOOK_FIELD_LABELS[f] }, f === "other" ? null : /* @__PURE__ */ import_react9.default.createElement("i", null, LOOK_FIELD_LABELS[f]), person.appearanceFields[f])) : "（还没有固定外貌）", person.outfitTags ? /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-look-chip", title: "这身衣服" }, /* @__PURE__ */ import_react9.default.createElement("i", null, person.outfit || "衣服"), person.outfitTags) : null), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row fg-person-folds" }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: `fg-btn${fold === "profile" ? " is-on" : ""}`, onClick: () => setFold(fold === "profile" ? "" : "profile") }, "档案 · 种子 ", person.seed, " · 声音 ", voiceText(voice), voice && voice.auto ? "（自动）" : ""), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: `fg-btn${fold === "wardrobe" ? " is-on" : ""}`, onClick: () => setFold(fold === "wardrobe" ? "" : "wardrobe") }, "衣橱与状态 · ", Object.keys(person.timeline && person.timeline.outfits || {}).length, " 套"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: `fg-btn${fold === "acting" ? " is-on" : ""}`, onClick: () => setFold(fold === "acting" ? "" : "acting") }, "动作与表情 · ", person.actingBusy ? "设计中…" : person.acting ? `${person.acting.poses.length} 个动作` : "还没设计")), fold === "profile" && /* @__PURE__ */ import_react9.default.createElement(ProfileEditor, { gameId, person, cast }), fold === "wardrobe" && /* @__PURE__ */ import_react9.default.createElement(WardrobeEditor, { gameId, person }), fold === "acting" && /* @__PURE__ */ import_react9.default.createElement(ActingEditor, { gameId, person, emotions, group, turn }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-looks" }, groups.map((g) => /* @__PURE__ */ import_react9.default.createElement("button", { key: g.key, type: "button", className: `fg-look${g.key === group.key ? " is-on" : ""}`, onClick: () => {
+  return /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person", style: { "--c": person.color } }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-art" }, mainRecord ? /* @__PURE__ */ import_react9.default.createElement(SpriteArt, { record: mainRecord, label: person.name, onOpen: () => setViewing(true) }) : /* @__PURE__ */ import_react9.default.createElement(Silhouette, { name: person.name, color: person.color, appearance: person.appearance, gender: person.gender })), viewing && mainRecord && /* @__PURE__ */ import_react9.default.createElement(SpriteViewer, { record: mainRecord, label: `${person.name} · ${lookLabel(now)}`, onClose: () => setViewing(false) }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-main" }, /* @__PURE__ */ import_react9.default.createElement("h3", null, /* @__PURE__ */ import_react9.default.createElement("span", { style: { color: person.color } }, person.name), person.global ? /* @__PURE__ */ import_react9.default.createElement("small", null, "全局 · 外貌冻结") : /* @__PURE__ */ import_react9.default.createElement("small", null, "本局", person.createdTurn != null ? ` · 第 ${person.createdTurn} 轮登场` : ""), /* @__PURE__ */ import_react9.default.createElement("small", { title: "此刻的样子" }, lookLabel(now)), person.temp && /* @__PURE__ */ import_react9.default.createElement("small", { title: "临时状态，只进插画" }, "临时：", person.temp)), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-person-tags" }, person.appearance ? LOOK_FIELDS.filter((f) => (person.appearanceFields || {})[f]).map((f) => /* @__PURE__ */ import_react9.default.createElement("span", { key: f, className: "fg-look-chip", title: LOOK_FIELD_LABELS[f] }, f === "other" ? null : /* @__PURE__ */ import_react9.default.createElement("i", null, LOOK_FIELD_LABELS[f]), person.appearanceFields[f])) : "（还没有固定外貌）", person.outfitTags ? /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-look-chip", title: "这身衣服" }, /* @__PURE__ */ import_react9.default.createElement("i", null, person.outfit || "衣服"), person.outfitTags) : null), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row fg-person-folds" }, /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: `fg-btn${fold === "profile" ? " is-on" : ""}`, onClick: () => setFold(fold === "profile" ? "" : "profile") }, "档案 · 种子 ", person.seed, " · 声音 ", voiceText(voice), voice && voice.auto ? "（自动）" : ""), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: `fg-btn${fold === "wardrobe" ? " is-on" : ""}`, onClick: () => setFold(fold === "wardrobe" ? "" : "wardrobe") }, "衣橱与状态 · ", Object.keys(person.timeline && person.timeline.outfits || {}).length, " 套"), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: `fg-btn${fold === "acting" ? " is-on" : ""}`, onClick: () => setFold(fold === "acting" ? "" : "acting") }, "动作与表情 · ", person.actingBusy ? "设计中…" : person.acting ? `${person.acting.poses.length} 个动作` : "还没设计")), fold === "profile" && /* @__PURE__ */ import_react9.default.createElement(ProfileEditor, { gameId, person, cast, group, turn }), fold === "wardrobe" && /* @__PURE__ */ import_react9.default.createElement(WardrobeEditor, { gameId, person }), fold === "acting" && /* @__PURE__ */ import_react9.default.createElement(ActingEditor, { gameId, person, emotions, group, turn }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-looks" }, groups.map((g) => /* @__PURE__ */ import_react9.default.createElement("button", { key: g.key, type: "button", className: `fg-look${g.key === group.key ? " is-on" : ""}`, onClick: () => {
     setGroupKey(g.key);
     setEmotion("");
     setPicked(/* @__PURE__ */ new Set());
@@ -8836,7 +9183,7 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
     {
       key: t.id,
       type: "button",
-      title: t.st && t.st.error ? t.st.error : t.desc || t.label,
+      title: t.st && t.st.error ? t.st.error : t.label,
       disabled: manage && !t.record,
       className: `fg-emo${t.st && ["writing", "queued", "running"].includes(t.st.status) ? " is-busy" : ""}${!manage && emotion === t.id ? " is-on" : ""}${manage && picked.has(t.key) ? " is-picked" : ""}${t.builtin ? "" : " is-custom"}`,
       onClick: () => manage ? pick(t.key) : setEmotion(emotion === t.id ? "" : t.id)
@@ -8851,15 +9198,15 @@ function PersonCard({ gameId, person, emotions, cast, voice, used, onBench }) {
 }
 function EmotionLibrary({ emotions }) {
   const [busy, run] = useBusy();
-  const [draft, setDraft] = import_react9.default.useState({ id: "", desc: "", base: "" });
+  const [draft, setDraft] = import_react9.default.useState({ id: "", base: "" });
   const builtin = allEmotions([]).filter((e) => e.builtin);
   const custom = emotions || [];
   const baseOptions = [["", "（无）"], ...builtin.map((e) => [e.id, e.label])];
   const save = (id, patch) => run("e" + id, () => api.emotion("save", { id, ...patch }), "已保存");
-  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "导演给每句台词标情绪；库里没有贴切的词时，它会自创一个（可以是复合情绪，比如「带着烦躁思考」），写一句神情姿态，加进这里。导演新造的情绪只挂在用过它的角色下面，谁用到了才给谁画差分；你自己加的大家都能用。所有对局共用。"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "新加的情绪 · ", custom.length), custom.map((e) => /* @__PURE__ */ import_react9.default.createElement("div", { key: e.id, className: "fg-emotion-row" }, /* @__PURE__ */ import_react9.default.createElement("b", null, e.id), /* @__PURE__ */ import_react9.default.createElement(Text, { value: e.desc || "", placeholder: "神情与姿态：眉眼、嘴角、脸色、手和身体", onCommit: (v) => save(e.id, { desc: v }) }), /* @__PURE__ */ import_react9.default.createElement(Select, { value: e.base || "", options: baseOptions, onChange: (v) => save(e.id, { base: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, e.source === "user" ? "你加的 · 大家都能用" : `导演加的${e.turn != null ? ` · 第 ${e.turn} 轮` : ""}${e.who && e.who.length ? ` · 用于 ${e.who.join("、")}` : ""}`), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "x" + e.id, onClick: () => run("x" + e.id, () => api.emotion("delete", { id: e.id }), "已删除（画好的立绘还在）") }, "删除"))), !custom.length && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "还没有。导演遇到内置情绪表达不了的瞬间时会自己加。"), /* @__PURE__ */ import_react9.default.createElement("form", { className: "fg-emotion-row is-new", onSubmit: (e) => {
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "导演给每句台词标情绪；库里没有贴切的词时，它会自创一个（可以是复合情绪，比如「带着烦躁思考」），加进这里。库里只有这个词本身，不带描述：这种情绪在谁脸上什么样，由表演设计师按那个人的表演笔记设计（人物志 →「动作与表情」）。「接近」是还没画好时先用哪张立绘。导演新造的情绪只挂在用过它的角色下面，谁用到了才给谁画差分；你自己加的大家都能用。所有对局共用。"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "新加的情绪 · ", custom.length), custom.map((e) => /* @__PURE__ */ import_react9.default.createElement("div", { key: e.id, className: "fg-emotion-row" }, /* @__PURE__ */ import_react9.default.createElement("b", null, e.id), /* @__PURE__ */ import_react9.default.createElement(Select, { value: e.base || "", options: baseOptions, onChange: (v) => save(e.id, { base: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, e.source === "user" ? "你加的 · 大家都能用" : `导演加的${e.turn != null ? ` · 第 ${e.turn} 轮` : ""}${e.who && e.who.length ? ` · 用于 ${e.who.join("、")}` : ""}`), /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "x" + e.id, onClick: () => run("x" + e.id, () => api.emotion("delete", { id: e.id }), "已删除（画好的立绘还在）") }, "删除"))), !custom.length && /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "还没有。导演遇到内置情绪表达不了的瞬间时会自己加。"), /* @__PURE__ */ import_react9.default.createElement("form", { className: "fg-emotion-row is-new", onSubmit: (e) => {
     e.preventDefault();
-    if (draft.id.trim()) run("add", () => api.emotion("save", draft), "已加进情绪库").then(() => setDraft({ id: "", desc: "", base: "" }));
-  } }, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", placeholder: "苦闷地表白", value: draft.id, onChange: (e) => setDraft({ ...draft, id: e.target.value }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", placeholder: "眉头紧锁却脸红，攥着衣角，视线躲开", value: draft.desc, onChange: (e) => setDraft({ ...draft, desc: e.target.value }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement(Select, { value: draft.base, options: baseOptions, onChange: (v) => setDraft({ ...draft, base: v }) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "submit", className: "fg-btn is-primary" }, "加进情绪库")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "内置 · ", builtin.length), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, builtin.map((e) => /* @__PURE__ */ import_react9.default.createElement("span", { key: e.id, className: "fg-chip" }, e.label, /* @__PURE__ */ import_react9.default.createElement("small", null, e.id)))));
+    if (draft.id.trim()) run("add", () => api.emotion("save", draft), "已加进情绪库").then(() => setDraft({ id: "", base: "" }));
+  } }, /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", placeholder: "新情绪，比如「苦闷地表白」（词本身要能看懂）", value: draft.id, onChange: (e) => setDraft({ ...draft, id: e.target.value }), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react9.default.createElement(Select, { value: draft.base, options: baseOptions, onChange: (v) => setDraft({ ...draft, base: v }) }), /* @__PURE__ */ import_react9.default.createElement("button", { type: "submit", className: "fg-btn is-primary" }, "加进情绪库")), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "内置 · ", builtin.length), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, builtin.map((e) => /* @__PURE__ */ import_react9.default.createElement("span", { key: e.id, className: "fg-chip" }, e.label, /* @__PURE__ */ import_react9.default.createElement("small", null, e.id)))));
 }
 function CastPanel({ view, gameId, onClose }) {
   const [tab, setTab] = import_react9.default.useState("people");
@@ -8919,6 +9266,27 @@ function Text({ value, onCommit, type = "text", placeholder, style }) {
     e.stopPropagation();
     if (e.key === "Enter") commit();
   } });
+}
+function Limit({ value, onCommit, fallback, min = 0, unit, free = "不限", width = "6cqw" }) {
+  const open = value === null || value === void 0;
+  const shown = open ? "" : String(value);
+  const [v, setV] = import_react9.default.useState(shown);
+  import_react9.default.useEffect(() => {
+    setV(shown);
+  }, [shown]);
+  const commit = () => {
+    const n = Math.max(min, Math.trunc(Number(v)));
+    if (String(v).trim() === "" || !Number.isFinite(n)) {
+      setV(shown);
+      return;
+    }
+    if (n !== value) onCommit(n);
+    else setV(shown);
+  };
+  return /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-row", style: { gap: ".5em" } }, !open && /* @__PURE__ */ import_react9.default.createElement("input", { className: "fg-input", type: "number", min, style: { width }, value: v, onChange: (e) => setV(e.target.value), onBlur: commit, onKeyDown: (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") commit();
+  } }), !open && unit && /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, unit), /* @__PURE__ */ import_react9.default.createElement("label", { className: "fg-row fg-note", style: { gap: ".3em" } }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "checkbox", checked: open, onChange: (e) => onCommit(e.target.checked ? null : fallback) }), free));
 }
 function Select({ value, options, onChange, style }) {
   return /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", value, style, onChange: (e) => onChange(e.target.value) }, options.map(([v, l]) => /* @__PURE__ */ import_react9.default.createElement("option", { key: v, value: v }, l)));
@@ -9094,11 +9462,11 @@ function DirectorSection({ data, onDirectorLog }) {
     });
   }, [cfg.director.provider]);
   const p4 = (patch) => patchConfig({ director: patch }).catch((e) => toast(e.message, "error"));
-  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "导演（后台整理）", onDirectorLog && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: onDirectorLog }, "查看导演日志")), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自动整理", hint: "每轮正文写完后，后台模型把它整理成场景：说话人、表情、站位、镜头、天气、选项、插画分镜。正文一字不改。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.director.auto, onChange: (v) => p4({ auto: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "模型", hint: hostName() === "st" ? "默认跟着酒馆当前的连接；也可以选一套连接配置（在酒馆「API 连接」里存的）专门给导演用，整理用便宜的小模型就够。" : "留空跟随 Tavern 的后台模型。整理用的是便宜的小模型就够。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: cfg.director.provider, onChange: (v) => p4({ provider: v, model: "" }), options: [["", hostName() === "st" ? "跟着酒馆当前的连接" : "跟随 Tavern"], ...llm.providers.map((x) => [x.id, x.name])] }), cfg.director.provider && (llm.models.length ? /* @__PURE__ */ import_react9.default.createElement(Select, { value: cfg.director.model, onChange: (v) => p4({ model: v }), options: [["", "（请选择）"], ...llm.models.map((m) => [m.id, m.name])] }) : /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.director.model, placeholder: "模型 ID", onCommit: (v) => p4({ model: v }) })))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "最大输出 / 温度", hint: "默认 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "9cqw" }, value: cfg.director.maxTokens, onCommit: (v) => p4({ maxTokens: v }) }), /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "7cqw" }, value: cfg.director.temperature, onCommit: (v) => p4({ temperature: v }) }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "资料长度", hint: "给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认 1000000，等于不截断；超出模型窗口时自动缩短。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", value: cfg.director.contextChars, onCommit: (v) => p4({ contextChars: v }) })), /* @__PURE__ */ import_react9.default.createElement(CgModelFields, { data, providers: llm.providers }), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自定义提示词", hint: "留空用内置导演提示词。可用 {{maxImages}} {{styleHint}}。情绪库、配乐曲库附在用户消息里，自定义时也生效。" }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.systemPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "导演（后台整理）", onDirectorLog && /* @__PURE__ */ import_react9.default.createElement("button", { type: "button", className: "fg-btn", onClick: onDirectorLog }, "查看导演日志")), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自动整理", hint: "每轮正文写完后，后台模型把它整理成场景：说话人、表情、站位、镜头、天气、选项、插画分镜。正文一字不改。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.director.auto, onChange: (v) => p4({ auto: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "模型", hint: hostName() === "st" ? "默认跟着酒馆当前的连接；也可以选一套连接配置（在酒馆「API 连接」里存的）专门给导演用，整理用便宜的小模型就够。" : "留空跟随 Tavern 的后台模型。整理用的是便宜的小模型就够。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Select, { value: cfg.director.provider, onChange: (v) => p4({ provider: v, model: "" }), options: [["", hostName() === "st" ? "跟着酒馆当前的连接" : "跟随 Tavern"], ...llm.providers.map((x) => [x.id, x.name])] }), cfg.director.provider && (llm.models.length ? /* @__PURE__ */ import_react9.default.createElement(Select, { value: cfg.director.model, onChange: (v) => p4({ model: v }), options: [["", "（请选择）"], ...llm.models.map((m) => [m.id, m.name])] }) : /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.director.model, placeholder: "模型 ID", onCommit: (v) => p4({ model: v }) })))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "最大输出", hint: "自动：模型报了输出上限就用它报的，没报按 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。导演、立绘设计师、插画分镜师都用这一个。" }, /* @__PURE__ */ import_react9.default.createElement(Limit, { value: cfg.director.maxTokens, fallback: 128e3, min: 1e3, width: "9cqw", free: "自动", onCommit: (v) => p4({ maxTokens: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "温度" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "7cqw" }, value: cfg.director.temperature, onCommit: (v) => p4({ temperature: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "资料长度", hint: "给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认不限，整份给；超出模型窗口时自动缩短。" }, /* @__PURE__ */ import_react9.default.createElement(Limit, { value: cfg.director.contextChars, fallback: 1e6, width: "9cqw", unit: "字", onCommit: (v) => p4({ contextChars: v }) })), /* @__PURE__ */ import_react9.default.createElement(CgModelFields, { data, providers: llm.providers }), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "每轮上限"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-note" }, "导演一轮里最多写几次。默认都不限：提示词里「只给真正需要的地方」「平常的句子不写」那几句一直在，靠它让导演自己收着用。限了数的，提示词里会写上这个数，导演写多了也只按正文顺序留前面那么多。"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-limits" }, DIRECTOR_LIMITS.map((l) => /* @__PURE__ */ import_react9.default.createElement(Field, { key: l.key, label: l.label }, /* @__PURE__ */ import_react9.default.createElement(Limit, { value: cfg.director.limits?.[l.key] ?? null, fallback: l.was, unit: l.unit, onCommit: (v) => p4({ limits: { [l.key]: v } }) })))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "提示词"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自定义提示词", hint: `留空用内置导演提示词。可用 {{styleHint}}，插画张数 {{imageLimit}} {{nsfwRoom}}，每轮上限 ${DIRECTOR_LIMITS.map((l) => `{{${l.key}Limit}}`).join(" ")}（限了数是「一轮最多 N 次，」这半句，不限时是空的）。情绪库、配乐曲库附在用户消息里，自定义时也生效。` }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.systemPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
     if (e.target.value !== cfg.director.systemPrompt) p4({ systemPrompt: e.target.value });
   } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "立绘设计师提示词", hint: '留空用内置的。可用 {{styleHint}}。输出格式必须是 {"sprites":[{"key","tags"}]}（负面只用画风里带的，写了也不收）。' }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.spritePrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
     if (e.target.value !== cfg.director.spritePrompt) p4({ spritePrompt: e.target.value });
-  } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "动作与表情设计提示词", hint: '留空用内置的（画立绘前给每个人设计专属动作和表情）。可用 {{styleHint}} {{max}}。输出格式必须是 {"read","poses":[{"id","label","desc","tags","side","emotions"}],"faces":[{"emotion","desc","tags"}]}。' }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.actingPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
+  } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "动作与表情设计提示词", hint: '留空用内置的（画立绘前给每个人设计专属动作和表情，read 是人物志里的「表演笔记」）。可用 {{styleHint}}。输出格式必须是 {"read","poses":[{"id","label","desc","tags","emotions"}],"faces":[{"emotion","desc","tags"}]}。' }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.actingPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
     if (e.target.value !== cfg.director.actingPrompt) p4({ actingPrompt: e.target.value });
   } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "插画分镜师提示词", hint: '留空用内置的（Base + 每人一个角色块的写法）。可用 {{styleHint}}。输出格式必须是 {"images":[{"key","tag","nl","characters":[{"name","tag","nl"}],"size"}]}。' }, /* @__PURE__ */ import_react9.default.createElement("textarea", { className: "fg-textarea", defaultValue: cfg.director.cgPrompt, onKeyDown: (e) => e.stopPropagation(), onBlur: (e) => {
     if (e.target.value !== cfg.director.cgPrompt) p4({ cgPrompt: e.target.value });
@@ -9134,7 +9502,7 @@ var parseSize = (text) => {
 function ImagesSection({ data }) {
   const cfg = data.config;
   const p4 = (patch) => patchConfig({ images: patch }).catch((e) => toast(e.message, "error"));
-  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "自动配图"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自动插画", hint: "导演判断值得画的地方自动出 CG，挂在正文对应段落后。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.auto, onChange: (v) => p4({ auto: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "每轮最多"), /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "6cqw" }, value: cfg.images.maxPerTurn, onCommit: (v) => p4({ maxPerTurn: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "张"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "插画方向", hint: "横图铺满舞台；竖图在剧场里镜头从上往下慢慢看一遍。交给 AI 时插画分镜师按构图挑（多人铺开、远景出横图，单人、特写、两人贴近出竖图）。只管自动配的插画，鉴赏里还能单张改。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.images.cgShape || "auto", onChange: (e) => p4({ cgShape: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "auto" }, "AI 自己判断"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "landscape" }, "都出横图"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "portrait" }, "都出竖图"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "新地点背景" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.backgrounds, onChange: (v) => p4({ backgrounds: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "立绘", hint: "角色登场、换装、长期状态变化时，画这一套的平静立绘。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.portraits, onChange: (v) => p4({ portraits: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "情绪差分", hint: "导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.expressions, onChange: (v) => p4({ expressions: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "每轮最多"), /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "6cqw" }, value: cfg.images.expressionsPerTurn, onCommit: (v) => p4({ expressionsPerTurn: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "张"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "表情只换脸", hint: "galgame 的「一个动作 + 一套表情」：同一套衣服每个动作整张画一张底图，同一个动作的其余情绪用 NovelAI 局部重绘只重画脸（眉、眼、两颊、嘴），身体和衣服一个像素都不动。每个人有哪些动作、哪种情绪归哪个动作、脸上什么样，是立绘设计师读完资料和剧情给他设计的（人物志 →「动作与表情」）。底图画好后要认一次脸：剧场开着、认脸小模型下好时自动认，认不准的在人物志里点开底图框一下。只对 NovelAI 有效；关掉就像以前一样每个情绪整张画。已经画好的立绘不会自动重画。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.faceSwap, onChange: (v) => p4({ faceSwap: v }) })), cfg.images.faceSwap && /* @__PURE__ */ import_react9.default.createElement(PoseGroups, { poses: cfg.images.poses || {}, onChange: (poses) => p4({ poses }) }), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "立绘设计师", hint: "给一个人画第一张立绘之前，先读完人物卡、世界书和到这一轮为止的全部剧情，按他的人设和经历设计专属的几个动作和每种情绪的表情（人物志 →「动作与表情」里能看能改）；之后每张差分的提示词也由它读完资料来写，照设计画，只换脸的表情直接用设计好的。一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼、用通用动作组。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.spriteWriter, onChange: (v) => p4({ spriteWriter: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "并发" }, /* @__PURE__ */ import_react9.default.createElement(Text, { type: "number", style: { width: "6cqw" }, value: cfg.images.concurrency, onCommit: (v) => p4({ concurrency: v }) })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "尺寸"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "插画、背景、立绘", hint: "宽×高，按 64 取整。默认是 NovelAI 常用的三种；超过 1024×1024 面积的尺寸在 NovelAI 上要扣点数。剧场画面默认跟横版一样的比例。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, SIZE_SHAPES.map(([shape, label]) => /* @__PURE__ */ import_react9.default.createElement("label", { key: shape, className: "fg-row", style: { gap: ".4em" } }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, label), /* @__PURE__ */ import_react9.default.createElement(Text, { style: { width: "9cqw" }, value: cfg.images.sizes[shape].join("×"), onCommit: (v) => {
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "自动配图"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自动插画", hint: "导演判断值得画的地方自动出 CG，挂在正文对应段落后。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.auto, onChange: (v) => p4({ auto: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "每轮最多"), /* @__PURE__ */ import_react9.default.createElement(Limit, { value: cfg.images.maxPerTurn, fallback: 4, unit: "张", onCommit: (v) => p4({ maxPerTurn: v }) }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "插画方向", hint: "横图铺满舞台；竖图在剧场里镜头从上往下慢慢看一遍。交给 AI 时插画分镜师按构图挑（多人铺开、远景出横图，单人、特写、两人贴近出竖图）。只管自动配的插画，鉴赏里还能单张改。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.images.cgShape || "auto", onChange: (e) => p4({ cgShape: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "auto" }, "AI 自己判断"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "landscape" }, "都出横图"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "portrait" }, "都出竖图"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "新地点背景" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.backgrounds, onChange: (v) => p4({ backgrounds: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "立绘", hint: "角色登场、换装、长期状态变化时，画这一套的平静立绘。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.portraits, onChange: (v) => p4({ portraits: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "情绪差分", hint: "导演用到这一套还没有的情绪时补画（包括它自创的新情绪）。漏掉的可以在人物志里一键补齐。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.expressions, onChange: (v) => p4({ expressions: v }) }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "每轮最多"), /* @__PURE__ */ import_react9.default.createElement(Limit, { value: cfg.images.expressionsPerTurn, fallback: 12, unit: "张", onCommit: (v) => p4({ expressionsPerTurn: v }) }))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "表情只换脸", hint: "galgame 的「一个动作 + 一套表情」：同一套衣服每个动作整张画一张底图，同一个动作的其余情绪用 NovelAI 局部重绘只重画脸（眉、眼、两颊、嘴），身体和衣服一个像素都不动。每个人有哪些动作、哪种情绪归哪个动作、脸上什么样，是立绘设计师读完资料和剧情给他设计的（人物志 →「动作与表情」）。底图画好后要认一次脸：剧场开着、认脸模型下好时自动认（下了认脸大模型就一律用大模型），认不准的在人物志里点开底图框一下。只对 NovelAI 有效；关掉就像以前一样每个情绪整张画。已经画好的立绘不会自动重画。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.faceSwap, onChange: (v) => p4({ faceSwap: v }) })), cfg.images.faceSwap && /* @__PURE__ */ import_react9.default.createElement(PoseGroups, { poses: cfg.images.poses || {}, onChange: (poses) => p4({ poses }) }), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "立绘设计师", hint: "给一个人画第一张立绘之前，先读完人物卡、世界书和到这一轮为止的全部剧情，按他的人设和经历设计专属的几个动作和每种情绪的表情（人物志 →「动作与表情」里能看能改）；之后每张差分的提示词也由它读完资料来写，照设计画，只换脸的表情直接用设计好的。一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼、用通用动作组。" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.images.spriteWriter, onChange: (v) => p4({ spriteWriter: v }) })), cfg.images.backend === "novelai" && (cfg.novelai?.endpoint || "official") === "official" ? /* @__PURE__ */ import_react9.default.createElement(Field, { label: "并发" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, "一次画 1 张：NovelAI 官方接口一个账号同时只能画一张（多发的会被它拒绝）。换成自建接入点、ComfyUI、WebUI、OpenAI 兼容时这里能调。")) : /* @__PURE__ */ import_react9.default.createElement(Field, { label: "并发", hint: `同时画几张。自动：OpenAI 兼容的同时 4 张，本地的 ComfyUI / WebUI 一张（一块显卡本来就一张张画，多发了只是在它那边排队）。现在是 ${imageConcurrency(cfg)} 张。` }, /* @__PURE__ */ import_react9.default.createElement(Limit, { value: cfg.images.concurrency, fallback: imageConcurrency(cfg), min: 1, unit: "张", free: "自动", onCommit: (v) => p4({ concurrency: v }) })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "尺寸"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "插画、背景、立绘", hint: "宽×高，按 64 取整。默认是 NovelAI 常用的三种；超过 1024×1024 面积的尺寸在 NovelAI 上要扣点数。剧场画面默认跟横版一样的比例。" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-row" }, SIZE_SHAPES.map(([shape, label]) => /* @__PURE__ */ import_react9.default.createElement("label", { key: shape, className: "fg-row", style: { gap: ".4em" } }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "fg-note" }, label), /* @__PURE__ */ import_react9.default.createElement(Text, { style: { width: "9cqw" }, value: cfg.images.sizes[shape].join("×"), onCommit: (v) => {
     const size = parseSize(v);
     if (size) p4({ sizes: { ...cfg.images.sizes, [shape]: size } });
     else toast("写成「宽×高」，比如 1216×832", "error");
@@ -9147,7 +9515,7 @@ var landscapeSize = (cfg) => {
 function LookSection({ data }) {
   const cfg = data.config;
   const p4 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
-  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "界面皮肤"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skins" }, SKINS.map((s) => /* @__PURE__ */ import_react9.default.createElement("button", { key: s.id, type: "button", className: `fg-skin${cfg.ui.skin === s.id ? " is-on" : ""}`, onClick: () => p4({ skin: s.id }) }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skin-swatch", style: { background: s.swatch } }), /* @__PURE__ */ import_react9.default.createElement("b", null, s.name), /* @__PURE__ */ import_react9.default.createElement("span", null, s.desc)))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "画面"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "画面比例", hint: "跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.ratio, onChange: (e) => p4({ ratio: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "cg" }, "跟横版插画一样（", landscapeSize(data.config), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "wide" }, "16:9 宽屏"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "同屏最多几人", hint: "台上的人多于这个数时，最久没说话、没登场的先下场，轮到他说话再回来。人越多立绘越小，按站位从左到右排开。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: String(cfg.ui.maxOnStage ?? 5), onChange: (e) => p4({ maxOnStage: Number(e.target.value) }) }, [2, 3, 4, 5, 6, 7, 8].map((n) => /* @__PURE__ */ import_react9.default.createElement("option", { key: n, value: String(n) }, n, " 人")), /* @__PURE__ */ import_react9.default.createElement("option", { value: "0" }, "不限"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "演出"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回", hint: "正文里一两句的回忆（「她说过：……」）怎么演。要换到当时的地方慢慢演的长回忆，导演会换成整段回忆场景，不受这里影响。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recall || "text", onChange: (e) => p4({ recall: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "text" }, "画面不动，对话框换成回忆的样子"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "ghost" }, "画面压暗，回忆里的人浮到台前"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "portrait" }, "对话框换样子，旁边再出说话人的小头像"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回的名牌", hint: "回忆里说话的人的名字。模糊压暗时认得出是谁，又像隔着一层看不清。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallName || "blur", onChange: (e) => p4({ recallName: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "blur" }, "模糊、压暗"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "hide" }, "不显示"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "show" }, "照常显示"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回的基调", hint: "切进闪回的方式和色调，对话框和回忆里的声音也跟着变：温暖怀念慢慢泛黄，甜蜜泛起粉光，伤感褪成冷灰，不安画面撕裂泛红、像心跳一样一暗一暗，猛然想起白闪一下，朦胧如梦起雾。自动时导演按剧情选，没选的按闪回里的情绪和当时的氛围挑。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallTone || "auto", onChange: (e) => p4({ recallTone: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "auto" }, "自动（按剧情和氛围）"), RECALL_TONES.map((t) => /* @__PURE__ */ import_react9.default.createElement("option", { key: t, value: t }, "都用「", RECALL_TONE_NAMES[t], "」")))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "文字速度", hint: "每字毫秒，0 为瞬间显示。" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "80", value: cfg.ui.textSpeed, onChange: (e) => p4({ textSpeed: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自动播放间隔" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "400", max: "4000", step: "100", value: cfg.ui.autoDelay, onChange: (e) => p4({ autoDelay: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "写完自动打开剧场" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.autoOpen, onChange: (v) => p4({ autoOpen: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "字体地址", hint: "皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。立绘工作台的认脸模型也从这里下它的运行库。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.ui.fontBase, onCommit: (v) => p4({ fontBase: v }) })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "认脸模型（立绘工作台的自动框）"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "下载来源", hint: "模型在 HuggingFace：自动是先连官网、连不上换镜像；只下一次，存在数据目录的 models 文件夹。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.vision.source, onChange: (e) => patchConfig({ vision: { source: e.target.value } }).catch((err) => toast(err.message, "error")) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "auto" }, "自动（先官网，连不上换镜像）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "official" }, "只用官网"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "mirror" }, "先用镜像"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "镜像地址", hint: "HuggingFace 的镜像站，默认 hf-mirror.com；路径规则要跟官网一样（…/仓库/resolve/版本/文件）。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.vision.mirror, onCommit: (v) => patchConfig({ vision: { mirror: v } }).catch((err) => toast(err.message, "error")) })));
+  return /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "界面皮肤"), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skins" }, SKINS.map((s) => /* @__PURE__ */ import_react9.default.createElement("button", { key: s.id, type: "button", className: `fg-skin${cfg.ui.skin === s.id ? " is-on" : ""}`, onClick: () => p4({ skin: s.id }) }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-skin-swatch", style: { background: s.swatch } }), /* @__PURE__ */ import_react9.default.createElement("b", null, s.name), /* @__PURE__ */ import_react9.default.createElement("span", null, s.desc)))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "画面"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "画面比例", hint: "跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.ratio, onChange: (e) => p4({ ratio: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "cg" }, "跟横版插画一样（", landscapeSize(data.config), "）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "wide" }, "16:9 宽屏"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "同屏最多几人", hint: "台上的人多于这个数时，最久没说话、没登场的先下场，轮到他说话再回来。人越多立绘越小，按站位从左到右排开。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: String(cfg.ui.maxOnStage ?? 8), onChange: (e) => p4({ maxOnStage: Number(e.target.value) }) }, STAGE_SIZES.filter(Boolean).map((n) => /* @__PURE__ */ import_react9.default.createElement("option", { key: n, value: String(n) }, n, " 人")), /* @__PURE__ */ import_react9.default.createElement("option", { value: "0" }, "不限"))), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "演出"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回", hint: "正文里一两句的回忆（「她说过：……」）怎么演。要换到当时的地方慢慢演的长回忆，导演会换成整段回忆场景，不受这里影响。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recall || "text", onChange: (e) => p4({ recall: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "text" }, "画面不动，对话框换成回忆的样子"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "ghost" }, "画面压暗，回忆里的人浮到台前"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "portrait" }, "对话框换样子，旁边再出说话人的小头像"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回的名牌", hint: "回忆里说话的人的名字。模糊压暗时认得出是谁，又像隔着一层看不清。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallName || "blur", onChange: (e) => p4({ recallName: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "blur" }, "模糊、压暗"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "hide" }, "不显示"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "show" }, "照常显示"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "短闪回的基调", hint: "切进闪回的方式和色调，对话框和回忆里的声音也跟着变：温暖怀念慢慢泛黄，甜蜜泛起粉光，伤感褪成冷灰，不安画面撕裂泛红、像心跳一样一暗一暗，猛然想起白闪一下，朦胧如梦起雾。自动时导演按剧情选，没选的按闪回里的情绪和当时的氛围挑。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallTone || "auto", onChange: (e) => p4({ recallTone: e.target.value }) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "auto" }, "自动（按剧情和氛围）"), RECALL_TONES.map((t) => /* @__PURE__ */ import_react9.default.createElement("option", { key: t, value: t }, "都用「", RECALL_TONE_NAMES[t], "」")))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "文字速度", hint: "每字毫秒，0 为瞬间显示。" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "0", max: "80", value: cfg.ui.textSpeed, onChange: (e) => p4({ textSpeed: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "自动播放间隔" }, /* @__PURE__ */ import_react9.default.createElement("input", { type: "range", min: "400", max: "4000", step: "100", value: cfg.ui.autoDelay, onChange: (e) => p4({ autoDelay: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "写完自动打开剧场" }, /* @__PURE__ */ import_react9.default.createElement(Toggle, { value: cfg.ui.autoOpen, onChange: (v) => p4({ autoOpen: v }) })), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "字体地址", hint: "皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。立绘工作台的认脸模型也从这里下它的运行库。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.ui.fontBase, onCommit: (v) => p4({ fontBase: v }) })), /* @__PURE__ */ import_react9.default.createElement("div", { className: "fg-section" }, "认脸模型（立绘工作台的自动框）"), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "下载来源", hint: "模型在 HuggingFace：自动是先连官网、连不上换镜像；只下一次，存在数据目录的 models 文件夹。" }, /* @__PURE__ */ import_react9.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.vision.source, onChange: (e) => patchConfig({ vision: { source: e.target.value } }).catch((err) => toast(err.message, "error")) }, /* @__PURE__ */ import_react9.default.createElement("option", { value: "auto" }, "自动（先官网，连不上换镜像）"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "official" }, "只用官网"), /* @__PURE__ */ import_react9.default.createElement("option", { value: "mirror" }, "先用镜像"))), /* @__PURE__ */ import_react9.default.createElement(Field, { label: "镜像地址", hint: "HuggingFace 的镜像站，默认 hf-mirror.com；路径规则要跟官网一样（…/仓库/resolve/版本/文件）。" }, /* @__PURE__ */ import_react9.default.createElement(Text, { value: cfg.vision.mirror, onCommit: (v) => patchConfig({ vision: { mirror: v } }).catch((err) => toast(err.message, "error")) })));
 }
 function EffectsSection({ data }) {
   const saved = data.config.ui.effects || {};
@@ -9568,9 +9936,10 @@ function SpritesView({ sprites }) {
   return /* @__PURE__ */ import_react10.default.createElement(Block, { label: `差分提示词 · ${sprites.length}` }, sprites.map((sp) => /* @__PURE__ */ import_react10.default.createElement("div", { key: sp.key, className: "fg-dlog-card" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "差分" }, sp.label), sp.writer && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "来源" }, WRITER[sp.writer] || sp.writer)), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, sp.tags || "—"), sp.negative && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "额外负面：", sp.negative))));
 }
 function ActingView({ acting }) {
+  if (acting && acting.read && !(acting.poses && acting.poses.length)) return /* @__PURE__ */ import_react10.default.createElement(Block, { label: "表演笔记（只重写了这一条，动作和表情没动）" }, /* @__PURE__ */ import_react10.default.createElement("div", null, acting.read));
   if (!acting || !acting.poses || !acting.poses.length) return /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "这次没有设计出能用的动作，先按已有的设计或通用动作组画；看「原始输出」里模型回了什么。");
   const label = (e) => emotionEntry(e).label;
-  return /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, acting.read && /* @__PURE__ */ import_react10.default.createElement(Block, { label: "怎么流露情绪" }, /* @__PURE__ */ import_react10.default.createElement("div", null, acting.read)), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `动作 · ${acting.poses.length}` }, acting.poses.map((p4) => /* @__PURE__ */ import_react10.default.createElement("div", { key: p4.id, className: "fg-dlog-card" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement(Chip, { k: p4.id }, p4.label), p4.side && /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "构图" }, "侧身"), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "底图" }, label(p4.emotions[0]))), p4.desc && /* @__PURE__ */ import_react10.default.createElement("div", null, p4.desc), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, p4.tags || "—"), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "情绪：", p4.emotions.map(label).join("、"))))), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `表情 · ${Object.keys(acting.faces || {}).length}` }, Object.entries(acting.faces || {}).map(([e, f]) => /* @__PURE__ */ import_react10.default.createElement("div", { key: e, className: "fg-dlog-card" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "情绪" }, label(e))), f.desc && /* @__PURE__ */ import_react10.default.createElement("div", null, f.desc), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, f.tags)))));
+  return /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, acting.read && /* @__PURE__ */ import_react10.default.createElement(Block, { label: "表演笔记" }, /* @__PURE__ */ import_react10.default.createElement("div", null, acting.read)), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `动作 · ${acting.poses.length}` }, acting.poses.map((p4) => /* @__PURE__ */ import_react10.default.createElement("div", { key: p4.id, className: "fg-dlog-card" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement(Chip, { k: p4.id }, p4.label), /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "底图" }, label(p4.emotions[0]))), p4.desc && /* @__PURE__ */ import_react10.default.createElement("div", null, p4.desc), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, p4.tags || "—"), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "情绪：", p4.emotions.map(label).join("、"))))), /* @__PURE__ */ import_react10.default.createElement(Block, { label: `表情 · ${Object.keys(acting.faces || {}).length}` }, Object.entries(acting.faces || {}).map(([e, f]) => /* @__PURE__ */ import_react10.default.createElement("div", { key: e, className: "fg-dlog-card" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-chips" }, /* @__PURE__ */ import_react10.default.createElement(Chip, { k: "情绪" }, label(e))), f.desc && /* @__PURE__ */ import_react10.default.createElement("div", null, f.desc), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-dlog-mono" }, f.tags)))));
 }
 function CgsView({ cgs }) {
   if (!cgs || !cgs.length) return /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "这次没有写出提示词，看「原始输出」里模型回了什么。");
@@ -10285,7 +10654,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       /* @__PURE__ */ import_react13.default.createElement(Backdrop, { scene: stageScene, view, transition: stageTr || "dissolve" }),
       !off.has("look.time") && /* @__PURE__ */ import_react13.default.createElement("div", { className: `fg-grade${backgroundFor(stageScene, view).src ? " is-drawn" : ""}`, "data-time": stageScene.time }),
       beat && !title && beat.moment && beat.moment.kind === "fireworks" && /* @__PURE__ */ import_react13.default.createElement(Fireworks, { key: beat.key, sound: sfxOn }),
-      stageBeat && /* @__PURE__ */ import_react13.default.createElement(Cast, { beat: title || stageBeat.recall || waking ? { ...stageBeat, speaker: "", speakers: null, sym: "" } : stageBeat, view, talk: title || stageBeat.recall || waking ? null : talk, max: ui0.maxOnStage ?? 5, dof: !off.has("actor.dof") }),
+      stageBeat && /* @__PURE__ */ import_react13.default.createElement(Cast, { beat: title || stageBeat.recall || waking ? { ...stageBeat, speaker: "", speakers: null, sym: "" } : stageBeat, view, talk: title || stageBeat.recall || waking ? null : talk, max: ui0.maxOnStage ?? 8, dof: !off.has("actor.dof") }),
       /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "tone", value: atmosphere && stageScene.mood !== "daily" && !off.has("look.tone") ? stageScene.mood : "", ms: 1600 }),
       /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "light", value: atmosphere && stageScene.light !== "normal" ? stageScene.light : "", ms: 700 }),
       /* @__PURE__ */ import_react13.default.createElement(FadeLayer, { name: "romance", value: atmosphere ? romance : "", ms: 1600 }),

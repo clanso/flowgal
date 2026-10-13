@@ -425,7 +425,7 @@ function useLeaving(cast, beat) {
   return [...leaving.current.values()].map(l => l.entry)
 }
 
-export function Cast({ beat, view, talk, max = 5, dof = true }) {
+export function Cast({ beat, view, talk, max = 8, dof = true }) {
   const people = new Map(((view && view.cast) || []).map(p => [p.name, p]))
   let cast = beat.cast || []
   // 导演还没整理、也没有上一幕站位时：说话的已知人物临时站到中间。整理过的轮次台上没人就是没人（便条、画外音）。
