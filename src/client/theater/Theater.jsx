@@ -154,25 +154,33 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   // 跟上一拍画面上的比：往回翻到插画已经在画面上的那句、读到一半插画才画好，都不等。几样同时有取最长的。
   const cgOn = beat && !title && beat.cg && cgSrc(beat.cg, assetUrl) ? beat.cg.id : ''
   const shownRef = React.useRef({ key: '', beat: null, was: null, cg: '', place: '', mode: '', hold: { ms: 0, away: false } })
+  // 从 log 跳过去的那一句：进场照故事里的上一句算（睁眼、换场、插画出现照样演），画面上原来是别的地方时先很快地经一下黑
+  const jumpRef = React.useRef('')
   if (beat && shownRef.current.key !== beat.key) {
     const was = shownRef.current
-    shownRef.current = { key: beat.key, beat, was: was.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was, eros: ui0.eros !== false, opening: !was.key }) }
+    const jumped = Boolean(was.key) && jumpRef.current === beat.key
+    const prev = jumped ? beats[index - 1] : null
+    const from = !jumped ? was : prev ? { key: prev.key, cg: prev.cg && cgSrc(prev.cg, assetUrl) ? prev.cg.id : '', place: prev.scene.location, mode: prev.mode } : { key: was.key }
+    jumpRef.current = ''
+    shownRef.current = { key: beat.key, visit: (was.visit || 0) + 1, beat, was: was.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was: from, eros: ui0.eros !== false, opening: !was.key, shown: jumped ? was : null }) }
   } else if (shownRef.current.cg !== cgOn) shownRef.current = { ...shownRef.current, cg: cgOn }
   const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false }
+  // 这一次读到这一拍（往回翻、再读到同一拍算新的一次）：停顿、换场、醒过来演没演完按它记，回滚后再到同一处照样演
+  const visit = beat ? `${beat.key}#${shownRef.current.visit}` : ''
   // 短闪回的演法（设置）：只有「压暗画面」进出时起雾、等画面变过去；另外两种画面不动，直接出字
   const recallStyle = ui0.recall || 'text'
   const recallTone = ui0.recallTone && ui0.recallTone !== 'auto' ? ui0.recallTone : '' // 设置里固定了一种基调
   const edgeMs = !beat || title ? 0 : beat.cut && !hold.change ? CUT_MS : beat.transition === 'haze' ? HAZE_MS : recallStyle === 'ghost' ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0
   const pauseMs = speed > 0 ? Math.max(edgeMs, hold.ms) : 0
   const [pauseSeen, setPauseSeen] = React.useState('')
-  const pausing = pauseMs > 0 && pauseSeen !== beat.key
+  const pausing = pauseMs > 0 && pauseSeen !== visit
   // 换场（playback.js 的 changePlan）：清场 → 盖上 → 盖满时换成新画面 → 揭开 → 人上来、出地点标题 → 出字，一段一段按时间线走；
-  // 换画面之前先等新背景解码好（最多多等一会儿），点一下直接跳到换好的样子，快进时不演
+  // 换画面之前先等新背景解码好（最多多等一会儿）；演的时候点鼠标、按键不跳过（分不清是没演还是点掉了），快进时不演
   const change = pausing && hold.change ? hold.change : null
   const [changeAt, setChangeAt] = React.useState({ key: '', phase: '' })
   React.useEffect(() => {
     if (!change) return undefined
-    const key = beat.key
+    const key = visit
     const bg = backgroundFor(beat.scene, view).src
     let live = true, timer = 0, i = 0
     const t0 = performance.now()
@@ -189,28 +197,28 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     preloadImage(bg)
     next()
     return () => { live = false; clearTimeout(timer) }
-  }, [change, beat && beat.key])
-  const phase = !change ? '' : changeAt.key === beat.key ? changeAt.phase : change.steps[0][0]
+  }, [change, visit])
+  const phase = !change ? '' : changeAt.key === visit ? changeAt.phase : change.steps[0][0]
   const swapped = !change || (change.steps.find(([name]) => name === phase) || [, 0])[1] >= change.swap
   const coverState = !change ? 'off' : phase === 'clear' ? 'idle' : phase === 'up' ? 'up' : phase === 'hold' ? 'full' : phase === 'down' ? 'down' : 'off'
   const clearing = Boolean(change && change.clear && ['clear', 'up', 'hold', 'down'].includes(phase))
   React.useEffect(() => {
     if (!pausing || hold.change) return undefined // 换场的那一拍由上面的时间线收尾
-    const t = setTimeout(() => setPauseSeen(beat.key), pauseMs)
+    const t = setTimeout(() => setPauseSeen(visit), pauseMs)
     return () => clearTimeout(t)
-  }, [pausing, beat && beat.key])
+  }, [pausing, visit])
   const cutOn = Boolean(change && change.cut && phase === 'hold')
   const cutShown = React.useRef('')
-  if (cutOn) cutShown.current = beat.key
+  if (cutOn) cutShown.current = visit
   const holdText = (Boolean(beat) && glyphKey !== beat.key) || pausing
   // 从回忆里醒过来：回忆褪白的这段时间舞台还演着回忆的最后一拍、配乐停下，白到最浓时（WAKE_SWAP_MS）才换成现在；点一下直接换
   const [wokeKey, setWokeKey] = React.useState('')
-  const waking = pausing && Boolean(hold.wake) && Boolean(shownRef.current.was) && wokeKey !== beat.key
+  const waking = pausing && Boolean(hold.wake) && Boolean(shownRef.current.was) && wokeKey !== visit
   React.useEffect(() => {
     if (!waking) return undefined
-    const t = setTimeout(() => setWokeKey(beat.key), WAKE_SWAP_MS)
+    const t = setTimeout(() => setWokeKey(visit), WAKE_SWAP_MS)
     return () => clearTimeout(t)
-  }, [waking, beat && beat.key])
+  }, [waking, visit])
   // 打开回想、设置这类面板时不把字速改成 0：改成 0 再改回来，关面板时这句会从头再打一遍（还带着打字音）。
   // 面板一打开就把这句直接打完（见下面的 effect），关掉后停在打完的样子。
   const typeSpeed = title ? 0 : speed
@@ -330,12 +338,12 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
   const advance = React.useCallback(() => {
     if (!beat) return
-    if (pausing) { setPauseSeen(beat.key); return }
+    if (pausing) { if (!change) setPauseSeen(visit); return } // 换场演完才往下
     if (!done) { finish(); return }
     if (atEnd) { setAuto(false); setSkip(false); setChoosing(true); return }
     sfx('page')
     go(index + 1)
-  }, [beat, done, atEnd, index, go, finish, pausing])
+  }, [beat, done, atEnd, index, go, finish, pausing, change, visit])
 
   // 自动 / 快进。
   React.useEffect(() => {
@@ -413,6 +421,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const hud = waking || before ? stageBeat : beat // 左上角的地点跟着画面走：回忆还没褪完、换场还没换过去时还是原来的地方
   // 醒过来那一下换画面时已经白透了：回忆的背景、人和滤镜直接撤掉，不在白雾散开时又露出来（theater.css 的 data-tr="wake"）
   // 换场时盖满才换背景，盖着看不见，直接换；旋涡揭开时新画面跟着旋进来；没有盖的（溶解、慢慢变化、横扫……）新背景在旧背景上演它的转场
+  // 盖满的时候换的画面（背景、光线、滤镜这些层）直接换，揭开时已经是换好的样子
+  const covered = Boolean(change && change.cover && change.cover !== 'swirl' && phase === 'hold')
   const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? 'wake' : change && change.cover && change.cover !== 'swirl' ? 'none' : stageBeat && stageBeat.transition
   const stageScene = stageBeat ? stageBeat.scene : { location: '', time: 'night', weather: 'stars', mood: 'calm', light: 'normal', fx: 'none' }
   const stageMode = (stageBeat && stageBeat.mode) || ''
@@ -453,26 +463,26 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
               {beat && !title && beat.moment && beat.moment.kind === 'fireworks' && <Fireworks key={beat.key} sound={sfxOn} />}
               {/* 短闪回时说话的是闪回里的人：现在台上的人不高亮、不对口型 */}
               {stageBeat && <Cast beat={title || stageBeat.recall || waking ? { ...stageBeat, speaker: '', speakers: null, sym: '' } : stageBeat} view={view} talk={title || stageBeat.recall || waking ? null : talk} max={ui0.maxOnStage ?? 5} />}
-              <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} />
-              <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} />
-              <FadeLayer name="romance" value={atmosphere ? romance : ''} ms={1600} />
-              <FadeLayer name="eros" value={atmosphere && ui0.eros !== false && stageScene.eros !== 'none' ? stageScene.eros || '' : ''} ms={1400} />
-              <FadeLayer name="tentacle" value={atmosphere && ui0.eros !== false && stageScene.tentacle !== 'none' ? stageScene.tentacle || '' : ''} ms={1800} />
+              <FadeLayer name="tone" value={atmosphere && stageScene.mood !== 'daily' ? stageScene.mood : ''} ms={1600} cut={covered} />
+              <FadeLayer name="light" value={atmosphere && stageScene.light !== 'normal' ? stageScene.light : ''} ms={700} cut={covered} />
+              <FadeLayer name="romance" value={atmosphere ? romance : ''} ms={1600} cut={covered} />
+              <FadeLayer name="eros" value={atmosphere && ui0.eros !== false && stageScene.eros !== 'none' ? stageScene.eros || '' : ''} ms={1400} cut={covered} />
+              <FadeLayer name="tentacle" value={atmosphere && ui0.eros !== false && stageScene.tentacle !== 'none' ? stageScene.tentacle || '' : ''} ms={1800} cut={covered} />
               {stageBeat && !title && <CgLayer beat={stageBeat} sound={sfxOn} />}
               <Particles weather={stageScene.weather} enabled={ui0.particles !== false} speed={atmosphere ? (TIME_FLOW[stageScene.fx] ?? 1) * (SENSE_FLOW[sense] ?? 1) : 1} />
               {stageBeat && !title && <SplitPanel beat={stageBeat} view={view} talk={talk} />}
               {stageBeat && !title && <RecallLayer beat={stageBeat} view={view} talk={talk} light={recallStyle !== 'ghost'} tone={recallTone} />}
-              <FadeLayer name="fxlayer" value={atmosphere && stageScene.fx !== 'none' ? stageScene.fx : ''} ms={900} />
+              <FadeLayer name="fxlayer" value={atmosphere && stageScene.fx !== 'none' ? stageScene.fx : ''} ms={900} cut={covered} />
               <div className="fg-vignette" />
             </div>
           </div>
         </div>
         {/* 感官那一层也在镜头外面：特写时蒙眼的黑、耳边的光不跟着放大出画 */}
-        <FadeLayer name="sense" value={atmosphere ? senseLayer(stageBeat, stageScene) : ''} ms={sense === 'blind' ? 1400 : 900} />
+        <FadeLayer name="sense" value={atmosphere ? senseLayer(stageBeat, stageScene) : ''} ms={sense === 'blind' ? 1400 : 900} cut={covered} />
         {/* 特殊段落的滤镜放在镜头外面：推镜头时录像框、REC 这些不跟着放大，对话框和标题卡也不被滤到 */}
         {/* 电影黑边：严肃的一段一直挂着，也在镜头外面 */}
         <div className="fg-bars" data-on={atmosphere && stageScene.bars === 'on' ? '' : undefined} aria-hidden="true" />
-        <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} />
+        <FadeLayer name="mode" value={atmosphere ? stageMode : ''} ms={stageTr === 'wake' ? 200 : stageTr === 'haze' ? 2400 : 1200} cut={covered} />
         {beat && !title && <SceneCover key={beat.key} plan={hold.change} state={coverState} />}
         {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} changed={Boolean(hold.change)} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
@@ -487,7 +497,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {!panel && <RestartNotice floating />}
         {/* 地点标题：换场时等新画面亮起来、人上来时再出 */}
         {beat && !title && (!change || phase === 'cast' || phase === 'settle') && <TitleCard beat={beat} delay={speed > 0 ? (beat.cut && !hold.change ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0) : 0} />}
-        {beat && !title && beat.cut && speed > 0 && cutShown.current === beat.key && <CutCard beat={beat} out={!cutOn} />}
+        {beat && !title && beat.cut && speed > 0 && cutShown.current === visit && <CutCard beat={beat} out={!cutOn} />}
 
         {!title && beat && (
           <div className="fg-hud">
@@ -543,7 +553,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
           </div>
         )}
 
-        {panel === 'log' && <Backlog beats={beats} index={index} gameId={gameId} onClose={() => setPanel('')} onJump={i => { go(i); setPanel(''); setTitle(false); setChoosing(false) }} />}
+        {panel === 'log' && <Backlog beats={beats} index={index} gameId={gameId} onClose={() => setPanel('')} onJump={i => { const key = (beats[i] || {}).key || ''; jumpRef.current = key !== shownRef.current.key ? key : ''; go(i); setPanel(''); setTitle(false); setChoosing(false) }} />}
         {panel === 'gallery' && <Gallery view={view} gameId={gameId} focusId={panelArg} onClose={() => setPanel('')} />}
         {panel === 'cast' && <CastPanel view={view} gameId={gameId} onClose={() => setPanel('')} />}
         {panel === 'director' && <DirectorLog gameId={gameId} focusTurn={panelArg} onClose={() => setPanel('')} />}

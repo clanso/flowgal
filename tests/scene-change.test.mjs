@@ -106,3 +106,26 @@ test('换场默认的转场：同一时段里走到别处溶解，时段也变�
   ])
   assert.deepEqual(steps.map(s => s.transition), ['', 'dissolve', 'black', 'dissolve', 'swirl', 'dissolve'])
 })
+
+test('从 log 跳过去：照故事里的上一句算进场（睁眼照样演）；那一句自己没换场、画面上原来是别的地方时很快地经一下黑', () => {
+  const mid = at('牛头之间', { sceneEnter: false, transition: '' })
+  const nest = { place: '巢穴', mode: '' }
+  // 跳到「梳头」那句：故事里上一句也在牛头之间，画面上原来是巢穴
+  const jump = beatHold(mid, { was: { key: 'x', place: '牛头之间', mode: '' }, shown: nest }).change
+  assert.equal(jump.jump, true)
+  assert.equal(jump.cover, 'black')
+  assert.deepEqual(phases(jump), ['up', 'hold', 'down', 'settle'])
+  assert.ok(jump.total <= 1300, '比换场的黑场短得多')
+  assert.equal(changePlan(mid, { place: '牛头之间', mode: '' }), null, '顺着读不演')
+  assert.equal(changePlan(mid, { place: '牛头之间', mode: '' }, { shown: { place: '牛头之间', mode: '' } }), null, '画面上本来就是这里')
+  // 跳到「醒过来的时候」：故事里上一句在牛头之间，闭眼睁眼照样演，不另外经黑
+  const wake = beatHold(at('巢穴', { transition: 'blink' }), { was: { key: 'x', place: '牛头之间', mode: '' }, shown: nest }).change
+  assert.equal(wake.cover, 'lids')
+  assert.ok(!wake.jump)
+  // 这一句自己有演法的照它的：从回忆里醒过来、起雾、导演写了直接切
+  const memory = { key: 'x', place: '回忆里的家', mode: 'memory' }
+  const back = beatHold(at('巢穴'), { was: memory, shown: { place: '教室', mode: '' } })
+  assert.ok(back.wake && !back.change)
+  assert.equal(changePlan(at('巢穴', { transition: 'haze', mode: 'memory' }), { place: '巢穴', mode: '' }, { shown: { place: '教室', mode: '' } }), null)
+  assert.equal(changePlan(at('巢穴', { transition: 'none' }), { place: '大厅', mode: '' }, { shown: { place: '教室', mode: '' } }), null)
+})

@@ -3357,15 +3357,18 @@ var COVERS = {
 };
 var CUT_COVER = { cover: "black", clear: true, up: 700, hold: 2300, down: 1e3 };
 var OPEN_COVER = { cover: "black", clear: true, up: 0, hold: 300, down: 1e3 };
+var JUMP_COVER = { cover: "black", clear: false, up: 250, hold: 150, down: 450 };
 var OWN_WAY = /* @__PURE__ */ new Set(["haze", "wake"]);
-function changePlan(beat, was = {}, { opening = false } = {}) {
+function changePlan(beat, was = {}, { opening = false, shown = null } = {}) {
   if (!beat || !beat.scene) return null;
   const moved = !opening && beat.sceneEnter && (beat.scene.location !== was.place || (beat.mode || "") !== (was.mode || ""));
   const tr = beat.transition || "";
-  if (!opening && !beat.cut && (!moved || tr === "none" || OWN_WAY.has(tr))) return null;
-  if (!opening && !beat.cut && was.mode === "memory" && (beat.mode || "") !== "memory" && WAKE_FROM.has(tr)) return null;
+  const waking = !opening && !beat.cut && was.mode === "memory" && (beat.mode || "") !== "memory" && WAKE_FROM.has(tr);
+  const own = opening || beat.cut || moved && tr !== "none" && !OWN_WAY.has(tr) && !waking;
+  const jump = !own && Boolean(shown) && !waking && !(moved && (tr === "none" || OWN_WAY.has(tr))) && (beat.scene.location !== shown.place || (beat.mode || "") !== (shown.mode || ""));
+  if (!own && !jump) return null;
   if (opening && tr === "none" && !beat.cut) return null;
-  const shape = opening ? beat.cut ? { ...CUT_COVER, up: 0 } : OPEN_COVER : beat.cut ? CUT_COVER : COVERS[tr] || { cover: "", clear: true, up: 0, hold: 0, down: TRANSITION_MS[tr] || TRANSITION_MS.dissolve };
+  const shape = jump ? JUMP_COVER : opening ? beat.cut ? { ...CUT_COVER, up: 0 } : OPEN_COVER : beat.cut ? CUT_COVER : COVERS[tr] || { cover: "", clear: true, up: 0, hold: 0, down: TRANSITION_MS[tr] || TRANSITION_MS.dissolve };
   const steps = [];
   let t = 0;
   const step2 = (name2, ms) => {
@@ -3381,15 +3384,15 @@ function changePlan(beat, was = {}, { opening = false } = {}) {
   step2("down", shape.down);
   step2("cast", shape.clear ? SCENE_CAST_MS : 0);
   step2("settle", SCENE_BEAT_MS);
-  return { tr: opening && !COVERS[tr] ? "black" : tr, cover: shape.cover, clear: shape.clear, up: shape.up, hold: shape.hold, down: shape.down, steps, swap, total: t, ...beat.cut ? { cut: true } : {}, ...opening ? { opening: true } : {} };
+  return { tr: jump || opening && !COVERS[tr] ? "black" : tr, cover: shape.cover, clear: shape.clear, up: shape.up, hold: shape.hold, down: shape.down, steps, swap, total: t, ...beat.cut ? { cut: true } : {}, ...opening ? { opening: true } : {}, ...jump ? { jump: true } : {} };
 }
-function beatHold(beat, { cg = "", was = {}, eros = true, opening = false } = {}) {
+function beatHold(beat, { cg = "", was = {}, eros = true, opening = false, shown = null } = {}) {
   let ms = 0, away = false;
   if (cg && cg !== was.cg && !beat.cut) {
     ms = Math.max(ms, cgHoldMs(beat.cg, beat.scene.mood));
     away = true;
   }
-  const change = changePlan(beat, was, { opening });
+  const change = changePlan(beat, was, { opening, shown });
   if (change) {
     ms = Math.max(ms, change.total);
     away = true;
@@ -6303,21 +6306,23 @@ function CutCard({ beat, out }) {
   if (!cut) return null;
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: `fg-cut${out ? " is-out" : ""}`, "data-kind": cut.kind, key: beat.key, "aria-live": "polite" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cut-inner" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cut-kicker" }, /* @__PURE__ */ import_react4.default.createElement("i", null), CUT_LABEL[cut.kind] || "", /* @__PURE__ */ import_react4.default.createElement("i", null)), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-cut-text" }, cut.text)));
 }
-function FadeLayer({ name: name2, value, ms = 1200 }) {
-  const [layers, setLayers] = import_react4.default.useState(() => [{ id: 0, value }]);
+function FadeLayer({ name: name2, value, ms = 1200, cut = false }) {
+  const [layers, setLayers] = import_react4.default.useState(() => [{ id: 0, value, ms }]);
   import_react4.default.useEffect(() => {
     setLayers((list2) => {
       const top = list2[list2.length - 1];
       if (top.value === value) return list2;
-      return [...list2.filter((l) => !l.leaving).map((l) => ({ ...l, leaving: true })), { id: top.id + 1, value }];
+      if (cut) return [{ id: top.id + 1, value, ms: 0 }];
+      return [...list2.filter((l) => !l.leaving).map((l) => ({ ...l, leaving: true, ms })), { id: top.id + 1, value, ms }];
     });
   }, [value]);
   import_react4.default.useEffect(() => {
-    if (!layers.some((l) => l.leaving)) return void 0;
-    const t = setTimeout(() => setLayers((list2) => list2.filter((l) => !l.leaving)), ms);
+    const leaving = layers.filter((l) => l.leaving);
+    if (!leaving.length) return void 0;
+    const t = setTimeout(() => setLayers((list2) => list2.filter((l) => !l.leaving)), Math.max(...leaving.map((l) => l.ms)));
     return () => clearTimeout(t);
   }, [layers]);
-  return layers.filter((l) => l.value).map((l) => /* @__PURE__ */ import_react4.default.createElement("div", { key: l.id, className: `fg-${name2}${l.leaving ? " is-leave" : ""}`, "data-v": l.value, style: { "--fade": ms + "ms" }, "aria-hidden": "true" }));
+  return layers.filter((l) => l.value).map((l) => /* @__PURE__ */ import_react4.default.createElement("div", { key: l.id, className: `fg-${name2}${l.leaving ? " is-leave" : ""}`, "data-v": l.value, style: { "--fade": l.ms + "ms" }, "aria-hidden": "true" }));
 }
 var QUAKE = [[0, 0], [0.6, 300], [1.2, 420], [2, 560]];
 function quake(el, power) {
@@ -9339,22 +9344,28 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const speed = skip ? 0 : ui0.textSpeed;
   const cgOn = beat && !title && beat.cg && cgSrc(beat.cg, assetUrl) ? beat.cg.id : "";
   const shownRef = import_react12.default.useRef({ key: "", beat: null, was: null, cg: "", place: "", mode: "", hold: { ms: 0, away: false } });
+  const jumpRef = import_react12.default.useRef("");
   if (beat && shownRef.current.key !== beat.key) {
     const was2 = shownRef.current;
-    shownRef.current = { key: beat.key, beat, was: was2.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was: was2, eros: ui0.eros !== false, opening: !was2.key }) };
+    const jumped = Boolean(was2.key) && jumpRef.current === beat.key;
+    const prev = jumped ? beats[index - 1] : null;
+    const from = !jumped ? was2 : prev ? { key: prev.key, cg: prev.cg && cgSrc(prev.cg, assetUrl) ? prev.cg.id : "", place: prev.scene.location, mode: prev.mode } : { key: was2.key };
+    jumpRef.current = "";
+    shownRef.current = { key: beat.key, visit: (was2.visit || 0) + 1, beat, was: was2.beat, cg: cgOn, place: beat.scene.location, mode: beat.mode, hold: beatHold(beat, { cg: cgOn, was: from, eros: ui0.eros !== false, opening: !was2.key, shown: jumped ? was2 : null }) };
   } else if (shownRef.current.cg !== cgOn) shownRef.current = { ...shownRef.current, cg: cgOn };
   const hold = beat && !title && shownRef.current.key === beat.key ? shownRef.current.hold : { ms: 0, away: false };
+  const visit = beat ? `${beat.key}#${shownRef.current.visit}` : "";
   const recallStyle = ui0.recall || "text";
   const recallTone = ui0.recallTone && ui0.recallTone !== "auto" ? ui0.recallTone : "";
   const edgeMs = !beat || title ? 0 : beat.cut && !hold.change ? CUT_MS : beat.transition === "haze" ? HAZE_MS : recallStyle === "ghost" ? RECALL_HOLD_MS[beat.recallEdge] || 0 : 0;
   const pauseMs = speed > 0 ? Math.max(edgeMs, hold.ms) : 0;
   const [pauseSeen, setPauseSeen] = import_react12.default.useState("");
-  const pausing = pauseMs > 0 && pauseSeen !== beat.key;
+  const pausing = pauseMs > 0 && pauseSeen !== visit;
   const change = pausing && hold.change ? hold.change : null;
   const [changeAt, setChangeAt] = import_react12.default.useState({ key: "", phase: "" });
   import_react12.default.useEffect(() => {
     if (!change) return void 0;
-    const key = beat.key;
+    const key = visit;
     const bg = backgroundFor(beat.scene, view).src;
     let live = true, timer = 0, i = 0;
     const t0 = performance.now();
@@ -9383,27 +9394,27 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       live = false;
       clearTimeout(timer);
     };
-  }, [change, beat && beat.key]);
-  const phase = !change ? "" : changeAt.key === beat.key ? changeAt.phase : change.steps[0][0];
+  }, [change, visit]);
+  const phase = !change ? "" : changeAt.key === visit ? changeAt.phase : change.steps[0][0];
   const swapped = !change || (change.steps.find(([name2]) => name2 === phase) || [, 0])[1] >= change.swap;
   const coverState = !change ? "off" : phase === "clear" ? "idle" : phase === "up" ? "up" : phase === "hold" ? "full" : phase === "down" ? "down" : "off";
   const clearing = Boolean(change && change.clear && ["clear", "up", "hold", "down"].includes(phase));
   import_react12.default.useEffect(() => {
     if (!pausing || hold.change) return void 0;
-    const t = setTimeout(() => setPauseSeen(beat.key), pauseMs);
+    const t = setTimeout(() => setPauseSeen(visit), pauseMs);
     return () => clearTimeout(t);
-  }, [pausing, beat && beat.key]);
+  }, [pausing, visit]);
   const cutOn = Boolean(change && change.cut && phase === "hold");
   const cutShown = import_react12.default.useRef("");
-  if (cutOn) cutShown.current = beat.key;
+  if (cutOn) cutShown.current = visit;
   const holdText = Boolean(beat) && glyphKey !== beat.key || pausing;
   const [wokeKey, setWokeKey] = import_react12.default.useState("");
-  const waking = pausing && Boolean(hold.wake) && Boolean(shownRef.current.was) && wokeKey !== beat.key;
+  const waking = pausing && Boolean(hold.wake) && Boolean(shownRef.current.was) && wokeKey !== visit;
   import_react12.default.useEffect(() => {
     if (!waking) return void 0;
-    const t = setTimeout(() => setWokeKey(beat.key), WAKE_SWAP_MS);
+    const t = setTimeout(() => setWokeKey(visit), WAKE_SWAP_MS);
     return () => clearTimeout(t);
-  }, [waking, beat && beat.key]);
+  }, [waking, visit]);
   const typeSpeed = title ? 0 : speed;
   const blipOn = Boolean(ui0.blip) && !skip && !title;
   const sfxOn = ui0.sfx !== false && !skip && !title;
@@ -9515,7 +9526,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const advance = import_react12.default.useCallback(() => {
     if (!beat) return;
     if (pausing) {
-      setPauseSeen(beat.key);
+      if (!change) setPauseSeen(visit);
       return;
     }
     if (!done) {
@@ -9530,7 +9541,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     }
     sfx("page");
     go(index + 1);
-  }, [beat, done, atEnd, index, go, finish, pausing]);
+  }, [beat, done, atEnd, index, go, finish, pausing, change, visit]);
   import_react12.default.useEffect(() => {
     if (title || panel || choosing || !beat) return void 0;
     if (skip) {
@@ -9631,6 +9642,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const before = Boolean(change && !swapped && was);
   const stageBeat = waking || before ? was : beat || (beats.length ? beats[beats.length - 1] : null);
   const hud = waking || before ? stageBeat : beat;
+  const covered = Boolean(change && change.cover && change.cover !== "swirl" && phase === "hold");
   const stageTr = stageBeat && hold.wake && !waking && stageBeat === beat ? "wake" : change && change.cover && change.cover !== "swirl" ? "none" : stageBeat && stageBeat.transition;
   const stageScene = stageBeat ? stageBeat.scene : { location: "", time: "night", weather: "stars", mood: "calm", light: "normal", fx: "none" };
   const stageMode = stageBeat && stageBeat.mode || "";
@@ -9703,21 +9715,21 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       /* @__PURE__ */ import_react12.default.createElement("div", { className: `fg-grade${backgroundFor(stageScene, view).src ? " is-drawn" : ""}`, "data-time": stageScene.time }),
       beat && !title && beat.moment && beat.moment.kind === "fireworks" && /* @__PURE__ */ import_react12.default.createElement(Fireworks, { key: beat.key, sound: sfxOn }),
       stageBeat && /* @__PURE__ */ import_react12.default.createElement(Cast, { beat: title || stageBeat.recall || waking ? { ...stageBeat, speaker: "", speakers: null, sym: "" } : stageBeat, view, talk: title || stageBeat.recall || waking ? null : talk, max: ui0.maxOnStage ?? 5 }),
-      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "tone", value: atmosphere && stageScene.mood !== "daily" ? stageScene.mood : "", ms: 1600 }),
-      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "light", value: atmosphere && stageScene.light !== "normal" ? stageScene.light : "", ms: 700 }),
-      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "romance", value: atmosphere ? romance : "", ms: 1600 }),
-      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "eros", value: atmosphere && ui0.eros !== false && stageScene.eros !== "none" ? stageScene.eros || "" : "", ms: 1400 }),
-      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "tentacle", value: atmosphere && ui0.eros !== false && stageScene.tentacle !== "none" ? stageScene.tentacle || "" : "", ms: 1800 }),
+      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "tone", value: atmosphere && stageScene.mood !== "daily" ? stageScene.mood : "", ms: 1600, cut: covered }),
+      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "light", value: atmosphere && stageScene.light !== "normal" ? stageScene.light : "", ms: 700, cut: covered }),
+      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "romance", value: atmosphere ? romance : "", ms: 1600, cut: covered }),
+      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "eros", value: atmosphere && ui0.eros !== false && stageScene.eros !== "none" ? stageScene.eros || "" : "", ms: 1400, cut: covered }),
+      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "tentacle", value: atmosphere && ui0.eros !== false && stageScene.tentacle !== "none" ? stageScene.tentacle || "" : "", ms: 1800, cut: covered }),
       stageBeat && !title && /* @__PURE__ */ import_react12.default.createElement(CgLayer, { beat: stageBeat, sound: sfxOn }),
       /* @__PURE__ */ import_react12.default.createElement(Particles, { weather: stageScene.weather, enabled: ui0.particles !== false, speed: atmosphere ? (TIME_FLOW[stageScene.fx] ?? 1) * (SENSE_FLOW[sense] ?? 1) : 1 }),
       stageBeat && !title && /* @__PURE__ */ import_react12.default.createElement(SplitPanel, { beat: stageBeat, view, talk }),
       stageBeat && !title && /* @__PURE__ */ import_react12.default.createElement(RecallLayer, { beat: stageBeat, view, talk, light: recallStyle !== "ghost", tone: recallTone }),
-      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "fxlayer", value: atmosphere && stageScene.fx !== "none" ? stageScene.fx : "", ms: 900 }),
+      /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "fxlayer", value: atmosphere && stageScene.fx !== "none" ? stageScene.fx : "", ms: 900, cut: covered }),
       /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-vignette" })
     ))),
-    /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "sense", value: atmosphere ? senseLayer(stageBeat, stageScene) : "", ms: sense === "blind" ? 1400 : 900 }),
+    /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "sense", value: atmosphere ? senseLayer(stageBeat, stageScene) : "", ms: sense === "blind" ? 1400 : 900, cut: covered }),
     /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-bars", "data-on": atmosphere && stageScene.bars === "on" ? "" : void 0, "aria-hidden": "true" }),
-    /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "mode", value: atmosphere ? stageMode : "", ms: stageTr === "wake" ? 200 : stageTr === "haze" ? 2400 : 1200 }),
+    /* @__PURE__ */ import_react12.default.createElement(FadeLayer, { name: "mode", value: atmosphere ? stageMode : "", ms: stageTr === "wake" ? 200 : stageTr === "haze" ? 2400 : 1200, cut: covered }),
     beat && !title && /* @__PURE__ */ import_react12.default.createElement(SceneCover, { key: beat.key, plan: hold.change, state: coverState }),
     beat && !title && /* @__PURE__ */ import_react12.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking, changed: Boolean(hold.change) }),
     /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),
@@ -9730,7 +9742,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     beat && !title && beat.phone && (beat.phone.kind === "notify" || beat.phone.kind === "voicemail") && /* @__PURE__ */ import_react12.default.createElement(PhoneBanner, { key: beat.key, beat, view, sound: sfxOn }),
     !panel && /* @__PURE__ */ import_react12.default.createElement(RestartNotice, { floating: true }),
     beat && !title && (!change || phase === "cast" || phase === "settle") && /* @__PURE__ */ import_react12.default.createElement(TitleCard, { beat, delay: speed > 0 ? beat.cut && !hold.change ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0 : 0 }),
-    beat && !title && beat.cut && speed > 0 && cutShown.current === beat.key && /* @__PURE__ */ import_react12.default.createElement(CutCard, { beat, out: !cutOn }),
+    beat && !title && beat.cut && speed > 0 && cutShown.current === visit && /* @__PURE__ */ import_react12.default.createElement(CutCard, { beat, out: !cutOn }),
     !title && beat && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react12.default.createElement("div", null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hud-place" }, hud.scene.location || `第 ${hud.turn} 轮`), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-hud-meta" }, hud.mode && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-hud-mode" }, MODE_LABEL[hud.mode]), /* @__PURE__ */ import_react12.default.createElement("span", null, TIME_LABEL[hud.scene.time] || ""), hud.scene.weather && hud.scene.weather !== "clear" && /* @__PURE__ */ import_react12.default.createElement("span", null, WEATHER_LABEL[hud.scene.weather]), LIGHT_LABEL[hud.scene.light] && /* @__PURE__ */ import_react12.default.createElement("span", null, LIGHT_LABEL[hud.scene.light]), FX_LABEL[hud.scene.fx] && /* @__PURE__ */ import_react12.default.createElement("span", null, FX_LABEL[hud.scene.fx]), ROMANCE_LABEL[hud.scene.romance] && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-hud-romance" }, "♡ ", ROMANCE_LABEL[hud.scene.romance]), SENSE_LABEL[hud.scene.sense] && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-hud-sense" }, SENSE_LABEL[hud.scene.sense]), hud.scene.mood && /* @__PURE__ */ import_react12.default.createElement("span", null, "♪ ", MOOD_LABEL[hud.scene.mood])))),
     !title && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, directing && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), drawing > 0 && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), beat && beat.call && beat.call.state === "live" && /* @__PURE__ */ import_react12.default.createElement(CallChip, { key: beat.call.id, call: beat.call, sound: sfxOn }), track && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill" + (hushed ? " is-hushed" : ""), title: hushed ? `${track.name}（留白，一会儿回来）` : track.name }, "♪ ", track.name), viewError && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
     beat && !title && beat.card && /* @__PURE__ */ import_react12.default.createElement(SceneCard, { beat }),
@@ -9759,6 +9771,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       m.run();
     } }, m.label, /* @__PURE__ */ import_react12.default.createElement("span", null, m.en)))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-title-foot" }, "FlowGal · 字体 思源 / 霞鹜文楷 / 马善政 / Cormorant（SIL OFL）")),
     panel === "log" && /* @__PURE__ */ import_react12.default.createElement(Backlog, { beats, index, gameId, onClose: () => setPanel(""), onJump: (i) => {
+      const key = (beats[i] || {}).key || "";
+      jumpRef.current = key !== shownRef.current.key ? key : "";
       go(i);
       setPanel("");
       setTitle(false);

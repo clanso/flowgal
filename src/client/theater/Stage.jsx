@@ -975,23 +975,27 @@ export function CutCard({ beat, out }) {
 /**
  * 气氛层：值变了时新的一层淡入、旧的一层淡出（基调色调、光线、画面效果、特殊段落滤镜都用它）。
  * value 为空就是没有这一层；className 下的 data-v 决定样子，样式在 theater.css。
+ * 每一层记住自己淡入、淡出用的时长：ms 后来变了也不改已经在画面上的层（改了 CSS 动画的时长，演完的动画会倒回去重新淡一次，看着像闪）。
+ * cut：换场盖满、画面被盖住的时候换值，直接换成新的一层，不淡入淡出（揭开时这几层已经是静的，不在画面上一起淡）。
  */
-export function FadeLayer({ name, value, ms = 1200 }) {
-  const [layers, setLayers] = React.useState(() => [{ id: 0, value }])
+export function FadeLayer({ name, value, ms = 1200, cut = false }) {
+  const [layers, setLayers] = React.useState(() => [{ id: 0, value, ms }])
   React.useEffect(() => {
     setLayers(list => {
       const top = list[list.length - 1]
       if (top.value === value) return list
-      return [...list.filter(l => !l.leaving).map(l => ({ ...l, leaving: true })), { id: top.id + 1, value }]
+      if (cut) return [{ id: top.id + 1, value, ms: 0 }]
+      return [...list.filter(l => !l.leaving).map(l => ({ ...l, leaving: true, ms })), { id: top.id + 1, value, ms }]
     })
   }, [value])
   React.useEffect(() => {
-    if (!layers.some(l => l.leaving)) return undefined
-    const t = setTimeout(() => setLayers(list => list.filter(l => !l.leaving)), ms)
+    const leaving = layers.filter(l => l.leaving)
+    if (!leaving.length) return undefined
+    const t = setTimeout(() => setLayers(list => list.filter(l => !l.leaving)), Math.max(...leaving.map(l => l.ms)))
     return () => clearTimeout(t)
   }, [layers])
   return layers.filter(l => l.value).map(l => (
-    <div key={l.id} className={`fg-${name}${l.leaving ? ' is-leave' : ''}`} data-v={l.value} style={{ '--fade': ms + 'ms' }} aria-hidden="true" />
+    <div key={l.id} className={`fg-${name}${l.leaving ? ' is-leave' : ''}`} data-v={l.value} style={{ '--fade': l.ms + 'ms' }} aria-hidden="true" />
   ))
 }
 
