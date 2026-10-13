@@ -201,7 +201,7 @@ test('gate: 酒馆版楼层——轮次号写进楼层、删掉前面的不错�
 
 test('gate: 装起来以后——酒馆写完一轮（MESSAGE_RECEIVED）→ 导演用连接配置整理 → 楼层挂上已整理的场景卡，接口表同页可调', async () => {
   const server = fakeServer()
-  const reply = ({ system }) => (system.includes('导演')
+  const reply = ({ system, user }) => ((system + user).includes('你是视觉小说（Galgame）的后台导演')
     ? JSON.stringify({ scene: { location: '琴房', time: 'afternoon' }, cast: [{ name: '林岚', pos: 'center' }], lines: [], choices: [], images: [], people: [] })
     : '{}')
   const { ctx, requests } = fakeContext({ reply })

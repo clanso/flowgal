@@ -226,19 +226,34 @@ function ScriptView({ script, units }) {
   )
 }
 
-/** 立绘设计师这次写出的每张差分。 */
-function SpritesView({ sprites }) {
-  if (!sprites || !sprites.length) return <div className="fg-note">这次没有写出提示词，看「原始输出」里模型回了什么。</div>
+/**
+ * 立绘设计师这次写出的每张差分：设计师写的 → 实际发出的（构图归插件、固定外貌照档案、表情收轻……），去掉了哪些、换掉了哪些。
+ * 补设计合进写词的那次，上面先列补好的设计。
+ */
+function SpritesView({ sprites, acting }) {
+  if ((!sprites || !sprites.length) && !acting) return <div className="fg-note">这次没有写出提示词，看「原始输出」里模型回了什么。</div>
   return (
-    <Block label={`差分提示词 · ${sprites.length}`}>
-      {sprites.map(sp => (
-        <div key={sp.key} className="fg-dlog-card">
-          <div className="fg-dlog-chips"><Chip k="差分">{sp.label}</Chip>{sp.writer && <Chip k="来源">{WRITER[sp.writer] || sp.writer}</Chip>}</div>
-          <div className="fg-dlog-mono">{sp.tags || '—'}</div>
-          {sp.negative && <div className="fg-note">额外负面：{sp.negative}</div>}
-        </div>
-      ))}
-    </Block>
+    <>
+      <Block label={`差分提示词 · ${(sprites || []).length}`}>
+        {(sprites || []).map(sp => (
+          <div key={sp.key} className="fg-dlog-card">
+            <div className="fg-dlog-chips"><Chip k="差分">{sp.label}</Chip>{sp.pose && <Chip k="动作">{sp.pose}</Chip>}{sp.writer && <Chip k="来源">{WRITER[sp.writer] || sp.writer}</Chip>}</div>
+            {sp.raw && sp.sent != null ? (
+              <>
+                <div className="fg-dlog-mono"><i className="fg-dlog-k">设计师写的</i>{sp.raw}</div>
+                <div className="fg-dlog-mono"><i className="fg-dlog-k">实际发出的</i>{sp.sent || '—'}</div>
+                {(sp.removed || []).length > 0 && <div className="fg-dlog-chips">{sp.removed.map((r, i) => <Chip key={i} k="去掉">{r.tag}<small>{r.why}</small></Chip>)}</div>}
+                {(sp.replaced || []).length > 0 && <div className="fg-dlog-chips">{sp.replaced.map((r, i) => <Chip key={i} k="换掉">{r.from} → {r.to}</Chip>)}</div>}
+                {!(sp.removed || []).length && !(sp.replaced || []).length && <div className="fg-note">一个词都没动（固定外貌、构图和底色另外由插件加在前后）。</div>}
+              </>
+            ) : <div className="fg-dlog-mono">{sp.tags || sp.raw || '—'}</div>}
+            {sp.note && <div className="fg-note">{sp.note}</div>}
+            {sp.negative && <div className="fg-note">额外负面：{sp.negative}</div>}
+          </div>
+        ))}
+      </Block>
+      {acting && <><div className="fg-dlog-label">这一次顺手补好的设计（整套）</div><ActingView acting={acting} /></>}
+    </>
   )
 }
 
@@ -368,7 +383,7 @@ function LogDetail({ gameId, summary }) {
           <Block label="模型输出（实时）"><Pre text={live.output} follow cursor empty="还没有输出" /></Block>
         </>
       )}
-      {tab === 'result' && (entry ? (sprite ? <SpritesView sprites={entry.sprites} /> : acting ? <ActingView acting={entry.acting} /> : cg ? <CgsView cgs={entry.cgs} /> : <ScriptView script={entry.script} units={entry.units || []} />) : <div className="fg-note">读取中…</div>)}
+      {tab === 'result' && (entry ? (sprite ? <SpritesView sprites={entry.sprites} acting={entry.acting} /> : acting ? <ActingView acting={entry.acting} /> : cg ? <CgsView cgs={entry.cgs} /> : <ScriptView script={entry.script} units={entry.units || []} />) : <div className="fg-note">读取中…</div>)}
       {tab === 'raw' && (entry ? <Attempts attempts={entry.attempts || []} /> : <div className="fg-note">读取中…</div>)}
       {tab === 'prompt' && (entry ? (
         <>

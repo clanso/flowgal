@@ -13,6 +13,7 @@ import { fixedCgShape } from '../lib/vocab.js'
 import { buildBeats } from '../src/client/theater/playback.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
+import { roleText, rulesText, userText, ownText } from './roles.mjs'
 
 const unitsOf = n => Array.from({ length: n }, (_, i) => ({ id: 'U' + (i + 1), text: `第 ${i + 1} 句。`, type: 'narration' }))
 const ids = n => unitsOf(n).map(u => u.id)
@@ -127,7 +128,7 @@ async function playTurn(shape, writerSize) {
   const llm = {
     stream(request) {
       calls.push(request)
-      const text = request.system.includes('你是视觉小说的插画分镜师') ? writer(request) : director
+      const text = roleText(request).includes('你是视觉小说的插画分镜师') ? writer(request) : director
       return (async function* () { yield { type: 'text-delta', text }; yield { type: 'finish', reason: { kind: 'stop' } } })()
     },
   }
@@ -139,7 +140,7 @@ async function playTurn(shape, writerSize) {
     await engine.setSecret('novelai', 'official', 'pst-test-key')
     await engine.onTurnSettled({ gameId: 'g', turn: 1, textVersion: 'v1', text: '傍晚。\n她站在海边。\n风很大。', card: { id: 'c', name: '卡' } })
     const view = await settle(engine, 'g', v => v.images.length === 1 && v.images[0].status === 'ready')
-    const writerUser = calls.find(c => c.system.includes('你是视觉小说的插画分镜师')).messages[0].content[0].text
+    const writerUser = ownText(calls.find(c => roleText(c).includes('你是视觉小说的插画分镜师')))
     const sent = requests.filter(r => r?.parameters?.v4_prompt).at(-1).parameters
     return { image: view.images[0], writerUser, size: [sent.width, sent.height] }
   } finally {

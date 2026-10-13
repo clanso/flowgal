@@ -15,6 +15,7 @@ import { variantKey, pickSprite } from '../lib/look.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 import { fromBase64 } from '../lib/bytes.js'
+import { rulesText } from './roles.mjs'
 
 /** 一张纯色 RGBA 图；alphaAt(x, y) 给透明度。 */
 function solid(width, height, [r, g, b], alphaAt = () => 255) {
@@ -176,7 +177,7 @@ test('gate: 立绘设计师：底图说明这一组的姿势和同组情绪，�
   const user = calls[0].messages[0].content[0].text
   assert.match(user, /- s1：.*这张是「抱臂」动作组的底图：同组的生气、赌气、得意会在这张上只换脸/)
   assert.match(user, /- s2：只换脸——在「冷淡」那张「抱臂」动作底图上只重画脸.*tags 只写这张脸的表情/)
-  assert.match(calls[0].system, /标着「只换脸」的会在同组底图上只重画脸/)
+  assert.match(rulesText(calls[0]), /标着「只换脸」的会在同组底图上只重画脸/)
   assert.equal(results.get(targets[0].key).tags, '1girl, black hair, school uniform, crossed arms, expressionless')
   assert.equal(results.get(targets[1].key).tags, 'angry, glaring, clenched teeth')
 })

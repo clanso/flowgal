@@ -10,6 +10,7 @@ import { createLibrary, libraryItems, gameFolder } from '../lib/library.js'
 import { createEngine, KIND_CG } from '../lib/engine.js'
 import { stageRatio, buildBeats } from '../src/client/theater/playback.js'
 import { resolveConfig } from '../lib/config.js'
+import { roleText, rulesText, userText } from './roles.mjs'
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
 
@@ -105,7 +106,7 @@ test('gate: 重新整理后新脚本里没有的插画从聊天里撤下：画�
   const reply = () => JSON.stringify({ scene: { location: '学园天台', time: 'dusk' }, cast: [], lines: [], choices: [], images: plan, people: [] })
   // 插画分镜师按「要画的插画」里的编号各回一份 Base。
   const cgReply = request => JSON.stringify({ images: [...request.messages[0].content[0].text.matchAll(/^- (c\d+)：/gm)].map(m => ({ key: m[1], tag: 'school rooftop, sunset', nl: 'A rooftop.', characters: [] })) })
-  const llm = { stream(request) { const text = request.system.includes('你是视觉小说的插画分镜师') ? cgReply(request) : reply(); return (async function* () { yield { type: 'text-delta', text }; yield { type: 'finish', reason: { kind: 'stop' } } })() } }
+  const llm = { stream(request) { const text = roleText(request).includes('你是视觉小说的插画分镜师') ? cgReply(request) : reply(); return (async function* () { yield { type: 'text-delta', text }; yield { type: 'finish', reason: { kind: 'stop' } } })() } }
   let opened = ''
   const engine = createEngine({
     store, services: { tavern, llm, credentials: null, openFolder: async path => { opened = path; return false } },

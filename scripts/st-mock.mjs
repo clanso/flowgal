@@ -7,7 +7,7 @@
 //   node scripts/st-mock.mjs [--port 5190]
 import { createServer } from 'node:http'
 import { TURNS } from './preview/story.mjs'
-import { fakeLlmReply, fakePaint } from './preview/fake-models.mjs'
+import { fakeLlmReply, fakePaint, roleOf } from './preview/fake-models.mjs'
 
 const portArg = process.argv.indexOf('--port')
 const PORT = Number(portArg > 0 ? process.argv[portArg + 1] : 5190)
@@ -20,7 +20,7 @@ const textOf = content => (Array.isArray(content) ? content.map(p => p?.text || 
 function answer(messages) {
   const system = messages.filter(m => m.role === 'system').map(m => textOf(m.content)).join('\n')
   const user = messages.filter(m => m.role === 'user').map(m => textOf(m.content)).join('\n')
-  if (/后台导演|立绘设计师|插画分镜师/.test(system)) return fakeLlmReply({ system, prompt: user })
+  if (/后台导演|立绘设计师|插画分镜师/.test(roleOf(system, user))) return fakeLlmReply({ system, prompt: user })
   const n = messages.filter(m => m.role === 'user').length
   const turn = TURNS[Math.max(0, n - 1) % TURNS.length]
   return { reasoning: '', text: turn.raw || turn.text }
