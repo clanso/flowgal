@@ -145,6 +145,7 @@ var api = {
   soundlib: () => call("/soundlib"),
   updateLibSound: (id, patch) => call("/soundlib", { action: "update", id, patch }),
   removeLibSounds: (ids) => call("/soundlib", { action: "remove", ids }),
+  clearLibSounds: (kind) => call("/soundlib", { action: "clear", kind }),
   /** 往音效库导入一个（最大 20 MB）：path 是相对导入文件夹的路径，meta 是描述文件里这一条。 */
   async uploadLibSound(file2, path, meta) {
     const query = `name=${encodeURIComponent(path || file2.name || "")}${meta ? `&meta=${encodeURIComponent(JSON.stringify(meta))}` : ""}`;
@@ -11033,7 +11034,6 @@ function saveText(text, name2) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1e3);
 }
 var KIND_LABEL = { ambience: "环境音", blip: "打字音", sfx: "音效" };
-var KIND_ORDER = ["ambience", "blip", "sfx"];
 var USE_OPTIONS = [["", "没有"], ...SOUND_SLOTS.map((s) => [s.id, `${s.group === "ui" ? "界面音" : "落字音效"} · ${s.label}`]), ["narration", "旁白的打字音"]];
 var LIB_SHOWN = 200;
 function LibSoundCard({ sound, playing, onPlay }) {
@@ -11056,17 +11056,30 @@ function ErosField({ cfg, p: p4 }) {
   const row = { gap: ".5cqw", marginTop: ".6cqw" };
   return /* @__PURE__ */ import_react11.default.createElement(Field, { label: "亲密场面", hint: "成年人之间的亲密戏。导演按正文给一段一段配节奏：爱抚、缓慢、加快、激烈、余韵，节奏底一直响，镜头跟着一下一下轻轻地送，画面边上泛起潮红；有触手时画面边上有暗影在动，配湿黏的蠕动声。插入、顶到最深、射精这些读到那句时响；高潮时画面柔和地白一下，射精时跟着声音一下一下地亮。正文里的 [SE：…] 提示和日文拟声（ぬぷ、こつん、どくどく……）也认得。音量跟剧情音效走，画面上不出字。" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react11.default.createElement(Toggle, { value: cfg.ui.eros, onChange: (v) => p4({ eros: v }) }), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpen((v) => !v) }, open ? "收起试听" : "试听")), open && /* @__PURE__ */ import_react11.default.createElement(import_react11.default.Fragment, null, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row", style: row }, EROS_PACES.filter((k) => k !== "none").map((k) => /* @__PURE__ */ import_react11.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => previewEros(k, "", volume) }, EROS_LABEL[k])), TENTACLE.filter((k) => k !== "none").map((k) => /* @__PURE__ */ import_react11.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => previewEros("", k, volume) }, TENTACLE_LABEL[k])), PEAKS.map((k) => /* @__PURE__ */ import_react11.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => erosPeak(k, volume) }, PEAK_LABEL[k]))), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row", style: row }, Object.keys(EROS_SFX).map((name2) => /* @__PURE__ */ import_react11.default.createElement("button", { key: name2, type: "button", className: "fg-btn", onClick: () => erosFoley(EROS_SFX[name2].id, volume) }, name2)))));
 }
-function SoundLibSection({ data }) {
+var LIB_PAGE = {
+  sfx: { kinds: ["sfx", "blip"], title: "音效库", unit: "个音效", other: "环境音库", empty: "音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。", note: "推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪句配什么音效。所以标签要写正文里会出现的词。" },
+  ambience: { kinds: ["ambience"], title: "环境音库", unit: "个环境音", other: "音效库", empty: "环境音库还是空的。没有环境音时剧场不放环境音。", note: "雨声、蝉鸣、车站广播这类循环的底。后台导演整理每一轮时按地点、天气和正文挑一批候选，决定每一幕放哪个，跨轮沿用。标签写地点、天气、时段这类词最管用。" }
+};
+function SoundLibSection({ data, kind = "sfx" }) {
   const cfg = data.config;
-  const sounds2 = useSoundlib();
+  const page = LIB_PAGE[kind];
+  const all = useSoundlib();
+  const sounds2 = import_react11.default.useMemo(() => all ? all.filter((s) => page.kinds.includes(s.kind || "sfx")) : null, [all, page]);
+  const otherKind = kind === "sfx" ? "ambience" : "sfx";
   const [playing, setPlaying] = import_react11.default.useState("");
   const [progress, setProgress] = import_react11.default.useState("");
   const [query, setQuery] = import_react11.default.useState("");
   const [openGroup, setOpenGroup] = import_react11.default.useState("");
+  const [clearing, setClearing] = import_react11.default.useState(false);
   const [busy, run] = useBusy2();
   const folderRef = import_react11.default.useRef(null);
   const p4 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
   import_react11.default.useEffect(() => () => stopPreview(), []);
+  import_react11.default.useEffect(() => {
+    setQuery("");
+    setOpenGroup("");
+    setClearing(false);
+  }, [kind]);
   const play = (s) => {
     if (playing === s.id) {
       stopPreview();
@@ -11093,9 +11106,9 @@ function SoundLibSection({ data }) {
       toast("没找到音频文件（mp3、m4a、aac、ogg、opus、wav、flac）", "error");
       return;
     }
-    const have = new Map((sounds2 || []).map((s) => [`${s.file}|${s.bytes}`, s]));
+    const have = new Map((all || []).map((s) => [`${s.file}|${s.bytes}`, s]));
     const failed = [];
-    let added = 0, updated = 0, useful = 0;
+    let added = 0, updated = 0, useful = 0, elsewhere = 0;
     for (let i = 0; i < audio.length; i++) {
       const f = audio[i];
       const { file: file2, meta } = match(pathOf(f));
@@ -11110,8 +11123,9 @@ function SoundLibSection({ data }) {
           }
           continue;
         }
-        await api.uploadLibSound(f, file2, meta);
+        const sound = await api.uploadLibSound(f, file2, { kind, ...meta || {} });
         added++;
+        if (sound && !page.kinds.includes(sound.kind)) elsewhere++;
       } catch (e) {
         failed.push(`${file2}：${e.message}`);
       }
@@ -11119,7 +11133,7 @@ function SoundLibSection({ data }) {
     setProgress("");
     await loadSoundlib().catch(() => {
     });
-    toast(`新导入 ${added} 个${updated ? `，更新了 ${updated} 个的描述` : ""}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join("；")}` : ""}${useful && !failed.length ? "。里面有打字音和标了用途的声音，到「声音」页可以一键套用" : ""}`, failed.length ? "error" : void 0);
+    toast(`新导入 ${added} 个${elsewhere ? `（其中 ${elsewhere} 个描述文件写的是${KIND_LABEL[otherKind]}，放进了${LIB_PAGE[otherKind].title}）` : ""}${updated ? `，更新了 ${updated} 个的描述` : ""}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join("；")}` : ""}${useful && !failed.length ? "。里面有打字音和标了用途的声音，到「声音」页可以一键套用" : ""}`, failed.length ? "error" : void 0);
   };
   const groups = import_react11.default.useMemo(() => {
     const map = /* @__PURE__ */ new Map();
@@ -11128,8 +11142,8 @@ function SoundLibSection({ data }) {
       if (!map.has(key)) map.set(key, { key, kind: s.kind, name: key.split("|")[1], items: [] });
       map.get(key).items.push(s);
     }
-    return [...map.values()].sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name, "zh-CN") : KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
-  }, [sounds2]);
+    return [...map.values()].sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name, "zh-CN") : a.kind === kind ? -1 : 1);
+  }, [sounds2, kind]);
   const words = query.trim().split(/\s+/).filter(Boolean);
   const found = words.length ? (sounds2 || []).filter((s) => {
     const text = `${s.name} ${s.category} ${(s.tags || []).join(" ")} ${s.description}`;
@@ -11137,16 +11151,29 @@ function SoundLibSection({ data }) {
   }) : null;
   const cards = (list3) => list3.slice(0, LIB_SHOWN).map((s) => /* @__PURE__ */ import_react11.default.createElement(LibSoundCard, { key: s.id, sound: s, playing: playing === s.id, onPlay: () => play(s) }));
   const removeGroup = (g) => {
-    if (!window.confirm(`把「${KIND_LABEL[g.kind]} · ${g.name}」这一类 ${g.items.length} 个都从音效库删掉？电脑上的原文件不受影响。`)) return;
+    if (!window.confirm(`把「${g.kind === kind ? g.name : `${KIND_LABEL[g.kind]} · ${g.name}`}」这一类 ${g.items.length} 个都从${page.title}删掉？电脑上的原文件不受影响。`)) return;
     run("g" + g.key, async () => {
       await api.removeLibSounds(g.items.map((s) => s.id));
       await loadSoundlib();
     }, "已删除");
   };
-  return /* @__PURE__ */ import_react11.default.createElement(import_react11.default.Fragment, null, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-section" }, "播放"), /* @__PURE__ */ import_react11.default.createElement(Field, { label: "环境音", hint: "雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react11.default.createElement(Toggle, { value: cfg.ui.amb, onChange: (v) => p4({ amb: v }) }), /* @__PURE__ */ import_react11.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.ambVolume, onChange: (e) => p4({ ambVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react11.default.createElement(Field, { label: "剧情音效", hint: "推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react11.default.createElement(Toggle, { value: cfg.ui.storySfx, onChange: (v) => p4({ storySfx: v }) }), /* @__PURE__ */ import_react11.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.05", value: cfg.ui.storySfxVolume, onChange: (e) => p4({ storySfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react11.default.createElement(ErosField, { cfg, p: p4 }), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-section" }, "我的音效库", sounds2 ? ` · ${sounds2.length} 个` : ""), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note" }, "库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪一幕放什么环境音、哪句配什么音效。所以标签要写正文里会出现的词。"), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn", disabled: !sounds2 || !sounds2.some((s) => s.file), onClick: () => saveText(writeSoundSidecar(sounds2 || []), SOUND_SIDECAR) }, "导出描述"), progress && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react11.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
+  const inUse = new Set([...Object.values(cfg.ui.sounds || {}), cfg.ui.narrationVoice, cfg.ui.voiceDefault].map(libIdOf).filter(Boolean));
+  const doomed = (sounds2 || []).filter((s) => s.kind === kind && !inUse.has(s.id));
+  const kept = { blips: (sounds2 || []).filter((s) => s.kind === "blip").length, used: (sounds2 || []).filter((s) => s.kind === kind && inUse.has(s.id)).length };
+  const totalBytes = doomed.reduce((n, s) => n + (s.bytes || 0), 0);
+  const clearAll = () => run("clear", async () => {
+    stopPreview();
+    setPlaying("");
+    const { cleared } = await api.clearLibSounds(kind);
+    await loadSoundlib().catch(() => {
+    });
+    setClearing(false);
+    toast(`已清空${page.title}：删掉 ${cleared.sounds} 个${cleared.kept ? `，留着「声音」页正在用的 ${cleared.kept} 个` : ""}${cleared.failed ? `；${cleared.failed} 个文件没删掉（可能正被占用），库里已经没有它们了` : ""}`, cleared.failed ? "error" : void 0);
+  });
+  return /* @__PURE__ */ import_react11.default.createElement(import_react11.default.Fragment, null, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-section" }, "播放"), kind === "ambience" && /* @__PURE__ */ import_react11.default.createElement(Field, { label: "环境音", hint: "雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react11.default.createElement(Toggle, { value: cfg.ui.amb, onChange: (v) => p4({ amb: v }) }), /* @__PURE__ */ import_react11.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.ambVolume, onChange: (e) => p4({ ambVolume: Number(e.target.value) }), style: { flex: 1 } }))), kind === "sfx" && /* @__PURE__ */ import_react11.default.createElement(Field, { label: "剧情音效", hint: "推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react11.default.createElement(Toggle, { value: cfg.ui.storySfx, onChange: (v) => p4({ storySfx: v }) }), /* @__PURE__ */ import_react11.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.05", value: cfg.ui.storySfxVolume, onChange: (e) => p4({ storySfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), kind === "sfx" && /* @__PURE__ */ import_react11.default.createElement(ErosField, { cfg, p: p4 }), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-section" }, "我的", page.title, sounds2 ? ` · ${sounds2.length} 个` : ""), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note" }, page.note), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn", disabled: !sounds2 || !sounds2.some((s) => s.file), onClick: () => saveText(writeSoundSidecar(sounds2 || []), SOUND_SIDECAR) }, "导出描述"), !clearing && /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn fg-danger", disabled: !doomed.length || Boolean(progress), title: `把${page.title}删光，重新整理；${page.other}${kind === "sfx" ? "、打字音" : ""}和「声音」页正在用的不动`, onClick: () => setClearing(true) }, "清空", page.title), progress && /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react11.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
     importFiles(e.target.files);
     e.target.value = "";
-  } })), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note" }, "文件夹最上面放一份 ", /* @__PURE__ */ import_react11.default.createElement("code", null, SOUND_SIDECAR), "（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹。同一个文件再导入不会重复存，但描述会以描述文件为准。种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。"), !sounds2 && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note" }, "读取中…"), sounds2 && !sounds2.length && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "音效库还是空的。没有声音时剧场不放环境音和剧情音效。"), sounds2 && sounds2.length > 0 && /* @__PURE__ */ import_react11.default.createElement(import_react11.default.Fragment, null, /* @__PURE__ */ import_react11.default.createElement("input", { className: "fg-input", style: { width: "100%", margin: "0.6cqw 0 1cqw" }, value: query, placeholder: "搜索名字、分类、标签、描述（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), found && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note" }, "找到 ", found.length, " 个", found.length > LIB_SHOWN ? `，先列出前 ${LIB_SHOWN} 个` : ""), found && cards(found), !found && groups.map((g) => /* @__PURE__ */ import_react11.default.createElement("div", { key: g.key, className: "fg-libgroup" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row fg-libgroup-head" }, /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpenGroup((k) => k === g.key ? "" : g.key) }, openGroup === g.key ? "▾" : "▸", " ", KIND_LABEL[g.kind], " · ", g.name), /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-note" }, g.items.length, " 个"), /* @__PURE__ */ import_react11.default.createElement("span", { style: { flex: 1 } }), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "g" + g.key, onClick: () => removeGroup(g) }, "删除这一类")), openGroup === g.key && /* @__PURE__ */ import_react11.default.createElement(import_react11.default.Fragment, null, g.items.length > LIB_SHOWN && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note" }, "这一类有 ", g.items.length, " 个，先列出前 ", LIB_SHOWN, " 个；用搜索找其余的。"), cards(g.items))))));
+  } })), clearing && doomed.length > 0 && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row fg-manage" }, /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-note" }, "删掉", page.title, "里的 ", doomed.length, " ", page.unit, "（", totalBytes >= 1073741824 ? (totalBytes / 1073741824).toFixed(1) + " GB" : sizeMB(totalBytes), "），名字、分类、标签和存进 FlowGal 的音频一起删；", page.other, "不动", kept.blips ? `，${kept.blips} 个打字音留着` : "", kept.used ? `，「声音」页正在用的 ${kept.used} 个留着` : "", "，电脑上的原文件也不受影响。描述想留着的话先点「导出描述」。"), /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "clear", onClick: clearAll }, busy === "clear" ? "清空中…" : "确认清空"), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "clear", onClick: () => setClearing(false) }, "取消")), /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note" }, "文件夹最上面放一份 ", /* @__PURE__ */ import_react11.default.createElement("code", null, SOUND_SIDECAR), "（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹，在这一页导入的算", KIND_LABEL[kind], "。同一个文件再导入不会重复存，但描述会以描述文件为准。", kind === "sfx" ? "种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。" : ""), !sounds2 && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note" }, "读取中…"), sounds2 && !sounds2.length && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, page.empty), sounds2 && sounds2.length > 0 && /* @__PURE__ */ import_react11.default.createElement(import_react11.default.Fragment, null, /* @__PURE__ */ import_react11.default.createElement("input", { className: "fg-input", style: { width: "100%", margin: "0.6cqw 0 1cqw" }, value: query, placeholder: "搜索名字、分类、标签、描述（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), found && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note" }, "找到 ", found.length, " 个", found.length > LIB_SHOWN ? `，先列出前 ${LIB_SHOWN} 个` : ""), found && cards(found), !found && groups.map((g) => /* @__PURE__ */ import_react11.default.createElement("div", { key: g.key, className: "fg-libgroup" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-row fg-libgroup-head" }, /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpenGroup((k) => k === g.key ? "" : g.key) }, openGroup === g.key ? "▾" : "▸", " ", g.kind === kind ? g.name : `${KIND_LABEL[g.kind]} · ${g.name}`), /* @__PURE__ */ import_react11.default.createElement("span", { className: "fg-note" }, g.items.length, " 个"), /* @__PURE__ */ import_react11.default.createElement("span", { style: { flex: 1 } }), /* @__PURE__ */ import_react11.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "g" + g.key, onClick: () => removeGroup(g) }, "删除这一类")), openGroup === g.key && /* @__PURE__ */ import_react11.default.createElement(import_react11.default.Fragment, null, g.items.length > LIB_SHOWN && /* @__PURE__ */ import_react11.default.createElement("div", { className: "fg-note" }, "这一类有 ", g.items.length, " 个，先列出前 ", LIB_SHOWN, " 个；用搜索找其余的。"), cards(g.items))))));
 }
 var stamp = (t) => new Date(t).toLocaleString("zh-CN", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 function UpdateSection({ data }) {
@@ -11165,7 +11192,7 @@ function Settings({ onClose, onDirectorLog = null, initialTab = "look" }) {
       title: "设置",
       en: "Config",
       onClose,
-      tabs: [{ id: "look", label: "外观与演出" }, { id: "effects", label: "特效" }, { id: "sound", label: "声音" }, { id: "music", label: "配乐" }, { id: "soundlib", label: "音效库" }, { id: "director", label: "导演" }, { id: "images", label: "生图渠道" }, { id: "style", label: "画风与配图" }, { id: "about", label: "版本与更新" }],
+      tabs: [{ id: "look", label: "外观与演出" }, { id: "effects", label: "特效" }, { id: "sound", label: "声音" }, { id: "music", label: "配乐" }, { id: "soundlib", label: "音效库" }, { id: "ambience", label: "环境音库" }, { id: "director", label: "导演" }, { id: "images", label: "生图渠道" }, { id: "style", label: "画风与配图" }, { id: "about", label: "版本与更新" }],
       tab,
       onTab: setTab,
       actions: data && /* @__PURE__ */ import_react11.default.createElement("span", { className: `fg-pill${data.ready ? "" : " fg-err"}` }, data.ready ? "生图已就绪" : data.readyReason)
@@ -11175,7 +11202,8 @@ function Settings({ onClose, onDirectorLog = null, initialTab = "look" }) {
     data && tab === "effects" && /* @__PURE__ */ import_react11.default.createElement(EffectsSection, { data }),
     data && tab === "sound" && /* @__PURE__ */ import_react11.default.createElement(SoundSection, { data }),
     data && tab === "music" && /* @__PURE__ */ import_react11.default.createElement(MusicSection, { data }),
-    data && tab === "soundlib" && /* @__PURE__ */ import_react11.default.createElement(SoundLibSection, { data }),
+    data && tab === "soundlib" && /* @__PURE__ */ import_react11.default.createElement(SoundLibSection, { data, kind: "sfx" }),
+    data && tab === "ambience" && /* @__PURE__ */ import_react11.default.createElement(SoundLibSection, { data, kind: "ambience" }),
     data && tab === "director" && /* @__PURE__ */ import_react11.default.createElement(DirectorSection, { data, onDirectorLog }),
     data && tab === "images" && /* @__PURE__ */ import_react11.default.createElement(BackendSection, { data }),
     data && tab === "style" && /* @__PURE__ */ import_react11.default.createElement(import_react11.default.Fragment, null, /* @__PURE__ */ import_react11.default.createElement(StyleSection, { data }), /* @__PURE__ */ import_react11.default.createElement(ImagesSection, { data })),
