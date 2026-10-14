@@ -15,7 +15,7 @@ function useBusy() {
 }
 
 const KIND_HINT = { tags: '逗号隔开的英文 tag', list: '一行一个', pairs: '一行「原词 → 换成」', map: '一行「编号：内容」' }
-const ROLES = [['director', '导演'], ['listen', '听音师'], ['acting', '表演设计师'], ['sprite', '立绘设计师'], ['cg', '插画分镜师']]
+const ROLES = [['director', '导演'], ['listen', '听音师'], ['sprite', '立绘设计师'], ['cg', '插画分镜师']]
 const FILTERS = [['all', '全部'], ['edited', '改过的'], ['stale', '内置有新版的']]
 const num = n => Number(n || 0).toLocaleString()
 
@@ -168,7 +168,7 @@ function PromptItem({ item, onSaved }) {
   )
 }
 
-/** 预览完整提示词：选一位（立绘、表演设计师再选一个人），照这一局现在的样子拼出来。 */
+/** 预览完整提示词：选一位（立绘设计师再选一个人），照这一局现在的样子拼出来。 */
 function Preview({ gameId }) {
   const [role, setRole] = React.useState('director')
   const [name, setName] = React.useState('')
@@ -180,7 +180,7 @@ function Preview({ gameId }) {
     api.game(gameId).then(r => { const names = (r.view?.cast || []).map(p => p.name); setCast(names); setName(n => n || names[0] || '') }).catch(() => {})
   }, [gameId])
   if (!gameId) return <div className="fg-note">先打开一局对话（进一次剧场），就能照那一局的资料、剧情和档案预览。</div>
-  const person = role === 'acting' || role === 'sprite'
+  const person = role === 'sprite'
   const copy = text => navigator.clipboard?.writeText(text).then(() => toast('已复制'), () => toast('复制失败', 'error'))
   return (
     <div className="fg-pb-preview">
@@ -189,7 +189,7 @@ function Preview({ gameId }) {
         {person && <select className="fg-select" value={name} onChange={e => { setName(e.target.value); setResult(null) }}>{cast.length ? cast.map(n => <option key={n} value={n}>{n}</option>) : <option value="">（这一局还没有人建档）</option>}</select>}
         <button type="button" className="fg-btn is-primary" disabled={Boolean(busy) || (person && !name)} onClick={() => run('p', async () => setResult((await api.previewPrompt(gameId, role, person ? name : '')).preview))}>{busy ? '拼装中…' : '拼出来看看'}</button>
       </div>
-      <div className="fg-note">走的是真的拼装：用现在存着的提示词（改了没保存的先点别处保存）、这一局最新的资料、剧情和档案，按模型窗口截短的也照截。不发给模型，不花额度。{role === 'sprite' ? '立绘设计师按这个人每个动作的底图拼（还没有设计时画平静）。' : role === 'acting' ? '表演设计师按整套设计拼。' : role === 'cg' ? '插画分镜师按最新一轮导演挑的插画拼。' : role === 'listen' ? '听音师按最新一轮拼（音效库比候选多、开着「先听一遍」时，整理前先发它）。' : '导演按最新一轮拼。'}</div>
+      <div className="fg-note">走的是真的拼装：用现在存着的提示词（改了没保存的先点别处保存）、这一局最新的资料、剧情和档案，按模型窗口截短的也照截。不发给模型，不花额度。{role === 'sprite' ? '立绘设计师按这个人每个动作的底图拼（开着「表情只换脸」时按通用动作组，不然画平静）。' : role === 'cg' ? '插画分镜师按最新一轮导演挑的插画拼。' : role === 'listen' ? '听音师按最新一轮拼（音效库比候选多、开着「先听一遍」时，整理前先发它）。' : '导演按最新一轮拼。'}</div>
       {result && (
         <>
           <div className="fg-note">第 {result.turn} 轮 · {result.model || '宿主默认模型'}{result.provider ? `（${result.provider}）` : ''}</div>
@@ -229,7 +229,7 @@ export function PromptBook({ onTab = null }) {
   const stale = book.items.filter(i => i.stale).length
   return (
     <div className="fg-pb">
-      <div className="fg-note">导演、听音师、表演设计师、立绘设计师、插画分镜师用的每一段提示词，连插件自己加的出图固定词和过滤规则，都在这里全文显示、能改。改完点别处就保存，改坏了点「恢复默认」。变量写成 {'{{名字}}'}，每段下面列着能用哪些；用 [[ … ]] 括起来的一截，里面有变量是空的就整截不要。</div>
+      <div className="fg-note">导演、听音师、立绘设计师、插画分镜师用的每一段提示词，连插件自己加的出图固定词和过滤规则，都在这里全文显示、能改。改完点别处就保存，改坏了点「恢复默认」。变量写成 {'{{名字}}'}，每段下面列着能用哪些；用 [[ … ]] 括起来的一截，里面有变量是空的就整截不要。</div>
       <div className="fg-note">
         画风的质量词和负面词在每套画风里定{onTab && <button type="button" className="fg-btn is-mini" onClick={() => onTab('style')}>去画风与配图</button>}；
         每种情绪默认的表情 tag 在人物志 → 情绪库。
@@ -238,8 +238,6 @@ export function PromptBook({ onTab = null }) {
         <div className="fg-pb-flow">
           <label><button type="button" className={`fg-switch${cfg.director.sharedPrefix ? ' is-on' : ''}`} aria-pressed={Boolean(cfg.director.sharedPrefix)} onClick={() => director({ sharedPrefix: !cfg.director.sharedPrefix })} />共用开头</label>
           <span className="fg-note">导演和几位设计师的系统提示词都换成「共用 → 共用的系统提示词」那一句，各自的规矩放进用户消息的【你的工作】一节，资料和剧情放在最前面一字不差：会自动缓存的模型接口（DeepSeek 等）第二次读就便宜、快。</span>
-          <label><button type="button" className={`fg-switch${cfg.director.combineDesign ? ' is-on' : ''}`} aria-pressed={Boolean(cfg.director.combineDesign)} onClick={() => director({ combineDesign: !cfg.director.combineDesign })} />补设计合进写词</label>
-          <span className="fg-note">已经设计过的人要画还没设计的情绪（或重新设计表情）时，补设计和写立绘提示词一次请求做完，资料和剧情只读一遍（见立绘设计师 → 顺手补设计）。第一次整套设计还是单独一次。</span>
         </div>
       )}
       <div className="fg-pb-sticky">
