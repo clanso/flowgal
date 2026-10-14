@@ -43,7 +43,7 @@ const FILTERS = [
 const FIELDS = [
   { key: 'tags', label: '整张画的表情', hint: '立绘设计师没写词时（没开、或者没写出来），整张画这种情绪拼进去的表情 tag。' },
   { key: 'face', label: '只换脸的表情', hint: '在动作底图上只换脸、又没有立绘设计师写的词时，这张脸用的表情 tag。' },
-  { key: 'act', label: '动作参考', hint: '交给立绘设计师参考的「演到全身」的样子（基准，不是模板：它按这个人的性格和处境来演）。' },
+  { key: 'act', label: '动作参考', hint: '还没给这个人设计动作与表情时，交给立绘设计师参考的「演到全身」的样子。' },
 ]
 
 const LEVEL_NAMES = { 1: '微', 2: '中', 3: '强', 4: '极' }
@@ -53,7 +53,7 @@ const PLAYS = [
     options: REACT_KINDS.map(k => [k, REACT_NAMES[k]]), effective: (id, lib) => emotionReact(id, lib) },
   { key: 'recall', label: '闪回的基调', hint: `短闪回导演没写基调时，闪回里有这种情绪就按它挑切入方式和色调；几种情绪挑得不一样时按 ${RECALL_PRIORITY.map(t => RECALL_TONE_NAMES[t]).join(' > ')}。`,
     options: [['none', '不影响基调'], ...RECALL_PRIORITY.map(t => [t, RECALL_TONE_NAMES[t]])], effective: (id, lib) => emotionRecall(id, lib) || 'none' },
-  { key: 'level', label: '默认强弱', hint: '只换脸时重画得多狠；「极」的默认整张画、不换脸（设置里能关）。',
+  { key: 'level', label: '默认强弱', hint: '只换脸时重画得多狠；「极」的默认整张画、不换脸（设置里能关）。表演设计师给某个人标过的按他标的。',
     options: [1, 2, 3, 4].map(n => [n, LEVEL_NAMES[n]]), effective: (id, lib) => emotionLevel(id, lib) },
 ]
 const playName = (f, v) => (f.options.find(o => String(o[0]) === String(v)) || [v, String(v)])[1]
@@ -364,7 +364,7 @@ export function EmotionLibrary({ emotions, view, gameId }) {
 
   return (
     <div className="fg-emo-lib">
-      <div className="fg-note">导演给每句台词标情绪；库里没有贴切的词、也不是哪种的近义词时，它会自创一个（可以是复合情绪，比如「带着烦躁思考」）。新造的词先交给导演用的模型归类（设置里能关）：画出来跟库里某一种差不多的，归进那一种（下面「并掉的」里能看到、能拆出来）；确实不一样的才新开一种，只挂在用过它的角色下面。库里只有词本身：这种情绪在谁脸上什么样，由立绘设计师按那个人的性格和此刻的处境来画。导演看库按类别看，新造的情绪会归进它挑的类；替身是这张立绘还没画好时先用哪张，没写替身就用这一类的代表情绪，再没有用平静。点「细节」能改「用在」（什么场面用它）、近义词、默认的表情 tag 和剧场里怎么演（有反应时怎么动、闪回的基调、强弱），没设的跟替身、再跟这一类的代表情绪。停用的导演不再用，画好的照用。所有对局共用。</div>
+      <div className="fg-note">导演给每句台词标情绪；库里没有贴切的词、也不是哪种的近义词时，它会自创一个（可以是复合情绪，比如「带着烦躁思考」）。新造的词先交给导演用的模型归类（设置里能关）：画出来跟库里某一种差不多的，归进那一种（下面「并掉的」里能看到、能拆出来）；确实不一样的才新开一种，只挂在用过它的角色下面。库里只有词本身：这种情绪在谁脸上什么样，由表演设计师按那个人设计（人物志 →「动作与表情」）。导演看库按类别看，新造的情绪会归进它挑的类；替身是这张立绘还没画好时先用哪张，没写替身就用这一类的代表情绪，再没有用平静。点「细节」能改「用在」（什么场面用它）、近义词、默认的表情 tag 和剧场里怎么演（有反应时怎么动、闪回的基调、强弱），没设的跟替身、再跟这一类的代表情绪。停用的导演不再用，画好的照用。所有对局共用。</div>
       <div className="fg-emo-sticky">
       <div className="fg-row fg-emo-tools">
         <input className="fg-input" style={{ flex: '1 1 14cqw', width: 'auto' }} placeholder="搜情绪（名字、编号、近义词、并进来的旧名字）" value={query} onChange={ev => setQuery(ev.target.value)} onKeyDown={ev => ev.stopPropagation()} />

@@ -15,6 +15,6 @@ export function ownText(request) {
   const i = user.indexOf('【你的工作】\n')
   if (i < 0) return user
   const rest = user.slice(i)
-  const end = rest.search(/\n【(?:已经画过|要画的|上一幕)/)
+  const end = rest.search(/\n【(?:先补设计|已经画过|要画的|已有的动作与表情设计|要设计的情绪|上一幕)/)
   return user.slice(0, i) + (end < 0 ? '' : rest.slice(end + 1))
 }

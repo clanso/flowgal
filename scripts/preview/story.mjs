@@ -153,7 +153,7 @@ export function directorReply(turn, units) {
       L('……为什么', { sp: '我', emo: 'confused' }),
       L('那、那间教室里', { sp: '苏晴', emo: 'scared', sym: 'sweat', textfx: [{ text: '那、那间教室里', style: 'shake' }] }),
       L('她的声音一下子乱了', { sp: '苏晴', emo: 'scared' }),
-      L('有人从窗口', { sp: '苏晴', emo: 'cry', say: 'breakdown', stress: '掉下去了', scene: { fx: 'slowmo' } }),
+      L('有人从窗口', { sp: '苏晴', emo: 'cry', say: 'breakdown', stress: '掉下去了', scene: { fx: 'slowmo' }, situ: [{ name: '苏晴', off: ['p2'], why: '说出了三年前的事' }] }),
       L('一道闪电', { cam: 'flash', sfx: '轰', scene: { light: 'flicker', fx: 'none' } }),
       L('撑开伞跑进了雨里', { sp: '苏晴', emo: 'sad', exit: [{ name: '苏晴', how: 'run' }], scene: { light: 'dim', mood: 'sad', bars: 'none' } }),
       L('口袋里的手机震了起来', { phone: { kind: 'call', who: '林岚' } }),

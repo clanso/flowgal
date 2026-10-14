@@ -188,7 +188,7 @@ test('emotions: 人物志里删掉的内置情绪不再挂格子；并掉的新�
   assert.ok(!ids.includes('苦涩地笑'))
 })
 
-test('emotions: 合并后立绘跟过去：并进去的那个还没画就把图挪过去', () => {
+test('emotions: 合并后立绘跟过去：并进去的那个还没画就把图挪过去，动作与表情设计里也顶替它的位置', () => {
   const holder = {
     sprites: {
       'a|校服||苦涩地笑': { assetId: 'img1', emotion: '苦涩地笑', pose: 'daily' },
@@ -197,6 +197,7 @@ test('emotions: 合并后立绘跟过去：并进去的那个还没画就把图�
       'a|睡衣||无可奈何': { assetId: 'img4', emotion: '无可奈何' },
     },
     spriteStatus: { 'a|校服||苦涩地笑': { status: 'done' } },
+    acting: { poses: [{ id: 'p1', emotions: ['neutral', '苦涩地笑'] }, { id: 'p2', emotions: ['无奈地笑'] }], faces: { 苦涩地笑: { desc: '嘴角一扯', tags: 'wry smile' } } },
   }
   const moved = followMerge(holder, ['苦涩地笑'], '无可奈何')
   assert.equal(moved, 1, '睡衣那套「无可奈何」已经有了，留着旧的不动')
@@ -206,6 +207,8 @@ test('emotions: 合并后立绘跟过去：并进去的那个还没画就把图�
   assert.equal(holder.sprites['a|睡衣||苦涩地笑'].assetId, 'img3')
   assert.deepEqual(holder.sprites['a|校服||无奈地笑'].face, { from: 'a|校服||无可奈何', anchor: '无可奈何' })
   assert.deepEqual(holder.spriteStatus, { 'a|校服||无可奈何': { status: 'done' } })
+  assert.deepEqual(holder.acting.poses[0].emotions, ['neutral', '无可奈何'])
+  assert.deepEqual(holder.acting.faces, { 无可奈何: { desc: '嘴角一扯', tags: 'wry smile' } })
 })
 
 test('emotions: 剧场找立绘按替身那一串往下找', () => {

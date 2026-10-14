@@ -71,12 +71,14 @@ export function cgReply(request) {
   })
 }
 const isCgWriter = request => roleText(request).includes('你是视觉小说的插画分镜师')
+export const isActingWriter = request => roleText(request).includes('你是视觉小说的角色表演设计师')
 export const isJudge = request => roleText(request).includes('你是视觉小说的情绪库管理员')
 /**
  * 导演、立绘设计师和插画分镜师共用一个假模型：按系统提示词分流。
- * 情绪归类默认回空（模型没归类：照导演写的新开），归类的流程在下面单独测。
+ * 动作与表情设计默认回空（设计不出来，按通用动作组画）：这里测的是没有设计时的老路，设计的整条流程在 tests/acting.test.mjs。
+ * 情绪归类默认也回空（模型没归类：照导演写的新开），归类的流程在下面单独测。
  */
-export const routedReply = (director, judge = () => '{}') => request => (roleText(request).includes('立绘设计师') ? spriteReply(request) : isCgWriter(request) ? cgReply(request) : isJudge(request) ? judge(request) : typeof director === 'function' ? director(request) : director)
+export const routedReply = (director, acting = () => '{}', judge = () => '{}') => request => (roleText(request).includes('立绘设计师') ? spriteReply(request) : isActingWriter(request) ? acting(request) : isCgWriter(request) ? cgReply(request) : isJudge(request) ? judge(request) : typeof director === 'function' ? director(request) : director)
 
 test('gate: 一整轮的后台整理与出图', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
@@ -428,7 +430,7 @@ test('gate: 导演新造的词先交给模型归类：能归进已有的记成�
     }
     let turns = 0
     const director = () => (turns++ === 0 ? reply : reply.replaceAll('带着杀意的微笑', '笑里藏刀'))
-    const llm = fakeLlm(routedReply(director, judge))
+    const llm = fakeLlm(routedReply(director, () => '{}', judge))
     const fetchImpl = async () => new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } })
     const engine = createEngine({ store, services: { tavern, llm }, fetchImpl, logger: { warn() {}, info() {} } })
     await engine.patchConfig({ images: { auto: false, backgrounds: false, portraits: false, expressions: false } })
