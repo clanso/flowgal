@@ -2160,7 +2160,8 @@ var skins_default = `/* ───────────── 皮肤 ───
   --wait-glyph: "▼";
 }
 .fg-theater[data-skin="noir"] .fg-dialog { left: 0; right: 0; bottom: 0; height: 31%; }
-.fg-theater[data-skin="noir"] .fg-box { box-shadow: none; }
+/* 不要边框：透明边框底下会露出对话框底色从下往上重复的那一行（最黑的那行），成了名字上方横贯整个画面的一条黑线 */
+.fg-theater[data-skin="noir"] .fg-box { box-shadow: none; border: 0; }
 .fg-theater[data-skin="noir"] .fg-box::before { top: 26%; left: 20%; right: 20%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: none; }
 .fg-theater[data-skin="noir"] .fg-box::after { display: none; }
 .fg-theater[data-skin="noir"] .fg-name { left: 0; right: 0; top: 10%; justify-content: center; }
