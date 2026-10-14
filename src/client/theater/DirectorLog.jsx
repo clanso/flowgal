@@ -1,4 +1,5 @@
-// 导演日志：后台导演每次整理的完整记录，以及立绘设计师（动作与表情设计、写差分提示词）、插画分镜师每次写提示词的记录。
+// 导演日志：后台导演每次整理的完整记录，以及立绘设计师（动作与表情设计、写差分提示词）、插画分镜师每次写提示词、
+// 导演新造的情绪词交给模型归类的记录。
 // 正在跑的那次实时滚动模型输出（有思考就一起显示），可以中途停止；
 // 历史记录能看实际发出去的提示词、每次尝试的原始输出 / 用量 / 报错，以及解析后逐句的演出标注。
 import React from 'react'
@@ -13,7 +14,7 @@ import { emotionLabel, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LA
 const lookText = v => (typeof v === 'string' ? v : v ? formatLook(v) : '')
 
 const STATUS = { running: ['进行中', 'is-running'], ok: ['完成', 'is-ok'], failed: ['失败', 'is-failed'], cancelled: ['已停止', 'is-cancelled'] }
-const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词', cg: '写插画提示词', acting: '设计动作与表情' }
+const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词', cg: '写插画提示词', acting: '设计动作与表情', judge: '导演新造了情绪词，交给模型归类' }
 const WRITER = { ai: '模型写的', fallback: '按档案拼的', user: '玩家改的' }
 // 宿主在启动后才定（酒馆版换了传输），所以现取
 const sourceLabel = (source, who = '插画分镜师') => ({ tavern: hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern 后台模型', plugin: '插件设置里指定', directorCustom: '导演的自定义接口', cg: '插画分镜师单独选的', listen: '听音师单独选的', custom: who + '的自定义接口' })[source]
@@ -25,8 +26,8 @@ const thenText = t => [t.name, t.outfit, t.states ? (t.states.length ? t.states.
 /** 处境变了（lib/pose-life.js）：收起 / 放回谁的哪个动作、为什么。 */
 const situText = s => [s.name, s.off && s.off.length ? `收起 ${s.off.join('、')}` : '', s.on && s.on.length ? `放回 ${s.on.join('、')}` : '', !(s.off && s.off.length) && !(s.on && s.on.length) ? '处境转了' : ''].filter(Boolean).join(' ') + (s.why ? `：${s.why}` : '')
 const shiftText = s => [s.name, s.outfit ? `换上${s.outfit}` : '', ...(s.on || []).map(x => '+' + x.name), ...(s.off || []).map(x => '−' + x.name)].filter(Boolean).join(' ')
-/** 一条记录的标题：导演按轮次，立绘和动作与表情设计按人，插画按轮次。 */
-const entryTitle = e => (e.kind === 'sprite' ? `立绘 · ${e.name}` : e.kind === 'acting' ? `动作与表情 · ${e.name}` : e.kind === 'cg' ? `插画 · 第 ${e.turn} 轮` : `第 ${e.turn} 轮`)
+/** 一条记录的标题：导演按轮次，立绘和动作与表情设计按人，插画、情绪归类按轮次。 */
+const entryTitle = e => (e.kind === 'sprite' ? `立绘 · ${e.name}` : e.kind === 'acting' ? `动作与表情 · ${e.name}` : e.kind === 'cg' ? `插画 · 第 ${e.turn} 轮` : e.kind === 'judge' ? `情绪归类 · 第 ${e.turn} 轮` : `第 ${e.turn} 轮`)
 
 const num = n => Number(n || 0).toLocaleString('en-US')
 const secs = ms => (ms >= 60000 ? `${Math.floor(ms / 60000)} 分 ${Math.round((ms % 60000) / 1000)} 秒` : `${(ms / 1000).toFixed(1)} 秒`)
@@ -326,6 +327,30 @@ function CgsView({ cgs }) {
 }
 
 /**
+ * 情绪归类的结果：每个新造的词归进了库里哪一种（之后写到它就用那一种的立绘），还是新开了一种（替身、类别、用在什么场面）。
+ * 模型漏写的词照导演写的新开。归错了在情绪库「并掉的」那一栏拆出来。
+ */
+function JudgeView({ judge }) {
+  if (!judge || !judge.length) return <div className="fg-note">这次没有归类结果，看「原始输出」里模型回了什么；没归的词照导演写的新开了。</div>
+  return (
+    <Block label={`归类结果 · ${judge.length} 个词`}>
+      {judge.map(j => (
+        <div key={j.name} className="fg-dlog-card">
+          <div className="fg-dlog-chips">
+            <Chip k="新词">{j.name}</Chip>
+            {j.into ? <Chip k="归进">{j.intoLabel || j.into}</Chip> : <Chip k={j.missed ? '模型漏写' : '新开'}>{j.missed ? '照导演写的新开' : '单独一种'}</Chip>}
+            {!j.into && (j.baseLabel || j.base) && <Chip k="替身">{j.baseLabel || j.base}</Chip>}
+            {!j.into && (j.categoryLabel || j.category) && <Chip k="类别">{j.categoryLabel || j.category}</Chip>}
+          </div>
+          {j.use && <div className="fg-note">用在：{j.use}</div>}
+        </div>
+      ))}
+      <div className="fg-note">归进去的词记成那一种的别名，之后再写到也用那一种的立绘；归错了到情绪库「并掉的」那一栏点「拆出来」。</div>
+    </Block>
+  )
+}
+
+/**
  * 听音师这一轮列出的声音：每条在哪一句、听到什么、拿哪些词去找，找到了哪些候选（导演从候选里挑，不一定都用上）。
  * 听音师失败时说一声：候选按正文对词挑的。
  */
@@ -395,15 +420,16 @@ function LogDetail({ gameId, summary }) {
   const sprite = summary.kind === 'sprite'
   const acting = summary.kind === 'acting'
   const cg = summary.kind === 'cg'
+  const judge = summary.kind === 'judge'
   const writer = sprite || cg || acting
-  const tabs = running ? [['live', '实时输出'], ['prompt', '提示词']] : [['result', acting ? '设计结果' : writer ? '写出的提示词' : '整理结果'], ['raw', `原始输出${summary.attempts > 1 ? ` · ${summary.attempts} 次` : ''}`], ['prompt', '提示词']]
+  const tabs = running ? [['live', '实时输出'], ['prompt', '提示词']] : [['result', acting ? '设计结果' : judge ? '归类结果' : writer ? '写出的提示词' : '整理结果'], ['raw', `原始输出${summary.attempts > 1 ? ` · ${summary.attempts} 次` : ''}`], ['prompt', '提示词']]
   const live = summary.live || { output: '', reasoning: '', chars: 0, note: '' }
   const elapsed = running ? Math.max(summary.ms, now - summary.at) : summary.ms
   return (
     <div className="fg-dlog-detail">
       <div className="fg-dlog-head">
         <div className="fg-dlog-title">{sprite || acting ? `${entryTitle(summary)}（读到第 ${summary.turn} 轮）` : entryTitle(summary)} <StatusPill status={summary.status} /><span className="fg-spacer" />
-          {running && <button type="button" className="fg-btn" disabled={stopping} onClick={stop}>{writer ? '停止' : '停止整理'}</button>}
+          {running && <button type="button" className="fg-btn" disabled={stopping} onClick={stop}>{writer || judge ? '停止' : '停止整理'}</button>}
         </div>
         <div className="fg-dlog-facts">
           <div><i>模型</i>{summary.model || '—'}{summary.provider ? <span className="fg-note"> · {summary.provider}</span> : null}{sourceLabel(summary.source) ? <span className="fg-note">（{sourceLabel(summary.source)}）</span> : null}{summary.stream === false ? <span className="fg-note"> · 不流式</span> : null}</div>
@@ -429,12 +455,12 @@ function LogDetail({ gameId, summary }) {
           <Block label="模型输出（实时）"><Pre text={live.output} follow cursor empty="还没有输出" /></Block>
         </>
       )}
-      {tab === 'result' && (entry ? (sprite ? <SpritesView sprites={entry.sprites} acting={entry.acting} /> : acting ? <ActingView acting={entry.acting} /> : cg ? <CgsView cgs={entry.cgs} /> : <>{entry.listen && <HeardView listen={entry.listen} />}<ScriptView script={entry.script} units={entry.units || []} /></>) : <div className="fg-note">读取中…</div>)}
+      {tab === 'result' && (entry ? (sprite ? <SpritesView sprites={entry.sprites} acting={entry.acting} /> : acting ? <ActingView acting={entry.acting} /> : cg ? <CgsView cgs={entry.cgs} /> : judge ? <JudgeView judge={entry.judge} /> : <>{entry.listen && <HeardView listen={entry.listen} />}<ScriptView script={entry.script} units={entry.units || []} /></>) : <div className="fg-note">读取中…</div>)}
       {tab === 'raw' && (entry ? <>{entry.listen && <ListenRaw listen={entry.listen} />}<Attempts attempts={entry.attempts || []} /></> : <div className="fg-note">读取中…</div>)}
       {tab === 'prompt' && (entry ? (
         <>
           <Block label={`系统提示词 · ${num((entry.system || '').length)} 字`} text={entry.system}><Pre text={entry.system} /></Block>
-          <Block label={`用户消息 · ${num((entry.user || '').length)} 字${sprite ? '（资料 + 全部剧情 + 角色档案 + 要画的差分）' : acting ? '（资料 + 全部剧情 + 角色档案 + 要设计的情绪）' : cg ? '（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）' : '（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）'}`} text={entry.user}><Pre text={entry.user} /></Block>
+          <Block label={`用户消息 · ${num((entry.user || '').length)} 字${sprite ? '（资料 + 全部剧情 + 角色档案 + 要画的差分）' : acting ? '（资料 + 全部剧情 + 角色档案 + 要设计的情绪）' : cg ? '（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）' : judge ? '（情绪库 + 这一轮新造的词和用到它的台词）' : '（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）'}`} text={entry.user}><Pre text={entry.user} /></Block>
           {entry.listen && <Block label={`先听一遍 · 系统提示词 · ${num((entry.listen.system || '').length)} 字`} text={entry.listen.system}><Pre text={entry.listen.system} /></Block>}
           {entry.listen && <Block label={`先听一遍 · 用户消息 · ${num((entry.listen.user || '').length)} 字（上一幕 + 库里的分类 + 曲库 + 本轮正文单元）`} text={entry.listen.user}><Pre text={entry.listen.user} /></Block>}
         </>

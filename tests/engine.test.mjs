@@ -72,11 +72,13 @@ export function cgReply(request) {
 }
 const isCgWriter = request => roleText(request).includes('你是视觉小说的插画分镜师')
 export const isActingWriter = request => roleText(request).includes('你是视觉小说的角色表演设计师')
+export const isJudge = request => roleText(request).includes('你是视觉小说的情绪库管理员')
 /**
  * 导演、立绘设计师和插画分镜师共用一个假模型：按系统提示词分流。
  * 动作与表情设计默认回空（设计不出来，按通用动作组画）：这里测的是没有设计时的老路，设计的整条流程在 tests/acting.test.mjs。
+ * 情绪归类默认也回空（模型没归类：照导演写的新开），归类的流程在下面单独测。
  */
-export const routedReply = (director, acting = () => '{}') => request => (roleText(request).includes('立绘设计师') ? spriteReply(request) : isActingWriter(request) ? acting(request) : isCgWriter(request) ? cgReply(request) : typeof director === 'function' ? director(request) : director)
+export const routedReply = (director, acting = () => '{}', judge = () => '{}') => request => (roleText(request).includes('立绘设计师') ? spriteReply(request) : isActingWriter(request) ? acting(request) : isCgWriter(request) ? cgReply(request) : isJudge(request) ? judge(request) : typeof director === 'function' ? director(request) : director)
 
 test('gate: 一整轮的后台整理与出图', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
@@ -136,13 +138,14 @@ test('gate: 一整轮的后台整理与出图', async () => {
     assert.match(writerUser, /你终于来了/)
     assert.match(writerUser, /校服：school uniform, sailor collar, red ribbon/)
     // 内置情绪带「演到全身」的动作参考（微笑：嘴角轻轻上扬……）
-    assert.match(writerUser, /情绪「微笑」；动作参考：嘴角轻轻上扬/)
+    assert.match(writerUser, /情绪「微笑」（用在[^）]*）；动作参考：嘴角轻轻上扬/)
     // 两张差分用写好的词、同一个种子（按名字算的固定种子）。写好的词进这个人的角色块（照柏宝绘的立绘写法），Base 只有画风和构图。
     const charOf = r => r.body?.parameters?.v4_prompt?.caption?.char_captions?.[0]?.char_caption || ''
     const spriteReqs = requests.filter(r => charOf(r).includes('written-s'))
     assert.equal(spriteReqs.length, 2)
     assert.deepEqual(spriteReqs.map(r => r.body.parameters.seed), [nameSeed('林岚'), nameSeed('林岚')])
-    assert.match(charOf(spriteReqs[0]), /^girl, long black hair, blue eyes, school uniform, sailor collar, written-s\d, cowboy shot, standing, facing forward, eye-level, facing viewer, straight-on$/)
+    // 衣橱里这套衣服的 tag 锁进每一张（设计师漏写的 red ribbon 也带上）
+    assert.match(charOf(spriteReqs[0]), /^girl, long black hair, blue eyes, school uniform, sailor collar, red ribbon, written-s\d, cowboy shot, standing, facing forward, eye-level, facing viewer, straight-on$/)
     assert.doesNotMatch(spriteReqs[0].body.input, /written-s|long black hair/)
     assert.equal(spriteReqs[0].body.parameters.v4_prompt.use_coords, true)
     assert.equal(person.seed, nameSeed('林岚'))
@@ -381,7 +384,8 @@ test('gate: 导演新造的复合情绪进情绪库，按这身衣服和长期�
     await engine.patchConfig({ images: { auto: false, backgrounds: false, faceSwap: false } })
     await engine.setSecret('novelai', 'official', 'k')
     await engine.onTurnSettled({ gameId: 'g', turn: 3, textVersion: 'v', text: '“又是这样……”\n“算了。”' })
-    const lib = (await engine.emotions()).list
+    // 新情绪先交给模型归类（这里没归类，照导演写的新开），场景不等它
+    const lib = await until(async () => { const list = (await engine.emotions()).list; return list.length ? list : null })
     assert.deepEqual(lib.map(e => [e.id, e.desc, e.base, e.source]), [['带着烦躁思考', undefined, 'thinking', 'director']], '导演写了描述也不存，情绪库里只有这个词')
     const look = { appearance: '1girl, long black hair', outfit: '睡衣', states: [{ name: '怀孕' }] }
     const key = variantKey(look, '带着烦躁思考')
@@ -396,8 +400,76 @@ test('gate: 导演新造的复合情绪进情绪库，按这身衣服和长期�
     // 导演下一轮能在情绪库里看到它。
     await engine.onTurnSettled({ gameId: 'g', turn: 4, textVersion: 'v4', text: '“嗯。”' })
     const next = ownText(llm.calls.filter(c => roleText(c).includes('后台导演')).at(-1))
-    assert.match(next, /【情绪库】[\s\S]*【思】[^\n]*thinking 思考[^\n]*，带着烦躁思考/, '按类别列：跟着它接近的思考归进「思」')
+    assert.match(next, /【情绪库】[\s\S]*【思】(?:\n- [^\n]*)*\n- thinking 思考：[^\n]*(?:\n- [^\n]*)*\n- 带着烦躁思考\n/, '按类别列：跟着它接近的思考归进「思」')
     assert.doesNotMatch(next, /皱眉撇嘴/)
+    engine.dispose()
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
+})
+
+test('gate: 导演新造的词先交给模型归类：能归进已有的记成别名、照那张画；确实不一样的新开一种，只挂在用过它的人下面；导演日志里看得到', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
+  try {
+    const store = createStore(dir)
+    const tavern = fakeTavern()
+    const reply = JSON.stringify({
+      scene: { location: '教室', time: 'noon', weather: 'clear', mood: 'daily' },
+      cast: [{ name: '林岚', pos: 'left' }, { name: '苏晴', pos: 'right' }],
+      lines: [{ u: 'U1', sp: '林岚', emo: '强忍泪水' }, { u: 'U2', sp: '苏晴', emo: '带着杀意的微笑' }, { u: 'U3', sp: '林岚', emo: '苦笑' }],
+      emotions: [{ name: '强忍泪水', base: 'sad' }, { name: '带着杀意的微笑', base: 'smile' }],
+      people: [{ name: '林岚', gender: 'female', appearance: '1girl, long black hair', outfit: '校服', outfitTags: 'school uniform' }, { name: '苏晴', gender: 'female', appearance: '1girl, short brown hair', outfit: '校服', outfitTags: 'school uniform' }],
+    })
+    const judged = []
+    const judge = request => {
+      judged.push(userText(request))
+      return JSON.stringify({ emotions: [
+        { name: '强忍泪水', into: 'wronged' },
+        { name: '带着杀意的微笑', into: '', base: 'smile', category: '冷', use: '表面笑着、心里动了杀意' },
+      ] })
+    }
+    let turns = 0
+    const director = () => (turns++ === 0 ? reply : reply.replaceAll('带着杀意的微笑', '笑里藏刀'))
+    const llm = fakeLlm(routedReply(director, () => '{}', judge))
+    const fetchImpl = async () => new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } })
+    const engine = createEngine({ store, services: { tavern, llm }, fetchImpl, logger: { warn() {}, info() {} } })
+    await engine.patchConfig({ images: { auto: false, backgrounds: false, portraits: false, expressions: false } })
+    await engine.onTurnSettled({ gameId: 'g', turn: 1, textVersion: 'v1', text: '“……没事。”\n“是吗。”\n“唉。”' })
+    const lib = await until(async () => { const r = await engine.emotions(); return r.list.length >= 2 ? r : null })
+    // 近义词直接当作那一种，不另造、也不交给模型
+    const view = await engine.gameView('g')
+    assert.equal(view.turns[0].script.lines.U3.emo, 'wry', '苦笑是无奈的近义词')
+    assert.equal(judged.length, 1)
+    assert.match(judged[0], /【情绪库】[\s\S]*- wronged 委屈：用在被冤枉[^\n]*也叫[^\n]*憋屈/)
+    assert.match(judged[0], /- 「强忍泪水」（导演写的接近 sad 难过）：林岚：……没事。/)
+    assert.match(judged[0], /- 「带着杀意的微笑」（导演写的接近 smile 微笑）：苏晴：是吗。/)
+    assert.doesNotMatch(judged[0], /「苦笑」/)
+    const folded = lib.list.find(e => e.id === '强忍泪水')
+    assert.deepEqual([folded.mergedInto, folded.source, folded.turn], ['wronged', 'judge', 1])
+    const fresh = lib.list.find(e => e.id === '带着杀意的微笑')
+    assert.deepEqual([fresh.base, fresh.category, fresh.use, fresh.who], ['smile', 'cold', '表面笑着、心里动了杀意', ['苏晴']])
+    // 剧本里写的还是原词，认成库里的那种
+    const { resolveEmotion, standIns, emotionBrief } = await import('../lib/emotions.js')
+    assert.equal(resolveEmotion('强忍泪水', lib), 'wronged')
+    assert.deepEqual(standIns('带着杀意的微笑', lib), ['smile', 'cold', 'neutral'])
+    assert.match(emotionBrief(lib), /- wronged 委屈：[^\n]*也叫[^\n]*、强忍泪水\n/, '归进来的词导演之后看得到')
+    assert.match(emotionBrief(lib), /【冷】[\s\S]*- 带着杀意的微笑：用在表面笑着、心里动了杀意$/)
+    // 导演日志里有一条归类
+    const entry = (await engine.directorLog('g')).entries.find(e => e.kind === 'judge')
+    assert.ok(entry, '导演日志里有归类这一步')
+    const full = (await engine.directorEntry('g', entry.id)).entry
+    assert.deepEqual(full.judge.map(j => [j.name, j.into]), [['强忍泪水', 'wronged'], ['带着杀意的微笑', '']])
+    assert.match(full.system, /情绪库管理员/)
+    // 归错了能拆出来：单独成一种，替身是原来并进的那个
+    await engine.emotionAction('split', { id: '强忍泪水' })
+    const split = (await engine.emotions()).list.find(e => e.id === '强忍泪水')
+    assert.deepEqual([split.mergedInto, split.base, split.category, split.source], [undefined, 'wronged', 'sorrow', 'director'])
+    // 关掉「新情绪先归类」就照以前，每个新词各成一种
+    await engine.patchConfig({ director: { judgeEmotions: false } })
+    await engine.onTurnSettled({ gameId: 'g', turn: 2, textVersion: 'v2', text: '“……没事。”\n“是吗。”\n“唉。”' })
+    const after = await until(async () => { const r = await engine.emotions(); return r.list.some(e => e.id === '笑里藏刀') ? r : null })
+    assert.deepEqual([after.list.find(e => e.id === '笑里藏刀').base, after.list.find(e => e.id === '笑里藏刀').source], ['smile', 'director'])
+    assert.equal(judged.length, 1, '关掉了不再问模型')
     engine.dispose()
   } finally {
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
