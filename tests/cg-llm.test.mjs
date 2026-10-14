@@ -81,9 +81,9 @@ test('自定义接口：模型列表（OpenAI、OpenRouter 的样子都认）', 
 })
 
 test('设置：插画分镜师的模型只收认得的来源和 http(s) 地址', () => {
-  assert.deepEqual(resolveConfig({}).director.cgLlm, { source: '', provider: '', model: '', baseURL: '', contextWindow: 128000 })
+  assert.deepEqual(resolveConfig({}).director.cgLlm, { source: '', provider: '', model: '', baseURL: '', contextWindow: 128000, stream: true })
   const bad = resolveConfig({ director: { cgLlm: { source: 'evil', baseURL: 'file:///etc/passwd', model: ' m ', contextWindow: -5 } } }).director.cgLlm
-  assert.deepEqual(bad, { source: '', provider: '', model: 'm', baseURL: '', contextWindow: 0 })
+  assert.deepEqual(bad, { source: '', provider: '', model: 'm', baseURL: '', contextWindow: 0, stream: true })
   assert.deepEqual(resolveConfig({ director: { cgLlm: 'custom' } }).director.cgLlm, resolveConfig({}).director.cgLlm)
   assert.equal(resolveConfig({ director: { cgLlm: { source: 'custom', baseURL: 'https://api.deepseek.com/v1' } } }).director.cgLlm.baseURL, 'https://api.deepseek.com/v1')
 })

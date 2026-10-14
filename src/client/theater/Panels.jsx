@@ -1225,8 +1225,8 @@ function Field({ label, hint, children }) {
     </>
   )
 }
-function Toggle({ value, onChange }) {
-  return <button type="button" className={`fg-switch${value ? ' is-on' : ''}`} aria-pressed={Boolean(value)} onClick={() => onChange(!value)} />
+function Toggle({ value, onChange, disabled = false }) {
+  return <button type="button" className={`fg-switch${value ? ' is-on' : ''}`} aria-pressed={Boolean(value)} disabled={disabled} onClick={() => onChange(!value)} />
 }
 /** 文本框：失焦或回车时才提交。 */
 function Text({ value, onCommit, type = 'text', placeholder, style }) {
@@ -1606,23 +1606,32 @@ function StyleSection({ data }) {
   )
 }
 
+/** 导演的模型下拉里「自定义接口」那一项（宿主的模型 id 不会长这样）。 */
+const CUSTOM_LLM = '__flowgal_custom__'
+
 function DirectorSection({ data, onDirectorLog, onTab = null }) {
   const cfg = data.config
+  const d = cfg.director
+  const custom = d.source === 'custom'
   const [llm, setLlm] = React.useState({ providers: [], models: [] })
-  React.useEffect(() => { api.llm(cfg.director.provider).then(setLlm).catch(() => {}) }, [cfg.director.provider])
+  React.useEffect(() => { api.llm(d.provider).then(setLlm).catch(() => {}) }, [d.provider])
   const p = patch => patchConfig({ director: patch }).catch(e => toast(e.message, 'error'))
+  // 换到自定义接口时宿主那边选的留着（模型名先带过去，同一个中转多半一样），换回来还是原来那个
+  const pickSource = v => (v === CUSTOM_LLM ? p({ source: 'custom' }) : p({ source: '', provider: v, model: '' }))
   return (
     <>
       <div className="fg-section">导演（后台整理）{onDirectorLog && <button type="button" className="fg-btn" onClick={onDirectorLog}>查看导演日志</button>}</div>
-      <Field label="自动整理" hint="每轮正文写完后，后台模型把它整理成场景：说话人、表情、站位、镜头、天气、选项、插画分镜。正文一字不改。"><Toggle value={cfg.director.auto} onChange={v => p({ auto: v })} /></Field>
-      <Field label="模型" hint={hostName() === 'st' ? '默认跟着酒馆当前的连接；也可以选一套连接配置（在酒馆「API 连接」里存的）专门给导演用，整理用便宜的小模型就够。' : '留空跟随 Tavern 的后台模型。整理用的是便宜的小模型就够。'}>
+      <Field label="自动整理" hint="每轮正文写完后，后台模型把它整理成场景：说话人、表情、站位、镜头、天气、选项、插画分镜。正文一字不改。"><Toggle value={d.auto} onChange={v => p({ auto: v })} /></Field>
+      <Field label="模型" hint={`${hostName() === 'st' ? '默认跟着酒馆当前的连接；也可以选一套连接配置（在酒馆「API 连接」里存的）专门给导演用，整理用便宜的小模型就够。' : '留空跟随 Tavern 的后台模型。整理用的是便宜的小模型就够。'}也可以自己接一个 OpenAI 兼容接口（填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行）。立绘设计师、表演设计师也用这个模型。`}>
         <div className="fg-row">
-          <Select value={cfg.director.provider} onChange={v => p({ provider: v, model: '' })} options={[['', hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern'], ...llm.providers.map(x => [x.id, x.name])]} />
-          {cfg.director.provider && (llm.models.length
-            ? <Select value={cfg.director.model} onChange={v => p({ model: v })} options={[['', '（请选择）'], ...llm.models.map(m => [m.id, m.name])]} />
-            : <Text value={cfg.director.model} placeholder="模型 ID" onCommit={v => p({ model: v })} />)}
+          <Select value={custom ? CUSTOM_LLM : d.provider} onChange={pickSource} options={[['', hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern'], ...llm.providers.map(x => [x.id, x.name]), [CUSTOM_LLM, '自定义接口（OpenAI 兼容）']]} />
+          {!custom && d.provider && (llm.models.length
+            ? <Select value={d.model} onChange={v => p({ model: v })} options={[['', '（请选择）'], ...llm.models.map(m => [m.id, m.name])]} />
+            : <Text value={d.model} placeholder="模型 ID" onCommit={v => p({ model: v })} />)}
         </div>
       </Field>
+      {custom && <CustomModelFields data={data} own={d} which="director" secret="directorllm" window="这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收。接口报出更小的输出上限时自动按它重试。" onPatch={p} />}
+      <StreamField data={data} own={d} custom={custom} also="插画分镜师、听音师选「跟导演一样」时也照这个。" onPatch={p} />
       <Field label="最大输出" hint="自动：模型报了输出上限就用它报的，没报按 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。导演、立绘设计师、插画分镜师都用这一个。"><Limit value={cfg.director.maxTokens} fallback={128000} min={1000} width="9cqw" free="自动" onCommit={v => p({ maxTokens: v })} /></Field>
       <Field label="温度"><Text type="number" style={{ width: '7cqw' }} value={cfg.director.temperature} onCommit={v => p({ temperature: v })} /></Field>
       <Field label="资料长度" hint="给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认不限，整份给；超出模型窗口时自动缩短。"><Limit value={cfg.director.contextChars} fallback={1000000} width="9cqw" unit="字" onCommit={v => p({ contextChars: v })} /></Field>
@@ -1651,6 +1660,50 @@ function DirectorSection({ data, onDirectorLog, onTab = null }) {
   )
 }
 
+/**
+ * 流式开关。自定义接口、酒馆的连接配置照它走；DSH 的模型服务只走流式（它的接口没有不流式这一项），开关灰掉，说明怎么换。
+ * 默认开着（跟以前一样）。
+ */
+function StreamField({ data, own, custom, also = '', onPatch }) {
+  const works = custom || data.hostStreamSwitch
+  const hint = works
+    ? `开着：模型边写边传回来，导演日志里能看实时输出。关掉：等模型整段写完一次拿回，日志里写完才看得到；有的中转流式不稳（吞字、半路断、只回几个字），关掉试试。默认开着。${also}`
+    : `DSH 的模型服务只走流式，这里关不掉。要不流式：上面选「自定义接口（OpenAI 兼容）」，把同一个中转的地址、Key 和模型填进来。${also}`
+  return (
+    <Field label="流式输出" hint={hint}>
+      <div className="fg-row">
+        <Toggle value={works ? own.stream !== false : true} disabled={!works} onChange={v => onPatch({ stream: v })} />
+        <span className="fg-note">{!works ? 'DSH 的模型只走流式' : own.stream === false ? '不流式：整段写完一次拿回' : '流式：边写边传'}</span>
+      </div>
+    </Field>
+  )
+}
+
+/**
+ * 自己接的 OpenAI 兼容接口：地址、Key（存在宿主）、模型（从接口读列表，也能手填）、上下文窗口。
+ * which 是读模型列表时说是谁的（director / cg / listen），secret 是 Key 存在哪。
+ */
+function CustomModelFields({ data, own, which, secret, window, onPatch }) {
+  const [busy, run] = useBusy()
+  const [list, setList] = React.useState(null)
+  const loadList = () => run('m', async () => setList(await api.ownModels(which)))
+  // 地址或 Key 换了就重新读模型列表
+  React.useEffect(() => { setList(null); if (own.baseURL) loadList() }, [own.baseURL, data.keys[secret]])
+  return (
+    <>
+      <Field label="接口地址"><Text value={own.baseURL} placeholder="https://api.deepseek.com/v1" style={{ flex: 1, width: '100%' }} onCommit={v => onPatch({ baseURL: String(v).trim() })} /></Field>
+      <Field label="Key" hint={`存在宿主（${data.secretStorage || '插件目录'}），不会发到浏览器。本机的接口不要 Key 就空着。`}><KeyInput backend={secret} has={data.keys[secret]} /></Field>
+      <Field label="模型" hint={list ? list.note : own.baseURL ? '正在读取模型列表…' : '先填接口地址'}>
+        <div className="fg-row">
+          <ModelField value={own.model} options={(list && list.models) || []} placeholder="模型 ID" onCommit={v => onPatch({ model: v, ...((list?.models || []).find(m => m.id === v)?.window ? { contextWindow: list.models.find(m => m.id === v).window } : {}) })} />
+          <button type="button" className="fg-btn" disabled={busy === 'm' || !own.baseURL} onClick={loadList}>{busy === 'm' ? '读取中…' : '刷新列表'}</button>
+        </div>
+      </Field>
+      <Field label="上下文窗口" hint={window}><Text type="number" style={{ width: '9cqw' }} value={own.contextWindow} onCommit={v => onPatch({ contextWindow: v })} /></Field>
+    </>
+  )
+}
+
 /** 插画分镜师（cg）、听音师（listen）各自能单独用的模型：跟导演一样 / 宿主里另选一个 / 自己接一个 OpenAI 兼容接口（Key 存在宿主）。 */
 const OWN_MODEL = {
   cg: { field: 'cgLlm', secret: 'cgllm', window: '这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收；最大输出、温度、资料长度跟导演用同一套设置。接口报出更小的输出上限时自动按它重试。', label: '插画分镜师的模型', hint: '写 CG 提示词的模型可以和导演分开。有的模型不肯把露骨的画面写具体，就给分镜师单独换一个；自定义接口填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行。' },
@@ -1659,17 +1712,12 @@ const OWN_MODEL = {
 function OwnModelFields({ data, providers, which }) {
   const meta = OWN_MODEL[which]
   const own = data.config.director[meta.field]
-  const [busy, run] = useBusy()
   const [hostModels, setHostModels] = React.useState([])
-  const [list, setList] = React.useState(null)
   const p = patch => patchConfig({ director: { [meta.field]: patch } }).catch(e => toast(e.message, 'error'))
   React.useEffect(() => {
     if (own.source !== 'host' || !own.provider) return setHostModels([])
     api.llm(own.provider).then(r => setHostModels(r.models || [])).catch(() => setHostModels([]))
   }, [own.source, own.provider])
-  const loadList = () => run('m', async () => setList(await api.ownModels(which)))
-  // 地址或 Key 换了就重新读模型列表
-  React.useEffect(() => { setList(null); if (own.source === 'custom' && own.baseURL) loadList() }, [own.source, own.baseURL, data.keys[meta.secret]])
   const sources = [['', '跟导演一样'], ['host', hostName() === 'st' ? '另选一套酒馆连接配置' : '另选一个 Tavern 里的模型'], ['custom', '自定义接口（OpenAI 兼容）']]
   return (
     <>
@@ -1682,19 +1730,8 @@ function OwnModelFields({ data, providers, which }) {
             : <Text value={own.model} placeholder="模型 ID" onCommit={v => p({ model: v })} />)}
         </div>
       </Field>
-      {own.source === 'custom' && (
-        <>
-          <Field label="接口地址"><Text value={own.baseURL} placeholder="https://api.deepseek.com/v1" style={{ flex: 1, width: '100%' }} onCommit={v => p({ baseURL: String(v).trim() })} /></Field>
-          <Field label="Key" hint={`存在宿主（${data.secretStorage || '插件目录'}），不会发到浏览器。本机的接口不要 Key 就空着。`}><KeyInput backend={meta.secret} has={data.keys[meta.secret]} /></Field>
-          <Field label="模型" hint={list ? list.note : own.baseURL ? '正在读取模型列表…' : '先填接口地址'}>
-            <div className="fg-row">
-              <ModelField value={own.model} options={(list && list.models) || []} placeholder="模型 ID" onCommit={v => p({ model: v, ...((list?.models || []).find(m => m.id === v)?.window ? { contextWindow: list.models.find(m => m.id === v).window } : {}) })} />
-              <button type="button" className="fg-btn" disabled={busy === 'm' || !own.baseURL} onClick={loadList}>{busy === 'm' ? '读取中…' : '刷新列表'}</button>
-            </div>
-          </Field>
-          <Field label="上下文窗口" hint={meta.window}><Text type="number" style={{ width: '9cqw' }} value={own.contextWindow} onCommit={v => p({ contextWindow: v })} /></Field>
-        </>
-      )}
+      {own.source === 'custom' && <CustomModelFields data={data} own={own} which={which} secret={meta.secret} window={meta.window} onPatch={p} />}
+      {own.source && <StreamField data={data} own={own} custom={own.source === 'custom'} onPatch={p} />}
     </>
   )
 }

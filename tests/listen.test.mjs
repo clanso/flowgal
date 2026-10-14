@@ -108,7 +108,7 @@ test('gate: 给听音师看的分类按大类一组、多的在前；超没超�
   assert.deepEqual(config.director.soundCandidates, { sfx: 80, ambience: AMBIENCE_CANDIDATES })
   assert.equal(config.director.listen, true, '只有明确写 false 才关')
   assert.equal(resolveConfig({ director: { listen: false } }).director.listen, false)
-  assert.deepEqual(resolveConfig({ director: { listenLlm: { source: 'evil', baseURL: 'file:///x', model: ' m ' } } }).director.listenLlm, { source: '', provider: '', model: 'm', baseURL: '', contextWindow: 128000 })
+  assert.deepEqual(resolveConfig({ director: { listenLlm: { source: 'evil', baseURL: 'file:///x', model: ' m ' } } }).director.listenLlm, { source: '', provider: '', model: 'm', baseURL: '', contextWindow: 128000, stream: true })
   // 要不要先听：开着并且有一种超了
   assert.equal(wantsListen(DEFAULT_CONFIG, LIBRARY), true)
   assert.equal(wantsListen(DEFAULT_CONFIG, LIBRARY.slice(0, 7)), false)
