@@ -2249,6 +2249,41 @@ var EMOTION_LEVEL = {
   cold: 1,
   teasing: 2
 };
+var REACT_KINDS = ["jolt", "shrink", "bounce", "droop", "shake", "nod", "tilt", "still"];
+var REACT_NAMES = { jolt: "一惊往上一缩", shrink: "害羞缩肩", bounce: "笑得一颤", droop: "垂下去", shake: "气得一抖", nod: "轻轻点头", tilt: "歪头", still: "不动" };
+var EMOTION_REACT = {
+  surprised: "jolt",
+  scared: "jolt",
+  shy: "shrink",
+  blush: "shrink",
+  love: "shrink",
+  happy: "bounce",
+  laugh: "bounce",
+  smug: "bounce",
+  teasing: "bounce",
+  sad: "droop",
+  cry: "droop",
+  tired: "droop",
+  worried: "droop",
+  angry: "shake",
+  pout: "shake",
+  cold: "shake",
+  confused: "tilt",
+  thinking: "tilt"
+};
+var EMOTION_RECALL = {
+  scared: "dread",
+  angry: "dread",
+  sad: "sad",
+  cry: "sad",
+  tired: "sad",
+  worried: "sad",
+  love: "sweet",
+  blush: "sweet",
+  shy: "sweet",
+  teasing: "sweet"
+};
+var RECALL_PRIORITY = ["dread", "sad", "sweet", "flash", "haze", "warm"];
 var EMOTION_TAGS = {
   neutral: "neutral expression, closed mouth",
   smile: "light smile",
@@ -2557,6 +2592,625 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null, ca
   return { steps, end: saved || cast, inside: saved ? cast : null };
 }
 
+// lib/limits.js
+var DIRECTOR_LIMITS = [
+  { key: "cams", label: "镜头", unit: "次", was: 14, phrase: (n) => `一轮最多 ${n} 次，` },
+  { key: "hits", label: "打斗出手", unit: "次", was: 12, phrase: (n) => `一轮最多 ${n} 次，` },
+  { key: "moments", label: "小瞬间", unit: "个", was: 4, phrase: (n) => `一轮最多 ${n} 个，` },
+  { key: "phone", label: "手机", unit: "个", was: 8, phrase: (n) => `一轮最多 ${n} 个。` },
+  { key: "stress", label: "重音", unit: "处", was: 3, phrase: (n) => `一轮最多 ${n} 处，` },
+  { key: "pauses", label: "停顿", unit: "处", was: 6, phrase: (n) => `一轮最多 ${n} 处，` },
+  { key: "hush", label: "配乐留白", unit: "次", was: 2, phrase: (n) => `一轮最多 ${n} 次，` },
+  { key: "textFx", label: "文字效果", unit: "处", was: 16, phrase: (n) => `一轮最多 ${n} 处，` },
+  { key: "textFxPerLine", label: "一句里的文字效果", unit: "处", was: 2, phrase: (n) => `一句最多 ${n} 处，` },
+  { key: "sfx", label: "剧情音效", unit: "个", was: 6, phrase: (n) => `一轮最多 ${n} 个，` },
+  { key: "erosSfx", label: "R18 音效", unit: "个", was: 14, phrase: (n) => `，一轮最多 ${n} 个` },
+  { key: "peaks", label: "高潮", unit: "次", was: 6, phrase: (n) => `；一轮最多 ${n} 次` },
+  { key: "newEmotions", label: "新造情绪", unit: "个", was: 6, phrase: (n) => `一轮最多新造 ${n} 个；` }
+];
+var DEFAULT_DIRECTOR_LIMITS = Object.freeze(Object.fromEntries(DIRECTOR_LIMITS.map((l) => [l.key, null])));
+
+// lib/prompt-words.js
+var STYLE_HINTS = Object.freeze({
+  novelai: "目标模型是 NovelAI，使用 Danbooru 风格 tag。",
+  comfyui: "目标模型是本地 Stable Diffusion / Anima / Illustrious 类模型，使用 Danbooru 风格 tag。",
+  webui: "目标模型是本地 Stable Diffusion，使用 Danbooru 风格 tag。",
+  openai: "目标是通用图像模型：插件会把英文描述和 tag 合并成一段话发出去，tag 仍用简洁的英文。"
+});
+var mapText = (entries) => entries.map(([k, v]) => `${k}：${v}`).join("\n");
+var FRAGMENTS = {
+  // 共用
+  "shared.system": "你在视觉小说插件 FlowGal 的后台工作。下面先给你资料、剧情和档案，再在【你的工作】里写明你这次是谁、要做什么、照什么规矩写；照它做，只输出它要求的 JSON。",
+  "shared.role": "【你的工作】\n{{rules}}",
+  "shared.styleHint": mapText(Object.entries(STYLE_HINTS)),
+  "shared.context": "【资料（仅供判断人物与外貌，勿复述）】\n{{text}}",
+  "shared.story.turn": "〔第 {{turn}} 轮〕\n{{text}}",
+  "shared.story.dropped": "（更早的 {{n}} 轮因模型窗口装不下略去）",
+  "shared.story.empty": "（还没有剧情）",
+  "shared.retry": "上一次输出无法使用（{{error}}）。只输出一个合法 JSON 对象。",
+  "shared.missing": "（上一次漏写了这几条，只补写它们。）",
+  "shared.person": [
+    "名字：{{name}}[[（{{gender}}）]]",
+    "固定外貌：{{appearance}}[[",
+    "衣橱：",
+    "{{wardrobe}}]][[",
+    "此刻穿着：{{outfit}}]]",
+    "长期状态：{{states}}[[",
+    "临时状态（只影响插画，立绘不要画）：{{temp}}]][[",
+    "表演笔记（玩家写的，必须遵守）：{{userNote}}]][[",
+    "表演笔记（表演设计师读完资料写的）：{{aiNote}}]][[",
+    "立绘备注（玩家写的，必须遵守）：{{note}}]][[",
+    "不要出现：{{negative}}]]"
+  ].join("\n"),
+  "shared.person.outfit": "- {{name}}：{{tags}}",
+  "shared.person.state": "{{name}}（{{tags}}）",
+  "shared.person.blanks": mapText([["female", "女"], ["male", "男"], ["other", "其他"], ["noLook", "（未建档）"], ["noTags", "（没写 tag，按名字和剧情推断）"], ["noStateTags", "按名字推断"], ["none", "无"]]),
+  // 导演
+  "director.noImages": "本次不需要插画：images 给空数组。",
+  "director.retry": "上一次输出无法解析（{{error}}）。只输出一个合法 JSON 对象，该写的字段（join、dual、lines……）照常写全，不要因为重来就省掉。",
+  "director.imageLimit": "最多 {{n}} 张（有露骨的性场面时照上面标 nsfw 那一条，可以到 {{nsfwMax}} 张）。",
+  "director.imageFree": "张数不设上限：值得定格的瞬间都画，多张时彼此要明显不同；没有值得画的就不画。",
+  "director.nsfwRoom": "这时这一轮一共可以到 {{nsfwMax}} 张，名额不够时先让给露骨的这几张。",
+  "director.limits": mapText(DIRECTOR_LIMITS.map((l) => [l.key, l.phrase("{{n}}")])),
+  "director.previous": "地点：{{location}}；时段：{{time}}；天气：{{weather}}；基调：{{mood}}[[；光线：{{light}}]][[；画面效果：{{fx}}]][[；亲密氛围：{{romance}}]][[；感官：{{sense}}（不会带到这一轮，还在这样就再写一次）]][[；电影黑边：{{bars}}]][[；亲密场面的节奏：{{eros}}（不会带到这一轮，还在继续就再写一次）]][[；触手：{{tentacle}}（不会带到这一轮，还在就再写一次）]]；结束时在场：{{who}}[[；结束时还在特殊段落 {{layer}} 里（{{layerPlace}}）：这一轮接着演就在第一句写同样的 mode，不写就回到现实]][[；结束时还在跟{{caller}}通话：这一轮还在通话就不用再写 call，挂断那一句写 phone end]][[；剧情：{{summary}}]]",
+  "director.previous.first": "（这是第一幕）",
+  "director.cast": "- {{name}}[[（{{global}}，固定外貌冻结）]]：固定外貌：{{appearance}}[[；衣橱：{{wardrobe}}]][[；正在穿：{{outfit}}]][[；长期状态：{{states}}]][[；临时：{{temp}}]][[；动作：{{poses}}]]",
+  "director.cast.none": "（暂无）",
+  "director.emotions": "写左边的编号：内置情绪是英文键，新加的就是原词本身。\n{{list}}",
+  "director.emotions.empty": "（这一类还没有情绪：新造的可以归进来）",
+  "director.raw": "【本轮原文（模型写的原样，含标签。下面的单元就是从它切出来的；用它看清每句话在原文的什么位置，被状态栏、面板、变量这类标签包着的单元写进 skip）】\n{{raw}}",
+  "director.music.now": "上一幕结束时在放：{{id}}（{{name}}）。",
+  "director.music.silent": "上一幕结束时没有放音乐。",
+  "director.sounds.now": "上一幕结束时的环境音：{{id}}（{{name}}）。",
+  "director.sounds.silent": "上一幕结束时没有环境音。",
+  "director.sounds.none": "（没有合适的）",
+  // 听音师
+  "listen.first": "这是第一幕，没有上一幕。",
+  "listen.noCats": "（库里还没分类）",
+  // 表演设计师
+  "acting.noEmotions": "（这次不设计表情）",
+  "acting.line.builtin": "- {{key}}（{{label}}）",
+  "acting.line.custom": "- {{key}}（新情绪[[，接近 {{near}}]]）",
+  "acting.line.placed": "{{line}}：已在动作 {{poses}}里，只重新设计表情",
+  "acting.current": "【已有的动作与表情设计】\n[[表演笔记：{{read}}\n]]动作：\n{{poses}}[[\n表情：\n{{faces}}]]",
+  "acting.current.pose": "- {{id}}「{{label}}」：{{desc}}[[；身体 {{tags}}]]；情绪：{{emotions}}",
+  "acting.current.face": "- {{label}}[[［{{level}}］]]：{{desc}}[[（{{tags}}）]]",
+  "acting.blanks": mapText([["noDesc", "（没写描述）"], ["base", "（底图）"]]),
+  // 立绘设计师
+  "sprite.references": "【已经画好的立绘（固定外貌的写法要和它们一致）】\n{{list}}",
+  "sprite.line.face": "- {{id}}：只换脸——在「{{anchor}}」那张「{{pose}}」动作底图上只重画脸，身体、衣服不动；情绪「{{emotion}}」[[；接近 {{near}}]]{{look}}；tags 只写这张脸的表情（情绪词 + 眉、眼、嘴的细节，需要时脸红、泪、汗、视线），不写外貌、衣服和动作",
+  "sprite.line.whole": "- {{id}}：服装 {{outfit}}；长期状态 {{states}}；情绪「{{emotion}}」[[；接近 {{near}}]]{{guide}}{{base}}{{era}}",
+  "sprite.look": "；这个人的表情：{{desc}}（脸 {{tags}}）",
+  "sprite.lookTags": "；这个人的表情：{{tags}}",
+  "sprite.faceAct": "；神情参考：{{act}}",
+  "sprite.guide.designed": "；这个人的动作「{{pose}}」：{{desc}}[[（身体 {{tags}}）]]",
+  "sprite.guide.group": "；动作组「{{pose}}」：{{desc}}[[（身体 {{tags}}）]]",
+  "sprite.guide.act": "；动作参考：{{act}}",
+  "sprite.base.designed": "；这张是「{{pose}}」动作的底图[[：同一个动作的{{members}}会在这张上只换脸，动作就定成这一个姿势，这些情绪都要能在这个姿势上成立]]",
+  "sprite.base.group": "；这张是「{{pose}}」动作组的底图[[：同组的{{members}}会在这张上只换脸，动作就定成这一个姿势，这些情绪都要能在这个姿势上成立]]",
+  "sprite.era.earlier": "；这一套是这个人这一轮早些时候、样子变化之前的样子，只画这里写的服装和状态，不要画剧情里后来才换的衣服、才戴上的饰物、才受的伤",
+  "sprite.era.then": "；这一套是「{{mode}}」里当时的样子，只画这里写的服装和状态，不要画现在才有的伤病、饰物和神色",
+  "sprite.blanks": mapText([["noOutfit", "（档案没写，按固定外貌和剧情推断）"], ["poseDesc", "照身体 tag"], ["none", "无"]]),
+  "sprite.design": [
+    "【先补设计】",
+    "下面「先设计再写」的几种情绪还没放进这个人的动作与表情设计里（或者要重新设计表情）。这一次先做表演设计师的活、再做立绘设计师的活，两份一起输出。表演设计师的规矩：",
+    "{{rules}}",
+    "{{current}}",
+    "【要先设计的情绪】",
+    "{{emotions}}",
+    "",
+    "{{task}}"
+  ].join("\n"),
+  "sprite.combo": '这一次输出一个 JSON 对象：{"acting":{表演设计师要输出的那个对象，只写这次要设计的情绪相关的部分},"sprites":[{"key":"差分编号","tags":"英文 tag"}]}。sprites 照立绘设计师的规矩写，【要画的差分】里每个编号一条，「先设计再写」的那几条也要写。',
+  "sprite.line.design": "- {{id}}：先设计再写——情绪「{{emotion}}」[[；接近 {{near}}]]：先在 acting 里给它设计好（放进哪个动作、脸上什么样、强弱 level），再写这张：放进已有动作、level 1～3 的会在那个动作的底图上只换脸，tags 只写脸上的表情；新开一个动作（它就是新动作的底图）或者 level 标 4 的整张画，tags 照整张画写全；服装 {{outfit}}；长期状态 {{states}}{{era}}",
+  // 插画分镜师
+  "cg.person": [
+    "- {{name}}[[（{{gender}}）]]",
+    "  固定外貌：{{appearance}}",
+    "  此刻穿着：{{outfit}}[[",
+    "  衣橱里还有：{{others}}]]",
+    "  长期状态：{{states}}[[",
+    "  临时状态：{{temp}}]][[",
+    "  备注（玩家写的）：{{note}}]]"
+  ].join("\n"),
+  "cg.noCast": "（还没有建档的人物，入画的人按正文和设定补全外貌）",
+  "cg.references": "【已经画过的插画（时代锚和衣服指纹沿用这些写法）】\n{{list}}",
+  "cg.line": "- {{id}}：插在 {{after}}[[（「{{quote}}」）]]之后[[；标题「{{title}}」]]；画什么：{{moment}}[[；入画：{{who}}]][[；露骨（{{nsfw}}）：照第七节如实画]][[；画幅已经定了：{{shape}}（size 写 {{size}}，按这个方向构图）]]",
+  "cg.era.earlier": "这一张在下面这些人样子变化之前（这一轮后面才换的衣服、才戴上的饰物、才受的伤都不画），他们这时的样子以这里为准：",
+  "cg.era.then": "这一张在「{{mode}}」里，下面这些人是当时的样子（以这里为准，不照上面档案里现在的；现在才有的伤病、饰物、神色都不画）：",
+  "cg.era.person": "- {{name}}：固定外貌 {{appearance}}；穿着 {{outfit}}；长期状态 {{states}}",
+  "cg.current": "现在的提示词：",
+  "cg.instruction": "玩家的修改意见：{{text}}（按意见改，意见没提到的部分保持原样）",
+  "cg.blanks": mapText([["female", "女"], ["male", "男"], ["other", "其他"], ["noLook", "（未建档，按设定补全）"], ["noTags", "（没写 tag，按名字和剧情补全指纹）"], ["noOutfit", "（档案没写，按剧情和设定补全）"], ["none", "无"], ["anyMoment", "从这一轮里挑最值得画的一个瞬间"], ["end", "最后"], ["eraLook", "（照档案）"], ["eraOutfit", "（按剧情补全）"], ["portrait", "竖图"], ["landscape", "横图"]])
+};
+var SPRITE_FRAME = "cowboy shot, centered, standing, facing forward, eye-level, no props, solo, facing viewer, looking at viewer, straight-on";
+var SPRITE_CHAR_FRAME = "cowboy shot, standing, facing forward, eye-level, facing viewer, straight-on";
+var BG_SUFFIX = "scenery, no humans, wide shot, detailed background, visual novel background";
+var TIME_TAGS = [
+  ["dawn", "dawn, early morning, soft light"],
+  ["morning", "morning, daylight"],
+  ["noon", "noon, bright sunlight"],
+  ["afternoon", "afternoon, warm light"],
+  ["dusk", "sunset, dusk, orange sky"],
+  ["evening", "evening, twilight, purple sky"],
+  ["night", "night, moonlight, dark"],
+  ["midnight", "midnight, night sky, stars, dark"]
+];
+var WEATHER_TAGS = [
+  ["rain", "rain, wet ground, overcast"],
+  ["storm", "storm, heavy rain, lightning, dark clouds"],
+  ["snow", "snow, snowing, winter"],
+  ["sakura", "cherry blossoms, falling petals, spring"],
+  ["leaves", "autumn leaves, falling leaves"],
+  ["fog", "fog, mist"],
+  ["fireflies", "fireflies, night"],
+  ["stars", "starry sky"],
+  ["blizzard", "blizzard, heavy snow, snowstorm"],
+  ["wind", "strong wind, windy"]
+];
+var lines = (...words) => words.join("\n");
+var SPRITE_DROP = lines("solo", "#girl", "#girls", "#boy", "#boys", "#other", "#others", "upper body", "cowboy shot", "full body", "portrait", "close-up", "standing", "centered", "facing viewer", "facing forward", "straight-on", "eye-level", "no props", "*background");
+var POSE_DROP = lines("solo", "#girl", "#girls", "#boy", "#boys", "#other", "#others", "upper body", "cowboy shot", "full body", "portrait", "close-up", "standing", "centered", "facing viewer", "facing forward", "straight-on", "eye-level", "no props", "from side", "profile", "side view", "*background");
+var CLOSE_UP_DROP = lines("cowboy shot", "upper body", "full body", "standing", "centered", "no props");
+var COLORS = lines("blonde", "blond", "black", "brown", "red", "blue", "green", "pink", "purple", "violet", "white", "silver", "grey", "gray", "orange", "aqua", "yellow", "golden", "gold", "platinum");
+var LOOK_WORDS = lines("long", "short", "medium", "very long", "heterochromia");
+var HARSH = lines("empty eyes", "dull eyes", "glazed eyes", "dead eyes", "hollow eyes", "lifeless eyes", "constricted pupils", "shrinking pupils", "pinpoint pupils", "shaded face", "crazy eyes", "crazy smile", "clenched teeth", "gritted teeth", "bloodshot eyes");
+var SOFTER = lines(
+  "streaming tears → tears",
+  "full-face blush → blush",
+  "heavy blush → blush",
+  "glaring → narrowed eyes",
+  "glare → narrowed eyes",
+  "sweat → sweatdrop",
+  "sweating → sweatdrop",
+  "flying sweatdrops → sweatdrop",
+  "dark circles → 0.6::dark circles::",
+  "bags under eyes → 0.6::bags under eyes::"
+);
+var OTHER_GAZE = lines("looking away", "looking to the side", "looking down", "looking up", "looking back", "looking afar", "sideways glance", "closed eyes", "eyes closed");
+var FACE_EXACT = lines(
+  "happy",
+  "sad",
+  "angry",
+  "annoyed",
+  "surprised",
+  "shocked",
+  "scared",
+  "afraid",
+  "frightened",
+  "shy",
+  "embarrassed",
+  "flustered",
+  "nervous",
+  "worried",
+  "anxious",
+  "serious",
+  "smug",
+  "confused",
+  "thinking",
+  "determined",
+  "tired",
+  "sleepy",
+  "excited",
+  "calm",
+  "gentle",
+  "neutral",
+  "cold",
+  "love",
+  "lovestruck",
+  "jealous",
+  "disgusted",
+  "bored",
+  "pensive",
+  "sorrow",
+  "relieved",
+  "proud",
+  "crying",
+  "laughing",
+  "expressionless",
+  "naughty face",
+  "trembling",
+  "panicking",
+  "teasing",
+  "doyagao",
+  "jitome",
+  "yandere",
+  "sulking",
+  "sulky",
+  "despair",
+  "melancholy",
+  "wistful",
+  "lonely",
+  "resigned",
+  "troubled",
+  "pained",
+  "guilty",
+  "dejected",
+  "frustrated",
+  "irritated",
+  "exasperated",
+  "disappointed",
+  "bashful",
+  "sheepish",
+  "mischievous",
+  "seductive",
+  "sly",
+  "dazed",
+  "stunned",
+  "horrified",
+  "terrified",
+  "panicked",
+  "ecstatic",
+  "content",
+  "serene",
+  "longing",
+  "nostalgic",
+  "contempt",
+  "disdain",
+  "flushed",
+  "tsundere face",
+  "looking at viewer",
+  "looking at another",
+  "looking away",
+  "looking down",
+  "looking up",
+  "looking to the side",
+  "looking back",
+  "looking afar",
+  "sideways glance"
+);
+var FACE_WORDS = lines(
+  "smile",
+  "smiling",
+  "smirk",
+  "smirking",
+  "grin",
+  "grinning",
+  "frown",
+  "frowning",
+  "pout",
+  "pouting",
+  "blush",
+  "blushing",
+  "tear",
+  "tears",
+  "teary",
+  "tearing up",
+  "teardrop",
+  "teardrops",
+  "crying",
+  "sobbing",
+  "laugh",
+  "laughing",
+  "giggle",
+  "giggling",
+  "scowl",
+  "scowling",
+  "sneer",
+  "sneering",
+  "wince",
+  "wincing",
+  "sigh",
+  "sighing",
+  "gasp",
+  "gasping",
+  "squint",
+  "squinting",
+  "yawn",
+  "yawning",
+  "teeth",
+  "lip",
+  "lips",
+  "mouth",
+  "tongue",
+  "fang",
+  "fangs",
+  "cheek",
+  "cheeks",
+  "eyebrow",
+  "eyebrows",
+  "brow",
+  "brows",
+  "glare",
+  "glaring",
+  "wink",
+  "winking",
+  "stare",
+  "staring",
+  "gaze",
+  "glance",
+  "pupils",
+  "sweat",
+  "sweatdrop",
+  "sweating",
+  "expression",
+  "expressionless",
+  "wide-eyed",
+  "bags under eyes",
+  "eye contact"
+);
+var FACE_EYE_BEFORE = lines("closed", "half-closed", "narrowed", "downcast", "squinting", "sparkling", "empty", "half-lidded", "watery", "teary", "rolling", "averted", "averting", "crazy", "shaded", "cold", "gentle", "sleepy", "tired", "wide", "dull", "glazed", "shining", "soft", "lowered");
+var FACE_EYE_AFTER = lines("closed", "open", "widened", "narrowed", "shut", "lowered");
+var FACE_NOT = lines("hair", "hand", "hands", "finger", "fingers", "arm", "arms", "holding", "covering", "eye-level", "eyewear", "eyepatch", "eyeshadow", "eyeliner", "mascara", "lipstick", "eyelashes", "facing", "mask", "paint", "mark", "whisker", "whiskers");
+var TEXT_DEFAULTS = Object.freeze({
+  ...FRAGMENTS,
+  "image.spriteFrame": SPRITE_FRAME,
+  "image.spriteCharFrame": SPRITE_CHAR_FRAME,
+  "image.spriteBg": "simple background, white background",
+  "image.spriteBgClear": "transparent background",
+  "image.bgSuffix": BG_SUFFIX,
+  "image.time": TIME_TAGS.map(([k, v]) => `${k}：${v}`).join("\n"),
+  "image.weather": WEATHER_TAGS.map(([k, v]) => `${k}：${v}`).join("\n"),
+  "image.closeUp": "portrait",
+  "image.openai.bg": "A visual novel background illustration with no people.",
+  "image.openai.cg": "A visual novel event CG illustration.",
+  "image.openai.sprite": "A visual novel character sprite: a single character from the thighs up, standing upright and facing the viewer, centered, eye level, no props, on a plain white background.",
+  "image.openai.style": "Style: anime, clean lineart, soft lighting.",
+  "filter.spriteDrop": SPRITE_DROP,
+  "filter.poseDrop": POSE_DROP,
+  "filter.closeUpDrop": CLOSE_UP_DROP,
+  "filter.colors": COLORS,
+  "filter.lookWords": LOOK_WORDS,
+  "filter.harsh": HARSH,
+  "filter.softer": SOFTER,
+  "filter.otherGaze": OTHER_GAZE,
+  "filter.face.exact": FACE_EXACT,
+  "filter.face.words": FACE_WORDS,
+  "filter.face.eyeBefore": FACE_EYE_BEFORE,
+  "filter.face.eyeAfter": FACE_EYE_AFTER,
+  "filter.face.not": FACE_NOT
+});
+function promptOf(config, id, fallback = TEXT_DEFAULTS[id] ?? "") {
+  const own = config?.prompts?.[id];
+  return own && typeof own.text === "string" ? own.text : fallback;
+}
+var LEGACY_PROMPTS = Object.freeze({ systemPrompt: "director.system", spritePrompt: "sprite.system", actingPrompt: "acting.system", cgPrompt: "cg.system" });
+var listOf = (text) => String(text || "").split(/[\n,，]+/).map((s) => s.trim()).filter(Boolean);
+var pairsOf = (text) => String(text || "").split("\n").map((line) => line.split(/\s*(?:→|->|=>)\s*/)).filter((p4) => p4.length === 2 && p4[0].trim()).map(([a, b]) => [a.trim(), b.trim()]);
+var escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+var wordsKey = (text) => String(text || "").toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+function wholeTags(list3) {
+  const parts = listOf(list3).map((t) => escapeRe(t.toLowerCase()).replace(/\\\*/g, ".*").replace(/#/g, "\\d*"));
+  return parts.length ? new RegExp(`^(?:${parts.join("|")})$`) : /(?!)/;
+}
+function anyWords(list3) {
+  const parts = listOf(list3).map((t) => escapeRe(wordsKey(t)).replace(/ /g, "\\s+"));
+  return parts.length ? new RegExp(`(?:^|[^a-z0-9])(?:${parts.join("|")})(?![a-z0-9])`) : /(?!)/;
+}
+function compile(config) {
+  const get = (id) => promptOf(config, id);
+  const colors = listOf(get("filter.colors")).map((c) => escapeRe(c.toLowerCase())).join("|") || "(?!)";
+  const looks = [...listOf(get("filter.lookWords")), ...listOf(get("filter.colors"))].map((c) => escapeRe(c.toLowerCase())).join("|") || "(?!)";
+  const eyeBefore = listOf(get("filter.face.eyeBefore")).map((w) => escapeRe(wordsKey(w)).replace(/ /g, "\\s+")).join("|");
+  const eyeAfter = listOf(get("filter.face.eyeAfter")).map((w) => escapeRe(wordsKey(w)).replace(/ /g, "\\s+")).join("|");
+  return {
+    spriteDrop: wholeTags(get("filter.spriteDrop")),
+    poseDrop: wholeTags(get("filter.poseDrop")),
+    closeUpDrop: wholeTags(get("filter.closeUpDrop")),
+    closeUp: get("image.closeUp").trim(),
+    // 发色、瞳色：颜色词前后可以夹别的词（long curly light brown hair、lake blue eyes）
+    colorFeature: new RegExp(`^(?:[\\w-]+\\s+)*?(?:${colors})(?:\\s+[\\w-]+)*?\\s+(hair|eyes)$`),
+    lookWord: new RegExp(`\\b(?:${looks})\\b.*\\b(?:hair|eyes)$`),
+    harsh: new Set(listOf(get("filter.harsh")).map((t) => t.toLowerCase().replace(/\s+/g, " "))),
+    softer: new Map(pairsOf(get("filter.softer")).map(([a, b]) => [a.toLowerCase().replace(/\s+/g, " "), b])),
+    otherGaze: new Set(listOf(get("filter.otherGaze")).map(wordsKey)),
+    face: {
+      exact: new Set(listOf(get("filter.face.exact")).map(wordsKey)),
+      words: anyWords(get("filter.face.words")),
+      eyes: new RegExp([eyeBefore && `(?:^|[^a-z0-9])(?:${eyeBefore})\\s+eyes?(?![a-z0-9])`, eyeAfter && `(?:^|[^a-z0-9])eyes?\\s+(?:${eyeAfter})(?![a-z0-9])`].filter(Boolean).join("|") || "(?!)"),
+      not: anyWords(get("filter.face.not"))
+    }
+  };
+}
+var RULE_IDS = Object.keys(TEXT_DEFAULTS).filter((id) => id.startsWith("filter.") || id === "image.closeUp");
+var rules = compile(null);
+var wordRules = () => rules;
+
+// lib/emotions.js
+var LABEL_TO_KEY = new Map(Object.entries(EMOTIONS).map(([k, v]) => [v, k]));
+var MAX_EMOTION_CHARS = 16;
+var CATEGORY_CHARS = 8;
+var DEFAULT_CATEGORIES = Object.freeze([
+  { id: "calm", label: "平静", rep: "neutral" },
+  { id: "joy", label: "喜", rep: "smile" },
+  { id: "anger", label: "怒", rep: "angry" },
+  { id: "sorrow", label: "哀", rep: "sad" },
+  { id: "fear", label: "惧", rep: "scared" },
+  { id: "surprise", label: "惊", rep: "surprised" },
+  { id: "shy", label: "羞", rep: "shy" },
+  { id: "love", label: "爱", rep: "love" },
+  { id: "think", label: "思", rep: "thinking" },
+  { id: "tired", label: "倦", rep: "tired" },
+  { id: "cold", label: "冷", rep: "cold" }
+].map((c) => Object.freeze(c)));
+var BUILTIN_CATEGORY = Object.freeze({
+  neutral: "calm",
+  smile: "joy",
+  happy: "joy",
+  laugh: "joy",
+  smug: "joy",
+  teasing: "joy",
+  angry: "anger",
+  pout: "anger",
+  sad: "sorrow",
+  cry: "sorrow",
+  scared: "fear",
+  worried: "fear",
+  surprised: "surprise",
+  confused: "surprise",
+  shy: "shy",
+  blush: "shy",
+  love: "love",
+  thinking: "think",
+  serious: "think",
+  determined: "think",
+  tired: "tired",
+  cold: "cold"
+});
+var EDITABLE = ["label", "category", "base", "tags", "face", "act", "react", "recall", "level"];
+var LEVELS = [1, 2, 3, 4];
+var stored = (entry, k) => k === "level" ? LEVELS.includes(entry?.[k]) : typeof entry?.[k] === "string";
+var clip = (v, n) => String(v ?? "").replace(/[\r\n\t]+/g, " ").trim().slice(0, n);
+function emotionId(value) {
+  const text = String(value ?? "").replace(/[|@"“”'‘’\r\n\t]/g, "").trim().slice(0, MAX_EMOTION_CHARS);
+  if (!text) return "";
+  const lower = text.toLowerCase();
+  if (EMOTIONS[lower]) return lower;
+  return LABEL_TO_KEY.get(text) || text;
+}
+var isBuiltinEmotion = (id) => Object.prototype.hasOwnProperty.call(EMOTIONS, id);
+function cleanCategories(raw) {
+  if (!Array.isArray(raw)) return DEFAULT_CATEGORIES.map((c) => ({ ...c }));
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const c of raw) {
+    const id = clip(c?.id, 24);
+    const label = clip(c?.label, CATEGORY_CHARS);
+    if (!id || !label || seen.has(id) || id === "__proto__") continue;
+    seen.add(id);
+    out.push({ id, label, rep: clip(c?.rep, MAX_EMOTION_CHARS) });
+  }
+  return out;
+}
+function libOf(custom) {
+  if (Array.isArray(custom)) return { list: custom, categories: DEFAULT_CATEGORIES };
+  return { list: Array.isArray(custom?.list) ? custom.list : [], categories: cleanCategories(custom?.categories) };
+}
+var listOf2 = (custom) => Array.isArray(custom) ? custom : Array.isArray(custom?.list) ? custom.list : [];
+function resolveEmotion(value, custom = []) {
+  let id = emotionId(value);
+  if (!id) return "";
+  const list3 = listOf2(custom);
+  if (!isBuiltinEmotion(id)) {
+    const renamed = list3.find((e) => e?.builtin && isBuiltinEmotion(e.id) && e.label === id && !e.deleted);
+    if (renamed) id = renamed.id;
+  }
+  for (let hop = 0; hop < 8; hop++) {
+    const into = list3.find((e) => e?.id === id)?.mergedInto;
+    if (!into || into === id) break;
+    id = emotionId(into);
+  }
+  return id;
+}
+function builtinDefaults(id) {
+  return {
+    label: EMOTIONS[id],
+    category: BUILTIN_CATEGORY[id] || "",
+    base: "",
+    tags: EMOTION_TAGS[id] || "",
+    face: EMOTION_FACE[id]?.add || "",
+    act: EMOTION_ACTS[id] || "",
+    react: EMOTION_REACT[id] || "nod",
+    recall: EMOTION_RECALL[id] || "none",
+    level: EMOTION_LEVEL[id] || 2
+  };
+}
+function emotionEntry(value, custom = []) {
+  const list3 = listOf2(custom);
+  const id = resolveEmotion(value, list3);
+  const own = list3.find((e) => e?.id === id) || null;
+  if (isBuiltinEmotion(id)) {
+    const defaults = builtinDefaults(id);
+    const edits = {};
+    for (const k of EDITABLE) if (own && stored(own, k)) edits[k] = own[k];
+    return { ...defaults, ...edits, id, builtin: true, off: Boolean(own?.off) && id !== "neutral", deleted: Boolean(own?.deleted) && id !== "neutral", edited: Object.keys(edits).length > 0, defaults };
+  }
+  if (!own) return { id, label: id, builtin: false, category: "", base: "", tags: "", face: "", act: "", react: "", recall: "", level: 0, off: false, deleted: false, edited: false };
+  const { desc, mergedInto, ...rest } = own;
+  const category = typeof own.category === "string" ? own.category : BUILTIN_CATEGORY[own.base] || "";
+  const level2 = LEVELS.includes(own.level) ? own.level : 0;
+  return {
+    ...rest,
+    id,
+    label: id,
+    builtin: false,
+    category,
+    base: own.base || "",
+    tags: own.tags || "",
+    face: own.face || "",
+    act: own.act || "",
+    react: own.react || "",
+    recall: own.recall || "",
+    level: level2,
+    off: Boolean(own.off),
+    deleted: false,
+    edited: Boolean(own.tags || own.face || own.act || own.react || own.recall || level2)
+  };
+}
+var emotionLabel = (id, custom = []) => emotionEntry(id, custom).label || String(id || "");
+function mergedFrom(value, custom = []) {
+  const list3 = listOf2(custom);
+  const id = resolveEmotion(value, list3);
+  return list3.filter((e) => e?.mergedInto && e.id !== id && resolveEmotion(e.id, list3) === id).map((e) => e.id);
+}
+function nearestOf(value, custom = []) {
+  const lib = libOf(custom);
+  const e = emotionEntry(value, lib);
+  const base = e.base ? resolveEmotion(e.base, lib.list) : "";
+  if (base && base !== e.id) return base;
+  const rep = resolveEmotion(lib.categories.find((c) => c.id === e.category)?.rep, lib.list);
+  return rep && rep !== e.id ? rep : "";
+}
+function standIns(value, custom = []) {
+  const lib = libOf(custom);
+  const id = resolveEmotion(value, lib.list);
+  const out = [];
+  const push = (e) => {
+    if (e && e !== id && !out.includes(e)) out.push(e);
+  };
+  for (const e of mergedFrom(id, lib)) push(e);
+  let at2 = id;
+  for (let hop = 0; hop < 8; hop++) {
+    const base = resolveEmotion(emotionEntry(at2, lib).base, lib.list);
+    if (!base || base === id || out.includes(base)) break;
+    push(base);
+    at2 = base;
+  }
+  push(resolveEmotion(lib.categories.find((c) => c.id === emotionEntry(id, lib).category)?.rep, lib.list));
+  push("neutral");
+  return out;
+}
+function inherit(value, field, custom, { neutral = true } = {}) {
+  const lib = libOf(custom);
+  const own = emotionEntry(value, lib);
+  if (own[field]) return own[field];
+  for (const e of standIns(own.id, lib)) {
+    if (e === "neutral" && !neutral) break;
+    const v = emotionEntry(e, lib)[field];
+    if (v) return v;
+  }
+  return "";
+}
+var emotionTags = (value, custom = [], { neutral = true } = {}) => inherit(value, "tags", custom, { neutral }) || (neutral ? EMOTION_TAGS.neutral : "");
+var emotionFace = (value, custom = []) => inherit(value, "face", custom) || EMOTION_FACE.neutral.add;
+var emotionAct = (value, custom = []) => inherit(value, "act", custom, { neutral: false });
+var emotionLevel = (value, custom = []) => inherit(value, "level", custom, { neutral: false }) || 2;
+var emotionReact = (value, custom = []) => inherit(value, "react", custom) || "nod";
+function emotionRecall(value, custom = []) {
+  const tone = inherit(value, "recall", custom);
+  return tone === "none" ? "" : tone;
+}
+function allEmotions(custom = [], { withDeleted = false } = {}) {
+  const list3 = listOf2(custom);
+  return [
+    ...Object.keys(EMOTIONS).filter((id) => !list3.find((e) => e?.id === id)?.mergedInto).map((id) => emotionEntry(id, list3)).filter((e) => withDeleted || !e.deleted),
+    ...list3.filter((e) => e && e.id && !isBuiltinEmotion(e.id) && !e.mergedInto).map((e) => emotionEntry(e.id, list3))
+  ];
+}
+function groupEmotions(entries, custom = []) {
+  const { categories } = libOf(custom);
+  const known = new Set(categories.map((c) => c.id));
+  const groups = categories.map((c) => ({ category: c, list: entries.filter((e) => e.category === c.id) }));
+  const loose = entries.filter((e) => !known.has(e.category));
+  return [...groups, { category: null, list: loose }];
+}
+function personEmotions(name2, custom = [], { used = [], drawn = [] } = {}) {
+  const list3 = listOf2(custom);
+  const usedSet = new Set(used.map((e) => resolveEmotion(e, list3)));
+  const drawnSet = new Set(drawn.map((e) => resolveEmotion(e, list3)));
+  return allEmotions(custom).filter((e) => e.builtin && !e.off || !e.off && e.source === "user" && !e.who?.length || e.who?.includes(name2) || usedSet.has(e.id) || drawnSet.has(e.id));
+}
+
 // lib/scenes.js
 var SCENE_DEFAULTS = { location: "", time: "afternoon", weather: "clear", mood: "daily", light: "normal", fx: "none", romance: "none", sense: "none", bars: "none", eros: "none", tentacle: "none", bg: "" };
 var MODE_TRANSITION = { memory: "haze", dream: "swirl", illusion: "glitch", imagine: "iris", pov: "blink", inner: "black", screen: "glitch", tale: "dissolve", vision: "flash", digital: "glitch" };
@@ -2690,11 +3344,10 @@ function recallRuns(script, units) {
   }
   return out;
 }
-var TONE_BY_EMOTION = [["dread", ["scared", "angry"]], ["sad", ["sad", "cry", "tired", "worried"]], ["sweet", ["love", "blush", "shy", "teasing"]]];
 var TONE_BY_MOOD = { tense: "dread", eerie: "dread", mystery: "dread", battle: "dread", sad: "sad", despair: "sad", solemn: "sad", sweet: "sweet" };
-function autoRecallTone(emos, mood) {
-  for (const [tone, list3] of TONE_BY_EMOTION) if ((emos || []).some((e) => list3.includes(e))) return tone;
-  return TONE_BY_MOOD[mood] || "warm";
+function autoRecallTone(emos, mood, custom = []) {
+  const tones = new Set((emos || []).filter(Boolean).map((e) => emotionRecall(e, custom)));
+  return RECALL_PRIORITY.find((t) => tones.has(t)) || TONE_BY_MOOD[mood] || "warm";
 }
 
 // lib/look.js
@@ -3183,596 +3836,6 @@ function faceCrop(box, size) {
   return { width: pct2(w), left: pct2(-((x0 + x1) / 2 - side / 2)), top: pct2(-((y0 + y1) / 2 - side * 0.52)) };
 }
 
-// lib/limits.js
-var DIRECTOR_LIMITS = [
-  { key: "cams", label: "镜头", unit: "次", was: 14, phrase: (n) => `一轮最多 ${n} 次，` },
-  { key: "hits", label: "打斗出手", unit: "次", was: 12, phrase: (n) => `一轮最多 ${n} 次，` },
-  { key: "moments", label: "小瞬间", unit: "个", was: 4, phrase: (n) => `一轮最多 ${n} 个，` },
-  { key: "phone", label: "手机", unit: "个", was: 8, phrase: (n) => `一轮最多 ${n} 个。` },
-  { key: "stress", label: "重音", unit: "处", was: 3, phrase: (n) => `一轮最多 ${n} 处，` },
-  { key: "pauses", label: "停顿", unit: "处", was: 6, phrase: (n) => `一轮最多 ${n} 处，` },
-  { key: "hush", label: "配乐留白", unit: "次", was: 2, phrase: (n) => `一轮最多 ${n} 次，` },
-  { key: "textFx", label: "文字效果", unit: "处", was: 16, phrase: (n) => `一轮最多 ${n} 处，` },
-  { key: "textFxPerLine", label: "一句里的文字效果", unit: "处", was: 2, phrase: (n) => `一句最多 ${n} 处，` },
-  { key: "sfx", label: "剧情音效", unit: "个", was: 6, phrase: (n) => `一轮最多 ${n} 个，` },
-  { key: "erosSfx", label: "R18 音效", unit: "个", was: 14, phrase: (n) => `，一轮最多 ${n} 个` },
-  { key: "peaks", label: "高潮", unit: "次", was: 6, phrase: (n) => `；一轮最多 ${n} 次` },
-  { key: "newEmotions", label: "新造情绪", unit: "个", was: 6, phrase: (n) => `一轮最多新造 ${n} 个；` }
-];
-var DEFAULT_DIRECTOR_LIMITS = Object.freeze(Object.fromEntries(DIRECTOR_LIMITS.map((l) => [l.key, null])));
-
-// lib/prompt-words.js
-var STYLE_HINTS = Object.freeze({
-  novelai: "目标模型是 NovelAI，使用 Danbooru 风格 tag。",
-  comfyui: "目标模型是本地 Stable Diffusion / Anima / Illustrious 类模型，使用 Danbooru 风格 tag。",
-  webui: "目标模型是本地 Stable Diffusion，使用 Danbooru 风格 tag。",
-  openai: "目标是通用图像模型：插件会把英文描述和 tag 合并成一段话发出去，tag 仍用简洁的英文。"
-});
-var mapText = (entries) => entries.map(([k, v]) => `${k}：${v}`).join("\n");
-var FRAGMENTS = {
-  // 共用
-  "shared.system": "你在视觉小说插件 FlowGal 的后台工作。下面先给你资料、剧情和档案，再在【你的工作】里写明你这次是谁、要做什么、照什么规矩写；照它做，只输出它要求的 JSON。",
-  "shared.role": "【你的工作】\n{{rules}}",
-  "shared.styleHint": mapText(Object.entries(STYLE_HINTS)),
-  "shared.context": "【资料（仅供判断人物与外貌，勿复述）】\n{{text}}",
-  "shared.story.turn": "〔第 {{turn}} 轮〕\n{{text}}",
-  "shared.story.dropped": "（更早的 {{n}} 轮因模型窗口装不下略去）",
-  "shared.story.empty": "（还没有剧情）",
-  "shared.retry": "上一次输出无法使用（{{error}}）。只输出一个合法 JSON 对象。",
-  "shared.missing": "（上一次漏写了这几条，只补写它们。）",
-  "shared.person": [
-    "名字：{{name}}[[（{{gender}}）]]",
-    "固定外貌：{{appearance}}[[",
-    "衣橱：",
-    "{{wardrobe}}]][[",
-    "此刻穿着：{{outfit}}]]",
-    "长期状态：{{states}}[[",
-    "临时状态（只影响插画，立绘不要画）：{{temp}}]][[",
-    "表演笔记（玩家写的，必须遵守）：{{userNote}}]][[",
-    "表演笔记（表演设计师读完资料写的）：{{aiNote}}]][[",
-    "立绘备注（玩家写的，必须遵守）：{{note}}]][[",
-    "不要出现：{{negative}}]]"
-  ].join("\n"),
-  "shared.person.outfit": "- {{name}}：{{tags}}",
-  "shared.person.state": "{{name}}（{{tags}}）",
-  "shared.person.blanks": mapText([["female", "女"], ["male", "男"], ["other", "其他"], ["noLook", "（未建档）"], ["noTags", "（没写 tag，按名字和剧情推断）"], ["noStateTags", "按名字推断"], ["none", "无"]]),
-  // 导演
-  "director.noImages": "本次不需要插画：images 给空数组。",
-  "director.retry": "上一次输出无法解析（{{error}}）。只输出一个合法 JSON 对象，该写的字段（join、dual、lines……）照常写全，不要因为重来就省掉。",
-  "director.imageLimit": "最多 {{n}} 张（有露骨的性场面时照上面标 nsfw 那一条，可以到 {{nsfwMax}} 张）。",
-  "director.imageFree": "张数不设上限：值得定格的瞬间都画，多张时彼此要明显不同；没有值得画的就不画。",
-  "director.nsfwRoom": "这时这一轮一共可以到 {{nsfwMax}} 张，名额不够时先让给露骨的这几张。",
-  "director.limits": mapText(DIRECTOR_LIMITS.map((l) => [l.key, l.phrase("{{n}}")])),
-  "director.previous": "地点：{{location}}；时段：{{time}}；天气：{{weather}}；基调：{{mood}}[[；光线：{{light}}]][[；画面效果：{{fx}}]][[；亲密氛围：{{romance}}]][[；感官：{{sense}}（不会带到这一轮，还在这样就再写一次）]][[；电影黑边：{{bars}}]][[；亲密场面的节奏：{{eros}}（不会带到这一轮，还在继续就再写一次）]][[；触手：{{tentacle}}（不会带到这一轮，还在就再写一次）]]；结束时在场：{{who}}[[；结束时还在特殊段落 {{layer}} 里（{{layerPlace}}）：这一轮接着演就在第一句写同样的 mode，不写就回到现实]][[；结束时还在跟{{caller}}通话：这一轮还在通话就不用再写 call，挂断那一句写 phone end]][[；剧情：{{summary}}]]",
-  "director.previous.first": "（这是第一幕）",
-  "director.cast": "- {{name}}[[（{{global}}，固定外貌冻结）]]：固定外貌：{{appearance}}[[；衣橱：{{wardrobe}}]][[；正在穿：{{outfit}}]][[；长期状态：{{states}}]][[；临时：{{temp}}]][[；动作：{{poses}}]]",
-  "director.cast.none": "（暂无）",
-  "director.emotions": "写左边的编号：内置情绪是英文键，新加的就是原词本身。\n{{list}}",
-  "director.raw": "【本轮原文（模型写的原样，含标签。下面的单元就是从它切出来的；用它看清每句话在原文的什么位置，被状态栏、面板、变量这类标签包着的单元写进 skip）】\n{{raw}}",
-  "director.music.now": "上一幕结束时在放：{{id}}（{{name}}）。",
-  "director.music.silent": "上一幕结束时没有放音乐。",
-  "director.sounds.now": "上一幕结束时的环境音：{{id}}（{{name}}）。",
-  "director.sounds.silent": "上一幕结束时没有环境音。",
-  "director.sounds.none": "（没有合适的）",
-  // 听音师
-  "listen.first": "这是第一幕，没有上一幕。",
-  "listen.noCats": "（库里还没分类）",
-  // 表演设计师
-  "acting.noEmotions": "（这次不设计表情）",
-  "acting.line.builtin": "- {{key}}（{{label}}）",
-  "acting.line.custom": "- {{key}}（新情绪[[，接近 {{near}}]]）",
-  "acting.line.placed": "{{line}}：已在动作 {{poses}}里，只重新设计表情",
-  "acting.current": "【已有的动作与表情设计】\n[[表演笔记：{{read}}\n]]动作：\n{{poses}}[[\n表情：\n{{faces}}]]",
-  "acting.current.pose": "- {{id}}「{{label}}」：{{desc}}[[；身体 {{tags}}]]；情绪：{{emotions}}",
-  "acting.current.face": "- {{label}}[[［{{level}}］]]：{{desc}}[[（{{tags}}）]]",
-  "acting.blanks": mapText([["noDesc", "（没写描述）"], ["base", "（底图）"]]),
-  // 立绘设计师
-  "sprite.references": "【已经画好的立绘（固定外貌的写法要和它们一致）】\n{{list}}",
-  "sprite.line.face": "- {{id}}：只换脸——在「{{anchor}}」那张「{{pose}}」动作底图上只重画脸，身体、衣服不动；情绪「{{emotion}}」[[；接近 {{near}}]]{{look}}；tags 只写这张脸的表情（情绪词 + 眉、眼、嘴的细节，需要时脸红、泪、汗、视线），不写外貌、衣服和动作",
-  "sprite.line.whole": "- {{id}}：服装 {{outfit}}；长期状态 {{states}}；情绪「{{emotion}}」[[；接近 {{near}}]]{{guide}}{{base}}{{era}}",
-  "sprite.look": "；这个人的表情：{{desc}}（脸 {{tags}}）",
-  "sprite.lookTags": "；这个人的表情：{{tags}}",
-  "sprite.faceAct": "；神情参考：{{act}}",
-  "sprite.guide.designed": "；这个人的动作「{{pose}}」：{{desc}}[[（身体 {{tags}}）]]",
-  "sprite.guide.group": "；动作组「{{pose}}」：{{desc}}[[（身体 {{tags}}）]]",
-  "sprite.guide.act": "；动作参考：{{act}}",
-  "sprite.base.designed": "；这张是「{{pose}}」动作的底图[[：同一个动作的{{members}}会在这张上只换脸，动作就定成这一个姿势，这些情绪都要能在这个姿势上成立]]",
-  "sprite.base.group": "；这张是「{{pose}}」动作组的底图[[：同组的{{members}}会在这张上只换脸，动作就定成这一个姿势，这些情绪都要能在这个姿势上成立]]",
-  "sprite.era.earlier": "；这一套是这个人这一轮早些时候、样子变化之前的样子，只画这里写的服装和状态，不要画剧情里后来才换的衣服、才戴上的饰物、才受的伤",
-  "sprite.era.then": "；这一套是「{{mode}}」里当时的样子，只画这里写的服装和状态，不要画现在才有的伤病、饰物和神色",
-  "sprite.blanks": mapText([["noOutfit", "（档案没写，按固定外貌和剧情推断）"], ["poseDesc", "照身体 tag"], ["none", "无"]]),
-  "sprite.design": [
-    "【先补设计】",
-    "下面「先设计再写」的几种情绪还没放进这个人的动作与表情设计里（或者要重新设计表情）。这一次先做表演设计师的活、再做立绘设计师的活，两份一起输出。表演设计师的规矩：",
-    "{{rules}}",
-    "{{current}}",
-    "【要先设计的情绪】",
-    "{{emotions}}",
-    "",
-    "{{task}}"
-  ].join("\n"),
-  "sprite.combo": '这一次输出一个 JSON 对象：{"acting":{表演设计师要输出的那个对象，只写这次要设计的情绪相关的部分},"sprites":[{"key":"差分编号","tags":"英文 tag"}]}。sprites 照立绘设计师的规矩写，【要画的差分】里每个编号一条，「先设计再写」的那几条也要写。',
-  "sprite.line.design": "- {{id}}：先设计再写——情绪「{{emotion}}」[[；接近 {{near}}]]：先在 acting 里给它设计好（放进哪个动作、脸上什么样、强弱 level），再写这张：放进已有动作、level 1～3 的会在那个动作的底图上只换脸，tags 只写脸上的表情；新开一个动作（它就是新动作的底图）或者 level 标 4 的整张画，tags 照整张画写全；服装 {{outfit}}；长期状态 {{states}}{{era}}",
-  // 插画分镜师
-  "cg.person": [
-    "- {{name}}[[（{{gender}}）]]",
-    "  固定外貌：{{appearance}}",
-    "  此刻穿着：{{outfit}}[[",
-    "  衣橱里还有：{{others}}]]",
-    "  长期状态：{{states}}[[",
-    "  临时状态：{{temp}}]][[",
-    "  备注（玩家写的）：{{note}}]]"
-  ].join("\n"),
-  "cg.noCast": "（还没有建档的人物，入画的人按正文和设定补全外貌）",
-  "cg.references": "【已经画过的插画（时代锚和衣服指纹沿用这些写法）】\n{{list}}",
-  "cg.line": "- {{id}}：插在 {{after}}[[（「{{quote}}」）]]之后[[；标题「{{title}}」]]；画什么：{{moment}}[[；入画：{{who}}]][[；露骨（{{nsfw}}）：照第七节如实画]][[；画幅已经定了：{{shape}}（size 写 {{size}}，按这个方向构图）]]",
-  "cg.era.earlier": "这一张在下面这些人样子变化之前（这一轮后面才换的衣服、才戴上的饰物、才受的伤都不画），他们这时的样子以这里为准：",
-  "cg.era.then": "这一张在「{{mode}}」里，下面这些人是当时的样子（以这里为准，不照上面档案里现在的；现在才有的伤病、饰物、神色都不画）：",
-  "cg.era.person": "- {{name}}：固定外貌 {{appearance}}；穿着 {{outfit}}；长期状态 {{states}}",
-  "cg.current": "现在的提示词：",
-  "cg.instruction": "玩家的修改意见：{{text}}（按意见改，意见没提到的部分保持原样）",
-  "cg.blanks": mapText([["female", "女"], ["male", "男"], ["other", "其他"], ["noLook", "（未建档，按设定补全）"], ["noTags", "（没写 tag，按名字和剧情补全指纹）"], ["noOutfit", "（档案没写，按剧情和设定补全）"], ["none", "无"], ["anyMoment", "从这一轮里挑最值得画的一个瞬间"], ["end", "最后"], ["eraLook", "（照档案）"], ["eraOutfit", "（按剧情补全）"], ["portrait", "竖图"], ["landscape", "横图"]])
-};
-var SPRITE_FRAME = "cowboy shot, centered, standing, facing forward, eye-level, no props, solo, facing viewer, looking at viewer, straight-on";
-var SPRITE_CHAR_FRAME = "cowboy shot, standing, facing forward, eye-level, facing viewer, straight-on";
-var BG_SUFFIX = "scenery, no humans, wide shot, detailed background, visual novel background";
-var TIME_TAGS = [
-  ["dawn", "dawn, early morning, soft light"],
-  ["morning", "morning, daylight"],
-  ["noon", "noon, bright sunlight"],
-  ["afternoon", "afternoon, warm light"],
-  ["dusk", "sunset, dusk, orange sky"],
-  ["evening", "evening, twilight, purple sky"],
-  ["night", "night, moonlight, dark"],
-  ["midnight", "midnight, night sky, stars, dark"]
-];
-var WEATHER_TAGS = [
-  ["rain", "rain, wet ground, overcast"],
-  ["storm", "storm, heavy rain, lightning, dark clouds"],
-  ["snow", "snow, snowing, winter"],
-  ["sakura", "cherry blossoms, falling petals, spring"],
-  ["leaves", "autumn leaves, falling leaves"],
-  ["fog", "fog, mist"],
-  ["fireflies", "fireflies, night"],
-  ["stars", "starry sky"],
-  ["blizzard", "blizzard, heavy snow, snowstorm"],
-  ["wind", "strong wind, windy"]
-];
-var lines = (...words) => words.join("\n");
-var SPRITE_DROP = lines("solo", "#girl", "#girls", "#boy", "#boys", "#other", "#others", "upper body", "cowboy shot", "full body", "portrait", "close-up", "standing", "centered", "facing viewer", "facing forward", "straight-on", "eye-level", "no props", "*background");
-var POSE_DROP = lines("solo", "#girl", "#girls", "#boy", "#boys", "#other", "#others", "upper body", "cowboy shot", "full body", "portrait", "close-up", "standing", "centered", "facing viewer", "facing forward", "straight-on", "eye-level", "no props", "from side", "profile", "side view", "*background");
-var CLOSE_UP_DROP = lines("cowboy shot", "upper body", "full body", "standing", "centered", "no props");
-var COLORS = lines("blonde", "blond", "black", "brown", "red", "blue", "green", "pink", "purple", "violet", "white", "silver", "grey", "gray", "orange", "aqua", "yellow", "golden", "gold", "platinum");
-var LOOK_WORDS = lines("long", "short", "medium", "very long", "heterochromia");
-var HARSH = lines("empty eyes", "dull eyes", "glazed eyes", "dead eyes", "hollow eyes", "lifeless eyes", "constricted pupils", "shrinking pupils", "pinpoint pupils", "shaded face", "crazy eyes", "crazy smile", "clenched teeth", "gritted teeth", "bloodshot eyes");
-var SOFTER = lines(
-  "streaming tears → tears",
-  "full-face blush → blush",
-  "heavy blush → blush",
-  "glaring → narrowed eyes",
-  "glare → narrowed eyes",
-  "sweat → sweatdrop",
-  "sweating → sweatdrop",
-  "flying sweatdrops → sweatdrop",
-  "dark circles → 0.6::dark circles::",
-  "bags under eyes → 0.6::bags under eyes::"
-);
-var OTHER_GAZE = lines("looking away", "looking to the side", "looking down", "looking up", "looking back", "looking afar", "sideways glance", "closed eyes", "eyes closed");
-var FACE_EXACT = lines(
-  "happy",
-  "sad",
-  "angry",
-  "annoyed",
-  "surprised",
-  "shocked",
-  "scared",
-  "afraid",
-  "frightened",
-  "shy",
-  "embarrassed",
-  "flustered",
-  "nervous",
-  "worried",
-  "anxious",
-  "serious",
-  "smug",
-  "confused",
-  "thinking",
-  "determined",
-  "tired",
-  "sleepy",
-  "excited",
-  "calm",
-  "gentle",
-  "neutral",
-  "cold",
-  "love",
-  "lovestruck",
-  "jealous",
-  "disgusted",
-  "bored",
-  "pensive",
-  "sorrow",
-  "relieved",
-  "proud",
-  "crying",
-  "laughing",
-  "expressionless",
-  "naughty face",
-  "trembling",
-  "panicking",
-  "teasing",
-  "doyagao",
-  "jitome",
-  "yandere",
-  "sulking",
-  "sulky",
-  "despair",
-  "melancholy",
-  "wistful",
-  "lonely",
-  "resigned",
-  "troubled",
-  "pained",
-  "guilty",
-  "dejected",
-  "frustrated",
-  "irritated",
-  "exasperated",
-  "disappointed",
-  "bashful",
-  "sheepish",
-  "mischievous",
-  "seductive",
-  "sly",
-  "dazed",
-  "stunned",
-  "horrified",
-  "terrified",
-  "panicked",
-  "ecstatic",
-  "content",
-  "serene",
-  "longing",
-  "nostalgic",
-  "contempt",
-  "disdain",
-  "flushed",
-  "tsundere face",
-  "looking at viewer",
-  "looking at another",
-  "looking away",
-  "looking down",
-  "looking up",
-  "looking to the side",
-  "looking back",
-  "looking afar",
-  "sideways glance"
-);
-var FACE_WORDS = lines(
-  "smile",
-  "smiling",
-  "smirk",
-  "smirking",
-  "grin",
-  "grinning",
-  "frown",
-  "frowning",
-  "pout",
-  "pouting",
-  "blush",
-  "blushing",
-  "tear",
-  "tears",
-  "teary",
-  "tearing up",
-  "teardrop",
-  "teardrops",
-  "crying",
-  "sobbing",
-  "laugh",
-  "laughing",
-  "giggle",
-  "giggling",
-  "scowl",
-  "scowling",
-  "sneer",
-  "sneering",
-  "wince",
-  "wincing",
-  "sigh",
-  "sighing",
-  "gasp",
-  "gasping",
-  "squint",
-  "squinting",
-  "yawn",
-  "yawning",
-  "teeth",
-  "lip",
-  "lips",
-  "mouth",
-  "tongue",
-  "fang",
-  "fangs",
-  "cheek",
-  "cheeks",
-  "eyebrow",
-  "eyebrows",
-  "brow",
-  "brows",
-  "glare",
-  "glaring",
-  "wink",
-  "winking",
-  "stare",
-  "staring",
-  "gaze",
-  "glance",
-  "pupils",
-  "sweat",
-  "sweatdrop",
-  "sweating",
-  "expression",
-  "expressionless",
-  "wide-eyed",
-  "bags under eyes",
-  "eye contact"
-);
-var FACE_EYE_BEFORE = lines("closed", "half-closed", "narrowed", "downcast", "squinting", "sparkling", "empty", "half-lidded", "watery", "teary", "rolling", "averted", "averting", "crazy", "shaded", "cold", "gentle", "sleepy", "tired", "wide", "dull", "glazed", "shining", "soft", "lowered");
-var FACE_EYE_AFTER = lines("closed", "open", "widened", "narrowed", "shut", "lowered");
-var FACE_NOT = lines("hair", "hand", "hands", "finger", "fingers", "arm", "arms", "holding", "covering", "eye-level", "eyewear", "eyepatch", "eyeshadow", "eyeliner", "mascara", "lipstick", "eyelashes", "facing", "mask", "paint", "mark", "whisker", "whiskers");
-var TEXT_DEFAULTS = Object.freeze({
-  ...FRAGMENTS,
-  "image.spriteFrame": SPRITE_FRAME,
-  "image.spriteCharFrame": SPRITE_CHAR_FRAME,
-  "image.spriteBg": "simple background, white background",
-  "image.spriteBgClear": "transparent background",
-  "image.bgSuffix": BG_SUFFIX,
-  "image.time": TIME_TAGS.map(([k, v]) => `${k}：${v}`).join("\n"),
-  "image.weather": WEATHER_TAGS.map(([k, v]) => `${k}：${v}`).join("\n"),
-  "image.closeUp": "portrait",
-  "image.openai.bg": "A visual novel background illustration with no people.",
-  "image.openai.cg": "A visual novel event CG illustration.",
-  "image.openai.sprite": "A visual novel character sprite: a single character from the thighs up, standing upright and facing the viewer, centered, eye level, no props, on a plain white background.",
-  "image.openai.style": "Style: anime, clean lineart, soft lighting.",
-  "filter.spriteDrop": SPRITE_DROP,
-  "filter.poseDrop": POSE_DROP,
-  "filter.closeUpDrop": CLOSE_UP_DROP,
-  "filter.colors": COLORS,
-  "filter.lookWords": LOOK_WORDS,
-  "filter.harsh": HARSH,
-  "filter.softer": SOFTER,
-  "filter.otherGaze": OTHER_GAZE,
-  "filter.face.exact": FACE_EXACT,
-  "filter.face.words": FACE_WORDS,
-  "filter.face.eyeBefore": FACE_EYE_BEFORE,
-  "filter.face.eyeAfter": FACE_EYE_AFTER,
-  "filter.face.not": FACE_NOT
-});
-function promptOf(config, id, fallback = TEXT_DEFAULTS[id] ?? "") {
-  const own = config?.prompts?.[id];
-  return own && typeof own.text === "string" ? own.text : fallback;
-}
-var LEGACY_PROMPTS = Object.freeze({ systemPrompt: "director.system", spritePrompt: "sprite.system", actingPrompt: "acting.system", cgPrompt: "cg.system" });
-var listOf = (text) => String(text || "").split(/[\n,，]+/).map((s) => s.trim()).filter(Boolean);
-var pairsOf = (text) => String(text || "").split("\n").map((line) => line.split(/\s*(?:→|->|=>)\s*/)).filter((p4) => p4.length === 2 && p4[0].trim()).map(([a, b]) => [a.trim(), b.trim()]);
-var escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-var wordsKey = (text) => String(text || "").toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
-function wholeTags(list3) {
-  const parts = listOf(list3).map((t) => escapeRe(t.toLowerCase()).replace(/\\\*/g, ".*").replace(/#/g, "\\d*"));
-  return parts.length ? new RegExp(`^(?:${parts.join("|")})$`) : /(?!)/;
-}
-function anyWords(list3) {
-  const parts = listOf(list3).map((t) => escapeRe(wordsKey(t)).replace(/ /g, "\\s+"));
-  return parts.length ? new RegExp(`(?:^|[^a-z0-9])(?:${parts.join("|")})(?![a-z0-9])`) : /(?!)/;
-}
-function compile(config) {
-  const get = (id) => promptOf(config, id);
-  const colors = listOf(get("filter.colors")).map((c) => escapeRe(c.toLowerCase())).join("|") || "(?!)";
-  const looks = [...listOf(get("filter.lookWords")), ...listOf(get("filter.colors"))].map((c) => escapeRe(c.toLowerCase())).join("|") || "(?!)";
-  const eyeBefore = listOf(get("filter.face.eyeBefore")).map((w) => escapeRe(wordsKey(w)).replace(/ /g, "\\s+")).join("|");
-  const eyeAfter = listOf(get("filter.face.eyeAfter")).map((w) => escapeRe(wordsKey(w)).replace(/ /g, "\\s+")).join("|");
-  return {
-    spriteDrop: wholeTags(get("filter.spriteDrop")),
-    poseDrop: wholeTags(get("filter.poseDrop")),
-    closeUpDrop: wholeTags(get("filter.closeUpDrop")),
-    closeUp: get("image.closeUp").trim(),
-    // 发色、瞳色：颜色词前后可以夹别的词（long curly light brown hair、lake blue eyes）
-    colorFeature: new RegExp(`^(?:[\\w-]+\\s+)*?(?:${colors})(?:\\s+[\\w-]+)*?\\s+(hair|eyes)$`),
-    lookWord: new RegExp(`\\b(?:${looks})\\b.*\\b(?:hair|eyes)$`),
-    harsh: new Set(listOf(get("filter.harsh")).map((t) => t.toLowerCase().replace(/\s+/g, " "))),
-    softer: new Map(pairsOf(get("filter.softer")).map(([a, b]) => [a.toLowerCase().replace(/\s+/g, " "), b])),
-    otherGaze: new Set(listOf(get("filter.otherGaze")).map(wordsKey)),
-    face: {
-      exact: new Set(listOf(get("filter.face.exact")).map(wordsKey)),
-      words: anyWords(get("filter.face.words")),
-      eyes: new RegExp([eyeBefore && `(?:^|[^a-z0-9])(?:${eyeBefore})\\s+eyes?(?![a-z0-9])`, eyeAfter && `(?:^|[^a-z0-9])eyes?\\s+(?:${eyeAfter})(?![a-z0-9])`].filter(Boolean).join("|") || "(?!)"),
-      not: anyWords(get("filter.face.not"))
-    }
-  };
-}
-var RULE_IDS = Object.keys(TEXT_DEFAULTS).filter((id) => id.startsWith("filter.") || id === "image.closeUp");
-var rules = compile(null);
-var wordRules = () => rules;
-
-// lib/emotions.js
-var LABEL_TO_KEY = new Map(Object.entries(EMOTIONS).map(([k, v]) => [v, k]));
-var MAX_EMOTION_CHARS = 16;
-var CATEGORY_CHARS = 8;
-var DEFAULT_CATEGORIES = Object.freeze([
-  { id: "calm", label: "平静", rep: "neutral" },
-  { id: "joy", label: "喜", rep: "smile" },
-  { id: "anger", label: "怒", rep: "angry" },
-  { id: "sorrow", label: "哀", rep: "sad" },
-  { id: "fear", label: "惧", rep: "scared" },
-  { id: "surprise", label: "惊", rep: "surprised" },
-  { id: "shy", label: "羞", rep: "shy" },
-  { id: "love", label: "爱", rep: "love" },
-  { id: "think", label: "思", rep: "thinking" },
-  { id: "tired", label: "倦", rep: "tired" },
-  { id: "cold", label: "冷", rep: "cold" }
-].map((c) => Object.freeze(c)));
-var BUILTIN_CATEGORY = Object.freeze({
-  neutral: "calm",
-  smile: "joy",
-  happy: "joy",
-  laugh: "joy",
-  smug: "joy",
-  teasing: "joy",
-  angry: "anger",
-  pout: "anger",
-  sad: "sorrow",
-  cry: "sorrow",
-  scared: "fear",
-  worried: "fear",
-  surprised: "surprise",
-  confused: "surprise",
-  shy: "shy",
-  blush: "shy",
-  love: "love",
-  thinking: "think",
-  serious: "think",
-  determined: "think",
-  tired: "tired",
-  cold: "cold"
-});
-var EDITABLE = ["label", "category", "base", "tags", "face", "act"];
-var clip = (v, n) => String(v ?? "").replace(/[\r\n\t]+/g, " ").trim().slice(0, n);
-function emotionId(value) {
-  const text = String(value ?? "").replace(/[|@"“”'‘’\r\n\t]/g, "").trim().slice(0, MAX_EMOTION_CHARS);
-  if (!text) return "";
-  const lower = text.toLowerCase();
-  if (EMOTIONS[lower]) return lower;
-  return LABEL_TO_KEY.get(text) || text;
-}
-var isBuiltinEmotion = (id) => Object.prototype.hasOwnProperty.call(EMOTIONS, id);
-function cleanCategories(raw) {
-  if (!Array.isArray(raw)) return DEFAULT_CATEGORIES.map((c) => ({ ...c }));
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const c of raw) {
-    const id = clip(c?.id, 24);
-    const label = clip(c?.label, CATEGORY_CHARS);
-    if (!id || !label || seen.has(id) || id === "__proto__") continue;
-    seen.add(id);
-    out.push({ id, label, rep: clip(c?.rep, MAX_EMOTION_CHARS) });
-  }
-  return out;
-}
-function libOf(custom) {
-  if (Array.isArray(custom)) return { list: custom, categories: DEFAULT_CATEGORIES };
-  return { list: Array.isArray(custom?.list) ? custom.list : [], categories: cleanCategories(custom?.categories) };
-}
-var listOf2 = (custom) => Array.isArray(custom) ? custom : Array.isArray(custom?.list) ? custom.list : [];
-function resolveEmotion(value, custom = []) {
-  let id = emotionId(value);
-  if (!id) return "";
-  const list3 = listOf2(custom);
-  if (!isBuiltinEmotion(id)) {
-    const renamed = list3.find((e) => e?.builtin && isBuiltinEmotion(e.id) && e.label === id && !e.deleted);
-    if (renamed) id = renamed.id;
-  }
-  for (let hop = 0; hop < 8; hop++) {
-    const into = list3.find((e) => e?.id === id)?.mergedInto;
-    if (!into || into === id) break;
-    id = emotionId(into);
-  }
-  return id;
-}
-function builtinDefaults(id) {
-  return { label: EMOTIONS[id], category: BUILTIN_CATEGORY[id] || "", base: "", tags: EMOTION_TAGS[id] || "", face: EMOTION_FACE[id]?.add || "", act: EMOTION_ACTS[id] || "" };
-}
-function emotionEntry(value, custom = []) {
-  const list3 = listOf2(custom);
-  const id = resolveEmotion(value, list3);
-  const own = list3.find((e) => e?.id === id) || null;
-  if (isBuiltinEmotion(id)) {
-    const defaults = builtinDefaults(id);
-    const edits = {};
-    for (const k of EDITABLE) if (own && typeof own[k] === "string") edits[k] = own[k];
-    return { ...defaults, ...edits, id, builtin: true, off: Boolean(own?.off) && id !== "neutral", deleted: Boolean(own?.deleted) && id !== "neutral", edited: Object.keys(edits).length > 0, defaults };
-  }
-  if (!own) return { id, label: id, builtin: false, category: "", base: "", tags: "", face: "", act: "", off: false, deleted: false, edited: false };
-  const { desc, mergedInto, ...rest } = own;
-  const category = typeof own.category === "string" ? own.category : BUILTIN_CATEGORY[own.base] || "";
-  return { ...rest, id, label: id, builtin: false, category, base: own.base || "", tags: own.tags || "", face: own.face || "", act: own.act || "", off: Boolean(own.off), deleted: false, edited: Boolean(own.tags || own.face || own.act) };
-}
-var emotionLabel = (id, custom = []) => emotionEntry(id, custom).label || String(id || "");
-function mergedFrom(value, custom = []) {
-  const list3 = listOf2(custom);
-  const id = resolveEmotion(value, list3);
-  return list3.filter((e) => e?.mergedInto && e.id !== id && resolveEmotion(e.id, list3) === id).map((e) => e.id);
-}
-function nearestOf(value, custom = []) {
-  const lib = libOf(custom);
-  const e = emotionEntry(value, lib);
-  const base = e.base ? resolveEmotion(e.base, lib.list) : "";
-  if (base && base !== e.id) return base;
-  const rep = resolveEmotion(lib.categories.find((c) => c.id === e.category)?.rep, lib.list);
-  return rep && rep !== e.id ? rep : "";
-}
-function standIns(value, custom = []) {
-  const lib = libOf(custom);
-  const id = resolveEmotion(value, lib.list);
-  const out = [];
-  const push = (e) => {
-    if (e && e !== id && !out.includes(e)) out.push(e);
-  };
-  for (const e of mergedFrom(id, lib)) push(e);
-  let at2 = id;
-  for (let hop = 0; hop < 8; hop++) {
-    const base = resolveEmotion(emotionEntry(at2, lib).base, lib.list);
-    if (!base || base === id || out.includes(base)) break;
-    push(base);
-    at2 = base;
-  }
-  push(resolveEmotion(lib.categories.find((c) => c.id === emotionEntry(id, lib).category)?.rep, lib.list));
-  push("neutral");
-  return out;
-}
-function inherit(value, field, custom, { neutral = true } = {}) {
-  const lib = libOf(custom);
-  const own = emotionEntry(value, lib);
-  if (own[field]) return own[field];
-  for (const e of standIns(own.id, lib)) {
-    if (e === "neutral" && !neutral) break;
-    const v = emotionEntry(e, lib)[field];
-    if (v) return v;
-  }
-  return "";
-}
-var emotionTags = (value, custom = [], { neutral = true } = {}) => inherit(value, "tags", custom, { neutral }) || (neutral ? EMOTION_TAGS.neutral : "");
-var emotionFace = (value, custom = []) => inherit(value, "face", custom) || EMOTION_FACE.neutral.add;
-var emotionAct = (value, custom = []) => inherit(value, "act", custom, { neutral: false });
-function emotionLevel(value, custom = []) {
-  const lib = libOf(custom);
-  const id = resolveEmotion(value, lib.list);
-  if (EMOTION_LEVEL[id]) return EMOTION_LEVEL[id];
-  for (const e of standIns(id, lib)) if (e !== "neutral" && EMOTION_LEVEL[e]) return EMOTION_LEVEL[e];
-  return 2;
-}
-function allEmotions(custom = [], { withDeleted = false } = {}) {
-  const list3 = listOf2(custom);
-  return [
-    ...Object.keys(EMOTIONS).filter((id) => !list3.find((e) => e?.id === id)?.mergedInto).map((id) => emotionEntry(id, list3)).filter((e) => withDeleted || !e.deleted),
-    ...list3.filter((e) => e && e.id && !isBuiltinEmotion(e.id) && !e.mergedInto).map((e) => emotionEntry(e.id, list3))
-  ];
-}
-function groupEmotions(entries, custom = []) {
-  const { categories } = libOf(custom);
-  const known = new Set(categories.map((c) => c.id));
-  const groups = categories.map((c) => ({ category: c, list: entries.filter((e) => e.category === c.id) }));
-  const loose = entries.filter((e) => !known.has(e.category));
-  return [...groups, { category: null, list: loose }];
-}
-function personEmotions(name2, custom = [], { used = [], drawn = [] } = {}) {
-  const list3 = listOf2(custom);
-  const usedSet = new Set(used.map((e) => resolveEmotion(e, list3)));
-  const drawnSet = new Set(drawn.map((e) => resolveEmotion(e, list3)));
-  return allEmotions(custom).filter((e) => e.builtin && !e.off || !e.off && e.source === "user" && !e.who?.length || e.who?.includes(name2) || usedSet.has(e.id) || drawnSet.has(e.id));
-}
-
 // lib/face-paint.js
 var FACE_LEVELS = [1, 2, 3, 4];
 var FACE_LEVEL_LABEL = { 1: "微", 2: "中", 3: "强", 4: "极" };
@@ -4145,27 +4208,7 @@ function reactsOf(line, onStage2 = [], speakers = []) {
   }
   return out;
 }
-var REACT_KIND = {
-  surprised: "jolt",
-  scared: "jolt",
-  shy: "shrink",
-  blush: "shrink",
-  love: "shrink",
-  happy: "bounce",
-  laugh: "bounce",
-  smug: "bounce",
-  teasing: "bounce",
-  sad: "droop",
-  cry: "droop",
-  tired: "droop",
-  worried: "droop",
-  angry: "shake",
-  pout: "shake",
-  cold: "shake",
-  confused: "tilt",
-  thinking: "tilt"
-};
-var reactKind = (base) => REACT_KIND[base] || "nod";
+var reactKind = (emotion, custom = []) => emotionReact(emotion, custom);
 function poseTracker() {
   let poses = /* @__PURE__ */ new Map();
   const get = (name2) => {
@@ -4336,7 +4379,6 @@ function showEmotions(lib) {
 }
 var shownLib = () => shownEmotions;
 var emotionLabel2 = (id, custom) => emotionLabel(id, custom || shownEmotions);
-var builtinOf = (emo, custom = []) => [resolveEmotion(emo, custom || []), ...standIns(emo, custom || [])].find(isBuiltinEmotion) || emo;
 var TIME_LABEL = { dawn: "黎明", morning: "清晨", noon: "正午", afternoon: "午后", dusk: "黄昏", evening: "傍晚", night: "夜", midnight: "深夜" };
 var WEATHER_LABEL = { clear: "晴", rain: "雨", storm: "暴雨", snow: "雪", blizzard: "暴风雪", wind: "狂风", sakura: "樱吹雪", leaves: "落叶", fireflies: "萤火", fog: "雾", embers: "余烬", dust: "浮尘", bokeh: "光斑", stars: "星空", sparkles: "光点", bubbles: "气泡" };
 var MOOD_LABEL = { daily: "日常", cheerful: "轻快", comic: "滑稽", sweet: "甜蜜", touching: "感动", calm: "静谧", solemn: "庄严", sad: "感伤", despair: "绝望", tense: "紧张", mystery: "悬疑", eerie: "诡异", battle: "激战", heroic: "热血", silence: "寂静" };
@@ -4464,7 +4506,7 @@ function buildBeats(view) {
       for (const name2 of speakers) spoke.set(name2, beats.length);
       const front = onStageNames.filter((name2) => spoke.has(name2)).sort((a, b) => spoke.get(b) - spoke.get(a));
       const recall = recalls[ui2];
-      if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map((e) => builtinOf(e, view.emotions)), at2.scene.mood);
+      if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos, at2.scene.mood, view.emotions);
       const phone = line.phone || null;
       if (call2 && call2.who && steps[ui2].entered.includes(call2.who)) call2 = null;
       const before = call2;
@@ -7326,9 +7368,8 @@ function Actor({ entry, person, beat, emo, emotions, groups = [], leaving = fals
     const el = reactRef.current;
     if (!el || typeof el.animate !== "function" || !reaction && !move && !symKind) return;
     if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const base = reaction ? builtinOf(reaction.emo, emotions) : "";
     const turning = move && TURN_FRAMES[move.act] ? TURN_FRAMES[move.act]((entry.x ?? 50) < 50 ? -1 : 1) : null;
-    const kind = symKind || (reaction && (reaction.emo || !move) ? reactKind(base) : STEP_MOVES.has(move.act) ? "step" : "");
+    const kind = symKind || (reaction && (reaction.emo || !move) ? reactKind(reaction.emo || "neutral", emotions) : STEP_MOVES.has(move.act) ? "step" : "");
     const frames = turning || REACT_FRAMES[kind];
     if (frames) el.animate(frames[0], { duration: frames[1], easing: "cubic-bezier(.3, .7, .3, 1)" });
   }, [beat.key]);
@@ -8287,6 +8328,51 @@ var FIELDS = [
   { key: "face", label: "只换脸的表情", hint: "在动作底图上只换脸、又没有立绘设计师写的词时，这张脸用的表情 tag。" },
   { key: "act", label: "动作参考", hint: "还没给这个人设计动作与表情时，交给立绘设计师参考的「演到全身」的样子。" }
 ];
+var LEVEL_NAMES = { 1: "微", 2: "中", 3: "强", 4: "极" };
+var PLAYS = [
+  {
+    key: "react",
+    label: "有反应时身子怎么动",
+    hint: "没在说话的人对一句话有反应时（导演写了 react），剧场里他身子跟着这样一动。",
+    options: REACT_KINDS.map((k) => [k, REACT_NAMES[k]]),
+    effective: (id, lib) => emotionReact(id, lib)
+  },
+  {
+    key: "recall",
+    label: "闪回的基调",
+    hint: `短闪回导演没写基调时，闪回里有这种情绪就按它挑切入方式和色调；几种情绪挑得不一样时按 ${RECALL_PRIORITY.map((t) => RECALL_TONE_NAMES[t]).join(" > ")}。`,
+    options: [["none", "不影响基调"], ...RECALL_PRIORITY.map((t) => [t, RECALL_TONE_NAMES[t]])],
+    effective: (id, lib) => emotionRecall(id, lib) || "none"
+  },
+  {
+    key: "level",
+    label: "默认强弱",
+    hint: "只换脸时重画得多狠；「极」的默认整张画、不换脸（设置里能关）。表演设计师给某个人标过的按他标的。",
+    options: [1, 2, 3, 4].map((n) => [n, LEVEL_NAMES[n]]),
+    effective: (id, lib) => emotionLevel(id, lib)
+  }
+];
+var playName = (f, v) => (f.options.find((o) => String(o[0]) === String(v)) || [v, String(v)])[1];
+function EmotionPlays({ e, lib, save }) {
+  const chain = standIns(e.id, lib);
+  const from = (key) => {
+    if (e[key]) return "";
+    for (const s of chain) {
+      if (key === "level" && s === "neutral") break;
+      if (emotionEntry(s, lib)[key]) return s;
+    }
+    return "";
+  };
+  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-emo-prompts" }, PLAYS.map((f) => {
+    const now = f.effective(e.id, lib);
+    const source = from(f.key);
+    const own = e[f.key];
+    const changed = e.builtin ? own !== e.defaults[f.key] : Boolean(own);
+    const follow = !(e.builtin && f.key === "level") && e.id !== "neutral";
+    const value = own ? String(own) : "";
+    return /* @__PURE__ */ import_react6.default.createElement("div", { key: f.key, className: "fg-emo-prompt" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("b", null, f.label), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, source ? `跟着「${emotionEntry(source, lib).label}」的` : own ? e.builtin ? changed ? "你改过" : "内置默认" : "它自己的" : "都没设，用默认"), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-spacer" }), e.builtin && changed && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => save({ [f.key]: e.defaults[f.key] }, "已恢复默认") }, "恢复默认")), /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", value, onChange: (ev) => save({ [f.key]: f.key === "level" ? Number(ev.target.value) || 0 : ev.target.value }) }, (follow || !value) && /* @__PURE__ */ import_react6.default.createElement("option", { value: "" }, `跟替身（现在：${playName(f, now)}）`), f.options.map(([v, label]) => /* @__PURE__ */ import_react6.default.createElement("option", { key: v, value: String(v) }, label, e.builtin && String(e.defaults[f.key]) === String(v) ? "（默认）" : ""))), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, f.hint));
+  }));
+}
 function usageOf(view, lib) {
   const used = /* @__PURE__ */ new Map();
   const drawn = /* @__PURE__ */ new Map();
@@ -8381,9 +8467,9 @@ function EmotionRow({ e, lib, all, usage, picked, onPick, open, onOpen, run, bus
     const text = e.builtin ? `删掉「${e.label}」？导演之后不再用它；画好的立绘不删。之后能在「删掉的内置情绪」里拿回来。` : `删掉「${e.label}」？导演之后不再用它（以后遇到合适的时候它可能再造一个）；画好的立绘不删。`;
     if (window.confirm(text)) run("x" + e.id, () => api.emotion("delete", { id: e.id }), "已删除（画好的立绘还在）");
   };
-  return /* @__PURE__ */ import_react6.default.createElement("div", { className: `fg-emo-row${e.off ? " is-off" : ""}${picked ? " is-picked" : ""}${open ? " is-open" : ""}` }, /* @__PURE__ */ import_react6.default.createElement("input", { type: "checkbox", checked: picked, onChange: onPick, title: "勾上几种，上面能一起挪类别、停用、删除、合并" }), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-emo-name" }, /* @__PURE__ */ import_react6.default.createElement(Commit, { value: e.label, title: e.builtin ? "改显示的名字（编号不变，老存档照样对得上）" : "改名：等于并进新名字，老剧本里的旧名字、画好的立绘跟过去", onCommit: (v) => save(e.builtin ? { label: v } : { rename: v }, "已改名") }), e.builtin && /* @__PURE__ */ import_react6.default.createElement("small", null, e.id)), /* @__PURE__ */ import_react6.default.createElement(CategorySelect, { value: e.category, lib, onChange: (v) => save({ category: v }) }), e.id === "neutral" ? /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "替身：没有（它是最后的兜底）") : /* @__PURE__ */ import_react6.default.createElement(EmotionSelect, { value: e.base, lib, all, exclude: [e.id], empty: `替身：跟类别（${near ? emotionEntry(near, lib).label : "平静"}）`, title: "这张立绘还没画好时先用哪张", onChange: (v) => save({ base: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note fg-emo-meta" }, meta), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-emo-acts" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: `fg-btn is-mini${open ? " is-on" : ""}`, onClick: onOpen }, "tag"), e.id !== "neutral" && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "s" + e.id, onClick: () => save({ off: !e.off }, e.off ? "已启用" : "已停用：导演不再用它") }, e.off ? "启用" : "停用"), e.id !== "neutral" && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "x" + e.id, onClick: remove }, "删除"), e.builtin && e.edited && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => {
-    if (window.confirm(`「${e.label}」的名字、类别、替身、tag 全部恢复成内置的？`)) run("r" + e.id, () => api.emotion("reset", { id: e.id }), "已恢复默认");
-  } }, "全部恢复默认")), open && /* @__PURE__ */ import_react6.default.createElement(EmotionPrompts, { e, lib, save }));
+  return /* @__PURE__ */ import_react6.default.createElement("div", { className: `fg-emo-row${e.off ? " is-off" : ""}${picked ? " is-picked" : ""}${open ? " is-open" : ""}` }, /* @__PURE__ */ import_react6.default.createElement("input", { type: "checkbox", checked: picked, onChange: onPick, title: "勾上几种，上面能一起挪类别、停用、删除、合并" }), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-emo-name" }, /* @__PURE__ */ import_react6.default.createElement(Commit, { value: e.label, title: e.builtin ? "改显示的名字（编号不变，老存档照样对得上）" : "改名：等于并进新名字，老剧本里的旧名字、画好的立绘跟过去", onCommit: (v) => save(e.builtin ? { label: v } : { rename: v }, "已改名") }), e.builtin && /* @__PURE__ */ import_react6.default.createElement("small", null, e.id)), /* @__PURE__ */ import_react6.default.createElement(CategorySelect, { value: e.category, lib, onChange: (v) => save({ category: v }) }), e.id === "neutral" ? /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "替身：没有（它是最后的兜底）") : /* @__PURE__ */ import_react6.default.createElement(EmotionSelect, { value: e.base, lib, all, exclude: [e.id], empty: `替身：跟类别（${near ? emotionEntry(near, lib).label : "平静"}）`, title: "这张立绘还没画好时先用哪张", onChange: (v) => save({ base: v }) }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note fg-emo-meta" }, meta), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-emo-acts" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: `fg-btn is-mini${open ? " is-on" : ""}`, onClick: onOpen, title: "默认的表情 tag、剧场里怎么演（反应动作、闪回基调、强弱）" }, "细节"), e.id !== "neutral" && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "s" + e.id, onClick: () => save({ off: !e.off }, e.off ? "已启用" : "已停用：导演不再用它") }, e.off ? "启用" : "停用"), e.id !== "neutral" && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "x" + e.id, onClick: remove }, "删除"), e.builtin && e.edited && /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => {
+    if (window.confirm(`「${e.label}」的名字、类别、替身、tag、演法全部恢复成内置的？`)) run("r" + e.id, () => api.emotion("reset", { id: e.id }), "已恢复默认");
+  } }, "全部恢复默认")), open && /* @__PURE__ */ import_react6.default.createElement(EmotionPrompts, { e, lib, save }), open && /* @__PURE__ */ import_react6.default.createElement(EmotionPlays, { e, lib, save }));
 }
 function CategoryManager({ lib, all, run }) {
   const [name2, setName] = import_react6.default.useState("");
@@ -8394,12 +8480,12 @@ function CategoryManager({ lib, all, run }) {
     [ids[i], ids[i + d]] = [ids[i + d], ids[i]];
     run("order", () => api.emotion("category-order", { order: ids }));
   };
-  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-manage fg-emo-cats" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "类别只管整理：导演看情绪库按类别列，这里按类别分组。代表情绪是这一类里没写替身的情绪先用哪张立绘（没设就用平静）。删掉一类，里面的情绪变成未分类，别的不变。"), cats.map((c, i) => /* @__PURE__ */ import_react6.default.createElement("div", { key: c.id, className: "fg-emo-cat" }, /* @__PURE__ */ import_react6.default.createElement(Commit, { value: c.label, onCommit: (label) => run("c" + c.id, () => api.emotion("category-save", { category: c.id, label }), "已改名") }), /* @__PURE__ */ import_react6.default.createElement(EmotionSelect, { value: resolveEmotion(c.rep, lib), lib, all, empty: "代表情绪：（没有，用平静）", onChange: (rep) => run("c" + c.id, () => api.emotion("category-save", { category: c.id, rep }), "已换代表情绪") }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, count(c.id), " 种"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: i === 0, onClick: () => order(i, -1), title: "往前挪" }, "↑"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: i === cats.length - 1, onClick: () => order(i, 1), title: "往后挪" }, "↓"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", onClick: () => {
+  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-manage fg-emo-cats" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "导演看情绪库按类别列（空的类别也列，它新造的情绪可以归进去），这里按类别分组。代表情绪是这一类里没写替身的情绪先用哪张立绘（没设就用平静），反应动作、闪回基调、强弱没设的也跟着它：给代表设一次，这一类都跟着。加一类会顺手加上同名的情绪当代表（库里已经有就把它挪进来）。删掉一类，里面的情绪变成未分类，别的不变。"), cats.map((c, i) => /* @__PURE__ */ import_react6.default.createElement("div", { key: c.id, className: "fg-emo-cat" }, /* @__PURE__ */ import_react6.default.createElement(Commit, { value: c.label, onCommit: (label) => run("c" + c.id, () => api.emotion("category-save", { category: c.id, label }), "已改名") }), /* @__PURE__ */ import_react6.default.createElement(EmotionSelect, { value: resolveEmotion(c.rep, lib), lib, all, empty: "代表情绪：（没有，用平静）", onChange: (rep) => run("c" + c.id, () => api.emotion("category-save", { category: c.id, rep }), "已换代表情绪") }), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, count(c.id), " 种"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: i === 0, onClick: () => order(i, -1), title: "往前挪" }, "↑"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: i === cats.length - 1, onClick: () => order(i, 1), title: "往后挪" }, "↓"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", onClick: () => {
     if (window.confirm(`删掉「${c.label}」这一类？里面的 ${count(c.id)} 种情绪变成未分类。`)) run("cd" + c.id, () => api.emotion("category-delete", { category: c.id }), "已删除这一类");
   } }, "删除")))), /* @__PURE__ */ import_react6.default.createElement("form", { className: "fg-row", onSubmit: (ev) => {
     ev.preventDefault();
-    if (name2.trim()) run("cadd", () => api.emotion("category-save", { label: name2.trim() }), "已加一类").then(() => setName(""));
-  } }, /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { width: "14cqw" }, placeholder: "新类别，比如「欲」", value: name2, onChange: (ev) => setName(ev.target.value), onKeyDown: (ev) => ev.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "submit", className: "fg-btn" }, "加一类"), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => {
+    if (name2.trim()) run("cadd", () => api.emotion("category-save", { label: name2.trim() }), `已加「${name2.trim()}」这一类，同名的情绪当代表`).then(() => setName(""));
+  } }, /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { width: "14cqw" }, placeholder: "新类别，比如「恨」", value: name2, onChange: (ev) => setName(ev.target.value), onKeyDown: (ev) => ev.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "submit", className: "fg-btn" }, "加一类"), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => {
     if (window.confirm("类别恢复成默认的那一套（平静、喜、怒、哀……）？情绪归哪一类不动；归在你加的类别里的变成未分类。")) run("creset", () => api.emotion("category-reset", {}), "类别已恢复默认");
   } }, "恢复默认类别")));
 }
@@ -8498,7 +8584,7 @@ function EmotionLibrary({ emotions, view, gameId }) {
       if (r) setDraft({ name: "", category: draft.category, base: "" });
     });
   };
-  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-emo-lib" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "导演给每句台词标情绪；库里没有贴切的词时它会自创一个（可以是复合情绪，比如「带着烦躁思考」）加进来。库里只有词本身：这种情绪在谁脸上什么样，由表演设计师按那个人设计（人物志 →「动作与表情」）。类别只管整理，导演看库也按类别看；替身是这张立绘还没画好时先用哪张，没写替身就用这一类的代表情绪，再没有用平静。停用的导演不再用，画好的照用。所有对局共用。"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-emo-sticky" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row fg-emo-tools" }, /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { flex: "1 1 14cqw", width: "auto" }, placeholder: "搜情绪（名字、编号、并进来的旧名字）", value: query, onChange: (ev) => setQuery(ev.target.value), onKeyDown: (ev) => ev.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: filter2, onChange: (ev) => setFilter(ev.target.value) }, FILTERS.map(([v, l]) => /* @__PURE__ */ import_react6.default.createElement("option", { key: v, value: v }, l))), people.length > 0 && /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: person, onChange: (ev) => setPerson(ev.target.value) }, /* @__PURE__ */ import_react6.default.createElement("option", { value: "" }, "所有人"), people.map((n) => /* @__PURE__ */ import_react6.default.createElement("option", { key: n, value: n }, n, "的"))), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setClosed(closed.size ? /* @__PURE__ */ new Set() : new Set(groups.map((g) => g.category ? g.category.id : ""))) }, closed.size ? "全部展开" : "全部收起"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !shown.length, onClick: () => pickMany(shown.map((e) => e.id), true) }, "全选", narrowed ? "筛出来的" : "", "（", shown.length, "）"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: `fg-btn is-mini${cats ? " is-on" : ""}`, onClick: () => setCats(!cats) }, "管理类别 · ", lib.categories.length)), pickedIds.length > 0 && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row fg-manage fg-emo-batch" }, /* @__PURE__ */ import_react6.default.createElement("b", null, "已选 ", pickedIds.length), /* @__PURE__ */ import_react6.default.createElement(CategorySelect, { value: "__", lib, first: "挪到类别…", style: { width: "auto" }, onChange: (v) => {
+  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-emo-lib" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-note" }, "导演给每句台词标情绪；库里没有贴切的词时它会自创一个（可以是复合情绪，比如「带着烦躁思考」）加进来。库里只有词本身：这种情绪在谁脸上什么样，由表演设计师按那个人设计（人物志 →「动作与表情」）。导演看库按类别看，新造的情绪会归进它挑的类；替身是这张立绘还没画好时先用哪张，没写替身就用这一类的代表情绪，再没有用平静。点「细节」能改默认的表情 tag 和剧场里怎么演（有反应时怎么动、闪回的基调、强弱），没设的跟替身、再跟这一类的代表情绪。停用的导演不再用，画好的照用。所有对局共用。"), /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-emo-sticky" }, /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row fg-emo-tools" }, /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", style: { flex: "1 1 14cqw", width: "auto" }, placeholder: "搜情绪（名字、编号、并进来的旧名字）", value: query, onChange: (ev) => setQuery(ev.target.value), onKeyDown: (ev) => ev.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: filter2, onChange: (ev) => setFilter(ev.target.value) }, FILTERS.map(([v, l]) => /* @__PURE__ */ import_react6.default.createElement("option", { key: v, value: v }, l))), people.length > 0 && /* @__PURE__ */ import_react6.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: person, onChange: (ev) => setPerson(ev.target.value) }, /* @__PURE__ */ import_react6.default.createElement("option", { value: "" }, "所有人"), people.map((n) => /* @__PURE__ */ import_react6.default.createElement("option", { key: n, value: n }, n, "的"))), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setClosed(closed.size ? /* @__PURE__ */ new Set() : new Set(groups.map((g) => g.category ? g.category.id : ""))) }, closed.size ? "全部展开" : "全部收起"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !shown.length, onClick: () => pickMany(shown.map((e) => e.id), true) }, "全选", narrowed ? "筛出来的" : "", "（", shown.length, "）"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: `fg-btn is-mini${cats ? " is-on" : ""}`, onClick: () => setCats(!cats) }, "管理类别 · ", lib.categories.length)), pickedIds.length > 0 && /* @__PURE__ */ import_react6.default.createElement("div", { className: "fg-row fg-manage fg-emo-batch" }, /* @__PURE__ */ import_react6.default.createElement("b", null, "已选 ", pickedIds.length), /* @__PURE__ */ import_react6.default.createElement(CategorySelect, { value: "__", lib, first: "挪到类别…", style: { width: "auto" }, onChange: (v) => {
     if (v !== "__") batch("move", { category: v }, "已挪过去");
   } }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "batch", onClick: () => batch("off", { off: true }, "已停用") }, "停用"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "batch", onClick: () => batch("off", { off: false }, "已启用") }, "启用"), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "batch", onClick: removePicked }, "删除"), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-note" }, "合并到"), /* @__PURE__ */ import_react6.default.createElement(EmotionSelect, { value: into, lib, all, empty: "选一种…", style: { width: "auto" }, onChange: setInto }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !into || busy === "batch" || !pickedIds.some((id) => id !== into), onClick: mergePicked }, "合并"), /* @__PURE__ */ import_react6.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(/* @__PURE__ */ new Set()) }, "取消选择"))), cats && /* @__PURE__ */ import_react6.default.createElement(CategoryManager, { lib, all, run }), /* @__PURE__ */ import_react6.default.createElement("form", { className: "fg-emo-add", onSubmit: add }, /* @__PURE__ */ import_react6.default.createElement("input", { className: "fg-input", placeholder: "加一个新情绪，比如「苦闷地表白」（词本身要能看懂）", value: draft.name, onChange: (ev) => setDraft({ ...draft, name: ev.target.value }), onKeyDown: (ev) => ev.stopPropagation() }), /* @__PURE__ */ import_react6.default.createElement(CategorySelect, { value: draft.category, lib, onChange: (v) => setDraft({ ...draft, category: v }) }), /* @__PURE__ */ import_react6.default.createElement(EmotionSelect, { value: draft.base, lib, all, empty: "替身：跟类别", onChange: (v) => setDraft((d) => ({ ...d, base: v, category: d.category || (v ? emotionEntry(v, lib).category : "") })) }), /* @__PURE__ */ import_react6.default.createElement("button", { type: "submit", className: "fg-btn is-primary", disabled: busy === "add" }, "加进情绪库")), groups.map((g) => {
     const id = g.category ? g.category.id : "";
