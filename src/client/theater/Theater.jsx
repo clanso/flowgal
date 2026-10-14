@@ -7,6 +7,7 @@ import { effectsOff, muteView, muteBeats, offDeliveries, cssOff } from './effect
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
 import { Backlog, Gallery, CastPanel, Settings, RestartNotice } from './Panels.jsx'
 import { DirectorLog } from './DirectorLog.jsx'
+import { asking } from '../ask.jsx'
 import { useFaceFramer } from './faceFramer.js'
 import { useParallax } from './parallax.js'
 import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros, warmVoices } from './audio.js'
@@ -403,6 +404,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
   React.useEffect(() => {
     const onKey = e => {
+      if (asking()) return // 确认框开着：Esc、回车归它
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return
       if (e.key === 'Escape') { e.preventDefault(); if (panel) setPanel(''); else if (choosing) setChoosing(false); else if (hidden) setHidden(false); else close(); return }
       if (panel || title) return

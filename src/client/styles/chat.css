@@ -53,6 +53,26 @@
 .fg-toast.is-error { border-color: rgba(255, 120, 120, .6); }
 @keyframes fg-toast-in { from { opacity: 0; transform: translate(-50%, calc(-100% + 10px)); } }
 
+/* 确认框、输入框（src/client/ask.jsx）：盖在剧场和聊天大图上面、提示条下面。宽高写死成视口大小，理由同剧场（酒馆给 html 加了 transform）。 */
+.fg-ask { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 2147483150; display: grid; place-items: center; padding: 16px; box-sizing: border-box; background: rgba(4, 3, 12, .58); backdrop-filter: blur(3px); animation: fg-fade-in .18s ease both; user-select: text; -webkit-user-select: text; }
+.fg-ask *, .fg-ask *::before, .fg-ask *::after { box-sizing: border-box; }
+.fg-ask-box { width: min(460px, 100%); max-height: calc(100dvh - 32px); overflow: auto; display: grid; gap: 14px; padding: 22px 22px 18px; border-radius: 16px; color: #f5f3ff; font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif; background: linear-gradient(135deg, rgba(22, 17, 48, .97), rgba(12, 10, 30, .97)); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 24px 60px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .06); animation: fg-ask-in .22s cubic-bezier(.2, .8, .2, 1) both; }
+.fg-ask-box::before { content: ""; height: 3px; margin: -22px -22px 4px; border-radius: 16px 16px 0 0; background: linear-gradient(90deg, #ff7eb6, #9b7bff); }
+.fg-ask-box.is-danger::before { background: linear-gradient(90deg, #ff6b6b, #ff7eb6); }
+.fg-ask-title { font-size: 16px; font-weight: 700; letter-spacing: .06em; }
+.fg-ask-text { font-size: 14.5px; line-height: 1.75; letter-spacing: .02em; white-space: pre-wrap; word-break: break-word; color: rgba(245, 243, 255, .92); }
+.fg-ask-input { width: 100%; margin: 0; padding: 9px 12px; font: inherit; font-size: 14.5px; color: #f5f3ff; background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .16); border-radius: 10px; outline: none; transition: border-color .15s; }
+.fg-ask-input:focus { border-color: #ff7eb6; }
+.fg-ask-row { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 2px; }
+.fg-ask-btn { margin: 0; min-width: 84px; padding: 8px 18px; font: inherit; font-size: 14px; letter-spacing: .08em; line-height: 1.4; color: #f5f3ff; cursor: pointer; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .05); transition: background .15s, border-color .15s, filter .15s; }
+.fg-ask-btn:hover { background: rgba(255, 255, 255, .12); border-color: #ff7eb6; }
+.fg-ask-btn:focus-visible { outline: 2px solid #9b7bff; outline-offset: 2px; }
+.fg-ask-btn.is-yes { font-weight: 700; color: #fff; border-color: transparent; background: linear-gradient(100deg, #ff7eb6, #9b7bff); }
+.fg-ask-btn.is-yes:hover { filter: brightness(1.1); }
+.fg-ask-box.is-danger .fg-ask-btn.is-yes { background: linear-gradient(100deg, #ff6b6b, #e0447a); }
+@keyframes fg-ask-in { from { opacity: 0; transform: translateY(8px) scale(.97); } }
+@media (prefers-reduced-motion: reduce) { .fg-ask, .fg-ask-box { animation: none; } }
+
 .fg-settings-card { --accent: #ff7eb6; --accent2: #9b7bff; --accent3: #5ee7ff; display: grid; gap: 12px; padding: 18px; border-radius: 14px; border: 1px solid rgba(127, 127, 127, .25); background: linear-gradient(135deg, rgba(155, 123, 255, .08), rgba(255, 126, 182, .06)); }
 .fg-settings-card h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
 .fg-settings-card p { margin: 0; font-size: 13px; opacity: .75; line-height: 1.6; }

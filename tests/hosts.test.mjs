@@ -39,3 +39,16 @@ test('gate: 核心（lib/ 除了 DSH 宿主层）和酒馆宿主层（st/）不�
   }
   assert.deepEqual(bad, [])
 })
+
+// DSH 桌面版（Electron，Windows）的原生对话框一关，网页常常拿不回键盘焦点：输入框点了没反应、下拉框点不开，
+// 要切到别的窗口再切回来才好（electron/electron#31917）；window.prompt 在 Electron 里也不支持。界面一律用 src/client/ask.jsx。
+test('gate: 浏览器界面不用原生的 alert / confirm / prompt', async () => {
+  const bad = []
+  for (const file of [...await walk(join(root, 'src')), ...await walk(join(root, 'st'))]) {
+    const text = await readFile(file, 'utf8')
+    for (const [i, line] of text.split('\n').entries()) {
+      if (/(^|[^.\w])(window\.|globalThis\.)?(alert|confirm|prompt)\(/.test(line.replace(/\/\/.*$/, ''))) bad.push(`${rel(file)}:${i + 1}`)
+    }
+  }
+  assert.deepEqual(bad, [])
+})

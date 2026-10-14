@@ -7,6 +7,7 @@ import chatCss from './styles/chat.css'
 import { api, openTheater, rememberGame, toast, useConfig, patchConfig, useUpdate, updateAvailable, hostName } from './api.js'
 import { TheaterRoot, Toast } from './theater/Theater.jsx'
 import { useFaceWatcher } from './theater/faceFramer.js'
+import { AskHost } from './ask.jsx'
 
 export function injectStyles() {
   if (document.getElementById('fg-styles')) return () => {}
@@ -17,10 +18,10 @@ export function injectStyles() {
   return () => style.remove()
 }
 
-/** 页面一直在的那一层：剧场、提示，和后台认脸（等认脸的动作底图不用开剧场也会认，见 theater/faceFramer.js）。 */
+/** 页面一直在的那一层：剧场、确认框、提示，和后台认脸（等认脸的动作底图不用开剧场也会认，见 theater/faceFramer.js）。 */
 export function Overlay() {
   useFaceWatcher()
-  return <><TheaterRoot /><Toast /></>
+  return <><TheaterRoot /><AskHost /><Toast /></>
 }
 
 /** 设置卡里的一行版本信息：有新版本 / 已下载待重启时提示，点进剧场的「版本与更新」页。 */

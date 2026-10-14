@@ -2,6 +2,7 @@
 // 和自动分配的音色组（没指定声音的角色按性别从哪几个里挑）。配方的写法和范围见 lib/sounds.js（cleanPart）。
 import React from 'react'
 import { toast } from '../api.js'
+import { confirmBox } from '../ask.jsx'
 import { previewVoice, loudnessVsClassic } from './audio.js'
 import { VOICES, voiceById, cleanPart, customRef, CUSTOM_VOICE_LIMIT, CUSTOM_PART_LIMIT, POOL_GENDERS, DEFAULT_VOICE_POOLS } from '../../../lib/sounds.js'
 
@@ -152,8 +153,8 @@ export function VoiceMaker({ ui, p }) {
     setDraft(null)
     toast(isNew ? `做好了「${clean.label}」：档案、旁白和上面的下拉框里都能选` : '已保存')
   }
-  const remove = v => {
-    if (!window.confirm(`删掉自己的音色「${v.label}」？用着它的角色会退回经典哔哔，设置里用着它的退回默认。`)) return
+  const remove = async v => {
+    if (!(await confirmBox(`删掉自己的音色「${v.label}」？用着它的角色会退回经典哔哔，设置里用着它的退回默认。`, { ok: '删除', danger: true }))) return
     save(mine.filter(x => x.id !== v.id))
     if (draft && draft.id === v.id) setDraft(null)
   }

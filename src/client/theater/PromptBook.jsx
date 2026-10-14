@@ -3,6 +3,7 @@
 // 「预览完整提示词」照这一局现在的资料、剧情和档案，把导演和几位设计师这次会发出去的系统提示词和用户消息拼出来（不发给模型、不花额度）。
 import React from 'react'
 import { api, toast, useUi, useConfig, patchConfig } from '../api.js'
+import { confirmBox } from '../ask.jsx'
 
 function useBusy() {
   const [busy, setBusy] = React.useState('')
@@ -111,7 +112,7 @@ function PromptItem({ item, onSaved }) {
   React.useEffect(() => { setText(item.text) }, [item.text])
   const save = (input, ok) => run(input.reset ? 'reset' : input.keep ? 'keep' : 'save', async () => { const r = await api.setPrompt({ id: item.id, ...input }); onSaved(r.item); return r }, ok)
   const commit = () => { if (text !== item.text) save({ text }, text === item.def ? '跟默认一样，按默认算' : '已保存') }
-  const reset = () => { if (window.confirm(`「${item.label}」恢复成内置的？你改的这段会丢掉。`)) save({ reset: true }, '已恢复默认') }
+  const reset = async () => { if (await confirmBox(`「${item.label}」恢复成内置的？你改的这段会丢掉。`, { ok: '恢复默认' })) save({ reset: true }, '已恢复默认') }
   const loadLast = () => run('last', async () => setLast((await api.promptLast(item.id)).last || { values: {} }))
   const dirty = text !== item.text
   return (
@@ -133,7 +134,7 @@ function PromptItem({ item, onSaved }) {
           <div>内置的这段在你改过之后更新了。下面是你的和新版的对照：换成新版会丢掉你的改动；保留自己的就不再提示，等内置下次更新再说。</div>
           <Diff from={item.text} to={item.def} fromLabel="你的" toLabel="内置新版" />
           <div className="fg-row">
-            <button type="button" className="fg-btn is-primary" disabled={Boolean(busy)} onClick={() => { if (window.confirm(`「${item.label}」换成内置新版？你改的这段会丢掉。`)) save({ reset: true }, '已换成内置新版') }}>换成新版</button>
+            <button type="button" className="fg-btn is-primary" disabled={Boolean(busy)} onClick={async () => { if (await confirmBox(`「${item.label}」换成内置新版？你改的这段会丢掉。`, { ok: '换成新版' })) save({ reset: true }, '已换成内置新版') }}>换成新版</button>
             <button type="button" className="fg-btn" disabled={Boolean(busy)} onClick={() => save({ keep: true }, '保留你的')}>{busy === 'keep' ? '保存中…' : '保留我的'}</button>
           </div>
         </div>

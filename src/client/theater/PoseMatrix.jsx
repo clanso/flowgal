@@ -3,6 +3,7 @@
 // 下面的表一列一个动作、一行一个情绪（按类别折叠）：格子里打勾 = 这个情绪放进这个动作，☆ 设为这个动作的底图（整张画的那张，其余在它上面只换脸）；
 // 每一行「全部动作」一下放进每一列，每一列「全选」把表里的情绪都放进来。cell 给了就在格子里显示这一格画好的小图（人物志用）。
 import React from 'react'
+import { confirmBox } from '../ask.jsx'
 import { emotionEntry, groupEmotions } from '../../../lib/emotions.js'
 import { freshPoseId } from '../../../lib/poses.js'
 
@@ -36,10 +37,10 @@ export function PoseMatrix({ poses, rows, lib, onChange, prefix = 'p', word = '�
   const intoAll = e => set(poses.map(p => (p.emotions.includes(e) ? p : { ...p, emotions: [...p.emotions, e] })))
   const fillPose = p => patchPose(p.id, { emotions: [...p.emotions, ...rows.filter(e => !p.emotions.includes(e))] })
   const addPose = () => set([...poses, { id: freshPoseId(poses, prefix), label: newLabel, desc: '', tags: '', emotions: [] }])
-  const dropPose = p => {
+  const dropPose = async p => {
     const alone = p.emotions.filter(e => !poses.some(q => q !== p && q.emotions.includes(e)))
     const tail = alone.length ? `只在这个${word}里的 ${alone.length} 种情绪（${alone.slice(0, 6).map(label).join('、')}${alone.length > 6 ? '……' : ''}）之后跟着替身走。` : ''
-    if (!window.confirm(`删掉「${p.label}」？${tail}已经画好的立绘不删。`)) return
+    if (!(await confirmBox(`删掉「${p.label}」？${tail}已经画好的立绘不删。`, { ok: '删除', danger: true }))) return
     set(poses.filter(q => q !== p))
   }
   const groups = groupEmotions(rows.map(e => emotionEntry(e, lib)), lib).filter(g => g.list.length)
