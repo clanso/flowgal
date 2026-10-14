@@ -242,9 +242,9 @@ function CgSpan({ gameId, image, units }) {
   )
 }
 
-export function Lightbox({ src, onClose, children }) {
+export function Lightbox({ src, onClose, children, className = '' }) {
   return (
-    <div className="fg-lightbox" onClick={onClose}>
+    <div className={`fg-lightbox${className ? ' ' + className : ''}`} onClick={onClose}>
       <img src={src} alt="" onClick={e => e.stopPropagation()} />
       <div className="fg-row" onClick={e => e.stopPropagation()}>{children}</div>
     </div>
@@ -643,6 +643,7 @@ function FaceBoxEditor({ gameId, person, bodyKey, record, onDone }) {
 function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
   const [busy, run] = useBusy()
   const [framing, setFraming] = React.useState(false)
+  const [look, setLook] = React.useState(-1) // 放大看的是第几次画的
   const sprites = person.sprites || {}
   if (record && record.face) {
     const body = sprites[record.face.from]
@@ -659,10 +660,13 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
       paint.tone && paint.tone.some(Boolean) ? `色调拉回 ${paint.tone.map(v => (v > 0 ? '+' : '') + v).join('/')}` : '',
       paint.check ? `比对：${Number.isFinite(paint.check.expr) ? `表情变化 ${paint.check.expr}、` : ''}接缝 ${paint.check.seam}、明暗 ${paint.check.shade}${paint.tries > 1 ? `（画了 ${paint.tries} 次，${paint.check.ok ? '这张过了' : paint.check.flat ? '表情都没换上，留了变得最多的' : '表情换上了，画风都没完全过，留了最像的'}）` : paint.check.ok ? '' : paint.check.flat ? '（表情没换上）' : '（画风没过）'}` : '',
     ].filter(Boolean).join(' · ') : ''
-    // 每次画的强度和比对：哪次表情没换上、哪次画风跑偏
-    const history = paint && Array.isArray(paint.history) && paint.history.length > 1
-      ? paint.history.map((t, i) => `第 ${i + 1} 次 ${Number(t.strength).toFixed(2)}：表情 ${t.expr}、接缝 ${t.seam}、明暗 ${t.shade}${t.ok ? '，过了' : t.flat ? '，表情没换上' : '，画风跑偏'}`).join('；')
-      : ''
+    // 每次画的强度和比对：哪次表情没换上、哪次画风跑偏；每次画的脸都留着（以前画的只有分数），点开能换成那次的
+    const tries = paint && Array.isArray(paint.history) ? paint.history : []
+    const tryText = (t, i) => `第 ${i + 1} 次 ${Number(t.strength).toFixed(2)}：表情 ${t.expr}、接缝 ${t.seam}、明暗 ${t.shade}${t.ok ? '，过了' : t.flat ? '，表情没换上' : '，画风跑偏'}`
+    const pickable = tries.length > 0 && tries.every(t => t && t.assetId) && Array.isArray(paint.rect)
+    const current = paint && Number.isInteger(paint.pick) ? paint.pick : -1
+    const history = !pickable && tries.length > 1 ? tries.map(tryText).join('；') : ''
+    const pick = i => run('pick', () => api.cast(gameId, 'face-pick', { name: person.name, key: emotionKey, index: i }), `换成第 ${i + 1} 次画的了`).then(() => setLook(-1))
     return (
       <div className="fg-face-info">
         <div className="fg-row">
@@ -671,6 +675,36 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
         </div>
         {how && <div className="fg-note">{how}</div>}
         {history && <div className="fg-note">{history}</div>}
+        {pickable && (
+          <>
+            <span className="fg-note">每次画的脸（点开放大，看中哪次就换成哪次；比对只认线条和色调，认不出表情对不对，以你看到的为准）</span>
+            <div className="fg-face-tries">
+              {tries.map((t, i) => (
+                <button type="button" key={i} className={`fg-face-try${i === current ? ' is-on' : ''}${t.ok ? '' : t.flat ? ' is-flat' : ' is-drift'}`} title={tryText(t, i)} onClick={() => setLook(i)}>
+                  <img src={assetUrl(t.assetId)} alt="" loading="lazy" />
+                  <span>{i + 1} · {Number(t.strength).toFixed(2)}{i === current ? ' · 在用' : t.ok ? ' · 过了' : t.flat ? ' · 没换上' : ' · 跑偏'}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {record.positive && (
+          <details>
+            <summary className="fg-note">这张实际发出去的提示词</summary>
+            <div className="fg-note">Base：{record.positive}</div>
+            {(record.characters || []).map((c, i) => <div key={i} className="fg-note">角色 {i + 1}：{c}</div>)}
+            {record.negativePrompt && <div className="fg-note">负面：{record.negativePrompt}</div>}
+            {(record.characterNegatives || []).map((c, i) => (c ? <div key={'n' + i} className="fg-note">角色 {i + 1} 负面：{c}</div> : null))}
+          </details>
+        )}
+        {look >= 0 && tries[look] && tries[look].assetId && (
+          <Lightbox className="is-face" src={assetUrl(tries[look].assetId)} onClose={() => setLook(-1)}>
+            <span className="fg-pill">{tryText(tries[look], look)}{look === current ? '（在用）' : ''}</span>
+            {look > 0 && <button type="button" className="fg-btn is-mini" onClick={() => setLook(look - 1)}>上一次</button>}
+            {look < tries.length - 1 && <button type="button" className="fg-btn is-mini" onClick={() => setLook(look + 1)}>下一次</button>}
+            {look !== current && <button type="button" className="fg-btn" disabled={busy === 'pick'} onClick={() => pick(look)}>用这次的</button>}
+          </Lightbox>
+        )}
         {record.assetId && (
           <div className="fg-row">
             <span className="fg-note">这张的重绘强度</span>
@@ -1829,8 +1863,14 @@ function FaceSettings({ cfg, onPatch }) {
         </div>
       </Field>
       <Field label="最激烈的整张画" hint="强弱是「极」的情绪（大笑、大哭、惊恐这类五官都在用力的）不换脸，在同一个动作上、用同一个种子整张画：脸由主模型画，画风跟底图自然一致，身子会跟着情绪动一点。"><Toggle value={f.wholePeak} onChange={v => set({ wholePeak: v })} /></Field>
+      <Field label="压住原来的表情" hint={`换脸是照着底图描的：强度不到 1 时原来的眉眼还在，模型往往只在上面添几滴泪、一点红晕。打开时，底图原来的表情里这张没有的（情绪词、眉、眼；嘴和视线只在这张写了时才压；泪、红晕、汗这张也有就不压）写进这张的负面，比如「坚定」换「难过」时负面加上 determined, serious, slightly furrowed brow, calm eyes。表情词加重：这张的表情词写成「${f.emphasis}::sad::」，1 不加重，越高越听表情词（太高会用力过头）。人物志里点开一张换脸的差分，「这张实际发出去的提示词」里能看到。`}>
+        <div className="fg-row">
+          <Toggle value={f.oldNegative} onChange={v => set({ oldNegative: v })} /><span className="fg-note">原来的表情写进负面</span>
+          <span className="fg-note">表情词加重</span><Dial value={f.emphasis} min={FACE_LIMITS.emphasis[0]} max={FACE_LIMITS.emphasis[1]} step={0.05} label="表情词加重" onCommit={v => set({ emphasis: v })} />
+        </div>
+      </Field>
       <Field label="色调对齐底图" hint="重画的脸整体偏亮、偏暗、偏色时，按底图的肤色拉回来再贴：每个颜色通道取脸上「底图减重画」的中位数，整块加上它（最多拉 40 级）。中位数跟着大片皮肤走，所以红晕、泪、眉眼口这些小块的变化不会被抹掉。关掉就照重画的原样贴。"><Toggle value={f.tone} onChange={v => set({ tone: v })} /></Field>
-      <Field label="画完自动比对" hint={`换完量两样，没过就换个种子再画，留最像的那张（每次重来都是一次出图）。①表情换上没有：脸框分成 4×4 格，比每格里眉、眼线、瞳孔、嘴线这些线条，挪了一两个像素、深浅差三成以内的不算，新长出来和没了的占这格线条的百分之几，取变得最多的那格。少于「表情至少变」就算没换上，下次调高强度。拿以前换过的脸实测：真换了表情的 6~30，强度 0.3 原样描一遍的不到 1。填 0 不查。②画风跑偏没有：软边那一圈新旧大块色调差太多（看得出一圈色差），或者脸上大块明暗变了（原来的阴影、排线没了），下次调低一点强度，最低到「强度下限」，再低表情就换不上了。宽严只管画风：小于 1 更严、更容易重来，大于 1 更松。表情没换上的那几张排在最后，不会被留下。`}>
+      <Field label="画完自动比对" hint={`换完量两样，没过就换个种子再画，留最像的那张（每次重来都是一次出图）。①表情换上没有：脸框分成 4×4 格，比每格里眉、眼线、瞳孔、嘴线这些线条，挪了一两个像素、深浅差三成以内的不算，新长出来和没了的占这格线条的百分之几，取变得最多的那格。少于「表情至少变」就算没换上，下次调高强度。拿以前换过的脸实测：真换了表情的 6~30，强度 0.3 原样描一遍的不到 1。填 0 不查。②画风跑偏没有：软边那一圈新旧大块色调差太多（看得出一圈色差），或者脸上大块明暗变了（原来的阴影、排线没了），就换个种子再画。「跑偏时强度最多降」默认 0：只换种子不降强度，因为强度一降眉眼就改不动了，换上的只剩泪和红晕；调大了每次跑偏降 0.06，最多比起步低这么多，也不会降回已经试出表情没换上的强度。宽严只管画风：小于 1 更严、更容易重来，大于 1 更松。表情没换上的那几张排在最后，不会被留下。每次画的脸都留着，人物志里点开那张差分能挑。`}>
         <div className="fg-row">
           <Toggle value={f.check} onChange={v => set({ check: v })} />
           {f.check && <><span className="fg-note">没过最多再画</span><Select value={String(f.retries)} options={Array.from({ length: FACE_LIMITS.retries[1] + 1 }, (_, n) => [String(n), `${n} 次`])} onChange={v => set({ retries: Number(v) })} style={INLINE} />
@@ -1839,7 +1879,7 @@ function FaceSettings({ cfg, onPatch }) {
         {f.check && (
           <div className="fg-row">
             <span className="fg-note">画风宽严</span><Dial value={f.tolerance} min={FACE_LIMITS.tolerance[0]} max={FACE_LIMITS.tolerance[1]} step={0.1} digits={1} label="画风比对的宽严" onCommit={v => set({ tolerance: v })} />
-            <span className="fg-note">强度下限</span><Dial value={f.floor} min={FACE_LIMITS.floor[0]} max={FACE_LIMITS.floor[1]} step={0.01} label="画风跑偏时强度最低调到" onCommit={v => set({ floor: v })} />
+            <span className="fg-note">跑偏时强度最多降</span><Dial value={f.drop} min={FACE_LIMITS.drop[0]} max={FACE_LIMITS.drop[1]} step={0.02} label="画风跑偏时强度最多往下调多少" onCommit={v => set({ drop: v })} />
           </div>
         )}
       </Field>

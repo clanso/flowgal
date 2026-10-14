@@ -6,8 +6,9 @@ import { mkdtemp, rm, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { decodePng, encodePng } from '../lib/image/png.js'
-import { cropFor, resample, faceAlpha, maskPixel, blendSoft, shrinkBack, faceDrift, expressionChange, matchTone, nextStrength, betterTry, referenceImage, cleanFaceSettings, DEFAULT_FACE, cleanLevel } from '../lib/face-paint.js'
-import { closeUpPrompt } from '../lib/face.js'
+import { cropFor, resample, faceAlpha, maskPixel, blendSoft, shrinkBack, faceDrift, expressionChange, matchTone, nextStrength, betterTry, referenceImage, cleanFaceSettings, DEFAULT_FACE, cleanLevel, clampRect, cutRect, pasteRect, faceTries } from '../lib/face-paint.js'
+import { closeUpPrompt, isFaceTag } from '../lib/face.js'
+import { splitTags, tagKey } from '../lib/image/style.js'
 import { emotionLevel } from '../lib/emotions.js'
 import { actingLevel, cleanActing, actingFace, actingBrief } from '../lib/acting.js'
 import { resolveConfig } from '../lib/config.js'
@@ -32,9 +33,10 @@ function stripes(width, height) {
 
 test('gate: 换脸设置：缺的用默认，数值夹在范围里，放大的边长对齐 64；默认全开、比对最多再画 10 次、角色参考默认关', () => {
   assert.deepEqual(cleanFaceSettings(null), JSON.parse(JSON.stringify(DEFAULT_FACE)))
-  assert.deepEqual([DEFAULT_FACE.tone, DEFAULT_FACE.check, DEFAULT_FACE.retries, DEFAULT_FACE.expression, DEFAULT_FACE.floor], [true, true, 10, 3, 0.5])
-  const c = cleanFaceSettings({ crop: false, cropScale: 9, cropSize: 1000, feather: -1, strength: { 1: 2, 3: 0.33 }, retries: 99, tolerance: 0, reference: true, check: 'x', tone: false, expression: 99, floor: 0 })
-  assert.deepEqual([c.crop, c.cropScale, c.cropSize, c.feather, c.retries, c.tolerance, c.reference, c.check, c.tone, c.expression, c.floor], [false, 4, 1024, 0, 10, 0.5, true, true, false, 30, 0.2])
+  assert.deepEqual([DEFAULT_FACE.tone, DEFAULT_FACE.check, DEFAULT_FACE.retries, DEFAULT_FACE.expression, DEFAULT_FACE.drop, DEFAULT_FACE.oldNegative, DEFAULT_FACE.emphasis], [true, true, 10, 3, 0, true, 1.2])
+  const c = cleanFaceSettings({ crop: false, cropScale: 9, cropSize: 1000, feather: -1, strength: { 1: 2, 3: 0.33 }, retries: 99, tolerance: 0, reference: true, check: 'x', tone: false, expression: 99, drop: 5, oldNegative: false, emphasis: 0.5 })
+  assert.deepEqual([c.crop, c.cropScale, c.cropSize, c.feather, c.retries, c.tolerance, c.reference, c.check, c.tone, c.expression, c.drop, c.oldNegative, c.emphasis], [false, 4, 1024, 0, 10, 0.5, true, true, false, 30, 0.8, false, 1])
+  assert.equal('floor' in cleanFaceSettings({ floor: 0.5 }), false, '以前存的强度下限不再用（它把强度一路降到眉眼改不动）')
   assert.deepEqual(c.strength, { 1: 1, 2: 0.68, 3: 0.33, 4: 0.9 })
   const cfg = resolveConfig({ images: { face: { retries: 2 } } })
   assert.equal(cfg.images.face.retries, 2)
@@ -168,13 +170,16 @@ test('gate: 比对：表情看眉眼口的线条——原样描一遍（挪一�
   const halfToned = matchTone(src, half, a)
   const drift = faceDrift(src, halfToned.image, a)
   assert.ok(drift.drift > 1 && !drift.flat, '半边脸变色：' + JSON.stringify(drift))
-  // 调强度：没换上往上（跑偏也先管表情）、跑偏往下但不低于下限、起步就低于下限的不往上抬、定死的不动
+  // 调强度：没换上往上（跑偏也先管表情）；跑偏默认只换种子不降强度；让降的最多比起步低 drop，也不降回试出没换上的强度；定死的不动
   assert.equal(nextStrength(0.55, same), 0.67)
   assert.equal(nextStrength(0.68, { ...drift, flat: true }), 0.8, '没换上又跑偏：先把表情换上')
-  assert.equal(nextStrength(0.8, drift), 0.74)
-  assert.equal(nextStrength(0.52, drift), 0.5, '最低到下限 0.5')
-  assert.equal(nextStrength(0.5, drift, { floor: 0.3 }), 0.44)
-  assert.equal(nextStrength(0.4, drift, { start: 0.4 }), 0.4, '起步 0.4 比下限低：不往下也不往上')
+  assert.equal(nextStrength(0.68, drift, { start: 0.68 }), 0.68, '跑偏：强度不降（降了眉眼就改不动）')
+  assert.equal(nextStrength(0.68, drift, { start: 0.68, drop: 0.1 }), 0.62)
+  assert.equal(nextStrength(0.62, drift, { start: 0.68, drop: 0.1 }), 0.58, '最多比起步低 0.1')
+  assert.equal(nextStrength(0.8, drift, { start: 0.68 }), 0.74, '表情没换上调高过的，跑偏往回降到起步')
+  assert.equal(nextStrength(0.8, drift, { start: 0.68, flatAt: 0.68 }), 0.74)
+  assert.equal(nextStrength(0.74, drift, { start: 0.68, flatAt: 0.68 }), 0.74, '0.68 试过没换上：不降回去')
+  assert.equal(nextStrength(0.68, drift, { start: 0.8, drop: 0 }), 0.68, '跑偏从不往上调')
   assert.equal(nextStrength(0.5, drift, { fixed: true }), 0.5)
   assert.equal(nextStrength(0.68, good), 0.68)
   // 留哪张：过了的 > 表情换上了、画风没过的 > 表情没换上的（画风再像也不要）；都没换上留变得最多的
@@ -184,6 +189,23 @@ test('gate: 比对：表情看眉眼口的线条——原样描一遍（挪一�
   assert.equal(betterTry(tSame, tDrift), tDrift, '没换上的排在跑偏的后面')
   assert.equal(betterTry(tDrift, tTraced), tDrift)
   assert.equal(betterTry(tSame, tTraced), t.expr > 0 ? tTraced : tSame)
+})
+
+test('gate: 每次画的脸那一块：剪下来、原样贴回；记录里每次的图也算这条记录用的文件', () => {
+  const img = solid(20, 10, [10, 20, 30])
+  for (let y = 2; y < 6; y++) for (let x = 3; x < 9; x++) img.data.set([200, 100, 50, 255], (y * 20 + x) * 4)
+  const rect = clampRect([2.5, -3, 9.2, 6], img)
+  assert.deepEqual(rect, [2, 0, 10, 6])
+  const piece = cutRect(img, rect)
+  assert.deepEqual([piece.width, piece.height], [8, 6])
+  assert.deepEqual(px(piece, 1, 2), [200, 100, 50, 255])
+  const blank = solid(20, 10, [0, 0, 0])
+  const back = pasteRect(blank, piece, rect)
+  for (let y = 0; y < 10; y++) for (let x = 0; x < 20; x++) assert.deepEqual(px(back, x, y), x >= 2 && x < 10 && y < 6 ? px(img, x, y) : [0, 0, 0, 255], `(${x},${y})`)
+  assert.deepEqual(px(blank, 4, 3), [0, 0, 0, 255], '不改原来的图')
+  assert.throws(() => pasteRect(solid(8, 8, [0, 0, 0]), piece, rect), /贴不进/)
+  assert.deepEqual(faceTries({ face: { paint: { history: [{ assetId: 'a' }, {}, { assetId: 'b' }] } } }), ['a', 'b'])
+  assert.deepEqual([faceTries({}), faceTries(null), faceTries({ face: { paint: { history: 'x' } } })], [[], [], []])
 })
 
 test('gate: 比对拿真图校过：强度 0.3 原样描了一遍的「难过」认得出没换上，以前真换了表情的认得出换了', async () => {
@@ -258,7 +280,7 @@ async function settle(engine, gameId, done, what = '') {
   }
 }
 
-test('gate: 换脸（默认画法）：等认脸的底图进后台清单 → 放大到 1024 重画、软边贴回 → 第一次跑偏就换种子调低一点强度再画、留过了的那张 → 定死强度的不调 → 表情没换上调高强度 → 「极」的整张画', async () => {
+test('gate: 换脸（默认画法）：等认脸的底图进后台清单 → 放大到 1024 重画、软边贴回 → 第一次跑偏就换种子、强度不降再画，留过了的那张 → 每次画的都留着、能换 → 定死强度的不调 → 表情没换上调高强度 → 「极」的整张画', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-facepaint-'))
   try {
     const store = createStore(dir)
@@ -283,8 +305,14 @@ test('gate: 换脸（默认画法）：等认脸的底图进后台清单 → 放
     assert.deepEqual([first.parameters.width, first.parameters.height], [1024, 1024], '头那一块放大到 1024 见方')
     assert.equal(first.parameters.seed, 7, '第一次跟底图同一个种子')
     assert.notEqual(second.parameters.seed, 7, '再画换种子')
-    assert.deepEqual([first.parameters.inpaintImg2ImgStrength, second.parameters.inpaintImg2ImgStrength], [0.8, 0.74], '生气「强」0.8，跑偏了调低一点')
+    assert.deepEqual([first.parameters.inpaintImg2ImgStrength, second.parameters.inpaintImg2ImgStrength], [0.8, 0.8], '生气「强」0.8，跑偏了只换种子、强度不降')
     assert.match(first.parameters.v4_prompt.caption.base_caption, /portrait/)
+    // 表情词加重；底图原来的表情（平静的，生气没有的）写进角色负面
+    const char = first.parameters.v4_prompt.caption.char_captions[0].char_caption, charNeg = first.parameters.v4_negative_prompt.caption.char_captions[0].char_caption
+    assert.match(char, /1\.2::angry::/)
+    const coldFace = splitTags(lin.sprites[cold].characters?.[0] || lin.sprites[cold].positive).filter(isFaceTag).map(tagKey).filter(k => !splitTags(char).map(tagKey).includes(k))
+    assert.ok(coldFace.length > 0, '平静底图有表情词')
+    for (const k of coldFace) assert.ok(splitTags(charNeg).map(tagKey).includes(k), `底图的 ${k} 进了负面：${charNeg}`)
     assert.doesNotMatch(first.parameters.v4_prompt.caption.base_caption + first.parameters.v4_prompt.caption.char_captions[0].char_caption, /cowboy shot/)
     const body = await decodePng((await engine.readAsset(lin.sprites[cold].assetId)).data)
     const face = await decodePng((await engine.readAsset(lin.sprites[angry].assetId)).data)
@@ -292,9 +320,29 @@ test('gate: 换脸（默认画法）：等认脸的底图进后台清单 → 放
     const mouth = Math.min(...[128, 129, 130, 131, 132, 133].map(y => px(face, 128, y)[0]))
     assert.ok(mouth < 120, '嘴换上了：' + mouth)
     const { paint } = lin.sprites[angry].face
-    assert.deepEqual([paint.level, paint.strength, paint.tries, paint.crop, paint.soft, paint.check.ok], [3, 0.74, 2, true, true, true])
+    assert.deepEqual([paint.level, paint.strength, paint.tries, paint.crop, paint.soft, paint.check.ok, paint.pick], [3, 0.8, 2, true, true, true, 1])
     assert.ok(paint.check.expr >= DEFAULT_FACE.expression, '表情变化：' + paint.check.expr)
-    assert.deepEqual(paint.history.map(t => [t.strength, t.ok, t.flat]), [[0.8, false, false], [0.74, true, false]], '每次的强度和比对都记着')
+    assert.deepEqual(paint.history.map(t => [t.strength, t.ok, t.flat]), [[0.8, false, false], [0.8, true, false]], '每次的强度和比对都记着')
+
+    // 每次画的脸那一块都留着：换成第 1 次（跑偏的那张）→ 框外跟底图一样、分数跟着换；再换回第 2 次跟原来一模一样
+    const pieces = paint.history.map(t => t.assetId)
+    assert.equal(new Set(pieces).size, 2)
+    const firstPiece = await decodePng((await engine.readAsset(pieces[0])).data)
+    assert.deepEqual([firstPiece.width, firstPiece.height], [paint.rect[2] - paint.rect[0], paint.rect[3] - paint.rect[1]])
+    const was = lin.sprites[angry].assetId
+    await engine.castAction('g', 'face-pick', { name: '林岚', key: angry, index: 0 })
+    lin = await settle(engine, 'g', p => p.sprites[angry].assetId !== was, '换成第 1 次')
+    const picked = lin.sprites[angry]
+    assert.deepEqual([picked.face.paint.pick, picked.face.paint.check.ok, picked.face.paint.history.length], [0, false, 2])
+    assert.equal(picked.seed, paint.history[0].seed)
+    assert.equal(await engine.readAsset(was), null, '换掉的那张删了')
+    const pickedImg = await decodePng((await engine.readAsset(picked.assetId)).data)
+    for (const [x, y] of [[5, 5], [40, 120], [220, 120], [200, 300]]) assert.deepEqual(px(pickedImg, x, y), px(body, x, y), `换了以后框外 (${x},${y}) 还跟底图一样`)
+    assert.ok(pickedImg.data.some((v, i) => v !== face.data[i]), '第 1 次是跑偏的那张，跟留下的第 2 次不一样')
+    await engine.castAction('g', 'face-pick', { name: '林岚', key: angry, index: 1 })
+    lin = await settle(engine, 'g', p => p.sprites[angry].face.paint.pick === 1, '换回第 2 次')
+    assert.deepEqual((await decodePng((await engine.readAsset(lin.sprites[angry].assetId)).data)).data, face.data, '换回来跟原来一模一样')
+    await assert.rejects(engine.castAction('g', 'face-pick', { name: '林岚', key: angry, index: 5 }), /没有留着/)
 
     // 玩家把这张定死成 0.5：一直跑偏也不调强度，画满 1 + 10 次，留最像的
     const infillCount = () => requests.filter(r => r.action === 'infill').length
@@ -303,6 +351,11 @@ test('gate: 换脸（默认画法）：等认脸的底图进后台清单 → 放
     assert.deepEqual(requests.filter(r => r.action === 'infill').slice(2).map(r => r.parameters.inpaintImg2ImgStrength), Array(11).fill(0.5))
     assert.equal(lin.sprites[angry].face.strength, 0.5)
     assert.deepEqual([lin.sprites[angry].face.paint.tries, lin.sprites[angry].face.paint.check.ok, lin.sprites[angry].face.paint.check.flat], [11, false, false])
+    // 记录先存、旧文件后删：等它删完
+    const gone = async () => (await Promise.all(pieces.map(id => engine.readAsset(id)))).every(a => a == null)
+    for (const end = Date.now() + 5000; !(await gone()) && Date.now() < end;) await new Promise(r => setTimeout(r, 20))
+    assert.ok(await gone(), '重画了：上一回每次画的脸删掉')
+    assert.equal(new Set(lin.sprites[angry].face.paint.history.map(t => t.assetId)).size, 11)
     // 回到自动
     await engine.castAction('g', 'face-redo', { name: '林岚', key: angry, strength: null })
     lin = await settle(engine, 'g', p => infillCount() === 14 && !p.spriteStatus[angry], '回到自动')
