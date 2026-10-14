@@ -286,7 +286,7 @@ test('gate: 换脸（默认画法）：等认脸的底图进后台清单 → 放
     const store = createStore(dir)
     const { requests, fetchImpl } = fakeNai(['drift', 'good', ...Array(11).fill('drift'), 'good', 'flat', 'flat', 'good'])
     const engine = createEngine({ store, services: {}, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] } } })
+    await engine.patchConfig({ images: { faceSwap: true, faceSwapPicked: true, auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] } } })
     await engine.setSecret('novelai', 'official', 'k')
     await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair, blue eyes', seed: 7 } })
     const look = { appearance: '1girl, long black hair, blue eyes', outfit: '', states: [] }

@@ -54,7 +54,7 @@ test('gate: 注册表：每一段都有默认、分组、说明；默认里用�
   const view = promptView(config)
   assert.equal(view.items.length, PROMPTS.size)
   assert.equal(view.shared, true, '共用开头默认开')
-  assert.deepEqual(view.groups.map(g => g.id), ['director', 'listen', 'acting', 'sprite', 'cg', 'shared', 'image', 'filter'])
+  assert.deepEqual(view.groups.map(g => g.id), ['director', 'judge', 'listen', 'acting', 'sprite', 'cg', 'shared', 'image', 'filter'])
 })
 
 test('gate: 改提示词：存成 { text, base }，跟默认一样的不存；内置更新了标「有新版」，保留我的不再提示；恢复默认；老设置的四个大框搬进来', () => {

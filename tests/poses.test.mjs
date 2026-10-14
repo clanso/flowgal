@@ -213,7 +213,7 @@ test('gate: 引擎：身子不动只换脸，用到了哪个「动作 × 情绪�
       ],
     }
     const engine = createEngine({ store, services: { tavern, llm: fakeLlm(JSON.stringify(director)) }, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, maxPerTurn: 0, portraits: true, expressions: true, poseGroups: GROUPS, sizes: { portrait: [64, 96] } } })
+    await engine.patchConfig({ images: { faceSwap: true, faceSwapPicked: true, auto: false, backgrounds: false, spriteWriter: false, maxPerTurn: 0, portraits: true, expressions: true, poseGroups: GROUPS, sizes: { portrait: [64, 96] } } })
     await engine.setSecret('novelai', 'official', 'k')
     const text = '“哼。”\n“……也不是不行。”\n“那就这样吧。”\n“太好了！”'
     const turn = { gameId: 'g', turn: 1, textVersion: 'v1', text, rawText: text, card: { name: '林岚' } }

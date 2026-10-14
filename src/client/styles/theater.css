@@ -1475,11 +1475,15 @@ button.fg-pm-name:hover { color: var(--accent); }
 .fg-emo-acts { display: flex; gap: .4cqw; flex-wrap: wrap; justify-content: flex-end; }
 .fg-emo-prompts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1cqw; padding: .4cqw 0 .6cqw 2.4cqw; }
 .fg-emo-prompt { display: grid; gap: .4cqw; align-content: start; }
+.fg-emo-prompts.is-words { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-bottom: 0; }
 .fg-emo-prompt b { font-size: 1cqw; }
 .fg-emo-cats { display: grid; gap: .5cqw; }
 .fg-emo-cat { display: grid; grid-template-columns: 9cqw 14cqw 1fr auto; gap: .7cqw; align-items: center; }
 .fg-emo-restore { cursor: pointer; font: inherit; color: inherit; }
 .fg-chip small { margin-left: .3em; opacity: .55; font-size: .85em; }
+.fg-chip-x { margin-left: .2em; padding: 0 .3em; border: 0; border-radius: 99px; background: transparent; color: inherit; font: inherit; opacity: .6; cursor: pointer; }
+.fg-chip-x:hover { opacity: 1; background: rgba(255, 255, 255, .12); }
+.fg-chip-x:disabled { opacity: .3; cursor: default; }
 .fg-dlog-chip small { margin-left: .3em; opacity: .6; font-size: .85em; }
 
 /* 设置 →「提示词」（PromptBook.jsx）：按导演、几位设计师、共用、出图固定词、过滤规则分组，每段全文、变量、对照 */

@@ -122,15 +122,15 @@ function noteWho(lib, id, who) { lib.list.find(e => e.id === id).who = who }
 
 test('emotions: 新情绪改名等于并进新名字：来源、谁用过都留着，旧名字认得', () => {
   const lib = fresh()
-  mergeEmotions(lib, [{ name: '苦笑', base: 'smile' }], { gameId: 'g', turn: 3 })
-  noteWho(lib, '苦笑', ['林岚'])
-  const next = renameEmotion(lib, '苦笑', '无奈地苦笑')
+  mergeEmotions(lib, [{ name: '苦涩地笑', base: 'smile' }], { gameId: 'g', turn: 3 })
+  noteWho(lib, '苦涩地笑', ['林岚'])
+  const next = renameEmotion(lib, '苦涩地笑', '无奈地苦笑')
   assert.equal(next, '无奈地苦笑')
   const e = emotionEntry('无奈地苦笑', lib)
   assert.equal(e.source, 'director')
   assert.deepEqual(e.who, ['林岚'])
   assert.equal(e.base, 'smile')
-  assert.equal(resolveEmotion('苦笑', lib), '无奈地苦笑')
+  assert.equal(resolveEmotion('苦涩地笑', lib), '无奈地苦笑')
   assert.throws(() => renameEmotion(lib, '无奈地苦笑', '微笑'), /已经有/)
 })
 
@@ -160,12 +160,12 @@ test('emotions: 类别能加、改名、换代表情绪、排顺序、删、恢�
   assert.deepEqual(lib.categories.slice(0, 2).map(c => c.label), ['欲', '乐'])
   editEmotion(lib, 'smile', { label: '浅笑' })
   const brief = emotionBrief(lib)
-  assert.ok(brief.indexOf('【欲】欲，情欲难耐') < brief.indexOf('【乐】smile 浅笑'), brief)
+  assert.ok(brief.indexOf('【欲】\n- 欲\n- 情欲难耐\n') < brief.indexOf('【乐】\n- smile 浅笑：'), brief)
   addEmotion(lib, { name: '想入非非', category: id })
   assert.deepEqual(standIns('想入非非', lib), ['情欲难耐', 'neutral'])
   deleteCategory(lib, id)
   assert.equal(emotionEntry('情欲难耐', lib).category, '')
-  assert.match(emotionBrief(lib), /【未分类】欲，情欲难耐，想入非非/)
+  assert.match(emotionBrief(lib), /【未分类】\n- 欲\n- 情欲难耐\n- 想入非非/)
   deleteCategory(lib, 'joy')
   assert.equal(emotionEntry('smile', lib).category, '')
   assert.deepEqual(groupEmotions(allEmotions(lib), lib).at(-1).list.map(e => e.id).slice(0, 3), ['smile', 'happy', 'laugh'])
@@ -178,50 +178,50 @@ test('emotions: 类别能加、改名、换代表情绪、排顺序、删、恢�
 
 test('emotions: 人物志里删掉的内置情绪不再挂格子；并掉的新情绪画过的算到并进去的那个', () => {
   const lib = fresh()
-  mergeEmotions(lib, [{ name: '苦笑' }, { name: '无奈' }])
-  noteWho(lib, '苦笑', ['林岚'])
+  mergeEmotions(lib, [{ name: '苦涩地笑' }, { name: '无可奈何' }])
+  noteWho(lib, '苦涩地笑', ['林岚'])
   deleteEmotions(lib, ['pout'])
-  mergeInto(lib, ['苦笑'], '无奈')
-  const ids = personEmotions('林岚', lib, { drawn: ['苦笑'] }).map(e => e.id)
+  mergeInto(lib, ['苦涩地笑'], '无可奈何')
+  const ids = personEmotions('林岚', lib, { drawn: ['苦涩地笑'] }).map(e => e.id)
   assert.ok(!ids.includes('pout'))
-  assert.ok(ids.includes('无奈'))
-  assert.ok(!ids.includes('苦笑'))
+  assert.ok(ids.includes('无可奈何'))
+  assert.ok(!ids.includes('苦涩地笑'))
 })
 
 test('emotions: 合并后立绘跟过去：并进去的那个还没画就把图挪过去，动作与表情设计里也顶替它的位置', () => {
   const holder = {
     sprites: {
-      'a|校服||苦笑': { assetId: 'img1', emotion: '苦笑', pose: 'daily' },
-      'a|校服||无奈地笑': { assetId: 'img2', emotion: '无奈地笑', face: { from: 'a|校服||苦笑', anchor: '苦笑' } },
-      'a|睡衣||苦笑': { assetId: 'img3', emotion: '苦笑' },
-      'a|睡衣||无奈': { assetId: 'img4', emotion: '无奈' },
+      'a|校服||苦涩地笑': { assetId: 'img1', emotion: '苦涩地笑', pose: 'daily' },
+      'a|校服||无奈地笑': { assetId: 'img2', emotion: '无奈地笑', face: { from: 'a|校服||苦涩地笑', anchor: '苦涩地笑' } },
+      'a|睡衣||苦涩地笑': { assetId: 'img3', emotion: '苦涩地笑' },
+      'a|睡衣||无可奈何': { assetId: 'img4', emotion: '无可奈何' },
     },
-    spriteStatus: { 'a|校服||苦笑': { status: 'done' } },
-    acting: { poses: [{ id: 'p1', emotions: ['neutral', '苦笑'] }, { id: 'p2', emotions: ['无奈地笑'] }], faces: { 苦笑: { desc: '嘴角一扯', tags: 'wry smile' } } },
+    spriteStatus: { 'a|校服||苦涩地笑': { status: 'done' } },
+    acting: { poses: [{ id: 'p1', emotions: ['neutral', '苦涩地笑'] }, { id: 'p2', emotions: ['无奈地笑'] }], faces: { 苦涩地笑: { desc: '嘴角一扯', tags: 'wry smile' } } },
   }
-  const moved = followMerge(holder, ['苦笑'], '无奈')
-  assert.equal(moved, 1, '睡衣那套「无奈」已经有了，留着旧的不动')
-  assert.equal(holder.sprites['a|校服||无奈'].assetId, 'img1')
-  assert.equal(holder.sprites['a|校服||无奈'].emotion, '无奈')
-  assert.ok(!holder.sprites['a|校服||苦笑'])
-  assert.equal(holder.sprites['a|睡衣||苦笑'].assetId, 'img3')
-  assert.deepEqual(holder.sprites['a|校服||无奈地笑'].face, { from: 'a|校服||无奈', anchor: '无奈' })
-  assert.deepEqual(holder.spriteStatus, { 'a|校服||无奈': { status: 'done' } })
-  assert.deepEqual(holder.acting.poses[0].emotions, ['neutral', '无奈'])
-  assert.deepEqual(holder.acting.faces, { 无奈: { desc: '嘴角一扯', tags: 'wry smile' } })
+  const moved = followMerge(holder, ['苦涩地笑'], '无可奈何')
+  assert.equal(moved, 1, '睡衣那套「无可奈何」已经有了，留着旧的不动')
+  assert.equal(holder.sprites['a|校服||无可奈何'].assetId, 'img1')
+  assert.equal(holder.sprites['a|校服||无可奈何'].emotion, '无可奈何')
+  assert.ok(!holder.sprites['a|校服||苦涩地笑'])
+  assert.equal(holder.sprites['a|睡衣||苦涩地笑'].assetId, 'img3')
+  assert.deepEqual(holder.sprites['a|校服||无奈地笑'].face, { from: 'a|校服||无可奈何', anchor: '无可奈何' })
+  assert.deepEqual(holder.spriteStatus, { 'a|校服||无可奈何': { status: 'done' } })
+  assert.deepEqual(holder.acting.poses[0].emotions, ['neutral', '无可奈何'])
+  assert.deepEqual(holder.acting.faces, { 无可奈何: { desc: '嘴角一扯', tags: 'wry smile' } })
 })
 
 test('emotions: 剧场找立绘按替身那一串往下找', () => {
   const look = { appearance: 'silver hair', outfit: '校服', states: [] }
   const lib = fresh()
-  mergeEmotions(lib, [{ name: '苦笑' }, { name: '无奈', base: 'smile' }])
-  mergeInto(lib, ['苦笑'], '无奈')
-  // 别的对局里只画过以前的「苦笑」（合并时没挪过去）：「无奈」先用它
-  const sprites = { [variantKey(look, '苦笑')]: { assetId: 'old' }, [variantKey(look, 'smile')]: { assetId: 'smile' } }
-  assert.equal(pickSprite(sprites, look, '无奈', standIns('无奈', lib)), 'old')
-  delete sprites[variantKey(look, '苦笑')]
-  assert.equal(pickSprite(sprites, look, '无奈', standIns('无奈', lib)), 'smile')
-  assert.equal(pickSprite(sprites, look, '无奈', 'smile'), 'smile', '只给一个替身也行（老写法）')
+  mergeEmotions(lib, [{ name: '苦涩地笑' }, { name: '无可奈何', base: 'smile' }])
+  mergeInto(lib, ['苦涩地笑'], '无可奈何')
+  // 别的对局里只画过以前的「苦涩地笑」（合并时没挪过去）：「无可奈何」先用它
+  const sprites = { [variantKey(look, '苦涩地笑')]: { assetId: 'old' }, [variantKey(look, 'smile')]: { assetId: 'smile' } }
+  assert.equal(pickSprite(sprites, look, '无可奈何', standIns('无可奈何', lib)), 'old')
+  delete sprites[variantKey(look, '苦涩地笑')]
+  assert.equal(pickSprite(sprites, look, '无可奈何', standIns('无可奈何', lib)), 'smile')
+  assert.equal(pickSprite(sprites, look, '无可奈何', 'smile'), 'smile', '只给一个替身也行（老写法）')
 })
 
 test('emotions: 导演写的情绪按情绪库收：停用的、删掉的不收，改过的名字、并掉的认成库里的那个', () => {
@@ -229,9 +229,9 @@ test('emotions: 导演写的情绪按情绪库收：停用的、删掉的不收�
   editEmotion(lib, 'smile', { label: '浅笑' })
   editEmotion(lib, 'pout', { off: true })
   deleteEmotions(lib, ['laugh'])
-  mergeEmotions(lib, [{ name: '苦笑' }, { name: '无奈' }])
-  mergeInto(lib, ['苦笑'], '无奈')
-  editEmotion(lib, '无奈', { off: false })
+  mergeEmotions(lib, [{ name: '苦涩地笑' }, { name: '无可奈何' }])
+  mergeInto(lib, ['苦涩地笑'], '无可奈何')
+  editEmotion(lib, '无可奈何', { off: false })
   const units = ['甲', '乙', '丙', '丁', '戊', '己'].map((text, i) => ({ id: 'U' + (i + 1), type: 'dialogue', speaker: '林岚', text }))
   const script = normalizeScript({
     scene: {}, cast: [{ name: '林岚' }],
@@ -239,26 +239,27 @@ test('emotions: 导演写的情绪按情绪库收：停用的、删掉的不收�
       { u: 'U1', sp: '林岚', emo: '浅笑' },
       { u: 'U2', sp: '林岚', emo: 'pout' },
       { u: 'U3', sp: '林岚', emo: '大笑' },
-      { u: 'U4', sp: '林岚', emo: '苦笑' },
+      { u: 'U4', sp: '林岚', emo: '苦涩地笑' },
       { u: 'U5', sp: '林岚', emo: '若有所思地叹气' },
       { u: 'U6', sp: '林岚', emo: 'thinking' },
     ],
-    emotions: [{ name: '若有所思地叹气', base: '无奈' }, { name: '苦笑', base: 'smile' }],
+    emotions: [{ name: '若有所思地叹气', base: '无可奈何' }, { name: '苦涩地笑', base: 'smile' }],
   }, units, { emotions: lib })
   assert.equal(script.lines.U1.emo, 'smile')
   assert.equal(script.lines.U2.emo, undefined, '停用的不收')
   assert.equal(script.lines.U3.emo, undefined, '删掉的内置情绪不收')
-  assert.equal(script.lines.U4.emo, '无奈', '并掉的认成并进去的那个')
+  assert.equal(script.lines.U4.emo, '无可奈何', '并掉的认成并进去的那个')
   assert.equal(script.lines.U5.emo, '若有所思地叹气')
   assert.equal(script.lines.U6.emo, 'thinking')
-  assert.deepEqual(script.emotions, [{ name: '若有所思地叹气', base: '无奈' }], '库里已有的（并掉的）不算新加的')
+  assert.deepEqual(script.emotions, [{ name: '若有所思地叹气', base: '无可奈何' }], '库里已有的（并掉的）不算新加的')
 })
 
 test('emotions: 给导演看的情绪库不带描述，按类别列，改过的名字照新的写', () => {
   const lib = cleanEmotionLib({ list: [{ id: '带着烦躁思考', base: 'thinking', desc: '皱眉撇嘴，手托下巴' }] })
   editEmotion(lib, 'thinking', { label: '琢磨' })
   const brief = emotionBrief(lib)
-  assert.match(brief, /【思】serious 认真，thinking 琢磨，determined 坚定，带着烦躁思考/)
+  assert.match(brief, /【思】\n- serious 认真：[^\n]+\n- thinking 琢磨：用在[^\n]+\n- determined 坚定：[^\n]+\n- suspicious 怀疑：[^\n]+\n- 带着烦躁思考\n/)
+  assert.doesNotMatch(brief.match(/- thinking 琢磨：[^\n]+/)[0], /也叫[^\n]*琢磨/, '改成的名字不再算它的近义词')
   assert.doesNotMatch(brief, /皱眉撇嘴/)
 })
 
@@ -340,7 +341,7 @@ test('emotions: 导演看的情绪库列出空的类别；导演造新词时能�
   editEmotion(lib, '恨', { category: '' })
   const brief = emotionBrief(lib)
   assert.match(brief, /【恨】（这一类还没有情绪：新造的可以归进来）/)
-  assert.match(brief, /【未分类】恨$/)
+  assert.match(brief, /【未分类】\n- 恨$/)
   assert.match(emotionBrief(lib, '{{list}}', '（空）'), /【恨】（空）/, '空的那句在提示词页能改')
   assert.equal(categoryOf('恨', lib), hate)
   assert.equal(categoryOf('【恨】', lib), hate)
@@ -349,13 +350,13 @@ test('emotions: 导演看的情绪库列出空的类别；导演造新词时能�
   const units = ['甲', '乙', '丙'].map((text, i) => ({ id: 'U' + (i + 1), type: 'dialogue', speaker: '林岚', text }))
   const script = normalizeScript({
     scene: {}, cast: [{ name: '林岚' }],
-    lines: [{ u: 'U1', sp: '林岚', emo: '咬牙切齿的恨' }, { u: 'U2', sp: '林岚', emo: '嫉妒' }, { u: 'U3', sp: '林岚', emo: '酸溜溜' }],
-    emotions: [{ name: '咬牙切齿的恨', base: 'angry', category: '恨' }, { name: '嫉妒', base: 'pout', category: '妒' }, { name: '酸溜溜', base: 'pout' }],
+    lines: [{ u: 'U1', sp: '林岚', emo: '咬牙切齿的恨' }, { u: 'U2', sp: '林岚', emo: '妒火中烧' }, { u: 'U3', sp: '林岚', emo: '酸溜溜' }],
+    emotions: [{ name: '咬牙切齿的恨', base: 'angry', category: '恨' }, { name: '妒火中烧', base: 'pout', category: '妒' }, { name: '酸溜溜', base: 'pout' }],
   }, units, { emotions: lib })
-  assert.deepEqual(script.emotions, [{ name: '咬牙切齿的恨', base: 'angry', category: hate }, { name: '嫉妒', base: 'pout' }, { name: '酸溜溜', base: 'pout' }])
+  assert.deepEqual(script.emotions, [{ name: '咬牙切齿的恨', base: 'angry', category: hate }, { name: '妒火中烧', base: 'pout' }, { name: '酸溜溜', base: 'pout' }])
   mergeEmotions(lib, script.emotions, { source: 'director' })
   assert.equal(emotionEntry('咬牙切齿的恨', lib).category, hate, '归进导演写的那一类（替身照样是生气）')
   assert.equal(emotionEntry('咬牙切齿的恨', lib).base, 'angry')
-  assert.equal(emotionEntry('嫉妒', lib).category, 'anger', '认不出的类别：跟着替身归类')
-  assert.match(emotionBrief(lib), /【恨】咬牙切齿的恨/)
+  assert.equal(emotionEntry('妒火中烧', lib).category, 'anger', '认不出的类别：跟着替身归类')
+  assert.match(emotionBrief(lib), /【恨】\n- 咬牙切齿的恨\n/)
 })

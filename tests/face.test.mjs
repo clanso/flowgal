@@ -252,7 +252,7 @@ test('gate: 只换脸整条流程（以前的画法：不放大、硬方框、�
     const store = createStore(dir)
     const { requests, fetchImpl } = fakeNai()
     const engine = createEngine({ store, services: {}, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] }, face: { crop: false, soft: false, tone: false, eyeColor: false, eyeUnify: false, check: false } } })
+    await engine.patchConfig({ images: { faceSwap: true, faceSwapPicked: true, auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] }, face: { crop: false, soft: false, tone: false, eyeColor: false, eyeUnify: false, check: false } } })
     await engine.setSecret('novelai', 'official', 'k')
     await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair, blue eyes', seed: 7 } })
     const look = { appearance: '1girl, long black hair, blue eyes', outfit: '', states: [] }
@@ -342,7 +342,7 @@ test('gate: 只换脸：日常组要「微笑」顺带画平静底图；底图�
     const store = createStore(dir)
     const { requests, fetchImpl } = fakeNai()
     const engine = createEngine({ store, services: {}, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] } } })
+    await engine.patchConfig({ images: { faceSwap: true, faceSwapPicked: true, auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] } } })
     await engine.setSecret('novelai', 'official', 'k')
     await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair' } })
     const look = { appearance: '1girl, long black hair', outfit: '', states: [] }
@@ -369,7 +369,7 @@ test('gate: 只换脸：底图还在别的请求里忙着时，换脸的等它�
     const store = createStore(dir)
     const { requests, fetchImpl } = fakeNai()
     const engine = createEngine({ store, services: {}, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] } } })
+    await engine.patchConfig({ images: { faceSwap: true, faceSwapPicked: true, auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] } } })
     await engine.setSecret('novelai', 'official', 'k')
     await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair' } })
     const look = { appearance: '1girl, long black hair', outfit: '', states: [] }

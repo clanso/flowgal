@@ -230,7 +230,7 @@ test('gate: 引擎：换脸照底图补瞳色 → 第一张量好脸框的当瞳
     const store = createStore(dir)
     const { requests, fetchImpl } = fakeNai()
     const engine = createEngine({ store, services: {}, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] } } })
+    await engine.patchConfig({ images: { faceSwap: true, faceSwapPicked: true, auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] } } })
     await engine.setSecret('novelai', 'official', 'k')
     await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair, blue eyes', seed: 7 } })
     const look = { appearance: '1girl, long black hair, blue eyes', outfit: '', states: [] }
