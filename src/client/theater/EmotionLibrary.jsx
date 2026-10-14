@@ -1,12 +1,12 @@
 // 人物志 → 情绪库（所有对局共用）。按类别分组，能搜（名字、编号、并进来的旧名字）、能筛（来源、停用、这一局用没用过、画没画过、某个人的）。
-// 每种情绪：改名、改类别、改替身、看和改它默认的表情 tag（不是空框：显示现在真正在用的那段）、停用、删除；
-// 勾选几种后批量挪类别、停用、启用、删除、合并到某一种；类别能加、改名、换代表情绪、排顺序、删；删掉的内置情绪能拿回来。
+// 每种情绪：改名、改类别、改替身、看和改它默认的表情 tag（不是空框：显示现在真正在用的那段）、剧场里怎么演（反应动作、闪回基调、强弱）、停用、删除；
+// 勾选几种后批量挪类别、停用、启用、删除、合并到某一种；类别能加（顺手加上同名的情绪当代表）、改名、换代表情绪、排顺序、删；删掉的内置情绪能拿回来。
 // 规则和存法见 lib/emotions.js，改动都走 api.emotion（lib/engine.js 的 emotionAction）。
 import React from 'react'
 import { api, toast } from '../api.js'
-import { speakersOf } from '../../../lib/vocab.js'
+import { speakersOf, REACT_KINDS, REACT_NAMES, RECALL_PRIORITY, RECALL_TONE_NAMES } from '../../../lib/vocab.js'
 import { keyEmotion } from '../../../lib/look.js'
-import { allEmotions, emotionEntry, emotionTags, emotionFace, emotionAct, groupEmotions, libOf, mergedFrom, nearestOf, personEmotions, resolveEmotion, standIns } from '../../../lib/emotions.js'
+import { allEmotions, emotionEntry, emotionTags, emotionFace, emotionAct, emotionReact, emotionRecall, emotionLevel, groupEmotions, libOf, mergedFrom, nearestOf, personEmotions, resolveEmotion, standIns } from '../../../lib/emotions.js'
 
 function useBusy() {
   const [busy, setBusy] = React.useState('')
@@ -43,6 +43,60 @@ const FIELDS = [
   { key: 'face', label: '只换脸的表情', hint: '在动作底图上只换脸、又没有立绘设计师写的词时，这张脸用的表情 tag。' },
   { key: 'act', label: '动作参考', hint: '还没给这个人设计动作与表情时，交给立绘设计师参考的「演到全身」的样子。' },
 ]
+
+const LEVEL_NAMES = { 1: '微', 2: '中', 3: '强', 4: '极' }
+/** 剧场里怎么演：每种情绪都能设，内置的默认照 vocab.js；新情绪没设的跟替身、再跟它那一类的代表情绪。 */
+const PLAYS = [
+  { key: 'react', label: '有反应时身子怎么动', hint: '没在说话的人对一句话有反应时（导演写了 react），剧场里他身子跟着这样一动。',
+    options: REACT_KINDS.map(k => [k, REACT_NAMES[k]]), effective: (id, lib) => emotionReact(id, lib) },
+  { key: 'recall', label: '闪回的基调', hint: `短闪回导演没写基调时，闪回里有这种情绪就按它挑切入方式和色调；几种情绪挑得不一样时按 ${RECALL_PRIORITY.map(t => RECALL_TONE_NAMES[t]).join(' > ')}。`,
+    options: [['none', '不影响基调'], ...RECALL_PRIORITY.map(t => [t, RECALL_TONE_NAMES[t]])], effective: (id, lib) => emotionRecall(id, lib) || 'none' },
+  { key: 'level', label: '默认强弱', hint: '只换脸时重画得多狠；「极」的默认整张画、不换脸（设置里能关）。表演设计师给某个人标过的按他标的。',
+    options: [1, 2, 3, 4].map(n => [n, LEVEL_NAMES[n]]), effective: (id, lib) => emotionLevel(id, lib) },
+]
+const playName = (f, v) => (f.options.find(o => String(o[0]) === String(v)) || [v, String(v)])[1]
+
+/** 一种情绪在剧场里怎么演的三样：显示现在真正用的（自己没设就是跟替身来的），改了就是它自己的。 */
+function EmotionPlays({ e, lib, save }) {
+  const chain = standIns(e.id, lib)
+  // 跟的是谁的：自己设了就是自己；没设往替身上找（强弱不找到平静）
+  const from = key => {
+    if (e[key]) return ''
+    for (const s of chain) {
+      if (key === 'level' && s === 'neutral') break
+      if (emotionEntry(s, lib)[key]) return s
+    }
+    return ''
+  }
+  return (
+    <div className="fg-emo-prompts">
+      {PLAYS.map(f => {
+        const now = f.effective(e.id, lib)
+        const source = from(f.key)
+        const own = e[f.key]
+        const changed = e.builtin ? own !== e.defaults[f.key] : Boolean(own)
+        // 内置的强弱没有「跟替身」（内置的都有自己的强弱）；别的都能改回跟替身
+        const follow = !(e.builtin && f.key === 'level') && e.id !== 'neutral'
+        const value = own ? String(own) : ''
+        return (
+          <div key={f.key} className="fg-emo-prompt">
+            <div className="fg-row">
+              <b>{f.label}</b>
+              <span className="fg-note">{source ? `跟着「${emotionEntry(source, lib).label}」的` : own ? (e.builtin ? (changed ? '你改过' : '内置默认') : '它自己的') : '都没设，用默认'}</span>
+              <span className="fg-spacer" />
+              {e.builtin && changed && <button type="button" className="fg-btn is-mini" onClick={() => save({ [f.key]: e.defaults[f.key] }, '已恢复默认')}>恢复默认</button>}
+            </div>
+            <select className="fg-select" value={value} onChange={ev => save({ [f.key]: f.key === 'level' ? Number(ev.target.value) || 0 : ev.target.value })}>
+              {(follow || !value) && <option value="">{`跟替身（现在：${playName(f, now)}）`}</option>}
+              {f.options.map(([v, label]) => <option key={v} value={String(v)}>{label}{e.builtin && String(e.defaults[f.key]) === String(v) ? '（默认）' : ''}</option>)}
+            </select>
+            <div className="fg-note">{f.hint}</div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 /** 这一局里每种情绪用了几次、画了几张，按人分开的也记一份（按情绪库认过：并掉的算并进去的那个）。 */
 function usageOf(view, lib) {
@@ -172,12 +226,13 @@ function EmotionRow({ e, lib, all, usage, picked, onPick, open, onOpen, run, bus
         : <EmotionSelect value={e.base} lib={lib} all={all} exclude={[e.id]} empty={`替身：跟类别（${near ? emotionEntry(near, lib).label : '平静'}）`} title="这张立绘还没画好时先用哪张" onChange={v => save({ base: v })} />}
       <span className="fg-note fg-emo-meta">{meta}</span>
       <div className="fg-emo-acts">
-        <button type="button" className={`fg-btn is-mini${open ? ' is-on' : ''}`} onClick={onOpen}>tag</button>
+        <button type="button" className={`fg-btn is-mini${open ? ' is-on' : ''}`} onClick={onOpen} title="默认的表情 tag、剧场里怎么演（反应动作、闪回基调、强弱）">细节</button>
         {e.id !== 'neutral' && <button type="button" className="fg-btn is-mini" disabled={busy === 's' + e.id} onClick={() => save({ off: !e.off }, e.off ? '已启用' : '已停用：导演不再用它')}>{e.off ? '启用' : '停用'}</button>}
         {e.id !== 'neutral' && <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'x' + e.id} onClick={remove}>删除</button>}
-        {e.builtin && e.edited && <button type="button" className="fg-btn is-mini" onClick={() => { if (window.confirm(`「${e.label}」的名字、类别、替身、tag 全部恢复成内置的？`)) run('r' + e.id, () => api.emotion('reset', { id: e.id }), '已恢复默认') }}>全部恢复默认</button>}
+        {e.builtin && e.edited && <button type="button" className="fg-btn is-mini" onClick={() => { if (window.confirm(`「${e.label}」的名字、类别、替身、tag、演法全部恢复成内置的？`)) run('r' + e.id, () => api.emotion('reset', { id: e.id }), '已恢复默认') }}>全部恢复默认</button>}
       </div>
       {open && <EmotionPrompts e={e} lib={lib} save={save} />}
+      {open && <EmotionPlays e={e} lib={lib} save={save} />}
     </div>
   )
 }
@@ -190,7 +245,7 @@ function CategoryManager({ lib, all, run }) {
   const order = (i, d) => { const ids = cats.map(c => c.id); [ids[i], ids[i + d]] = [ids[i + d], ids[i]]; run('order', () => api.emotion('category-order', { order: ids })) }
   return (
     <div className="fg-manage fg-emo-cats">
-      <div className="fg-note">类别只管整理：导演看情绪库按类别列，这里按类别分组。代表情绪是这一类里没写替身的情绪先用哪张立绘（没设就用平静）。删掉一类，里面的情绪变成未分类，别的不变。</div>
+      <div className="fg-note">导演看情绪库按类别列（空的类别也列，它新造的情绪可以归进去），这里按类别分组。代表情绪是这一类里没写替身的情绪先用哪张立绘（没设就用平静），反应动作、闪回基调、强弱没设的也跟着它：给代表设一次，这一类都跟着。加一类会顺手加上同名的情绪当代表（库里已经有就把它挪进来）。删掉一类，里面的情绪变成未分类，别的不变。</div>
       {cats.map((c, i) => (
         <div key={c.id} className="fg-emo-cat">
           <Commit value={c.label} onCommit={label => run('c' + c.id, () => api.emotion('category-save', { category: c.id, label }), '已改名')} />
@@ -203,8 +258,8 @@ function CategoryManager({ lib, all, run }) {
           </div>
         </div>
       ))}
-      <form className="fg-row" onSubmit={ev => { ev.preventDefault(); if (name.trim()) run('cadd', () => api.emotion('category-save', { label: name.trim() }), '已加一类').then(() => setName('')) }}>
-        <input className="fg-input" style={{ width: '14cqw' }} placeholder="新类别，比如「欲」" value={name} onChange={ev => setName(ev.target.value)} onKeyDown={ev => ev.stopPropagation()} />
+      <form className="fg-row" onSubmit={ev => { ev.preventDefault(); if (name.trim()) run('cadd', () => api.emotion('category-save', { label: name.trim() }), `已加「${name.trim()}」这一类，同名的情绪当代表`).then(() => setName('')) }}>
+        <input className="fg-input" style={{ width: '14cqw' }} placeholder="新类别，比如「恨」" value={name} onChange={ev => setName(ev.target.value)} onKeyDown={ev => ev.stopPropagation()} />
         <button type="submit" className="fg-btn">加一类</button>
         <span className="fg-spacer" />
         <button type="button" className="fg-btn is-mini" onClick={() => { if (window.confirm('类别恢复成默认的那一套（平静、喜、怒、哀……）？情绪归哪一类不动；归在你加的类别里的变成未分类。')) run('creset', () => api.emotion('category-reset', {}), '类别已恢复默认') }}>恢复默认类别</button>
@@ -275,7 +330,7 @@ export function EmotionLibrary({ emotions, view, gameId }) {
 
   return (
     <div className="fg-emo-lib">
-      <div className="fg-note">导演给每句台词标情绪；库里没有贴切的词时它会自创一个（可以是复合情绪，比如「带着烦躁思考」）加进来。库里只有词本身：这种情绪在谁脸上什么样，由表演设计师按那个人设计（人物志 →「动作与表情」）。类别只管整理，导演看库也按类别看；替身是这张立绘还没画好时先用哪张，没写替身就用这一类的代表情绪，再没有用平静。停用的导演不再用，画好的照用。所有对局共用。</div>
+      <div className="fg-note">导演给每句台词标情绪；库里没有贴切的词时它会自创一个（可以是复合情绪，比如「带着烦躁思考」）加进来。库里只有词本身：这种情绪在谁脸上什么样，由表演设计师按那个人设计（人物志 →「动作与表情」）。导演看库按类别看，新造的情绪会归进它挑的类；替身是这张立绘还没画好时先用哪张，没写替身就用这一类的代表情绪，再没有用平静。点「细节」能改默认的表情 tag 和剧场里怎么演（有反应时怎么动、闪回的基调、强弱），没设的跟替身、再跟这一类的代表情绪。停用的导演不再用，画好的照用。所有对局共用。</div>
       <div className="fg-emo-sticky">
       <div className="fg-row fg-emo-tools">
         <input className="fg-input" style={{ flex: '1 1 14cqw', width: 'auto' }} placeholder="搜情绪（名字、编号、并进来的旧名字）" value={query} onChange={ev => setQuery(ev.target.value)} onKeyDown={ev => ev.stopPropagation()} />

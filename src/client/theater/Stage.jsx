@@ -3,7 +3,7 @@
 import React from 'react'
 import { assetUrl } from '../api.js'
 import { Particles } from './particles.js'
-import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, HIT_IMPACT_MS, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL, builtinOf } from './playback.js'
+import { SKY, placeKey, actorX, onStage, stageLayout, blockLayout, HIT_IMPACT_MS, cgSrc, cgEntrance, cgExit, cgStay, CG_OUT_MS, TRANSITION_MS, WAKE_MS, WAKE_SWAP_MS, TIME_LABEL, WEATHER_LABEL, MODE_LABEL, CUT_LABEL } from './playback.js'
 import { lookAt, pickSprite, thenLook, undoShifts } from '../../../lib/look.js'
 import { faceBoxFrom } from '../../../lib/face.js'
 import { resolveEmotion, standIns } from '../../../lib/emotions.js'
@@ -305,10 +305,9 @@ function Actor({ entry, person, beat, emo, emotions, groups = [], leaving = fals
     const el = reactRef.current
     if (!el || typeof el.animate !== 'function' || (!reaction && !move && !symKind)) return
     if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    // 新情绪按它接近的内置情绪（替身一路往下、它那一类的代表情绪）选怎么动
-    const base = reaction ? builtinOf(reaction.emo, emotions) : ''
+    // 怎么动在情绪库里每种情绪能改；新情绪没设的跟替身一路往下、再跟它那一类的代表情绪
     const turning = move && TURN_FRAMES[move.act] ? TURN_FRAMES[move.act]((entry.x ?? 50) < 50 ? -1 : 1) : null
-    const kind = symKind || (reaction && (reaction.emo || !move) ? reactKind(base) : STEP_MOVES.has(move.act) ? 'step' : '')
+    const kind = symKind || (reaction && (reaction.emo || !move) ? reactKind(reaction.emo || 'neutral', emotions) : STEP_MOVES.has(move.act) ? 'step' : '')
     const frames = turning || REACT_FRAMES[kind]
     if (frames) el.animate(frames[0], { duration: frames[1], easing: 'cubic-bezier(.3, .7, .3, 1)' })
   }, [beat.key])
