@@ -11328,7 +11328,7 @@ var AMBIENCE_CANDIDATES = 12;
 
 // lib/music.js
 var MAX_TRACK_BYTES = 50 * 1024 * 1024;
-var MUSIC_CANDIDATES = 60;
+var MUSIC_CANDIDATES = 300;
 var HEARD_SHARE = 2 / 3;
 
 // lib/config.js
@@ -13061,10 +13061,10 @@ function MusicPicking({ cfg, count }) {
   const listen = cfg.director.listen;
   const pd = (patch) => patchConfig({ director: patch }).catch((e) => toast(e.message, "error"));
   const state2 = count <= quota ? `现在曲库有 ${count} 首，没超过 ${quota}：每轮整张曲目表都给导演看，不用找。` : listen ? `现在曲库有 ${count} 首，比 ${quota} 多：每轮导演之前先让听音师读一遍正文，说出这一轮该放什么样的音乐（情绪、场面、节奏），拿这些词去对每首的标签、描述、曲名和分类，最像的先给导演看（最多占三分之二）；剩下的名额按分类轮流挑，保证各种情绪都有。` : `现在曲库有 ${count} 首，比 ${quota} 多：每轮按分类的第一层（没分类的按第一个标签）分组轮流挑 ${quota} 首，正文和上一幕基调里出现的标签、曲名优先。分类随手分的话容易挑不准，建议开着「先听一遍」。`;
-  return /* @__PURE__ */ import_react13.default.createElement(import_react13.default.Fragment, null, /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-section" }, "导演怎么挑"), /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-note" }, state2), /* @__PURE__ */ import_react13.default.createElement(Field, { label: "每轮候选", hint: "后台导演每一轮能看到几首（编号、曲名、描述、分类和标签各一行，越多提示词越长）。曲库没超过这个数时全给它看。" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react13.default.createElement(Text, { type: "number", style: { width: "7cqw" }, value: quota, onCommit: (v) => {
+  return /* @__PURE__ */ import_react13.default.createElement(import_react13.default.Fragment, null, /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-section" }, "导演怎么挑"), /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-note" }, state2), /* @__PURE__ */ import_react13.default.createElement(Field, { label: "每轮候选", hint: "后台导演每一轮能看到几首（编号、曲名、描述、分类和标签各一行，每首大约一百字）。曲库没超过这个数时全给它看。填得很大时提示词会很长，超出模型窗口时先缩人物卡资料。" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react13.default.createElement(Text, { type: "number", style: { width: "7cqw" }, value: quota, onCommit: (v) => {
     const n = Math.trunc(Number(v));
     if (n >= 1) pd({ musicCandidates: n });
-  } }), /* @__PURE__ */ import_react13.default.createElement("span", { className: "fg-note" }, "首，最多 300"))), /* @__PURE__ */ import_react13.default.createElement(Field, { label: "先听一遍", hint: "曲子比候选多时，导演之前先让听音师读一遍这一轮正文，说出该放什么样的音乐（开头的基调，中途情绪转折再各一段），连同找它们的词（会参照曲库里常用的标签）。候选照它说的去对标签和描述，跟你怎么分类没关系。每轮多一次模型调用（跟音效共用这一次），听音师的模型在「导演」页换，提示词在「提示词 → 听音师」里改。它出错时退回按分组轮流挑。音效库、环境音库和配乐共用这一个开关。" }, /* @__PURE__ */ import_react13.default.createElement(Toggle, { value: listen, onChange: (v) => pd({ listen: v }) })));
+  } }), /* @__PURE__ */ import_react13.default.createElement("span", { className: "fg-note" }, "首，最多 5000（填到曲库的首数就是整张都给）"))), /* @__PURE__ */ import_react13.default.createElement(Field, { label: "先听一遍", hint: "曲子比候选多时，导演之前先让听音师读一遍这一轮正文，说出该放什么样的音乐（开头的基调，中途情绪转折再各一段），连同找它们的词（会参照曲库里常用的标签）。候选照它说的去对标签和描述，跟你怎么分类没关系。每轮多一次模型调用（跟音效共用这一次），听音师的模型在「导演」页换，提示词在「提示词 → 听音师」里改。它出错时退回按分组轮流挑。音效库、环境音库和配乐共用这一个开关。" }, /* @__PURE__ */ import_react13.default.createElement(Toggle, { value: listen, onChange: (v) => pd({ listen: v }) })));
 }
 function MusicSection({ data }) {
   const cfg = data.config;

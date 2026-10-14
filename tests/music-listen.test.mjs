@@ -2,7 +2,7 @@
 // 剩下的按分组轮流补；听音师没跑时上一幕的基调也参与对词；每轮候选数能调；导演日志记下每段配乐找到了哪些。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { musicCandidates, musicQuota, tagBrief, musicCategoryBrief, moodWords, MUSIC_CANDIDATES } from '../lib/music.js'
+import { musicCandidates, musicQuota, tagBrief, musicCategoryBrief, moodWords, MUSIC_CANDIDATES, MAX_MUSIC_CANDIDATES } from '../lib/music.js'
 import { cleanHeard } from '../lib/soundlib.js'
 import { direct, wantsListen } from '../lib/director.js'
 import { segmentTurn } from '../lib/segment.js'
@@ -46,7 +46,9 @@ test('gate: 听音师没跑时上一幕的基调也参与对词；候选数照�
   const tense = musicCandidates(LIBRARY, moodWords('battle'), { limit: 12 })
   assert.ok(tense.filter(t => t.tags.includes('战斗')).length >= 3, '基调「激战」对上标着战斗的')
   assert.equal(musicQuota(null), MUSIC_CANDIDATES)
-  assert.equal(musicQuota({ director: { musicCandidates: 999 } }), 300)
+  assert.equal(MUSIC_CANDIDATES, 300, '默认按最高档给：300 首')
+  assert.equal(musicQuota({ director: { musicCandidates: 999 } }), 999)
+  assert.equal(musicQuota({ director: { musicCandidates: 99999 } }), MAX_MUSIC_CANDIDATES, '最多填到曲库上限（整张都给）')
   assert.equal(resolveConfig({ director: { musicCandidates: '120' } }).director.musicCandidates, 120)
   assert.equal(resolveConfig({ director: { musicCandidates: 0 } }).director.musicCandidates, MUSIC_CANDIDATES)
   assert.match(tagBrief(LIBRARY), /^(日常|甜蜜|感伤|战斗|悬疑|壮阔)、/, '用得多的标签在前')
@@ -68,10 +70,13 @@ test('gate: 曲子比候选多时先听一遍：听音师看到曲库的分类�
   const userOf = request => request.messages[0].content[0].text
   const previous = { scene: { location: '废墟', time: 'night', weather: 'clear', mood: 'tense' }, lines: [] }
   const trace = {}
-  assert.equal(wantsListen(DEFAULT_CONFIG, [], LIBRARY), true, '只有曲库超了也要先听')
-  assert.equal(wantsListen(DEFAULT_CONFIG, [], LIBRARY.slice(0, 10)), false)
+  // 默认 300 首，这个 153 首的曲库导演全看得到；调成 60 首才超
+  const config = resolveConfig({ director: { musicCandidates: 60 } })
+  assert.equal(wantsListen(DEFAULT_CONFIG, [], LIBRARY), false, '默认 300 首，曲库没超就不用为配乐先听')
+  assert.equal(wantsListen(config, [], LIBRARY), true, '只有曲库超了也要先听')
+  assert.equal(wantsListen(config, [], LIBRARY.slice(0, 10)), false)
   assert.equal(wantsListen(resolveConfig({ director: { musicCandidates: 200 } }), [], LIBRARY), false)
-  await direct({ llm, provider: 'fake', model: 'fake-1', units, previous, castList: [], context: {}, config: DEFAULT_CONFIG, backend: 'novelai', music: LIBRARY, trace })
+  await direct({ llm, provider: 'fake', model: 'fake-1', units, previous, castList: [], context: {}, config, backend: 'novelai', music: LIBRARY, trace })
   assert.equal(calls.length, 2)
   const listenUser = userOf(calls[0])
   assert.match(listenUser, /【上一幕结束时】废墟 夜 基调紧张/)
@@ -81,12 +86,12 @@ test('gate: 曲子比候选多时先听一遍：听音师看到曲库的分类�
   const music = director.slice(director.indexOf('【配乐曲库】'), director.indexOf('配乐规则'))
   assert.match(music, /chase｜Machine Strike｜急促的鼓点，被机械兽追赶｜地平线原声、紧张、追逐、快节奏/)
   assert.match(music, /flee｜Run/)
-  assert.equal(music.split('\n').filter(l => l.startsWith('- ')).length, MUSIC_CANDIDATES)
+  assert.equal(music.split('\n').filter(l => l.startsWith('- ')).length, 60)
   assert.deepEqual(trace.listen.heard.bgm.map(h => [h.what, h.found.slice(0, 2)]), [['紧张的追逐', ['Machine Strike', 'Run']]])
   // 曲子不多（导演全看得到）、音效超了：照样听音效，但告诉它配乐不用找
   const quiet = []
   const llm2 = { stream(request) { quiet.push(request); return llm.stream(request) } }
   const sounds = Array.from({ length: 50 }, (_, i) => ({ id: 's' + i, kind: 'sfx', category: '杂/类' + i, name: '声' + i, tags: ['词' + i] }))
-  await direct({ llm: llm2, provider: 'fake', model: 'fake-1', units, previous, castList: [], context: {}, config: DEFAULT_CONFIG, backend: 'novelai', music: LIBRARY.slice(0, 10), sounds, trace: {} })
+  await direct({ llm: llm2, provider: 'fake', model: 'fake-1', units, previous, castList: [], context: {}, config, backend: 'novelai', music: LIBRARY.slice(0, 10), sounds, trace: {} })
   assert.match(userOf(quiet[0]), /【曲库】这一轮不用找配乐/)
 })
