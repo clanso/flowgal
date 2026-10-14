@@ -5,6 +5,7 @@
 // 规则和存法见 lib/emotions.js，改动都走 api.emotion（lib/engine.js 的 emotionAction）。
 import React from 'react'
 import { api, toast } from '../api.js'
+import { confirmBox } from '../ask.jsx'
 import { speakersOf, REACT_KINDS, REACT_NAMES, RECALL_PRIORITY, RECALL_TONE_NAMES } from '../../../lib/vocab.js'
 import { keyEmotion } from '../../../lib/look.js'
 import { allEmotions, emotionEntry, emotionTags, emotionFace, emotionAct, emotionReact, emotionRecall, emotionLevel, groupEmotions, libOf, mergedFrom, nearestOf, personEmotions, resolveEmotion, standIns } from '../../../lib/emotions.js'
@@ -239,11 +240,11 @@ function EmotionRow({ e, lib, all, usage, picked, onPick, open, onOpen, run, bus
     drawn ? `画了 ${drawn} 张` : '',
     e.off ? '停用中：导演不再用它，画好的照用' : '',
   ].filter(Boolean).join(' · ')
-  const remove = () => {
+  const remove = async () => {
     const text = e.builtin
       ? `删掉「${e.label}」？导演之后不再用它；画好的立绘不删。之后能在「删掉的内置情绪」里拿回来。`
       : `删掉「${e.label}」？导演之后不再用它（以后遇到合适的时候它可能再造一个）；画好的立绘不删。`
-    if (window.confirm(text)) run('x' + e.id, () => api.emotion('delete', { id: e.id }), '已删除（画好的立绘还在）')
+    if (await confirmBox(text, { ok: '删除', danger: true })) run('x' + e.id, () => api.emotion('delete', { id: e.id }), '已删除（画好的立绘还在）')
   }
   return (
     <div className={`fg-emo-row${e.off ? ' is-off' : ''}${picked ? ' is-picked' : ''}${open ? ' is-open' : ''}`}>
@@ -261,7 +262,7 @@ function EmotionRow({ e, lib, all, usage, picked, onPick, open, onOpen, run, bus
         <button type="button" className={`fg-btn is-mini${open ? ' is-on' : ''}`} onClick={onOpen} title="用在什么场面、近义词、默认的表情 tag、剧场里怎么演（反应动作、闪回基调、强弱）">细节</button>
         {e.id !== 'neutral' && <button type="button" className="fg-btn is-mini" disabled={busy === 's' + e.id} onClick={() => save({ off: !e.off }, e.off ? '已启用' : '已停用：导演不再用它')}>{e.off ? '启用' : '停用'}</button>}
         {e.id !== 'neutral' && <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'x' + e.id} onClick={remove}>删除</button>}
-        {e.builtin && e.edited && <button type="button" className="fg-btn is-mini" onClick={() => { if (window.confirm(`「${e.label}」的名字、类别、替身、用在、近义词、tag、演法全部恢复成内置的？`)) run('r' + e.id, () => api.emotion('reset', { id: e.id }), '已恢复默认') }}>全部恢复默认</button>}
+        {e.builtin && e.edited && <button type="button" className="fg-btn is-mini" onClick={async () => { if (await confirmBox(`「${e.label}」的名字、类别、替身、用在、近义词、tag、演法全部恢复成内置的？`, { ok: '恢复默认' })) run('r' + e.id, () => api.emotion('reset', { id: e.id }), '已恢复默认') }}>全部恢复默认</button>}
       </div>
       {open && <EmotionWords e={e} lib={lib} save={save} />}
       {open && <EmotionPrompts e={e} lib={lib} save={save} />}
@@ -287,7 +288,7 @@ function CategoryManager({ lib, all, run }) {
           <div className="fg-row">
             <button type="button" className="fg-btn is-mini" disabled={i === 0} onClick={() => order(i, -1)} title="往前挪">↑</button>
             <button type="button" className="fg-btn is-mini" disabled={i === cats.length - 1} onClick={() => order(i, 1)} title="往后挪">↓</button>
-            <button type="button" className="fg-btn is-mini fg-danger" onClick={() => { if (window.confirm(`删掉「${c.label}」这一类？里面的 ${count(c.id)} 种情绪变成未分类。`)) run('cd' + c.id, () => api.emotion('category-delete', { category: c.id }), '已删除这一类') }}>删除</button>
+            <button type="button" className="fg-btn is-mini fg-danger" onClick={async () => { if (await confirmBox(`删掉「${c.label}」这一类？里面的 ${count(c.id)} 种情绪变成未分类。`, { ok: '删除', danger: true })) run('cd' + c.id, () => api.emotion('category-delete', { category: c.id }), '已删除这一类') }}>删除</button>
           </div>
         </div>
       ))}
@@ -295,7 +296,7 @@ function CategoryManager({ lib, all, run }) {
         <input className="fg-input" style={{ width: '14cqw' }} placeholder="新类别，比如「恨」" value={name} onChange={ev => setName(ev.target.value)} onKeyDown={ev => ev.stopPropagation()} />
         <button type="submit" className="fg-btn">加一类</button>
         <span className="fg-spacer" />
-        <button type="button" className="fg-btn is-mini" onClick={() => { if (window.confirm('类别恢复成默认的那一套（平静、喜、怒、哀……）？情绪归哪一类不动；归在你加的类别里的变成未分类。')) run('creset', () => api.emotion('category-reset', {}), '类别已恢复默认') }}>恢复默认类别</button>
+        <button type="button" className="fg-btn is-mini" onClick={async () => { if (await confirmBox('类别恢复成默认的那一套（平静、喜、怒、哀……）？情绪归哪一类不动；归在你加的类别里的变成未分类。', { ok: '恢复默认' })) run('creset', () => api.emotion('category-reset', {}), '类别已恢复默认') }}>恢复默认类别</button>
       </form>
     </div>
   )
@@ -344,15 +345,15 @@ export function EmotionLibrary({ emotions, view, gameId }) {
   const toggle = id => setClosed(c => { const n = new Set(c); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const batch = (action, input, ok) => run('batch', () => api.emotion(action, { ids: pickedIds, ...input, gameId }).then(() => setPicked(new Set())), ok)
   const label = id => emotionEntry(id, lib).label
-  const removePicked = () => {
+  const removePicked = async () => {
     if (pickedIds.includes('neutral')) { toast('平静不能删：它是登场立绘，也是最后的兜底', 'error'); return }
-    if (window.confirm(`删掉这 ${pickedIds.length} 种情绪（${pickedIds.map(label).join('、')}）？导演之后不再用它们；画好的立绘不删，内置的能在「删掉的内置情绪」里拿回来。`)) batch('delete', {}, `已删除 ${pickedIds.length} 种`)
+    if (await confirmBox(`删掉这 ${pickedIds.length} 种情绪（${pickedIds.map(label).join('、')}）？导演之后不再用它们；画好的立绘不删，内置的能在「删掉的内置情绪」里拿回来。`, { ok: '删除', danger: true })) batch('delete', {}, `已删除 ${pickedIds.length} 种`)
   }
-  const mergePicked = () => {
+  const mergePicked = async () => {
     const from = pickedIds.filter(id => id !== into)
     if (!into || !from.length) return
     if (from.includes('neutral')) { toast('平静不能并掉：它是登场立绘，也是最后的兜底', 'error'); return }
-    if (!window.confirm(`把 ${from.map(label).join('、')} 并进「${label(into)}」？\n之后导演写它们、老剧本里的它们都算「${label(into)}」；这一局和全局角色里它们画好的立绘，「${label(into)}」还没画的直接挪给它用。旧名字留作别名，搜得到；新造的词并掉以后能在最下面「并掉的」里拆出来（挪过去的立绘不挪回来），内置的并掉了拆不开。`)) return
+    if (!(await confirmBox(`把 ${from.map(label).join('、')} 并进「${label(into)}」？\n之后导演写它们、老剧本里的它们都算「${label(into)}」；这一局和全局角色里它们画好的立绘，「${label(into)}」还没画的直接挪给它用。旧名字留作别名，搜得到；新造的词并掉以后能在最下面「并掉的」里拆出来（挪过去的立绘不挪回来），内置的并掉了拆不开。`, { ok: '合并' }))) return
     run('batch', () => api.emotion('merge', { ids: from, into, gameId }).then(() => { setPicked(new Set()); setInto('') }), `已并进「${label(into)}」`)
   }
   const add = ev => {
@@ -439,7 +440,7 @@ export function EmotionLibrary({ emotions, view, gameId }) {
             <span key={e.id} className="fg-chip" title={e.source === 'judge' ? `模型归类时归进去的${e.turn != null ? `（第 ${e.turn} 轮）` : ''}` : '合并进去的'}>
               {e.builtin ? emotionEntry(e.id, []).label : e.id} → {label(e.mergedInto)}{e.source === 'judge' && <small>模型归的</small>}
               {!e.builtin && <button type="button" className="fg-chip-x" title="拆出来，单独成一种" disabled={busy === 'split' + e.id}
-                onClick={() => { if (window.confirm(`把「${e.id}」从「${label(e.mergedInto)}」里拆出来，单独成一种？替身是「${label(e.mergedInto)}」，之后写到它就照它自己画（已经挪过去的立绘不挪回来）。`)) run('split' + e.id, () => api.emotion('split', { id: e.id, gameId }), `已拆出「${e.id}」`) }}>✂</button>}
+                onClick={async () => { if (await confirmBox(`把「${e.id}」从「${label(e.mergedInto)}」里拆出来，单独成一种？替身是「${label(e.mergedInto)}」，之后写到它就照它自己画（已经挪过去的立绘不挪回来）。`, { ok: '拆出来' })) run('split' + e.id, () => api.emotion('split', { id: e.id, gameId }), `已拆出「${e.id}」`) }}>✂</button>}
             </span>
           ))}</div>
         </>

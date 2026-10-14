@@ -1,6 +1,7 @@
 // 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含声音、「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
 import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, soundlibNow, configNow, hostName } from '../api.js'
+import { confirmBox, promptBox } from '../ask.jsx'
 import { emotionLabel, shownLib, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, RECALL_TONES, RECALL_TONE_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions, nearestOf } from '../../../lib/emotions.js'
@@ -278,7 +279,7 @@ function CgTile({ gameId, image, onOpen, onEdit }) {
           ? <button type="button" className="fg-btn" onClick={() => run('c', () => api.cancel(gameId, 'cg', image.id), '已取消')}>取消</button>
           : <button type="button" className="fg-btn" disabled={busy === 'r'} onClick={() => run('r', () => api.render(gameId, image.id, {}), '已加入出图队列')}>重画</button>}
         <button type="button" className="fg-btn" onClick={() => onEdit(image)}>改词</button>
-        <button type="button" className="fg-btn" onClick={() => { if (window.confirm('删除这张插画和它的所有版本？图片文件夹里另存的那份不会删。')) run('d', () => api.deleteImage(gameId, image.id), '已删除') }}>删除</button>
+        <button type="button" className="fg-btn" onClick={async () => { if (await confirmBox('删除这张插画和它的所有版本？图片文件夹里另存的那份不会删。', { ok: '删除', danger: true })) run('d', () => api.deleteImage(gameId, image.id), '已删除') }}>删除</button>
       </div>
       {image.status === 'failed' && image.error && <div className="fg-note fg-err" style={{ marginTop: '.4cqw' }}>{image.error}</div>}
     </div>
@@ -868,9 +869,9 @@ function PersonCard({ gameId, person, emotions, poseGroups = [], cast, voice, us
   const deletable = tiles.filter(t => t.record)
   const pick = key => setPicked(p => { const n = new Set(p); if (n.has(key)) n.delete(key); else n.add(key); return n })
   const endManage = () => { setManage(false); setPicked(new Set()) }
-  const removePicked = () => {
+  const removePicked = async () => {
     const keys = [...picked]
-    if (!keys.length || !window.confirm(`删除 ${person.name} 的 ${keys.length} 张立绘？${person.global ? '这是全局角色，所有对局里都会少这几张。' : ''}删掉后可以再画。`)) return
+    if (!keys.length || !(await confirmBox(`删除 ${person.name} 的 ${keys.length} 张立绘？${person.global ? '这是全局角色，所有对局里都会少这几张。' : ''}删掉后可以再画。`, { ok: '删除', danger: true }))) return
     run('del', () => api.cast(gameId, 'sprite-delete', { name: person.name, keys }).then(endManage), `已删除 ${keys.length} 张`)
   }
   // 清空立绘：这个人每一身、每种情绪的立绘全删，测试时反复重画用
@@ -947,8 +948,8 @@ function PersonCard({ gameId, person, emotions, poseGroups = [], cast, voice, us
           <button type="button" className="fg-btn" disabled={!drawn && !Object.values(person.sprites || {}).some(r => r && r.assetId)} onClick={onBench}>逆转式工作台（眨眼、口型）</button>
           {!person.global && <button type="button" className="fg-btn" onClick={() => run('g', () => api.cast(gameId, 'promote', { name: person.name }), '已提升为全局角色：所有对局共用，AI 不再改它的固定外貌')}>提升为全局</button>}
           {person.global && <button type="button" className="fg-btn" onClick={() => run('l', () => api.cast(gameId, 'copy-local', { name: person.name }), '已复制到本局，可单独修改')}>复制到本局</button>}
-          {person.global && <button type="button" className="fg-btn" onClick={() => { if (window.confirm('从全局库移除？各对局里的副本不受影响。')) run('u', () => api.cast(gameId, 'unglobal', { name: person.name }), '已移出全局库') }}>移出全局</button>}
-          {!person.global && <button type="button" className="fg-btn" onClick={() => { if (window.confirm(`删除 ${person.name} 的本局档案和立绘记录？`)) run('d', () => api.cast(gameId, 'delete', { name: person.name }), '已删除') }}>删除</button>}
+          {person.global && <button type="button" className="fg-btn" onClick={async () => { if (await confirmBox('从全局库移除？各对局里的副本不受影响。', { ok: '移出全局' })) run('u', () => api.cast(gameId, 'unglobal', { name: person.name }), '已移出全局库') }}>移出全局</button>}
+          {!person.global && <button type="button" className="fg-btn" onClick={async () => { if (await confirmBox(`删除 ${person.name} 的本局档案和立绘记录？`, { ok: '删除', danger: true })) run('d', () => api.cast(gameId, 'delete', { name: person.name }), '已删除') }}>删除</button>}
         </div>
         {person.versions && person.versions.length > 1 && (
           <div className="fg-note" style={{ marginTop: '.6cqw' }}>
@@ -1306,8 +1307,8 @@ function StyleSection({ data }) {
     const at = s.presets.findIndex(x => x.id === id) + 1
     return { presets: [...s.presets.slice(0, at), ...fresh, ...s.presets.slice(at)], current: fresh[0].id }
   }, msg)
-  const remove = () => {
-    if (styles.length <= 1 || !window.confirm(`删除画风「${st.name}」？`)) return
+  const remove = async () => {
+    if (styles.length <= 1 || !(await confirmBox(`删除画风「${st.name}」？`, { ok: '删除', danger: true }))) return
     saveStyle(s => {
       const at = s.presets.findIndex(x => x.id === id)
       const rest = s.presets.filter(x => x.id !== id)
@@ -1539,8 +1540,8 @@ function PoseGroups({ cfg, onPatch }) {
   }, [draft])
   const listed = new Set([...draft.flatMap(g => g.emotions), ...allEmotions(lib).filter(e => !e.off).map(e => e.id)])
   const rows = [...allEmotions(lib).map(e => e.id).filter(e => listed.has(e)), ...[...listed].filter(e => !allEmotions(lib).some(x => x.id === e))]
-  const reset = () => {
-    if (!window.confirm('通用动作组恢复成默认的四组（日常、抱臂、手在胸前、托腮）？你加的组、改的分法都会去掉。')) return
+  const reset = async () => {
+    if (!(await confirmBox('通用动作组恢复成默认的四组（日常、抱臂、手在胸前、托腮）？你加的组、改的分法都会去掉。', { ok: '恢复默认' }))) return
     onPatch({ poseGroups: null, poses: Object.fromEntries(Object.keys(cfg.images.poses || {}).map(k => [k, null])) })
   }
   return (
@@ -1579,7 +1580,7 @@ function FaceSettings({ cfg, onPatch }) {
   const set = patch => onPatch({ face: patch })
   const refOk = naiReferenceOk(cfg.novelai && cfg.novelai.model)
   const edited = JSON.stringify(f) !== JSON.stringify(DEFAULT_FACE)
-  const reset = () => { if (window.confirm('换脸的这些设置都回到默认？')) set(JSON.parse(JSON.stringify(DEFAULT_FACE))) }
+  const reset = async () => { if (await confirmBox('换脸的这些设置都回到默认？', { ok: '恢复默认' })) set(JSON.parse(JSON.stringify(DEFAULT_FACE))) }
   const [lo, hi] = FACE_LIMITS.strength
   return (
     <>
@@ -2133,7 +2134,7 @@ function TrackEditor({ track }) {
       <div className="fg-row">
         <Text value={track.name} style={{ flex: 2, width: 'auto', fontWeight: 600 }} onCommit={v => save({ name: v })} />
         <Text value={track.category} list={MUSIC_LIST} placeholder="分类，两层用 / 隔开：日常/校园" style={{ flex: 1, width: 'auto' }} onCommit={v => save({ category: v })} />
-        <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'd'} onClick={() => { if (window.confirm(`从曲库删除「${track.name}」？电脑上的原文件不受影响。`)) run('d', async () => { await api.removeTrack(track.id); await loadMusic() }, '已删除') }}>删除</button>
+        <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'd'} onClick={async () => { if (await confirmBox(`从曲库删除「${track.name}」？电脑上的原文件不受影响。`, { ok: '删除', danger: true })) run('d', async () => { await api.removeTrack(track.id); await loadMusic() }, '已删除') }}>删除</button>
       </div>
       <TextArea value={track.description} placeholder="听起来什么样、适合什么场面。例如：慢板萨克斯和雨声，深夜独处、心事重重，也适合告白前的沉默" onCommit={v => save({ description: v })} />
       <Text value={(track.tags || []).join('、')} placeholder="标签，用顿号或逗号隔开：深夜、城市、雨、怀旧" style={{ width: '100%' }} onCommit={v => save({ tags: v })} />
@@ -2263,8 +2264,8 @@ function LibBrowser({ items, unit = '个', kinds = null, playing, onPlay, editor
     if (!tags.length) return
     run('tag', () => ops.update(ids, mode === 'add' ? { addTags: tags } : { removeTags: tags }).then(() => toast(mode === 'add' ? `已给 ${ids.length} ${unit}加上「${tags.join('、')}」` : `已从 ${ids.length} ${unit}去掉「${tags.join('、')}」`)))
   }
-  const removeSelected = () => {
-    if (!window.confirm(`删掉选中的 ${ids.length} ${unit}？存进 FlowGal 的音频一起删，电脑上的原文件不受影响。`)) return
+  const removeSelected = async () => {
+    if (!(await confirmBox(`删掉选中的 ${ids.length} ${unit}？存进 FlowGal 的音频一起删，电脑上的原文件不受影响。`, { ok: '删除', danger: true }))) return
     run('del', () => ops.remove(ids).then(() => { setSelected(new Set()); toast(`已删除 ${ids.length} ${unit}`) }))
   }
   const named = cat && cat !== NO_CAT
@@ -2274,8 +2275,8 @@ function LibBrowser({ items, unit = '个', kinds = null, playing, onPlay, editor
     if (!name || name === cat) { setRenaming(false); return }
     run('rename', () => ops.rename(cat, name, kind).then(() => { setCat(name); toast(`「${cat}」改名为「${name}」`) }))
   }
-  const removeCat = () => {
-    if (!window.confirm(`把「${cat}」这一类的 ${inCat.length} ${unit}都删掉${cat.includes('/') ? '' : '（连子分类）'}？存进 FlowGal 的音频一起删，电脑上的原文件不受影响。`)) return
+  const removeCat = async () => {
+    if (!(await confirmBox(`把「${cat}」这一类的 ${inCat.length} ${unit}都删掉${cat.includes('/') ? '' : '（连子分类）'}？存进 FlowGal 的音频一起删，电脑上的原文件不受影响。`, { ok: '删除', danger: true }))) return
     run('delcat', () => ops.remove(inCat.map(it => it.id)).then(() => { setCat(''); toast(`已删除「${cat}」这一类`) }))
   }
 
@@ -2527,7 +2528,7 @@ function LibSoundEditor({ sound, listId }) {
       <div className="fg-row">
         <Text value={sound.name} style={{ flex: 2, width: 'auto', fontWeight: 600 }} onCommit={v => save({ name: v })} />
         <Text value={catOf(sound)} list={listId} placeholder="分类，两层用 / 隔开：门窗/敲门" style={{ flex: 1, width: 'auto' }} onCommit={v => save({ category: v })} />
-        <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'd'} onClick={() => { if (window.confirm(`从音效库删除「${sound.name}」？电脑上的原文件不受影响。`)) run('d', async () => { await api.removeLibSounds([sound.id]); await loadSoundlib() }, '已删除') }}>删除</button>
+        <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'd'} onClick={async () => { if (await confirmBox(`从音效库删除「${sound.name}」？电脑上的原文件不受影响。`, { ok: '删除', danger: true })) run('d', async () => { await api.removeLibSounds([sound.id]); await loadSoundlib() }, '已删除') }}>删除</button>
       </div>
       <div className="fg-row">
         <Select value={sound.kind} options={KIND_OPTIONS} style={INLINE} onChange={v => save({ kind: v })} />

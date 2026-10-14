@@ -2,6 +2,7 @@
 // 做过动态的用剧场同款分层画布（一直眨眼，循环念一句台词让嘴动），没做过的就是原图。
 import React from 'react'
 import { assetUrl } from '../api.js'
+import { asking } from '../ask.jsx'
 import { AaSprite } from './AaSprite.jsx'
 import { rectsBox } from '../../../lib/aa-sprite.js'
 import { planLine } from '../../../lib/typing.js'
@@ -79,7 +80,7 @@ export function SpriteViewer({ record, label, onClose, children }) {
   const [talking, setTalking] = React.useState(true)
   const talk = useDemoTalk(animated && talking)
   React.useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
+    const onKey = e => { if (e.key === 'Escape' && !asking()) { e.stopPropagation(); onClose() } }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose])
