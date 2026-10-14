@@ -540,3 +540,56 @@ test('gate: 全局角色的外貌也按字段改；只挪格子不改 tag，复�
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
   }
 })
+
+test('gate: 全局角色从全局库带来的衣服也能删：只删这一局（能放回）、全局库也删；默认服装这一局能不穿；复制回本局不带删掉的', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-'))
+  try {
+    const engine = createEngine({ store: createStore(dir), services: {}, logger: { warn() {}, info() {} } })
+    const who = async game => (await engine.gameView(game)).cast.find(p => p.name === '柯萝伊')
+    // 在 g 局建档、提升为全局；h、k 两局里她穿全局库的默认服装
+    await engine.castAction('g', 'save', { name: '柯萝伊', patch: { appearance: '1girl, silver hair' } })
+    await engine.castAction('g', 'look', { name: '柯萝伊', patch: { outfits: { 白色寝衣: 'white nightgown', 药师外套: 'white coat' }, wear: '白色寝衣' }, turn: 0 })
+    await engine.castAction('g', 'promote', { name: '柯萝伊' })
+    await engine.castAction('k', 'look', { name: '柯萝伊', patch: { outfits: { 泳装: 'swimsuit' } }, turn: 0 })
+    let p = await who('h')
+    assert.deepEqual([p.global, p.outfit, Object.keys(p.timeline.outfits).sort()], [true, '白色寝衣', ['白色寝衣', '药师外套'].sort()])
+    assert.deepEqual(p.library, { outfits: ['白色寝衣', '药师外套'], outfit: '白色寝衣', hidden: [], noDefaultWear: false })
+
+    // 只这一局：衣橱里没有了、一开头也不穿；别的对局照旧
+    await engine.castAction('h', 'look', { name: '柯萝伊', patch: { outfits: { 白色寝衣: null }, defaultWear: false } })
+    p = await who('h')
+    assert.deepEqual([Object.keys(p.timeline.outfits), p.outfit, p.timeline.wear.length], [['药师外套'], '', 0])
+    assert.deepEqual([p.library.hidden, p.library.noDefaultWear], [['白色寝衣'], true])
+    assert.equal((await who('k')).outfit, '白色寝衣')
+    // 放回
+    await engine.castAction('h', 'look', { name: '柯萝伊', patch: { restoreOutfits: ['白色寝衣'], defaultWear: true } })
+    p = await who('h')
+    assert.deepEqual([Object.keys(p.timeline.outfits).sort(), p.outfit, p.library.hidden, p.library.noDefaultWear], [['白色寝衣', '药师外套'].sort(), '白色寝衣', [], false])
+    // 这一局自己加回同名的一套：用这一局的 tag，再删又藏起全局库那套
+    await engine.castAction('h', 'look', { name: '柯萝伊', patch: { outfits: { 药师外套: 'long white coat' } } })
+    assert.equal((await who('h')).timeline.outfits.药师外套.tags, 'long white coat')
+    await engine.castAction('h', 'look', { name: '柯萝伊', patch: { outfits: { 药师外套: null } } })
+    assert.deepEqual(Object.keys((await who('h')).timeline.outfits), ['白色寝衣'])
+    // 默认服装留在衣橱里、只是一开头不穿
+    await engine.castAction('h', 'look', { name: '柯萝伊', patch: { defaultWear: false } })
+    p = await who('h')
+    assert.deepEqual([Object.keys(p.timeline.outfits), p.outfit], [['白色寝衣'], ''])
+
+    // 复制回本局：这一局删掉的、不穿的默认服装不带过来
+    await engine.castAction('h', 'copy-local', { name: '柯萝伊' })
+    p = await who('h')
+    assert.deepEqual([p.global, Object.keys(p.timeline.outfits), p.outfit], [false, ['白色寝衣'], ''])
+    await engine.castAction('k', 'copy-local', { name: '柯萝伊' })
+    p = await who('k')
+    assert.deepEqual([p.global, Object.keys(p.timeline.outfits).sort(), p.outfit], [false, ['泳装', '白色寝衣', '药师外套'].sort(), '白色寝衣'])
+
+    // 全局库也删：所有对局都没有了，默认服装一起去掉
+    await engine.castAction('m', 'global-wardrobe', { name: '柯萝伊', patch: { outfits: { 白色寝衣: null } } })
+    p = await who('m')
+    assert.deepEqual([Object.keys(p.timeline.outfits), p.outfit, p.library.outfit], [['药师外套'], '', ''])
+    await assert.rejects(engine.castAction('m', 'global-wardrobe', { name: '没这个人', patch: { outfits: { 白色寝衣: null } } }), /全局库里没有/)
+    engine.dispose()
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
+})

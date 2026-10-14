@@ -1,7 +1,7 @@
 // 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含声音、「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
 import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, soundlibNow, configNow, hostName } from '../api.js'
-import { confirmBox, promptBox } from '../ask.jsx'
+import { confirmBox, promptBox, choiceBox } from '../ask.jsx'
 import { emotionLabel, shownLib, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, RECALL_TONES, RECALL_TONE_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions, nearestOf } from '../../../lib/emotions.js'
@@ -501,18 +501,40 @@ function WardrobeEditor({ gameId, person }) {
   const look = patch => api.cast(gameId, 'look', { name: person.name, patch })
   const outfits = Object.entries((person.timeline && person.timeline.outfits) || {})
   const states = person.states || []
+  // 全局角色从全局库带来的衣服：删的时候问只删这一局还是全局库也删；这一局删掉的能放回
+  const lib = person.library
+  const shared = name => Boolean(lib && lib.outfits.includes(name))
+  const hiddenHere = lib ? lib.hidden.filter(shared) : []
+  const drop = async name => {
+    if (!shared(name)) return run('d' + name, () => look({ outfits: { [name]: null } }))
+    const isDefault = lib.outfit === name
+    const where = await choiceBox(
+      `「${name}」是${person.name}从全局库带来的衣服${isDefault ? '，也是每一局一开头穿的默认服装' : ''}。\n\n只这一局：这一局的衣橱里不再有它${isDefault ? '，一开头也不穿它' : ''}，别的对局照旧，下面随时能放回。\n全局库也删：所有对局都没有它了${isDefault ? '，默认服装一起去掉' : ''}。`,
+      [{ value: 'here', label: '只这一局' }, { value: 'all', label: '全局库也删', danger: true }],
+      { title: `删掉${name}` })
+    if (where === 'here') run('d' + name, () => look({ outfits: { [name]: null }, ...(isDefault ? { defaultWear: false } : {}) }), `这一局不带${name}了`)
+    else if (where === 'all') run('d' + name, async () => { await api.cast(gameId, 'global-wardrobe', { name: person.name, patch: { outfits: { [name]: null } } }); await look({ outfits: { [name]: null } }) }, `已从全局库删掉${name}`)
+  }
   return (
     <div className="fg-person-form">
       <div className="fg-wardrobe">
         {outfits.map(([name, o]) => (
           <div key={name} className={`fg-outfit${person.outfit === name ? ' is-on' : ''}`}>
-            <b>{name}</b>
+            <b title={shared(name) ? '从全局库带来的' : undefined}>{name}</b>
             <Text value={o.tags || ''} placeholder="这套衣服的英文 tag" onCommit={v => run('o' + name, () => look({ outfits: { [name]: v } }), '已保存')} />
             {person.outfit === name ? <span className="fg-pill">正在穿</span> : <button type="button" className="fg-btn" onClick={() => run('w' + name, () => look({ wear: name }), `${person.name} 换上了${name}`)}>穿上</button>}
-            <button type="button" className="fg-btn" title="从衣橱删掉" onClick={() => run('d' + name, () => look({ outfits: { [name]: null } }))}>✕</button>
+            <button type="button" className="fg-btn" title={shared(name) ? '从衣橱删掉（全局库带来的：问你只删这一局还是全局库也删）' : '从衣橱删掉'} onClick={() => drop(name)}>✕</button>
           </div>
         ))}
         {!outfits.length && <div className="fg-note">衣橱还是空的。导演会在角色登场、换衣服时记下来；也可以自己加。</div>}
+        {hiddenHere.length > 0 && (
+          <div className="fg-row">
+            <span className="fg-note">这一局删掉的全局库衣服：</span>
+            {hiddenHere.map(name => (
+              <button key={name} type="button" className="fg-btn" title="放回这一局的衣橱" onClick={() => run('r' + name, () => look({ restoreOutfits: [name], ...(lib.outfit === name ? { defaultWear: true } : {}) }), `${name}放回衣橱了`)}>放回{name}</button>
+            ))}
+          </div>
+        )}
         <form className="fg-outfit is-new" onSubmit={e => { e.preventDefault(); if (draft.name.trim()) run('add', () => look({ outfits: { [draft.name.trim()]: draft.tags } }), '已加进衣橱').then(() => setDraft({ name: '', tags: '' })) }}>
           <input className="fg-input" placeholder="新衣服名" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} onKeyDown={e => e.stopPropagation()} />
           <input className="fg-input" placeholder="pajamas, striped" value={draft.tags} onChange={e => setDraft({ ...draft, tags: e.target.value })} onKeyDown={e => e.stopPropagation()} />
@@ -553,6 +575,7 @@ function LookTimeline({ gameId, person }) {
   const setSpans = (name, list) => run('sp' + name, () => look({ stateSpans: { name, spans: list.map(sp => [sp.from, sp.to]) } }), '已改，用到的立绘会按新样子补画')
   const edit = (name, i, change) => setSpans(name, spans[name].map((sp, j) => (j === i ? { ...sp, ...change } : sp)))
   const wear = timeline.wear || []
+  const lib = person.library
   return (
     <>
       <div className="fg-field"><label>状态哪几轮有</label>
@@ -573,10 +596,22 @@ function LookTimeline({ gameId, person }) {
       </div>
       <div className="fg-field"><label>哪一轮起穿</label>
         <div className="fg-spans">
+          {lib && lib.noDefaultWear && lib.outfit && (
+            <div className="fg-span">
+              <b>{lib.outfit}</b>
+              <span className="fg-note">全局角色的默认服装，这一局一开头不穿</span>
+              <button type="button" className="fg-btn is-mini" title="这一局一开头照旧穿默认服装" onClick={() => run('wr', () => look({ defaultWear: true, restoreOutfits: [lib.outfit] }), `一开头照旧穿${lib.outfit}`)}>放回</button>
+            </div>
+          )}
           {wear.map((w, i) => (
             <div key={w.fromTurn + '|' + w.outfit} className="fg-span">
               <b>{w.outfit}</b>
-              {person.global && i === 0 && !w.source ? <span className="fg-note">全局角色的默认服装</span> : (
+              {person.global && i === 0 && !w.source ? (
+                <>
+                  <span className="fg-note">全局角色的默认服装，第 0 轮起</span>
+                  <button type="button" className="fg-btn is-mini" title="这一局一开头不穿它（全局库和别的对局不变）" onClick={() => run('wd' + i, () => look({ defaultWear: false }), '这一局一开头不穿默认服装了')}>✕</button>
+                </>
+              ) : (
                 <>
                   <span>第</span>
                   <Text value={w.fromTurn} style={{ width: '5cqw' }} onCommit={v => { const t = turnOf(v); if (t != null && t !== w.fromTurn) run('w' + i, () => look({ wearMove: { from: w.fromTurn, to: t } }), '已改') }} />
@@ -586,7 +621,7 @@ function LookTimeline({ gameId, person }) {
               )}
             </div>
           ))}
-          {!wear.length && <span className="fg-note">还没有换装记录</span>}
+          {!wear.length && !(lib && lib.noDefaultWear && lib.outfit) && <span className="fg-note">还没有换装记录</span>}
         </div>
       </div>
     </>

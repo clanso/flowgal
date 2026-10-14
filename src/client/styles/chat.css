@@ -70,6 +70,7 @@
 .fg-ask-btn.is-yes { font-weight: 700; color: #fff; border-color: transparent; background: linear-gradient(100deg, #ff7eb6, #9b7bff); }
 .fg-ask-btn.is-yes:hover { filter: brightness(1.1); }
 .fg-ask-box.is-danger .fg-ask-btn.is-yes { background: linear-gradient(100deg, #ff6b6b, #e0447a); }
+.fg-ask-btn.is-yes.is-danger { background: linear-gradient(100deg, #ff6b6b, #e0447a); }
 @keyframes fg-ask-in { from { opacity: 0; transform: translateY(8px) scale(.97); } }
 @media (prefers-reduced-motion: reduce) { .fg-ask, .fg-ask-box { animation: none; } }
 
