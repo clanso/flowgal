@@ -15,7 +15,6 @@ import { followMerge } from '../lib/emotions.js'
 import { unitSpeakers, hintedSpeaker } from '../lib/staging.js'
 import { reactsOf } from '../lib/blocking.js'
 import { castBrief, normalizeScript } from '../lib/director.js'
-import { cleanActing, mergeActing } from '../lib/acting.js'
 import { buildBeats } from '../src/client/theater/playback.js'
 import { encodePng } from '../lib/image/png.js'
 import { createStore } from '../lib/dsh/store.js'
@@ -53,27 +52,22 @@ test('gate: 动作表规整：一个情绪能进好几个动作；平静的那�
   const poses = [{ id: 'a', emotions: ['cold'] }, { id: 'b', emotions: ['smile'] }]
   settleNeutral(poses)
   assert.deepEqual(poses[0], { id: 'a', emotions: ['neutral', 'cold'] }, '哪都没有平静：放进第一个动作')
-  // 设计师写的整套：同一个情绪放进两个动作都留着；空动作去掉，玩家刚加的空列（keepEmpty）留着
-  const sheet = cleanActing({ poses: [{ label: '站着', emotions: ['neutral', 'smile'] }, { label: '抱臂', emotions: ['cold', 'smile'] }, { label: '空的', emotions: [] }], faces: [] })
-  assert.deepEqual(sheet.poses.map(p => p.emotions), [['neutral', 'smile'], ['cold', 'smile']])
-  assert.equal(cleanActing({ poses: [{ label: '站着', emotions: ['neutral'] }, { id: 'p2', label: '空的', emotions: [] }] }, { keepIds: true, keepEmpty: true }).poses.length, 2)
-  // 补设计：新情绪可以同时放进好几个已有动作，已经在的不再挪
-  const merged = mergeActing(sheet, { poses: [{ id: 'p1', emotions: ['worried', 'smile'] }, { id: 'p2', emotions: ['worried'] }] }).sheet
-  assert.deepEqual(merged.poses.map(p => p.emotions), [['neutral', 'smile', 'worried'], ['cold', 'smile', 'worried']])
+  // 同一个情绪放进两个动作都留着；空动作 keepEmpty 关掉时去掉
+  const kept = cleanPoseList([{ label: '站着', emotions: ['neutral', 'smile'] }, { label: '抱臂', emotions: ['cold', 'smile'] }, { label: '空的', emotions: [] }], { keepEmpty: false })
+  assert.deepEqual(kept.map(p => p.emotions), [['neutral', 'smile'], ['cold', 'smile']])
 })
 
 test('gate: 情绪在哪个动作：主动作是第一个有它的；点名的动作演得了才去；新情绪哪个动作都能演（只换脸）', () => {
-  const sheet = sheetOf({ acting: { poses: GROUPS } })
-  assert.equal(sheet.designed, true)
-  assert.equal(sheetOf({}, GROUPS).designed, false, '没有设计时用通用动作组')
-  assert.equal(sheetOf({}, []), null, '通用动作组全删了：不分动作')
+  const sheet = sheetOf(GROUPS)
+  assert.deepEqual(sheet.poses, GROUPS)
+  assert.equal(sheetOf([]), null, '通用动作组全删了：不分动作')
   assert.deepEqual(posesWith(sheet, 'smile').map(p => p.id), ['daily', 'arms'])
   assert.equal(findPose(sheet, '抱臂').id, 'arms', '导演写动作名也认')
   assert.equal(homePose(sheet, 'smile').id, 'daily')
   assert.equal(homePose(sheet, '不爽', [{ id: '不爽', base: 'cold' }]).id, 'arms', '不在任何动作里的：跟着替身（不爽 → 冷淡）')
   assert.equal(poseFor(sheet, 'smile', 'arms').id, 'arms')
   assert.equal(poseFor(sheet, 'happy', 'arms').id, 'daily', '抱臂里没有开心：去主动作')
-  assert.ok(fitsPose(sheet, sheet.poses[1], '带着烦躁思考'), '还没设计的新情绪：当前动作上只换脸')
+  assert.ok(fitsPose(sheet, sheet.poses[1], '带着烦躁思考'), '还没放进任何动作的新情绪：当前动作上只换脸')
   assert.deepEqual(poseCells({ poses: GROUPS }).filter(c => c.anchor).map(c => c.emotion), ['neutral', 'cold'])
 })
 
@@ -131,14 +125,11 @@ test('gate: 剧场挑图：先找这个动作上的这张脸，没画好看主�
   assert.deepEqual(slotKeys(sprites, look, sheet, 'arms', 'smile'), [key('smile', 'arms'), key('smile')])
 })
 
-test('gate: 情绪并掉时：动作里的换成并进去的那个（同一个动作里只留一个），差分编号带着 @ 一起改', () => {
-  const holder = {
-    sprites: { [key('不爽', 'arms')]: { assetId: 'x.png' }, [key('不爽')]: { assetId: 'y.png' } },
-    acting: { poses: [{ id: 'p1', label: '站', emotions: ['neutral', '不爽', 'annoyed'] }, { id: 'p2', label: '抱臂', emotions: ['不爽'] }] },
-  }
+test('gate: 情绪并掉时：差分编号带着 @ 一起改', () => {
+  const holder = { sprites: { [key('不爽', 'arms')]: { assetId: 'x.png' }, [key('不爽')]: { assetId: 'y.png' } } }
   followMerge(holder, ['不爽'], 'annoyed')
   assert.ok(holder.sprites[key('annoyed', 'arms')]?.assetId)
-  assert.deepEqual(holder.acting.poses.map(p => p.emotions), [['neutral', 'annoyed'], ['annoyed']])
+  assert.ok(holder.sprites[key('annoyed')]?.assetId)
 })
 
 test('gate: 说话人、谁换了情绪或动作：台词没写 sp 按切分猜的、再沿用上一位；react 和点名换动作一起算', () => {
@@ -154,11 +145,12 @@ test('gate: 说话人、谁换了情绪或动作：台词没写 sp 按切分猜�
   assert.deepEqual(lineSteps({ pose: 'p2' }, ['林岚'], []), [{ name: '林岚', emo: '', pose: 'p2' }], '只点名换动作')
 })
 
-test('gate: 导演：角色档案里列每个人的动作和里面的情绪；pose 和 react 的 pose 收下（写了竖线和 @ 的去掉）', () => {
-  const brief = castBrief([{ name: '林岚', appearance: 'a', acting: { poses: GROUPS } }, { name: '苏晴', appearance: 'b' }], { poseGroups: [] })
+test('gate: 导演：角色档案里列通用动作组的动作和里面的情绪；pose 和 react 的 pose 收下（写了竖线和 @ 的去掉）', () => {
+  const brief = castBrief([{ name: '林岚', appearance: 'a', acting: { poses: [{ id: 'p1', label: '老设计', emotions: ['neutral'] }] } }, { name: '苏晴', appearance: 'b' }], { poseGroups: GROUPS })
   assert.match(brief, /林岚.*动作：daily 日常（平静、微笑、开心） \/ arms 抱臂（冷淡、微笑）/)
-  assert.doesNotMatch(brief.split('\n')[1], /动作：/, '苏晴没有设计、也没有通用动作组')
-  assert.match(castBrief([{ name: '苏晴', appearance: 'b' }], { poseGroups: GROUPS }), /动作：daily/)
+  assert.match(brief.split('\n')[1], /苏晴.*动作：daily/, '大家共用一套')
+  assert.doesNotMatch(brief, /老设计/, '老存档里的设计不再读')
+  assert.doesNotMatch(castBrief([{ name: '苏晴', appearance: 'b' }], { poseGroups: [] }), /动作：/, '没有通用动作组：不分动作')
   const units = [{ id: 'U1', type: 'dialogue', text: '“嗯。”' }, { id: 'U2', type: 'dialogue', text: '“好啊。”' }]
   const script = normalizeScript({ cast: [{ name: '林岚' }, { name: '苏晴' }], lines: [{ u: 'U1', sp: '林岚', emo: 'cold', pose: 'arms' }, { u: 'U2', sp: '苏晴', emo: 'smile', react: [{ name: '林岚', pose: 'da@ily|' }] }] }, units)
   assert.equal(script.lines.U1.pose, 'arms')
@@ -242,7 +234,7 @@ test('gate: 引擎：身子不动只换脸，用到了哪个「动作 × 情绪�
     // 剧场：一拍一拍走到的动作跟出图一样；抱臂上的微笑换好脸之前先用抱臂的底图
     const { beats } = buildBeats({ turns: view.turns, images: [], cast: view.cast, emotions: view.emotions, poseGroups: view.poseGroups })
     assert.deepEqual(beats.map(b => b.postures?.林岚), ['arms', 'arms', 'daily', 'daily'])
-    const sheet = sheetOf(p, view.poseGroups)
+    const sheet = sheetOf(view.poseGroups)
     const shown = beats.map(b => pickSprite(p.sprites, lookAt(p.timeline, 1), b.emotions.林岚, '', { keys: e => slotKeys(p.sprites, now, sheet, b.postures.林岚, e) }))
     assert.deepEqual(shown, [p.sprites[k('cold')].assetId, p.sprites[k('cold')].assetId, p.sprites[k('neutral')].assetId, p.sprites[k('neutral')].assetId], '第二句身子没动')
 

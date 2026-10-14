@@ -10,7 +10,6 @@ import { cropFor, resample, faceAlpha, maskPixel, blendSoft, shrinkBack, faceDri
 import { closeUpPrompt, isFaceTag } from '../lib/face.js'
 import { splitTags, tagKey } from '../lib/image/style.js'
 import { emotionLevel } from '../lib/emotions.js'
-import { actingLevel, cleanActing, actingFace, actingBrief } from '../lib/acting.js'
 import { resolveConfig } from '../lib/config.js'
 import { buildNaiBody, naiReferenceOk } from '../lib/image/novelai.js'
 import { variantKey } from '../lib/look.js'
@@ -44,18 +43,11 @@ test('gate: 换脸设置：缺的用默认，数值夹在范围里，放大的�
   assert.deepEqual([cleanLevel(3), cleanLevel('4'), cleanLevel(5), cleanLevel(null)], [3, 4, 0, 0])
 })
 
-test('gate: 情绪强弱：内置的有默认（微笑「微」、生气「强」、大笑大哭惊恐「极」），新情绪跟着替身；设计师给这个人标的优先，只标了强弱的不算设计了表情', () => {
+test('gate: 情绪强弱：内置的有默认（微笑「微」、生气「强」、大笑大哭惊恐「极」），新情绪跟着替身', () => {
   assert.deepEqual(['smile', 'happy', 'angry', 'laugh', 'cry', 'scared'].map(e => emotionLevel(e)), [1, 2, 3, 4, 4, 4])
   const lib = { list: [{ id: '暴怒', base: 'angry' }, { id: '怪怪的' }] }
   assert.equal(emotionLevel('暴怒', lib), 3)
   assert.equal(emotionLevel('怪怪的', lib), 2, '跟不上任何内置情绪：算「中」')
-  const acting = cleanActing({ poses: [{ label: '站着', emotions: ['neutral', 'angry', 'happy'] }], faces: [{ emotion: 'angry', tags: 'angry', level: 1 }, { emotion: 'happy', level: 4 }, { emotion: 'neutral', tags: 'calm', level: 9 }] })
-  assert.equal(actingLevel(acting, 'angry'), 1, '冷的人生气只是「微」')
-  assert.equal(actingLevel(acting, 'happy'), 4)
-  assert.equal(actingLevel(acting, 'neutral'), 1, '标坏了的不认')
-  assert.equal(acting.faces.neutral.level, undefined)
-  assert.equal(actingFace(acting, 'happy'), null, '只标了强弱：表情照内置的画')
-  assert.match(actingBrief(acting), /生气［微］：/)
 })
 
 test('gate: 放大重画：裁脸框长边 2.2 倍的正方形、放大到 1024；Lanczos 缩放不走样，超出图的地方垫白，透明处按白底', () => {
