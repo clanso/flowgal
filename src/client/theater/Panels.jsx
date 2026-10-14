@@ -1800,7 +1800,7 @@ function CustomModelFields({ data, own, which, secret, window, onPatch }) {
 /** 插画分镜师（cg）、听音师（listen）各自能单独用的模型：跟导演一样 / 宿主里另选一个 / 自己接一个 OpenAI 兼容接口（Key 存在宿主）。 */
 const OWN_MODEL = {
   cg: { field: 'cgLlm', secret: 'cgllm', window: '这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收；最大输出、温度、资料长度跟导演用同一套设置。接口报出更小的输出上限时自动按它重试。', label: '插画分镜师的模型', hint: '写 CG 提示词的模型可以和导演分开。有的模型不肯把露骨的画面写具体，就给分镜师单独换一个；自定义接口填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行。' },
-  listen: { field: 'listenLlm', secret: 'listenllm', window: '这个模型一次能读多少 token，最大输出按它往下收（听音师最多要 16000）；温度跟导演用同一个。接口报出更小的输出上限时自动按它重试。', label: '听音师的模型', hint: '音效库比每轮给导演看的候选多时（设置 → 音效库 →「先听一遍」），导演之前先让听音师读一遍正文、列出听得见的声音，候选照它列的找。活很简单，可以换个便宜、快的模型，省钱也少等一会儿；自定义接口同上。' },
+  listen: { field: 'listenLlm', secret: 'listenllm', window: '这个模型一次能读多少 token，最大输出按它往下收（听音师最多要 16000）；温度跟导演用同一个。接口报出更小的输出上限时自动按它重试。', label: '听音师的模型', hint: '音效库或曲库比每轮给导演看的候选多时（设置 → 音效库、配乐 →「先听一遍」），导演之前先让听音师读一遍正文、列出听得见的声音和该放什么样的配乐，候选照它列的找。活很简单，可以换个便宜、快的模型，省钱也少等一会儿；自定义接口同上。' },
 }
 function OwnModelFields({ data, providers, which }) {
   const meta = OWN_MODEL[which]
@@ -2675,7 +2675,34 @@ function LibBrowser({ items, unit = '个', kinds = null, playing, onPlay, editor
 }
 
 
-/** 配乐页：开关音量、导入整个音乐文件夹（带上里面的描述文件）、按分类整理、导出描述、清空。 */
+/**
+ * 配乐页的「导演怎么挑」：每轮给导演看几首，和「先听一遍」（跟音效库、环境音库是同一个开关）。
+ * 曲子没超过这个数时全给导演看；超过了，开着先听一遍就先让听音师说这一轮该放什么样的音乐、照它找，关着只按分组轮流挑。
+ */
+function MusicPicking({ cfg, count }) {
+  const quota = cfg.director.musicCandidates
+  const listen = cfg.director.listen
+  const pd = patch => patchConfig({ director: patch }).catch(e => toast(e.message, 'error'))
+  const state = count <= quota
+    ? `现在曲库有 ${count} 首，没超过 ${quota}：每轮整张曲目表都给导演看，不用找。`
+    : listen
+      ? `现在曲库有 ${count} 首，比 ${quota} 多：每轮导演之前先让听音师读一遍正文，说出这一轮该放什么样的音乐（情绪、场面、节奏），拿这些词去对每首的标签、描述、曲名和分类，最像的先给导演看（最多占三分之二）；剩下的名额按分类轮流挑，保证各种情绪都有。`
+      : `现在曲库有 ${count} 首，比 ${quota} 多：每轮按分类的第一层（没分类的按第一个标签）分组轮流挑 ${quota} 首，正文和上一幕基调里出现的标签、曲名优先。分类随手分的话容易挑不准，建议开着「先听一遍」。`
+  return (
+    <>
+      <div className="fg-section">导演怎么挑</div>
+      <div className="fg-note">{state}</div>
+      <Field label="每轮候选" hint="后台导演每一轮能看到几首（编号、曲名、描述、分类和标签各一行，越多提示词越长）。曲库没超过这个数时全给它看。">
+        <div className="fg-row"><Text type="number" style={{ width: '7cqw' }} value={quota} onCommit={v => { const n = Math.trunc(Number(v)); if (n >= 1) pd({ musicCandidates: n }) }} /><span className="fg-note">首，最多 300</span></div>
+      </Field>
+      <Field label="先听一遍" hint="曲子比候选多时，导演之前先让听音师读一遍这一轮正文，说出该放什么样的音乐（开头的基调，中途情绪转折再各一段），连同找它们的词（会参照曲库里常用的标签）。候选照它说的去对标签和描述，跟你怎么分类没关系。每轮多一次模型调用（跟音效共用这一次），听音师的模型在「导演」页换，提示词在「提示词 → 听音师」里改。它出错时退回按分组轮流挑。音效库、环境音库和配乐共用这一个开关。">
+        <Toggle value={listen} onChange={v => pd({ listen: v })} />
+      </Field>
+    </>
+  )
+}
+
+/** 配乐页：开关音量、导演怎么挑、导入整个音乐文件夹（带上里面的描述文件）、按分类整理、导出描述、清空。 */
 function MusicSection({ data }) {
   const cfg = data.config
   const tracks = useMusic()
@@ -2751,8 +2778,9 @@ function MusicSection({ data }) {
     <>
       <div className="fg-section">播放</div>
       <Field label="配乐"><div className="fg-row"><Toggle value={cfg.ui.bgm} onChange={v => p({ bgm: v })} /><input type="range" min="0" max="1" step="0.05" value={cfg.ui.bgmVolume} onChange={e => p({ bgmVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
+      <MusicPicking cfg={cfg} count={(tracks || []).length} />
       <div className="fg-section">我的曲库{tracks ? ` · ${tracks.length} 首` : ''}</div>
-      <div className="fg-note">后台导演整理每一轮时会读到每首的分类、描述和标签，自己决定这一幕放哪首、哪句话换歌。描述随便写：听感、乐器、适合的场面和情绪都行，越具体导演选得越准。导演还没整理完的轮次会先按描述粗配一首。曲子多的时候导演每轮按分类各挑几首看，分好类它就不会只看到一种情绪。</div>
+      <div className="fg-note">后台导演整理每一轮时会读到每首的分类、描述和标签，自己决定这一幕放哪首、哪句话换歌。描述随便写：听感、乐器、适合的场面和情绪都行，越具体导演选得越准。导演还没整理完的轮次会先按描述粗配一首。分类怎么分都行（按游戏、专辑、心情都可以），只用来整理；曲子多的时候导演看到哪些主要靠标签和描述，标签建议写上情绪（日常、温馨、甜蜜、感伤、紧张、悬疑、诡异、战斗、热血、壮阔、滑稽）、场面（校园、夜晚、追逐、告白、回忆）和节奏乐器（舒缓、快节奏、钢琴、弦乐）。</div>
       <div className="fg-row" style={{ margin: '1cqw 0' }}>
         <button type="button" className="fg-btn is-primary" disabled={Boolean(progress)} onClick={() => folderRef.current && folderRef.current.click()}>导入文件夹</button>
         <button type="button" className="fg-btn" disabled={Boolean(progress)} onClick={() => filesRef.current && filesRef.current.click()}>添加曲子</button>
@@ -2914,7 +2942,7 @@ function PickingFields({ cfg, kind, count }) {
       <Field label="每轮候选" hint={`后台导演每一轮能看到几个${word}（编号、名字、分类和描述各一行，越多提示词越长）。库没超过这个数时全给它看。`}>
         <div className="fg-row"><Text type="number" style={{ width: '7cqw' }} value={quota} onCommit={v => { const n = Math.trunc(Number(v)); if (n >= 1) pd({ soundCandidates: { [kind]: n } }) }} /><span className="fg-note">个，最多 300</span></div>
       </Field>
-      <Field label="先听一遍" hint={'库比候选多时，导演之前先让听音师读一遍这一轮正文，列出听得见的声音和找它们的近义词（「砸了杯子」会去找摔碎、打碎、玻璃……），候选照它列的找，正文里没有原词的声音也找得到。每轮多一次模型调用，会慢一点；听音师可以在「导演」页单独换个便宜、快的模型，提示词在「提示词 → 听音师」里改。它出错时退回按正文对词，导演照常整理。音效库和环境音库共用这一个开关。'}>
+      <Field label="先听一遍" hint={'库比候选多时，导演之前先让听音师读一遍这一轮正文，列出听得见的声音和找它们的近义词（「砸了杯子」会去找摔碎、打碎、玻璃……），候选照它列的找，正文里没有原词的声音也找得到。每轮多一次模型调用，会慢一点；听音师可以在「导演」页单独换个便宜、快的模型，提示词在「提示词 → 听音师」里改。它出错时退回按正文对词，导演照常整理。音效库、环境音库和配乐共用这一个开关。'}>
         <Toggle value={listen} onChange={v => pd({ listen: v })} />
       </Field>
     </>
