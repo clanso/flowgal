@@ -53,7 +53,7 @@
 .fg-toast.is-error { border-color: rgba(255, 120, 120, .6); }
 @keyframes fg-toast-in { from { opacity: 0; transform: translate(-50%, calc(-100% + 10px)); } }
 
-.fg-settings-card { display: grid; gap: 12px; padding: 18px; border-radius: 14px; border: 1px solid rgba(127, 127, 127, .25); background: linear-gradient(135deg, rgba(155, 123, 255, .08), rgba(255, 126, 182, .06)); }
+.fg-settings-card { --accent: #ff7eb6; --accent2: #9b7bff; --accent3: #5ee7ff; display: grid; gap: 12px; padding: 18px; border-radius: 14px; border: 1px solid rgba(127, 127, 127, .25); background: linear-gradient(135deg, rgba(155, 123, 255, .08), rgba(255, 126, 182, .06)); }
 .fg-settings-card h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
 .fg-settings-card p { margin: 0; font-size: 13px; opacity: .75; line-height: 1.6; }
 .fg-settings-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
