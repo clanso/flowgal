@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { deflateRawSync } from 'node:zlib'
 import { segmentTurn, unitsForPrompt, anchorFor } from '../lib/segment.js'
-import { extractJson, normalizeScript, direct, retryMaxTokens, castBrief, wantedOutput, wantedContext, imagePhrases } from '../lib/director.js'
+import { extractJson, callModel, normalizeScript, direct, retryMaxTokens, castBrief, wantedOutput, wantedContext, imagePhrases } from '../lib/director.js'
 import { DIRECTOR_LIMITS, directorCaps, limitPhrases } from '../lib/limits.js'
 import { applyPeople, effectivePerson, expandMentions, rollback, allNames, editPerson, editLook } from '../lib/cast.js'
 import { variantKey, lookAt, pickSprite, nameSeed, cleanLookFields, joinLook, lookTags, formatLook } from '../lib/look.js'
@@ -61,6 +61,33 @@ test('gate: 导演 JSON 容错与规整', () => {
   assert.deepEqual(s.choices, ['走过去', '开个玩笑'])
   assert.equal(s.images.length, 1)
   assert.equal(s.images[0].shape, 'landscape')
+})
+
+test('gate: 导演 JSON 漏了收尾括号补上；配错的、多出来的括号理顺；后面跟着带括号的废话也不碍事', () => {
+  const images = '{"images":[{"key":"c1","tag":"rooftop, sunset","nl":"A girl on the roof.","characters":[{"name":"林岚","tag":"girl, smile","nl":"She smiles, {softly} [warmly]."}]}]'
+  // DeepSeek 有时最后少一个 }：以前从最后一个 } 截断，整批作废
+  assert.equal(extractJson(images).images[0].characters[0].nl, 'She smiles, {softly} [warmly].')
+  assert.equal(extractJson('```json\n' + images + '\n```').images[0].key, 'c1')
+  assert.deepEqual(extractJson('{"a":[1,2}'), { a: [1, 2] })
+  assert.deepEqual(extractJson('{"a":[1,2]]}'), { a: [1, 2] })
+  assert.deepEqual(extractJson('{"a":1} 以上。{备注}'), { a: 1 })
+  assert.deepEqual(extractJson('{"a":[{"b":"x"},]'), { a: [{ b: 'x' }] })
+  // 像是被截断的（停在字符串、键名或逗号中间）不补
+  assert.throws(() => extractJson('{"images":[{"key":"c1"},{"key":"c2","tag":"roof'), /JSON 无法解析/)
+  assert.throws(() => extractJson('{"images":[{"key":"c1","tag":"roof'), /没有返回 JSON/)
+  assert.throws(() => extractJson('{"images":[{"key":"c1"},'), /JSON 无法解析/)
+  assert.throws(() => extractJson('{"images":['), /没有返回 JSON/)
+  // 这次调用本来就是被截断收尾的：不替它补
+  assert.throws(() => extractJson(images, { close: false }), /JSON 无法解析/)
+})
+
+test('gate: 调用写到上限、被内容过滤掐断或中途报错收尾的，标 cut，不补括号', async () => {
+  const llmEnding = reason => ({ stream: () => (async function* () { yield { type: 'text-delta', text: '{"a":[1' }; yield { type: 'finish', reason } })() })
+  const run = reason => callModel(llmEnding(reason), { provider: 'p', model: 'm', system: 's', user: 'u' })
+  assert.equal((await run({ kind: 'stop' })).cut, false)
+  assert.equal((await run({ kind: 'length' })).cut, true)
+  assert.equal((await run({ kind: 'content_filter' })).cut, true)
+  assert.equal((await run({ kind: 'error', failure: { message: '断了' } })).cut, true)
 })
 
 function scriptedLlm(replies, info) {

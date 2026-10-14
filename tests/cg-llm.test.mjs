@@ -192,3 +192,41 @@ test('gate: 导演用宿主的模型，插画分镜师走自己接的接口；Ke
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('gate: 分镜师的 JSON 最后少一个 }（DeepSeek 常见）：照样收下它写的画面，不退回按档案拼', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'flowgal-cgclose-'))
+  try {
+    const store = createStore(dir)
+    const tavern = fakeTavern()
+    const writerCalls = []
+    const writer = request => {
+      writerCalls.push(request)
+      const ids = [...userText(request).matchAll(/^- (c\d+)：/gm)].map(m => m[1])
+      const reply = JSON.stringify({ images: ids.map(key => ({ key, tag: 'bedroom, night, from side, dim lighting', nl: 'Moonlight falls across the bed as she turns toward the door.', characters: [{ name: '林岚', tag: 'girl, white nightgown, looking back, blush', nl: 'She glances back over her shoulder.' }] })) })
+      return reply.slice(0, -1)
+    }
+    const llm = {
+      stream(request) {
+        const text = roleText(request).includes('你是视觉小说的插画分镜师') ? writer(request) : DIRECTOR_REPLY
+        return (async function* () { yield { type: 'text-delta', text }; yield { type: 'finish', reason: { kind: 'stop' } } })()
+      },
+    }
+    const images = []
+    const fetchImpl = async (url, init) => { images.push(init?.body ? JSON.parse(init.body) : null); return new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } }) }
+    const engine = createEngine({ store, services: { tavern, llm, credentials: null }, fetchImpl, logger: { warn() {}, info() {} } })
+    await engine.patchConfig({ images: { backgrounds: false, portraits: false, expressions: false }, director: { cgLlm: { source: 'host', provider: 'deepseek-official', model: 'deepseek-v4-pro' } } })
+    await engine.setSecret('novelai', 'official', 'pst-test-key')
+    await engine.onTurnSettled({ gameId: 'g', turn: 2, textVersion: 'v1', text: '夜深了。\n“别看。”林岚回过头。', card: { id: 'c', name: '学园' } })
+    const view = await settle(engine, 'g', v => v.images[0]?.status === 'ready')
+    assert.equal(writerCalls.length, 1, '一次就收下了，不用带着错误再要')
+    assert.equal(view.images[0].writer, 'ai')
+    assert.equal(view.images[0].desc, 'Moonlight falls across the bed as she turns toward the door.')
+    const caption = images.find(r => r?.parameters?.v4_prompt)?.parameters.v4_prompt.caption
+    assert.match(caption.base_caption, /bedroom, night, from side/)
+    assert.match(caption.char_captions[0].char_caption, /looking back, blush/)
+    const cg = (await engine.directorLog('g')).entries.find(e => e.kind === 'cg')
+    assert.equal(cg.status, 'ok')
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 })
+  }
+})
