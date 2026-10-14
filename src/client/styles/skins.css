@@ -30,7 +30,7 @@
 .fg-theater[data-skin="sakura"] .fg-panel { background: linear-gradient(135deg, rgba(255, 246, 250, .96), rgba(245, 236, 255, .95)); color: var(--ink); }
 .fg-theater[data-skin="sakura"] .fg-lib-bar { background: rgb(252, 242, 250); box-shadow: 0 -.6cqw 1.4cqw rgba(120, 60, 100, .18); }
 .fg-theater[data-skin="sakura"] .fg-emo-sticky { background: rgb(252, 242, 250); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(120, 60, 100, .18); }
-.fg-theater[data-skin="sakura"] .fg-pm-table thead th { background: rgb(250, 236, 246); } .fg-theater[data-skin="sakura"] .fg-pm-emo { background: rgb(252, 242, 250); } .fg-theater[data-skin="sakura"] .fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 12%, rgb(252, 242, 250)); }
+.fg-theater[data-skin="sakura"] .fg-pm-table thead th { background: rgb(250, 236, 246); } .fg-theater[data-skin="sakura"] .fg-pm-emo { background: rgb(252, 242, 250); }
 .fg-theater[data-skin="sakura"] .fg-input, .fg-theater[data-skin="sakura"] .fg-select, .fg-theater[data-skin="sakura"] .fg-textarea { background: rgba(255, 255, 255, .7); }
 .fg-theater[data-skin="sakura"] .fg-choice { color: var(--ink); }
 .fg-theater[data-skin="sakura"] .fg-free input { background: rgba(255, 255, 255, .7); color: var(--ink); }
@@ -62,7 +62,7 @@
 .fg-theater[data-skin="ink"] .fg-panel { background: linear-gradient(135deg, rgba(242, 234, 214, .97), rgba(232, 220, 196, .97)); color: var(--ink); }
 .fg-theater[data-skin="ink"] .fg-lib-bar { background: rgb(238, 229, 207); box-shadow: 0 -.6cqw 1.4cqw rgba(60, 40, 20, .2); }
 .fg-theater[data-skin="ink"] .fg-emo-sticky { background: rgb(238, 229, 207); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(60, 40, 20, .2); }
-.fg-theater[data-skin="ink"] .fg-pm-table thead th { background: rgb(232, 221, 196); } .fg-theater[data-skin="ink"] .fg-pm-emo { background: rgb(238, 229, 207); } .fg-theater[data-skin="ink"] .fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 12%, rgb(238, 229, 207)); }
+.fg-theater[data-skin="ink"] .fg-pm-table thead th { background: rgb(232, 221, 196); } .fg-theater[data-skin="ink"] .fg-pm-emo { background: rgb(238, 229, 207); }
 .fg-theater[data-skin="ink"] .fg-input, .fg-theater[data-skin="ink"] .fg-select, .fg-theater[data-skin="ink"] .fg-textarea { background: rgba(255, 252, 244, .7); }
 .fg-theater[data-skin="ink"] .fg-choice { border-radius: .2cqw; color: var(--ink); }
 .fg-theater[data-skin="ink"] .fg-free input { border-radius: .2cqw; background: rgba(255, 252, 244, .7); color: var(--ink); }

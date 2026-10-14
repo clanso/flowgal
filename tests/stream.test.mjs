@@ -1,5 +1,5 @@
 // 流式开关：自定义接口（导演 / 插画分镜师 / 听音师）和酒馆的连接配置能选不流式；DSH 的模型服务只走流式。
-// 导演也能自己接一个 OpenAI 兼容接口（立绘设计师、表演设计师跟着用），这样 DSH 上也能不流式。
+// 导演也能自己接一个 OpenAI 兼容接口（立绘设计师跟着用），这样 DSH 上也能不流式。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -176,7 +176,7 @@ test('gate: 导演自己接接口、不流式：导演和跟着导演的插画�
     assert.equal(entry.window, 200000, '按填的窗口裁')
 
     // 立绘设计师、插画分镜师（跟导演一样时）也走导演的接口：预览里看得到，预览不发
-    for (const role of ['cg', 'acting']) {
+    for (const role of ['cg', 'sprite']) {
       const preview = await engine.previewPrompt('g', role, { name: '林岚' })
       assert.deepEqual([preview.provider, preview.model], ['custom', 'claude-x'], role)
     }
