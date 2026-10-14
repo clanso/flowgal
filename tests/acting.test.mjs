@@ -296,7 +296,7 @@ test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整�
     await engine.castAction('g', 'face-box', { name: '林岚', key: pout, rects: EYES })
     lin = await settle(engine, 'g', p => p.sprites[angry]?.assetId && !p.spriteStatus[angry], '换好脸')
     assert.equal(requests[1].action, 'infill')
-    assert.match(charOf(requests[1]), /expressionless, narrowed eyes, cold eyes, closed mouth, half-closed eyes/)
+    assert.match(charOf(requests[1]), /1\.2::expressionless::, 1\.2::narrowed eyes::, 1\.2::cold eyes::, 1\.2::closed mouth::, 1\.2::half-closed eyes::/, '表情词加重')
     assert.doesNotMatch(charOf(requests[1]), /puffed cheeks/)
 
     // 导演新造的情绪：补进设计（不重新设计整套）和写词一次请求做完，再在默认站姿（平静）的底图上换脸
@@ -347,7 +347,7 @@ test('gate: 只换脸整条流程按设计走：要「生气」→ 先设计整�
     lin = await settle(engine, 'g', p => requests.length > before && p.sprites[angry]?.tags === 'biting lip, glaring, half-closed eyes' && !p.spriteStatus[angry], '重新设计这张脸')
     assert.match(userText(combined().at(-1)), /- angry（生气）：已在动作 p2「抱着胳膊别过脸」里，只重新设计表情/)
     assert.equal(requests.at(-1).action, 'infill')
-    assert.match(charOf(requests.at(-1)), /biting lip, narrowed eyes/)
+    assert.match(charOf(requests.at(-1)), /1\.2::biting lip::, 1\.2::narrowed eyes::/)
     assert.doesNotMatch(charOf(requests.at(-1)), /glaring/)
     assert.equal(lin.acting.faces.angry.tags, 'biting lip, narrowed eyes')
 
