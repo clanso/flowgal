@@ -10,7 +10,7 @@ import { PlayView, useDemoTalk, SpriteViewer } from './AaPreview.jsx'
 import { emotionLabel } from './playback.js'
 import { visionApi, frameSprite, followSprite, holdVision, releaseVisionLater } from './vision.js'
 import { AA_PARTS, AA_STEPS, AA_STEPS_LITE, defaultRects, rectsBox, stateRects, motionPack, packLevel, cleanRects } from '../../../lib/aa-sprite.js'
-import { cleanPatch } from '../../../lib/aa-patch.js'
+import { cleanPatch, fitMouth } from '../../../lib/aa-patch.js'
 import { keyEmotion, keyPose } from '../../../lib/look.js'
 
 const BOX_NAMES = { eyes: ['左眼', '右眼'], mouth: ['嘴'] }
@@ -26,14 +26,14 @@ const readBlob = blob => new Promise((resolve, reject) => { const r = new FileRe
 const assetDataUrl = async id => readBlob(await (await fetch(assetUrl(id))).blob())
 
 /**
- * 重画结果洗成贴片：只留真正变了的像素、颜色对齐原图；眼睛的贴片里刘海一律用原图（见 lib/aa-patch.js）。
- * gen 是重画结果（垫过白底、补成 64 的倍数），prep.src 是原图像素（带透明度）。
+ * 重画结果洗成贴片：只留真正变了的像素、颜色对齐原图；眼睛只改眼睛本身（头发、眉毛、脸颊用原图），
+ * 嘴挪回原来嘴线的位置、只改嘴附近（见 lib/aa-patch.js）。gen 是重画结果（垫过白底、补成 64 的倍数），prep.src 是原图像素（带透明度）。
  */
 function cleanToPatch(gen, prep, rects, part, state) {
   const c = makeCanvas(prep.padW, prep.padH)
   const g = c.getContext('2d')
   g.drawImage(gen, 0, 0, prep.padW, prep.padH)
-  const p = cleanPatch(prep.src, g.getImageData(0, 0, prep.padW, prep.padH), stateRects(rects, part, state, prep.h), { classes: part === 'eyes', keepHair: part === 'eyes' })
+  const p = cleanPatch(prep.src, g.getImageData(0, 0, prep.padW, prep.padH), stateRects(rects, part, state, prep.h), { classes: part === 'eyes', keepHair: part === 'eyes', mouth: part === 'mouth' ? (state === 'half' || state === 'open' ? 'top' : 'center') : null })
   const out = makeCanvas(p.width, p.height)
   out.getContext('2d').putImageData(new ImageData(p.data, p.width, p.height), 0, 0)
   return { dataUrl: out.toDataURL('image/png'), x: p.x, y: p.y }
@@ -345,8 +345,9 @@ export function AaWorkbench({ gameId, person, onClose }) {
   const make = async (v, only = null, given = null) => {
     job(v.key, { status: 'running', step: 0, error: '' })
     const prep = await prepare(v.record)
-    // 跟宿主画遮罩用同一个框（对齐 8 像素、夹在垫好的图里），洗贴片时才对得上
-    const rects = cleanRects(given || rectsOf(v.key), prep.padW, prep.padH)
+    // 跟宿主画遮罩用同一个框（对齐 8 像素、夹在垫好的图里），洗贴片时才对得上；
+    // 嘴框先对准原图上的嘴线（左右对中、上边收到嘴线上方）：NovelAI 把嘴画在遮罩中间，框偏了嘴就偏、往上长
+    const rects = cleanRects(fitMouth(prep.src, cleanRects(given || rectsOf(v.key), prep.padW, prep.padH)), prep.padW, prep.padH)
     setSizes(s => ({ ...s, [v.key]: { w: prep.w, h: prep.h } }))
     const patches = only ? await storedPatches(v.record) : {}
     const todo = only ? [only] : steps
@@ -398,8 +399,8 @@ export function AaWorkbench({ gameId, person, onClose }) {
       </div>
       <div className="fg-note">
         给差分做眨眼和说话的口型：框好两只眼睛和嘴，每张差分用 NovelAI 局部重绘 6 次（眼睛半闭、闭；嘴齿缝、小开、开、圆），只重画框里那一小块，原图不动；
-        重画的结果会洗干净（颜色对齐原图、刘海用原图），眨眼时不闪色、头发不跳。路人可以勾「精简版」：只做闭眼和一个张嘴，每张 2 次。
-        同一个角色的差分姿势相同，框一次可以「套用到所选」。嘴框尽量扁：框多高，嘴最多张多大。生成要用 NovelAI 的额度（试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。
+        重画的结果会洗干净（颜色对齐原图，只改眼睛本身，压着的刘海、两眼之间的头发、眉毛都用原图），眨眼时不闪色、头发不跳。路人可以勾「精简版」：只做闭眼和一个张嘴，每张 2 次。
+        同一个角色的差分姿势相同，框一次可以「套用到所选」。嘴框尽量扁：框的下边到哪，嘴最多张到哪；生成时嘴框会自动对准原来的嘴线（左右对中、上边收到嘴线上方），画出来的嘴也会挪回原来的位置。生成要用 NovelAI 的额度（试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。
       </div>
       {variants.length > 0 && <VisionBar status={vision} setStatus={setVision} />}
       {!variants.length && <div className="fg-note" style={{ marginTop: '1cqw' }}>这个角色还没有画好的差分。先在人物志里画几张。</div>}

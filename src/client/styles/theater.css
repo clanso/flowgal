@@ -1322,6 +1322,13 @@
 .fg-aa-box.is-face { color: #ffd166; }
 .fg-face-info { gap: .6cqw; margin: .4cqw 0; } .fg-face-info:not(.fg-row) { display: grid; }
 .fg-face-editor { margin: .6cqw 0; }
+/* 换脸每次画的脸：一排小图，在用的那次描边，没过的压暗一点；点开放大能换 */
+.fg-face-tries { display: flex; flex-wrap: wrap; gap: .6cqw; }
+.fg-face-try { display: grid; gap: .2cqw; width: 9cqw; min-width: 64px; padding: .25cqw; border: 1px solid var(--box-border); border-radius: .6cqw; background: rgba(255, 255, 255, .04); color: inherit; font: inherit; font-size: .78em; cursor: zoom-in; }
+.fg-face-try img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: .4cqw; background: rgba(255, 255, 255, .06); }
+.fg-face-try.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.fg-face-try.is-flat:not(.is-on), .fg-face-try.is-drift:not(.is-on) { opacity: .78; }
+.fg-lightbox.is-face img { width: min(88vw, 104dvh); height: auto; max-height: 78%; image-rendering: auto; }
 .fg-face-editor .fg-aa-frame { height: 28cqw; }
 /* 动作与表情设计：一个动作一块，块里每个情绪一行（名字、归哪个动作、他的这种表情） */
 .fg-acting { display: grid; gap: .7cqw; }
@@ -1606,6 +1613,7 @@ button.fg-pm-name:hover { color: var(--accent); }
 }
 @container stage (max-aspect-ratio: 4/5) {
   .fg-face-levels { grid-template-columns: minmax(0, 1fr); } .fg-dial input[type=range], .fg-pct input[type=range] { width: 30cqw; }
+  .fg-face-try { width: 22cqw; }
   .fg-pct .fg-input { width: 14cqw; } .fg-dlg-preview { width: 100%; } .fg-fontname { font-size: 3.2cqw; }
   .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }

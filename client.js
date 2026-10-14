@@ -1686,6 +1686,13 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-aa-box.is-face { color: #ffd166; }
 .fg-face-info { gap: .6cqw; margin: .4cqw 0; } .fg-face-info:not(.fg-row) { display: grid; }
 .fg-face-editor { margin: .6cqw 0; }
+/* 换脸每次画的脸：一排小图，在用的那次描边，没过的压暗一点；点开放大能换 */
+.fg-face-tries { display: flex; flex-wrap: wrap; gap: .6cqw; }
+.fg-face-try { display: grid; gap: .2cqw; width: 9cqw; min-width: 64px; padding: .25cqw; border: 1px solid var(--box-border); border-radius: .6cqw; background: rgba(255, 255, 255, .04); color: inherit; font: inherit; font-size: .78em; cursor: zoom-in; }
+.fg-face-try img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: .4cqw; background: rgba(255, 255, 255, .06); }
+.fg-face-try.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.fg-face-try.is-flat:not(.is-on), .fg-face-try.is-drift:not(.is-on) { opacity: .78; }
+.fg-lightbox.is-face img { width: min(88vw, 104dvh); height: auto; max-height: 78%; image-rendering: auto; }
 .fg-face-editor .fg-aa-frame { height: 28cqw; }
 /* 动作与表情设计：一个动作一块，块里每个情绪一行（名字、归哪个动作、他的这种表情） */
 .fg-acting { display: grid; gap: .7cqw; }
@@ -1970,6 +1977,7 @@ button.fg-pm-name:hover { color: var(--accent); }
 }
 @container stage (max-aspect-ratio: 4/5) {
   .fg-face-levels { grid-template-columns: minmax(0, 1fr); } .fg-dial input[type=range], .fg-pct input[type=range] { width: 30cqw; }
+  .fg-face-try { width: 22cqw; }
   .fg-pct .fg-input { width: 14cqw; } .fg-dlg-preview { width: 100%; } .fg-fontname { font-size: 3.2cqw; }
   .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
@@ -2986,7 +2994,58 @@ var FACE_WORDS = lines(
   "bags under eyes",
   "eye contact"
 );
-var FACE_EYE_BEFORE = lines("closed", "half-closed", "narrowed", "downcast", "squinting", "sparkling", "empty", "half-lidded", "watery", "teary", "rolling", "averted", "averting", "crazy", "shaded", "cold", "gentle", "sleepy", "tired", "wide", "dull", "glazed", "shining", "soft", "lowered");
+var FACE_EYE_BEFORE = lines(
+  "closed",
+  "half-closed",
+  "narrowed",
+  "downcast",
+  "squinting",
+  "sparkling",
+  "empty",
+  "half-lidded",
+  "watery",
+  "teary",
+  "rolling",
+  "averted",
+  "averting",
+  "crazy",
+  "shaded",
+  "cold",
+  "gentle",
+  "sleepy",
+  "tired",
+  "wide",
+  "dull",
+  "glazed",
+  "shining",
+  "soft",
+  "lowered",
+  "calm",
+  "serious",
+  "determined",
+  "sad",
+  "kind",
+  "fierce",
+  "stern",
+  "focused",
+  "tearful",
+  "misty",
+  "glistening",
+  "unfocused",
+  "distant",
+  "hopeful",
+  "pleading",
+  "worried",
+  "nervous",
+  "happy",
+  "smiling",
+  "loving",
+  "lustful",
+  "seductive",
+  "bedroom",
+  "upturned",
+  "puppy"
+);
 var FACE_EYE_AFTER = lines("closed", "open", "widened", "narrowed", "shut", "lowered");
 var FACE_NOT = lines("hair", "hand", "hands", "finger", "fingers", "arm", "arms", "holding", "covering", "eye-level", "eyewear", "eyepatch", "eyeshadow", "eyeliner", "mascara", "lipstick", "eyelashes", "facing", "mask", "paint", "mark", "whisker", "whiskers");
 var TEXT_DEFAULTS = Object.freeze({
@@ -3911,16 +3970,26 @@ var DEFAULT_FACE = Object.freeze({
   // 每档的重绘强度：低的留住原来的线条和颜色，高的改得动
   wholePeak: true,
   // 「极」那一档不换脸，在同一个动作、同一个种子上整张画（脸由主模型画，画风自然一致）
+  tone: true,
+  // 色调对齐底图：重画的脸整体偏亮、偏暗、偏色时按底图拉回来（只动整体色调，眉眼口、泪、红晕不动）
+  oldNegative: true,
+  // 底图原来的表情（这张没有的）写进负面：低强度重画时模型照着底图描，不压住原来的表情就换不过去
+  emphasis: 1.2,
+  // 这张的表情词加重多少（NovelAI 的「1.2::词::」写法，1 不加重）
   check: true,
-  // 画完自动比对，跑偏了换种子、调强度再来，留最像的那张
-  retries: 5,
-  // 跑偏了最多再画几次
+  // 画完自动比对：表情没换上调高强度再来，画风跑偏换种子再来，留最像的那张
+  retries: 10,
+  // 没过最多再画几次
+  expression: 3,
+  // 表情至少变多少：眉眼口的线条比底图变了百分之几（见 expressionChange），少于这个算没换上；0 不查
   tolerance: 1,
-  // 比对的宽严：小于 1 更严（更容易重来），大于 1 更松
+  // 画风比对的宽严：小于 1 更严（更容易重来），大于 1 更松
+  drop: 0,
+  // 画风跑偏时强度最多往下调多少：0 只换种子不降强度（降下去眉眼就改不动了，换上的只剩泪和红晕）
   reference: false
   // 把底图当角色参考一起发给 NovelAI，锁住人物和画风（只有 V4.5 支持，V5 还没有；每张多花 5 Anlas；接口不认时自动不带）
 });
-var FACE_LIMITS = { cropScale: [1.5, 4], cropSize: [512, 1536], feather: [0, 0.6], strength: [0.2, 1], retries: [0, 5], tolerance: [0.5, 2.5] };
+var FACE_LIMITS = { cropScale: [1.5, 4], cropSize: [512, 1536], feather: [0, 0.6], strength: [0.2, 1], retries: [0, 10], expression: [0, 30], tolerance: [0.5, 2.5], drop: [0, 0.8], emphasis: [1, 2] };
 
 // lib/face.js
 var POSE_IDS = Object.keys(POSES);
@@ -9853,32 +9922,119 @@ function blur(m, w, h, sigma) {
   };
   return pass(pass(m, 1, 0), 0, 1);
 }
+function convexHull(points) {
+  const p4 = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p4.length < 3) return p4;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower = [], upper = [];
+  for (const q of p4) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  for (const q of p4.slice().reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+function hullDistance(hull, x, y) {
+  let d = -Infinity;
+  for (let i = 0; i < hull.length; i++) {
+    const [ax, ay] = hull[i], [bx, by] = hull[(i + 1) % hull.length];
+    const ex = bx - ax, ey = by - ay, len = Math.hypot(ex, ey) || 1;
+    d = Math.max(d, ((x - ax) * ey - (y - ay) * ex) / len);
+  }
+  return Math.max(0, d);
+}
+function components(mask, w, h) {
+  const seen = new Uint8Array(w * h), out = [];
+  for (let s = 0; s < w * h; s++) {
+    if (!(mask[s] > 0) || seen[s]) continue;
+    const comp = [s], stack = [s];
+    seen[s] = 1;
+    while (stack.length) {
+      const k = stack.pop(), x = k % w;
+      for (const nb of [x > 0 ? k - 1 : -1, x < w - 1 ? k + 1 : -1, k - w, k + w]) {
+        if (nb < 0 || nb >= w * h || seen[nb] || !(mask[nb] > 0)) continue;
+        seen[nb] = 1;
+        stack.push(nb);
+        comp.push(nb);
+      }
+    }
+    out.push(comp);
+  }
+  return out;
+}
+var isSclera = (L, a, b) => L > 80 && Math.hypot(a, b) < 7;
+function eyeCore(r, { x0, y0, w, h, bl, g2, wb, wg, de }) {
+  const rx = (r[2] - r[0]) / 2, ry = (r[3] - r[1]) / 2, cx = r[0] + rx, cy = r[1] + ry;
+  const ell = (x, y) => ((x0 + x + 0.5 - cx) / rx) ** 2 + ((y0 + y + 0.5 - cy) / ry) ** 2;
+  const feat = new Float32Array(w * h), strong = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (ell(x, y) > 0.9) continue;
+    const fb = wb[i * 3] > 0.5 || isSclera(bl[i * 3], bl[i * 3 + 1], bl[i * 3 + 2]);
+    const fg = wg[i * 3] > 0.5 || isSclera(g2[i * 3], g2[i * 3 + 1], g2[i * 3 + 2]);
+    if (fb || fg) feat[i] = 1;
+    if (de(i) > 22) strong[i] = 1;
+  }
+  const feats = components(maxF(minF(feat, w, h, 3), w, h, 3), w, h);
+  const biggest = Math.max(0, ...feats.map((c) => c.length));
+  const points = [];
+  feat.fill(0);
+  for (const c of feats) if (c.length >= Math.max(6, biggest * 0.2)) for (const k of c) {
+    feat[k] = 1;
+    points.push([k % w, k / w | 0]);
+  }
+  if (points.length < 25) return null;
+  let top = Infinity, bot = -Infinity, left = Infinity, right = -Infinity;
+  for (const [x, y] of points) {
+    top = Math.min(top, y);
+    bot = Math.max(bot, y);
+    left = Math.min(left, x);
+    right = Math.max(right, x);
+  }
+  const eh = bot - top + 1, ew = right - left + 1;
+  const up = 2 + Math.min(eh * 0.7, ew * 0.22), down = 2 + Math.min(eh * 0.35, ew * 0.12), side = 2 + ew * 0.12;
+  const all = convexHull(points).flatMap(([x, y]) => [[x, y - up], [x, y + down], [x - side, y], [x + side, y]]);
+  const near = maxF(feat, w, h, 7);
+  for (const c of components(maxF(minF(strong, w, h, 3), w, h, 3), w, h)) {
+    if (c.some((k) => near[k])) for (const k of c) {
+      all.push([k % w, k / w | 0]);
+      points.push([k % w, k / w | 0]);
+    }
+  }
+  const hull = convexHull(all).map(([x, y]) => [x0 + x + 0.5, y0 + y + 0.5]);
+  return { hull, reach: 1, soft: 2.5 };
+}
 var median = (values) => {
   if (!values.length) return 0;
   const s = Float64Array.from(values).sort();
   const mid = s.length >> 1;
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 };
-function cleanPatch(base, gen, rects, { classes = true, keepHair = false, threshold = 7, grow: grow2 = 2, feather = 1.5 } = {}) {
+function cleanPatch(base, gen, rects, { classes = true, keepHair = false, mouth = null, threshold = 7, grow: grow2 = 2, feather = 1.5 } = {}) {
   const x0 = Math.max(0, Math.min(...rects.map((r) => r[0]))), y0 = Math.max(0, Math.min(...rects.map((r) => r[1])));
   const x1 = Math.min(base.width, Math.max(...rects.map((r) => r[2]))), y1 = Math.min(base.height, Math.max(...rects.map((r) => r[3])));
   const w = x1 - x0, h = y1 - y0;
   if (w <= 0 || h <= 0) throw new Error("框在图外");
   if (gen.width < x1 || gen.height < y1) throw new Error("重画结果比原图小，对不上");
   const n = w * h;
+  const fit = mouth ? mouthFit(base, gen, rects[0], mouth) : null;
+  const [dx, dy] = fit ? fit.shift : [0, 0];
   const bl = new Float32Array(n * 3), gl = new Float32Array(n * 3), inside = new Uint8Array(n), alpha = new Float32Array(n);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       const X = x0 + x, Y = y0 + y;
-      const bi = (Y * base.width + X) * 4, gi = (Y * gen.width + X) * 4;
+      const bi = (Y * base.width + X) * 4, gi = ((Y - dy) * gen.width + X - dx) * 4;
       const a = base.data[bi + 3] / 255;
       alpha[i] = a;
       const lb = rgbToLab(base.data[bi] * a + 255 * (1 - a), base.data[bi + 1] * a + 255 * (1 - a), base.data[bi + 2] * a + 255 * (1 - a));
       const lg = rgbToLab(gen.data[gi], gen.data[gi + 1], gen.data[gi + 2]);
       bl.set(lb, i * 3);
       gl.set(lg, i * 3);
-      inside[i] = rects.some((r) => X >= r[0] && X < r[2] && Y >= r[1] && Y < r[3]) ? 1 : 0;
+      inside[i] = rects.some((r) => X >= r[0] && X < r[2] && Y >= r[1] && Y < r[3] && X - dx >= r[0] && X - dx < r[2] && Y - dy >= r[1] && Y - dy < r[3]) ? 1 : 0;
     }
   }
   const de = (i) => Math.hypot(gl[i * 3] - bl[i * 3], gl[i * 3 + 1] - bl[i * 3 + 1], gl[i * 3 + 2] - bl[i * 3 + 2]);
@@ -9930,13 +10086,29 @@ function cleanPatch(base, gen, rects, { classes = true, keepHair = false, thresh
   used = maxF(minF(maxF(used, w, h, grow2 * 2 + 1), w, h, 3), w, h, 3);
   used = blur(used, w, h, feather);
   if (keepHair) {
+    const cores = rects.map((r) => eyeCore(r, { x0, y0, w, h, bl, g2, wb, wg, de }));
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const X = x0 + x + 0.5, Y = y0 + y + 0.5;
       let k = 0;
-      for (const r of rects) {
+      rects.forEach((r, ri) => {
         const rx = (r[2] - r[0]) / 2, ry = (r[3] - r[1]) / 2;
         const d = ((X - (r[0] + rx)) / rx) ** 2 + ((Y - (r[1] + ry)) / ry) ** 2;
-        k = Math.max(k, clamp01((1.08 - d) / 0.16));
+        let kk = clamp01((1.08 - d) / 0.16);
+        const c = cores[ri];
+        if (c) kk *= clamp01((c.reach + c.soft - hullDistance(c.hull, X, Y)) / c.soft);
+        k = Math.max(k, kk);
+      });
+      used[y * w + x] *= k;
+    }
+  }
+  if (fit) {
+    const g = fit.grow, f = 2;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const X = x0 + x + 0.5, Y = y0 + y + 0.5;
+      let k = 0;
+      for (const b of fit.areas) {
+        const d = Math.max(b[0] - X, X - b[2], b[1] - Y, Y - b[3], 0);
+        k = Math.max(k, clamp01((g + f - d) / f));
       }
       used[y * w + x] *= k;
     }
@@ -9951,7 +10123,101 @@ function cleanPatch(base, gen, rects, { classes = true, keepHair = false, thresh
     data[i * 4 + 2] = rgb[2];
     data[i * 4 + 3] = Math.round(255 * used[i] * alpha[i]);
   }
-  return { x: x0, y: y0, width: w, height: h, data, used };
+  return { x: x0, y: y0, width: w, height: h, data, used, shift: [dx, dy] };
+}
+function mouthFit(base, gen, rect, how) {
+  const a = mouthLine(base, rect), b = mouthLine(gen, rect);
+  if (!a || !b) return null;
+  let dx = Math.round(a.center[0] - b.center[0]);
+  let dy = how === "top" ? Math.max(0, a.box[1] - 1 - b.box[1]) : Math.round(a.center[1] - b.center[1]);
+  const lim = (v, lo, hi) => Math.max(Math.max(-6, lo), Math.min(Math.min(6, hi), v));
+  dx = lim(dx, -(rect[2] - a.box[2] - 1), a.box[0] - rect[0] - 1);
+  dy = lim(dy, -(rect[3] - a.box[3] - 1), a.box[1] - rect[1] - 1);
+  const moved = [b.box[0] + dx, b.box[1] + dy, b.box[2] + dx, b.box[3] + dy];
+  const grow2 = 3 + Math.max(a.box[3] - a.box[1], b.box[3] - b.box[1]) * 0.25;
+  return { shift: [dx, dy], areas: [a.box, moved], grow: grow2 };
+}
+function mouthLine(img, rect) {
+  const pad = 4;
+  const X0 = Math.max(0, rect[0] - pad), Y0 = Math.max(0, rect[1] - pad), X1 = Math.min(img.width, rect[2] + pad), Y1 = Math.min(img.height, rect[3] + pad);
+  const w = X1 - X0, h = Y1 - Y0;
+  if (w < 8 || h < 8) return null;
+  const L = new Float32Array(w * h), R = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = ((Y0 + y) * img.width + X0 + x) * 4, a = img.data[i + 3] / 255;
+    const r = img.data[i] * a + 255 * (1 - a), g = img.data[i + 1] * a + 255 * (1 - a), b = img.data[i + 2] * a + 255 * (1 - a);
+    L[y * w + x] = 0.299 * r + 0.587 * g + 0.114 * b;
+    R[y * w + x] = r - (g + b) / 2;
+  }
+  const ringL = [], ringR = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x < 3 || y < 3 || x >= w - 3 || y >= h - 3) {
+    ringL.push(L[y * w + x]);
+    ringR.push(R[y * w + x]);
+  }
+  const sL = median(ringL), sR = median(ringR);
+  const score = new Float32Array(w * h);
+  let max = 0;
+  for (let i = 0; i < w * h; i++) {
+    score[i] = Math.max(0, sL - L[i] - 18) + Math.max(0, R[i] - sR - 12) * 1.5;
+    max = Math.max(max, score[i]);
+  }
+  if (max < 25) return null;
+  const blobs = components(score.map((s) => s >= max * 0.3 ? 1 : 0), w, h).filter((c) => c.length >= 3).map((c) => {
+    let x0 = w, y0 = h, x1 = 0, y1 = 0, m2 = 0, sx2 = 0, sy2 = 0;
+    for (const k of c) {
+      const x = k % w, y = k / w | 0;
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x + 1);
+      y1 = Math.max(y1, y + 1);
+      m2 += score[k];
+      sx2 += x * score[k];
+      sy2 += y * score[k];
+    }
+    const off = ((sx2 / m2 - w / 2) / (w * 0.35)) ** 2 + ((sy2 / m2 - h / 2) / (h * 0.6)) ** 2;
+    return { box: [x0, y0, x1, y1], m: m2, sx: sx2, sy: sy2, value: m2 * Math.exp(-off / 2), edge: x0 === 0 || y0 === 0 || x1 === w || y1 === h };
+  }).filter((b) => !b.edge);
+  if (!blobs.length) return null;
+  blobs.sort((a, b) => b.value - a.value);
+  const main = blobs[0];
+  let box = main.box.slice(), m = main.m, sx = main.sx, sy = main.sy;
+  for (const b of blobs.slice(1)) {
+    const cy = (b.box[1] + b.box[3]) / 2, my = (box[1] + box[3]) / 2;
+    const gap = Math.max(b.box[0] - box[2], box[0] - b.box[2]);
+    if (Math.abs(cy - my) <= 4 && gap <= (rect[2] - rect[0]) * 0.3 && b.m > main.m * 0.08) {
+      box = [Math.min(box[0], b.box[0]), Math.min(box[1], b.box[1]), Math.max(box[2], b.box[2]), Math.max(box[3], b.box[3])];
+      m += b.m;
+      sx += b.sx;
+      sy += b.sy;
+    }
+  }
+  return { box: [X0 + box[0], Y0 + box[1], X0 + box[2], Y0 + box[3]], center: [X0 + sx / m + 0.5, Y0 + sy / m + 0.5] };
+}
+function fitMouthRect(rect, line, width, height) {
+  const [lx0, ly0, lx1, ly1] = line.box;
+  const cx = line.center[0];
+  const s8 = (v) => Math.round(v / 8) * 8;
+  let W = Math.max(rect[2] - rect[0], Math.ceil((lx1 - lx0 + 8) / 8) * 8);
+  let best = null;
+  for (const ww of [W, W + 8]) {
+    const x0 = s8(cx - ww / 2);
+    if (x0 > lx0 - 2 || x0 + ww < lx1 + 2) continue;
+    const err = Math.abs(x0 + ww / 2 - cx);
+    if (!best || err < best.err - 0.01) best = { x0, ww, err };
+  }
+  if (!best) {
+    W += 16;
+    best = { x0: s8(cx - W / 2), ww: W };
+  }
+  const y0 = Math.floor((ly0 - 2) / 8) * 8;
+  const y1 = Math.max(rect[3], Math.ceil((ly1 + 8) / 8) * 8, y0 + 16);
+  const out = [best.x0, y0, best.x0 + best.ww, y1];
+  return [Math.max(0, out[0]), Math.max(0, out[1]), Math.min(width, out[2]), Math.min(height, out[3])];
+}
+function fitMouth(img, rects) {
+  const r = rects.mouth && rects.mouth[0];
+  const line = r && mouthLine(img, r);
+  return line ? { ...rects, mouth: [fitMouthRect(r, line, img.width, img.height)] } : rects;
 }
 
 // src/client/theater/AaWorkbench.jsx
@@ -9979,7 +10245,7 @@ function cleanToPatch(gen, prep, rects, part, state2) {
   const c = makeCanvas(prep.padW, prep.padH);
   const g = c.getContext("2d");
   g.drawImage(gen, 0, 0, prep.padW, prep.padH);
-  const p4 = cleanPatch(prep.src, g.getImageData(0, 0, prep.padW, prep.padH), stateRects(rects, part, state2, prep.h), { classes: part === "eyes", keepHair: part === "eyes" });
+  const p4 = cleanPatch(prep.src, g.getImageData(0, 0, prep.padW, prep.padH), stateRects(rects, part, state2, prep.h), { classes: part === "eyes", keepHair: part === "eyes", mouth: part === "mouth" ? state2 === "half" || state2 === "open" ? "top" : "center" : null });
   const out = makeCanvas(p4.width, p4.height);
   out.getContext("2d").putImageData(new ImageData(p4.data, p4.width, p4.height), 0, 0);
   return { dataUrl: out.toDataURL("image/png"), x: p4.x, y: p4.y };
@@ -10251,7 +10517,7 @@ function AaWorkbench({ gameId, person, onClose }) {
   const make = async (v, only = null, given = null) => {
     job(v.key, { status: "running", step: 0, error: "" });
     const prep = await prepare(v.record);
-    const rects = cleanRects(given || rectsOf(v.key), prep.padW, prep.padH);
+    const rects = cleanRects(fitMouth(prep.src, cleanRects(given || rectsOf(v.key), prep.padW, prep.padH)), prep.padW, prep.padH);
     setSizes((s) => ({ ...s, [v.key]: { w: prep.w, h: prep.h } }));
     const patches = only ? await storedPatches(v.record) : {};
     const todo = only ? [only] : steps;
@@ -10305,7 +10571,7 @@ function AaWorkbench({ gameId, person, onClose }) {
     const m = 24;
     return [Math.max(0, x0 - m), Math.max(0, y0 - m), x1 + m, y1 + m];
   })() : null;
-  return /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-bench" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react10.default.createElement("b", null, person.name, " · 逆转式立绘工作台"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn", onClick: onClose }, "返回人物列表")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "给差分做眨眼和说话的口型：框好两只眼睛和嘴，每张差分用 NovelAI 局部重绘 6 次（眼睛半闭、闭；嘴齿缝、小开、开、圆），只重画框里那一小块，原图不动； 重画的结果会洗干净（颜色对齐原图、刘海用原图），眨眼时不闪色、头发不跳。路人可以勾「精简版」：只做闭眼和一个张嘴，每张 2 次。 同一个角色的差分姿势相同，框一次可以「套用到所选」。嘴框尽量扁：框多高，嘴最多张多大。生成要用 NovelAI 的额度（试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。"), variants.length > 0 && /* @__PURE__ */ import_react10.default.createElement(VisionBar, { status: vision, setStatus: setVision }), !variants.length && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "这个角色还没有画好的差分。先在人物志里画几张。"), variants.length > 0 && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-grid" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-list" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.map((v) => v.key))) }, "全选"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(/* @__PURE__ */ new Set()) }, "全不选"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.filter((v) => !v.record.aa).map((v) => v.key))) }, "选还没做的"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "已选 ", picked.size), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !visionReady || !picked.size || running || Boolean(framing), title: visionReady ? "用认脸模型给所选的差分框好眼睛和嘴" : "先在上面下载认脸小模型", onClick: () => autoFrameList(pickedList) }, "🪄 自动框所选")), variants.map((v) => /* @__PURE__ */ import_react10.default.createElement("div", { key: v.key, className: `fg-aa-item${v.key === focus ? " is-on" : ""}`, onClick: () => setFocus(v.key) }, /* @__PURE__ */ import_react10.default.createElement("input", { type: "checkbox", checked: picked.has(v.key), onClick: (e) => e.stopPropagation(), onChange: () => toggle(v.key), "aria-label": `选择 ${v.label}` }), /* @__PURE__ */ import_react10.default.createElement("img", { src: assetUrl(v.record.assetId), alt: "", loading: "lazy", title: "双击放大看", onDoubleClick: (e) => {
+  return /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-bench" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react10.default.createElement("b", null, person.name, " · 逆转式立绘工作台"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn", onClick: onClose }, "返回人物列表")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "给差分做眨眼和说话的口型：框好两只眼睛和嘴，每张差分用 NovelAI 局部重绘 6 次（眼睛半闭、闭；嘴齿缝、小开、开、圆），只重画框里那一小块，原图不动； 重画的结果会洗干净（颜色对齐原图，只改眼睛本身，压着的刘海、两眼之间的头发、眉毛都用原图），眨眼时不闪色、头发不跳。路人可以勾「精简版」：只做闭眼和一个张嘴，每张 2 次。 同一个角色的差分姿势相同，框一次可以「套用到所选」。嘴框尽量扁：框的下边到哪，嘴最多张到哪；生成时嘴框会自动对准原来的嘴线（左右对中、上边收到嘴线上方），画出来的嘴也会挪回原来的位置。生成要用 NovelAI 的额度（试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。"), variants.length > 0 && /* @__PURE__ */ import_react10.default.createElement(VisionBar, { status: vision, setStatus: setVision }), !variants.length && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "这个角色还没有画好的差分。先在人物志里画几张。"), variants.length > 0 && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-grid" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-list" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.map((v) => v.key))) }, "全选"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(/* @__PURE__ */ new Set()) }, "全不选"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.filter((v) => !v.record.aa).map((v) => v.key))) }, "选还没做的"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "已选 ", picked.size), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !visionReady || !picked.size || running || Boolean(framing), title: visionReady ? "用认脸模型给所选的差分框好眼睛和嘴" : "先在上面下载认脸小模型", onClick: () => autoFrameList(pickedList) }, "🪄 自动框所选")), variants.map((v) => /* @__PURE__ */ import_react10.default.createElement("div", { key: v.key, className: `fg-aa-item${v.key === focus ? " is-on" : ""}`, onClick: () => setFocus(v.key) }, /* @__PURE__ */ import_react10.default.createElement("input", { type: "checkbox", checked: picked.has(v.key), onClick: (e) => e.stopPropagation(), onChange: () => toggle(v.key), "aria-label": `选择 ${v.label}` }), /* @__PURE__ */ import_react10.default.createElement("img", { src: assetUrl(v.record.assetId), alt: "", loading: "lazy", title: "双击放大看", onDoubleClick: (e) => {
     e.stopPropagation();
     setViewing(v);
   } }), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("b", null, v.label, auto[v.key] && /* @__PURE__ */ import_react10.default.createElement("i", { className: `fg-aa-badge ${AUTO_BADGE[auto[v.key].confidence][1]}`, title: auto[v.key].notes.join("；") }, "自动框·", AUTO_BADGE[auto[v.key].confidence][0])), /* @__PURE__ */ import_react10.default.createElement("small", null, v.look), /* @__PURE__ */ import_react10.default.createElement("small", { className: jobs[v.key] && jobs[v.key].status === "failed" ? "fg-err" : "" }, statusText(v)))))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-stage" }, current && /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: `fg-btn is-mini${tab === "frame" ? " is-on" : ""}`, onClick: () => setTab("frame") }, "框眼睛和嘴"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: `fg-btn is-mini${tab === "play" ? " is-on" : ""}`, disabled: !current.record.aa, title: current.record.aa ? "" : "这张还没做，生成后才能看动起来的样子", onClick: () => setTab("play") }, "看效果"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setViewing(current) }, "🔍 放大看"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, current.label, current.look ? " · " + current.look : "")), tab === "frame" && /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(RectEditor, { src: assetUrl(current.record.assetId), width: sizeOf(current.key).w, height: sizeOf(current.key).h, rects: rectsOf(current.key), zoom, onChange: (r) => {
@@ -10998,8 +11264,8 @@ function CgSpan({ gameId, image, units }) {
   const label = (u) => `${u.id} · ${u.text.length > 26 ? u.text.slice(0, 26) + "…" : u.text}`;
   return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-field" }, /* @__PURE__ */ import_react12.default.createElement("label", null, "剧场里显示"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "从「", units[from] ? label(units[from]) : image.after, "」到"), /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { flex: 1, width: "auto" }, disabled: busy === "u", value: image.until || "", onChange: (e) => run("u", () => api.until(gameId, image.id, e.target.value), "已改好，剧场里马上生效") }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "" }, "这一轮结束"), units.slice(from).map((u) => /* @__PURE__ */ import_react12.default.createElement("option", { key: u.id, value: u.id }, label(u))))));
 }
-function Lightbox({ src, onClose, children }) {
-  return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-lightbox", onClick: onClose }, /* @__PURE__ */ import_react12.default.createElement("img", { src, alt: "", onClick: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", onClick: (e) => e.stopPropagation() }, children));
+function Lightbox({ src, onClose, children, className = "" }) {
+  return /* @__PURE__ */ import_react12.default.createElement("div", { className: `fg-lightbox${className ? " " + className : ""}`, onClick: onClose }, /* @__PURE__ */ import_react12.default.createElement("img", { src, alt: "", onClick: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", onClick: (e) => e.stopPropagation() }, children));
 }
 function openLibrary(gameId) {
   return api.openLibrary(gameId).then((r) => {
@@ -11229,6 +11495,7 @@ function FaceBoxEditor({ gameId, person, bodyKey, record, onDone }) {
 function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
   const [busy, run] = useBusy3();
   const [framing, setFraming] = import_react12.default.useState(false);
+  const [look, setLook] = import_react12.default.useState(-1);
   const sprites = person.sprites || {};
   if (record && record.face) {
     const body = sprites[record.face.from];
@@ -11242,9 +11509,16 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
       paint.crop ? "放大重画" : "",
       paint.soft ? "软边" : "",
       paint.reference ? "带角色参考" : "",
-      paint.check ? `比对：接缝 ${paint.check.seam}、明暗 ${paint.check.shade}、变化 ${paint.check.change}${paint.tries > 1 ? `（画了 ${paint.tries} 次，${paint.check.ok ? "这张过了" : "都没完全过，留了最像的"}）` : paint.check.ok ? "" : "（没过）"}` : ""
+      paint.tone && paint.tone.some(Boolean) ? `色调拉回 ${paint.tone.map((v) => (v > 0 ? "+" : "") + v).join("/")}` : "",
+      paint.check ? `比对：${Number.isFinite(paint.check.expr) ? `表情变化 ${paint.check.expr}、` : ""}接缝 ${paint.check.seam}、明暗 ${paint.check.shade}${paint.tries > 1 ? `（画了 ${paint.tries} 次，${paint.check.ok ? "这张过了" : paint.check.flat ? "表情都没换上，留了变得最多的" : "表情换上了，画风都没完全过，留了最像的"}）` : paint.check.ok ? "" : paint.check.flat ? "（表情没换上）" : "（画风没过）"}` : ""
     ].filter(Boolean).join(" · ") : "";
-    return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-face-info" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "只换脸：在「", bodyLabel, "」这张「", record.poseLabel || (POSES[record.face.pose] || {}).label || "动作", "」底图上重画脸，身体衣服跟底图一样", Number.isInteger(record.face.seed) ? ` · 脸的种子 ${record.face.seed}` : ""), record.assetId && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "redo", onClick: () => redo(void 0) }, "换个种子重画脸")), how && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, how), record.assetId && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "这张的重绘强度"), /* @__PURE__ */ import_react12.default.createElement(
+    const tries = paint && Array.isArray(paint.history) ? paint.history : [];
+    const tryText = (t, i) => `第 ${i + 1} 次 ${Number(t.strength).toFixed(2)}：表情 ${t.expr}、接缝 ${t.seam}、明暗 ${t.shade}${t.ok ? "，过了" : t.flat ? "，表情没换上" : "，画风跑偏"}`;
+    const pickable = tries.length > 0 && tries.every((t) => t && t.assetId) && Array.isArray(paint.rect);
+    const current = paint && Number.isInteger(paint.pick) ? paint.pick : -1;
+    const history = !pickable && tries.length > 1 ? tries.map(tryText).join("；") : "";
+    const pick = (i) => run("pick", () => api.cast(gameId, "face-pick", { name: person.name, key: emotionKey, index: i }), `换成第 ${i + 1} 次画的了`).then(() => setLook(-1));
+    return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-face-info" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "只换脸：在「", bodyLabel, "」这张「", record.poseLabel || (POSES[record.face.pose] || {}).label || "动作", "」底图上重画脸，身体衣服跟底图一样", Number.isInteger(record.face.seed) ? ` · 脸的种子 ${record.face.seed}` : ""), record.assetId && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "redo", onClick: () => redo(void 0) }, "换个种子重画脸")), how && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, how), history && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, history), pickable && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "每次画的脸（点开放大，看中哪次就换成哪次；比对只认线条和色调，认不出表情对不对，以你看到的为准）"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-face-tries" }, tries.map((t, i) => /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", key: i, className: `fg-face-try${i === current ? " is-on" : ""}${t.ok ? "" : t.flat ? " is-flat" : " is-drift"}`, title: tryText(t, i), onClick: () => setLook(i) }, /* @__PURE__ */ import_react12.default.createElement("img", { src: assetUrl(t.assetId), alt: "", loading: "lazy" }), /* @__PURE__ */ import_react12.default.createElement("span", null, i + 1, " · ", Number(t.strength).toFixed(2), i === current ? " · 在用" : t.ok ? " · 过了" : t.flat ? " · 没换上" : " · 跑偏"))))), record.positive && /* @__PURE__ */ import_react12.default.createElement("details", null, /* @__PURE__ */ import_react12.default.createElement("summary", { className: "fg-note" }, "这张实际发出去的提示词"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "Base：", record.positive), (record.characters || []).map((c, i) => /* @__PURE__ */ import_react12.default.createElement("div", { key: i, className: "fg-note" }, "角色 ", i + 1, "：", c)), record.negativePrompt && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "负面：", record.negativePrompt), (record.characterNegatives || []).map((c, i) => c ? /* @__PURE__ */ import_react12.default.createElement("div", { key: "n" + i, className: "fg-note" }, "角色 ", i + 1, " 负面：", c) : null)), look >= 0 && tries[look] && tries[look].assetId && /* @__PURE__ */ import_react12.default.createElement(Lightbox, { className: "is-face", src: assetUrl(tries[look].assetId), onClose: () => setLook(-1) }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill" }, tryText(tries[look], look), look === current ? "（在用）" : ""), look > 0 && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setLook(look - 1) }, "上一次"), look < tries.length - 1 && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setLook(look + 1) }, "下一次"), look !== current && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "pick", onClick: () => pick(look) }, "用这次的")), record.assetId && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "这张的重绘强度"), /* @__PURE__ */ import_react12.default.createElement(
       Select,
       {
         value: fixed ? record.face.strength.toFixed(2) : "",
@@ -11252,7 +11526,7 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
         onChange: (v) => redo(v === "" ? null : Number(v)),
         options: [["", "自动（按强弱）"], ...[.../* @__PURE__ */ new Set([0.3, 0.4, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1, ...fixed ? [record.face.strength] : []])].sort((a, b) => a - b).map((n) => [n.toFixed(2), n.toFixed(2) + (n <= 0.5 ? "（改得少，留住画风）" : n >= 0.95 ? "（从零重画）" : "")])]
       }
-    ), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "改了就按它重画这张；表情没换上调高，画风跑偏调低")));
+    ), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "改了就按它重画这张（定死了就不自动调）；表情没换上调高，画风跑偏调低")));
   }
   const deps = Object.values(sprites).filter((r) => r && r.face && r.face.from === emotionKey);
   if (!record || !record.assetId || !deps.length && !record.pose) return null;
@@ -11929,7 +12203,7 @@ function FaceSettings({ cfg, onPatch }) {
     if (window.confirm("换脸的这些设置都回到默认？")) set(JSON.parse(JSON.stringify(DEFAULT_FACE)));
   };
   const [lo, hi] = FACE_LIMITS.strength;
-  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement(Field, { label: "放大重画", hint: `照 SD 里 ADetailer 的做法：把头那一块（脸框长边的 ${f.cropScale} 倍，带上头发和脸的轮廓）裁出来放大到 ${f.cropSize}×${f.cropSize} 再重画，画完缩回去贴上。脸在整张立绘里只有一两百像素见方，放大了模型才有足够的像素照底图的画法画眼睛。NovelAI Opus 会员 1024×1024 以内不花 Anlas，再大要扣。关掉就像以前一样整张图上原尺寸重画。` }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.crop, onChange: (v) => set({ crop: v }) }), f.crop && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "裁脸框的"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.cropScale, min: FACE_LIMITS.cropScale[0], max: FACE_LIMITS.cropScale[1], step: 0.1, digits: 1, label: "裁多大", onCommit: (v) => set({ cropScale: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "倍，放大到"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(f.cropSize), options: [512, 640, 768, 896, 1024, 1152, 1280, 1408, 1536].map((n) => [String(n), `${n}×${n}${n > 1024 ? "（扣 Anlas）" : ""}`]), onChange: (v) => set({ cropSize: Number(v) }), style: INLINE })))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "软边遮罩", hint: "重画的范围是围着眉眼口和两颊的圆角，往外一圈慢慢过渡到底图，不再是看得出框边的硬方框，脸边的头发尽量留原图。宽度是脸框半边长的几成：宽一点接缝更看不出，窄一点头发动得更少。关掉是以前的硬方框（框边 8 像素羽化）。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.soft, onChange: (v) => set({ soft: v }) }), f.soft && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "过渡宽度"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.feather, min: FACE_LIMITS.feather[0], max: FACE_LIMITS.feather[1], step: 0.05, label: "过渡宽度", onCommit: (v) => set({ feather: v }) })))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "重绘强度", hint: "按这个人这种情绪的强弱定（表演设计师给每种情绪标微 / 中 / 强 / 极，人物志「动作与表情」里点情绪名能改）。低的留住底图原来的线条、颜色和光影，只动得了眉眼嘴；高的改得动大表情，但越高越可能跑出底图的画风。人物志里点开一张换脸的差分还能单独定这张的强度。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-face-levels" }, FACE_LEVELS.map((l) => /* @__PURE__ */ import_react12.default.createElement("label", { key: l, className: "fg-row", title: LEVEL_HINT[l] }, /* @__PURE__ */ import_react12.default.createElement("b", null, FACE_LEVEL_LABEL[l]), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.strength[l], min: lo, max: hi, step: 0.01, label: `${FACE_LEVEL_LABEL[l]}的重绘强度`, onCommit: (v) => set({ strength: { [l]: v } }) }), l === 4 && f.wholePeak && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "（开着「最激烈的整张画」时不用）"))))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "最激烈的整张画", hint: "强弱是「极」的情绪（大笑、大哭、惊恐这类五官都在用力的）不换脸，在同一个动作上、用同一个种子整张画：脸由主模型画，画风跟底图自然一致，身子会跟着情绪动一点。" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.wholePeak, onChange: (v) => set({ wholePeak: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "画完自动比对", hint: "换完量一下：软边那一圈新旧对不上（会有重影、色差），或者脸上大块的明暗变了（原来的阴影、排线没了，画风跑偏），就换个种子、调低强度再画；整张脸几乎没变（表情没换上）就调高强度再画；留最像的那张。宽严：小于 1 更严、更容易重来，大于 1 更松。每次重来都是一次出图。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.check, onChange: (v) => set({ check: v }) }), f.check && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "跑偏了最多再画"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(f.retries), options: [0, 1, 2, 3, 4, 5].map((n) => [String(n), `${n} 次`]), onChange: (v) => set({ retries: Number(v) }), style: INLINE }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "宽严"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.tolerance, min: FACE_LIMITS.tolerance[0], max: FACE_LIMITS.tolerance[1], step: 0.1, digits: 1, label: "比对的宽严", onCommit: (v) => set({ tolerance: v }) })))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "底图当角色参考", hint: `把整张底图当 NovelAI 的角色参考（Precise Reference，人物和画风一起参考）跟换脸一起发，锁住画风。NovelAI 只给 V4.5 训了带参考的重绘模型，V5 还没有；每张多花 5 Anlas。${refOk ? "" : `现在用的模型（${cfg.novelai && cfg.novelai.model || ""}）不支持，开着也不会带。`}接口不认时自动不带。` }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.reference, onChange: (v) => set({ reference: v }) })), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !edited, onClick: reset }, "换脸设置恢复默认")));
+  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement(Field, { label: "放大重画", hint: `照 SD 里 ADetailer 的做法：把头那一块（脸框长边的 ${f.cropScale} 倍，带上头发和脸的轮廓）裁出来放大到 ${f.cropSize}×${f.cropSize} 再重画，画完缩回去贴上。脸在整张立绘里只有一两百像素见方，放大了模型才有足够的像素照底图的画法画眼睛。NovelAI Opus 会员 1024×1024 以内不花 Anlas，再大要扣。关掉就像以前一样整张图上原尺寸重画。` }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.crop, onChange: (v) => set({ crop: v }) }), f.crop && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "裁脸框的"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.cropScale, min: FACE_LIMITS.cropScale[0], max: FACE_LIMITS.cropScale[1], step: 0.1, digits: 1, label: "裁多大", onCommit: (v) => set({ cropScale: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "倍，放大到"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(f.cropSize), options: [512, 640, 768, 896, 1024, 1152, 1280, 1408, 1536].map((n) => [String(n), `${n}×${n}${n > 1024 ? "（扣 Anlas）" : ""}`]), onChange: (v) => set({ cropSize: Number(v) }), style: INLINE })))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "软边遮罩", hint: "重画的范围是围着眉眼口和两颊的圆角，往外一圈慢慢过渡到底图，不再是看得出框边的硬方框，脸边的头发尽量留原图。宽度是脸框半边长的几成：宽一点接缝更看不出，窄一点头发动得更少。关掉是以前的硬方框（框边 8 像素羽化）。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.soft, onChange: (v) => set({ soft: v }) }), f.soft && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "过渡宽度"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.feather, min: FACE_LIMITS.feather[0], max: FACE_LIMITS.feather[1], step: 0.05, label: "过渡宽度", onCommit: (v) => set({ feather: v }) })))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "重绘强度", hint: "按这个人这种情绪的强弱定（表演设计师给每种情绪标微 / 中 / 强 / 极，人物志「动作与表情」里点情绪名能改）。低的留住底图原来的线条、颜色和光影，只动得了眉眼嘴；高的改得动大表情，但越高越可能跑出底图的画风。人物志里点开一张换脸的差分还能单独定这张的强度。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-face-levels" }, FACE_LEVELS.map((l) => /* @__PURE__ */ import_react12.default.createElement("label", { key: l, className: "fg-row", title: LEVEL_HINT[l] }, /* @__PURE__ */ import_react12.default.createElement("b", null, FACE_LEVEL_LABEL[l]), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.strength[l], min: lo, max: hi, step: 0.01, label: `${FACE_LEVEL_LABEL[l]}的重绘强度`, onCommit: (v) => set({ strength: { [l]: v } }) }), l === 4 && f.wholePeak && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "（开着「最激烈的整张画」时不用）"))))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "最激烈的整张画", hint: "强弱是「极」的情绪（大笑、大哭、惊恐这类五官都在用力的）不换脸，在同一个动作上、用同一个种子整张画：脸由主模型画，画风跟底图自然一致，身子会跟着情绪动一点。" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.wholePeak, onChange: (v) => set({ wholePeak: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "压住原来的表情", hint: `换脸是照着底图描的：强度不到 1 时原来的眉眼还在，模型往往只在上面添几滴泪、一点红晕。打开时，底图原来的表情里这张没有的（情绪词、眉、眼；嘴和视线只在这张写了时才压；泪、红晕、汗这张也有就不压）写进这张的负面，比如「坚定」换「难过」时负面加上 determined, serious, slightly furrowed brow, calm eyes。表情词加重：这张的表情词写成「${f.emphasis}::sad::」，1 不加重，越高越听表情词（太高会用力过头）。人物志里点开一张换脸的差分，「这张实际发出去的提示词」里能看到。` }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.oldNegative, onChange: (v) => set({ oldNegative: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "原来的表情写进负面"), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "表情词加重"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.emphasis, min: FACE_LIMITS.emphasis[0], max: FACE_LIMITS.emphasis[1], step: 0.05, label: "表情词加重", onCommit: (v) => set({ emphasis: v }) }))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "色调对齐底图", hint: "重画的脸整体偏亮、偏暗、偏色时，按底图的肤色拉回来再贴：每个颜色通道取脸上「底图减重画」的中位数，整块加上它（最多拉 40 级）。中位数跟着大片皮肤走，所以红晕、泪、眉眼口这些小块的变化不会被抹掉。关掉就照重画的原样贴。" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.tone, onChange: (v) => set({ tone: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "画完自动比对", hint: `换完量两样，没过就换个种子再画，留最像的那张（每次重来都是一次出图）。①表情换上没有：脸框分成 4×4 格，比每格里眉、眼线、瞳孔、嘴线这些线条，挪了一两个像素、深浅差三成以内的不算，新长出来和没了的占这格线条的百分之几，取变得最多的那格。少于「表情至少变」就算没换上，下次调高强度。拿以前换过的脸实测：真换了表情的 6~30，强度 0.3 原样描一遍的不到 1。填 0 不查。②画风跑偏没有：软边那一圈新旧大块色调差太多（看得出一圈色差），或者脸上大块明暗变了（原来的阴影、排线没了），就换个种子再画。「跑偏时强度最多降」默认 0：只换种子不降强度，因为强度一降眉眼就改不动了，换上的只剩泪和红晕；调大了每次跑偏降 0.06，最多比起步低这么多，也不会降回已经试出表情没换上的强度。宽严只管画风：小于 1 更严、更容易重来，大于 1 更松。表情没换上的那几张排在最后，不会被留下。每次画的脸都留着，人物志里点开那张差分能挑。` }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.check, onChange: (v) => set({ check: v }) }), f.check && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "没过最多再画"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(f.retries), options: Array.from({ length: FACE_LIMITS.retries[1] + 1 }, (_, n) => [String(n), `${n} 次`]), onChange: (v) => set({ retries: Number(v) }), style: INLINE }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "表情至少变"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.expression, min: FACE_LIMITS.expression[0], max: FACE_LIMITS.expression[1], step: 0.5, digits: 1, label: "表情至少变多少", onCommit: (v) => set({ expression: v }) }))), f.check && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "画风宽严"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.tolerance, min: FACE_LIMITS.tolerance[0], max: FACE_LIMITS.tolerance[1], step: 0.1, digits: 1, label: "画风比对的宽严", onCommit: (v) => set({ tolerance: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "跑偏时强度最多降"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.drop, min: FACE_LIMITS.drop[0], max: FACE_LIMITS.drop[1], step: 0.02, label: "画风跑偏时强度最多往下调多少", onCommit: (v) => set({ drop: v }) }))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "底图当角色参考", hint: `把整张底图当 NovelAI 的角色参考（Precise Reference，人物和画风一起参考）跟换脸一起发，锁住画风。NovelAI 只给 V4.5 训了带参考的重绘模型，V5 还没有；每张多花 5 Anlas。${refOk ? "" : `现在用的模型（${cfg.novelai && cfg.novelai.model || ""}）不支持，开着也不会带。`}接口不认时自动不带。` }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.reference, onChange: (v) => set({ reference: v }) })), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !edited, onClick: reset }, "换脸设置恢复默认")));
 }
 var SIZE_SHAPES = [["landscape", "横版"], ["portrait", "竖版"], ["square", "方形"]];
 var parseSize = (text) => {

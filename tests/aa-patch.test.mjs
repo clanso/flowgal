@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cleanPatch, rgbToLab, labToRgb } from '../lib/aa-patch.js'
+import { cleanPatch, rgbToLab, labToRgb, mouthLine, fitMouthRect, fitMouth } from '../lib/aa-patch.js'
 import { composePrompt } from '../lib/image/style.js'
 import { poseOf } from '../lib/face.js'
 import { POSES } from '../lib/vocab.js'
@@ -54,21 +54,75 @@ test('gate: 洗贴片：只留变了的像素；虹膜颜色拉回原图；刘�
 test('gate: 腮红跟头发同色时，闭眼不留原来的下睫毛；青绿色的眼睛算虹膜，颜色拉回原图、不会更艳', () => {
   const W = 96, H = 64
   const BLUSH = [221, 174, 164] // 跟头发一个颜色（真实遇到的：浅米粉的头发 + 明显的腮红）
-  const AQUA = [140, 215, 200], LASH = [90, 50, 40]
-  const iris = (x, y) => (x - 48) ** 2 + (y - 32) ** 2 < 11 ** 2
-  const base = picture(W, H, (x, y) => (y === 46 && x % 4 < 2 && x > 30 && x < 66 ? LASH : y > 42 ? BLUSH : iris(x, y) ? AQUA : SKIN))
+  const AQUA = [140, 215, 200], LASH = [90, 50, 40], WHITE = [244, 244, 248]
+  // 杏仁眼：眼白（扁椭圆）中间一个虹膜，下面一排下睫毛的小点
+  const eye = (x, y) => ((x - 48) / 22) ** 2 + ((y - 32) / 9) ** 2 < 1
+  const iris = (x, y) => (x - 48) ** 2 + (y - 32) ** 2 < 9 ** 2
+  const base = picture(W, H, (x, y) => (y === 44 && x % 4 < 2 && x > 30 && x < 66 ? LASH : y > 42 ? BLUSH : iris(x, y) ? AQUA : eye(x, y) ? WHITE : SKIN))
   // 闭眼：眼线画在中间，下面整片是腮红（原来的下睫毛没了）
-  const closed = picture(W, H, (x, y) => (y >= 30 && y <= 33 && x > 26 && x < 70 ? LASH : y > 42 ? BLUSH : SKIN))
+  const closed = picture(W, H, (x, y) => (y >= 34 && y <= 37 && x > 26 && x < 70 ? LASH : y > 42 ? BLUSH : SKIN))
   const c = cleanPatch(base, closed, [[16, 12, 80, 56]], { classes: true, keepHair: true })
-  const dot = at(c, 32 - c.x, 46 - c.y)
+  const dot = at(c, 32 - c.x, 44 - c.y)
   assert.ok(dot[3] > 200 && dot[0] > 180, '原来的下睫毛被盖掉了：' + dot)
   // 半闭：重画的虹膜更深更艳，洗完往原图拉回
-  const half = picture(W, H, (x, y) => (iris(x, y) ? (y < 28 ? SKIN : [40, 200, 185]) : y > 42 ? BLUSH : SKIN))
+  const half = picture(W, H, (x, y) => (eye(x, y) && y < 30 ? SKIN : iris(x, y) ? [40, 200, 185] : eye(x, y) ? WHITE : y > 42 ? BLUSH : SKIN))
   const h = cleanPatch(base, half, [[16, 12, 80, 56]], { classes: true, keepHair: true })
   const px = at(h, 48 - h.x, 36 - h.y)
   const [, ga, gb] = rgbToLab(40, 200, 185), [, ba, bb] = rgbToLab(...AQUA), [, oa, ob] = rgbToLab(px[0], px[1], px[2])
   assert.ok(Math.hypot(oa, ob) <= Math.hypot(ga, gb) + 1, '没有更艳')
   assert.ok(Math.hypot(oa - ba, ob - bb) < Math.hypot(ga - ba, gb - bb), '比重画的更接近原图的青绿：' + px)
+})
+
+test('gate: 眨眼时两眼之间的头发、眉毛不跟着变（重画把它们改了几笔也用原图），眼睛本身照样闭上', () => {
+  const W = 160, H = 64
+  const WHITE = [244, 244, 248], LASH = [90, 50, 40], BROW = [150, 100, 90]
+  const eye = (x, y, cx) => ((x - cx) / 20) ** 2 + ((y - 34) / 8) ** 2 < 1
+  const iris = (x, y, cx) => (x - cx) ** 2 + (y - 34) ** 2 < 7 ** 2
+  const brow = (x, y, cx) => y >= 6 && y <= 8 && Math.abs(x - cx) < 14
+  const paint = ({ strand, browY, closed }) => (x, y) => {
+    if (x >= strand && x < strand + 4) return HAIR // 两眼之间垂下来的一缕头发
+    for (const cx of [45, 115]) {
+      if (brow(x, y - browY, cx)) return BROW
+      if (closed) { if (y >= 36 && y <= 38 && Math.abs(x - cx) < 20) return LASH }
+      else if (iris(x, y, cx)) return [70, 110, 190]
+      else if (eye(x, y, cx)) return WHITE
+      if (!closed && y >= 24 && y <= 26 && Math.abs(x - cx) < 20) return LASH // 上睫毛
+    }
+    return SKIN
+  }
+  const base = picture(W, H, paint({ strand: 76, browY: 0, closed: false }))
+  // 重画：眼睛闭上了，但那缕头发往右挪了 6 像素、眉毛往下挪了 3 像素（局部重绘常这样）
+  const gen = picture(W, H, paint({ strand: 82, browY: 3, closed: true }))
+  const rects = [[16, 2, 80, 62], [80, 2, 144, 62]]
+  const p = cleanPatch(base, gen, rects, { classes: true, keepHair: true })
+  const px = (x, y) => at(p, x - p.x, y - p.y)
+  assert.equal(px(78, 34)[3], 0, '原来的那缕头发还在（不被重画的皮肤盖掉）')
+  assert.equal(px(84, 34)[3], 0, '重画挪过去的头发不用')
+  assert.equal(px(45, 10)[3], 0, '眉毛不动')
+  assert.ok(px(45, 34)[3] > 200 && px(115, 34)[3] > 200, '眼睛（虹膜那块）换成闭眼')
+  assert.ok(px(45, 25)[3] > 200, '原来的上睫毛也盖掉了')
+  assert.ok(px(115, 37)[3] > 200 && px(115, 37)[0] < 120, '闭眼的眼线画上了：' + px(115, 37))
+})
+
+test('gate: 嘴框对准原来的嘴线；新画的嘴挪回原来嘴线的位置（左右对中、张嘴不往上长），下巴不跟着变', () => {
+  const W = 64, H = 48
+  const RED = [190, 80, 80], LINE = [130, 60, 55], CHIN = [200, 150, 140]
+  const base = picture(W, H, (x, y) => (y === 20 && x >= 30 && x <= 50 ? LINE : y === 40 && x > 20 && x < 44 ? CHIN : SKIN))
+  // 框：自动框给偏了（中心 44、上面空了 8 像素）→ 对准嘴线：左右以 40 为中心，上边收到嘴线上方，下边不动
+  const line = mouthLine(base, [24, 12, 64, 36])
+  assert.deepEqual(line.box, [30, 20, 51, 21])
+  assert.deepEqual(fitMouthRect([24, 8, 72, 40], line, W, H), [16, 16, 64, 40])
+  assert.deepEqual(fitMouth(base, { eyes: [[0, 0, 8, 8]], mouth: [[24, 8, 72, 40]] }).mouth, [[16, 16, 64, 40]])
+  // 重画：嘴画在框中间（中心 46）、往上多长了 3 像素（上沿 17）；下巴那条线也被改了
+  const gen = picture(W, H, (x, y) => (((x - 46) / 8) ** 2 + ((y - 20) / 4) ** 2 < 1 ? RED : y === 41 && x > 18 && x < 46 ? CHIN : SKIN))
+  const p = cleanPatch(base, gen, [[24, 12, 64, 44]], { classes: false, mouth: 'top' })
+  assert.deepEqual(p.shift, [-6, 2], '往左挪 6、往下挪到上沿只比嘴线高 1 像素')
+  const px = (x, y) => at(p, x - p.x, y - p.y)
+  assert.ok(px(40, 22)[3] > 200 && px(40, 22)[0] > 170, '嘴挪到了原来的中心：' + px(40, 22))
+  assert.ok(px(52, 21)[3] < 60 || px(52, 21)[0] > 230, '原来画在 46 的嘴右半边没留下：' + px(52, 21))
+  assert.ok(px(30, 20)[3] > 200 && px(30, 20)[0] > 230, '原来的嘴线盖掉了：' + px(30, 20))
+  assert.equal(px(32, 41)[3], 0, '下巴不跟着变')
+  assert.equal(px(32, 40)[3], 0)
 })
 
 test('gate: 侧身动作组去掉了：赌气归抱臂那组，立绘都按正面构图画（以前标着侧身的也一样）', () => {

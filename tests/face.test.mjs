@@ -7,7 +7,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { decodePng, encodePng, pngSize } from '../lib/image/png.js'
-import { poseOf, anchorOf, poseMembers, cleanPoseMap, isFaceTag, faceTags, faceFor, swapFace, faceBoxFrom, cleanFaceBox, padWhite, blendFace } from '../lib/face.js'
+import { poseOf, anchorOf, poseMembers, cleanPoseMap, isFaceTag, faceTags, faceFor, swapFace, oldFaceNegative, faceBoxFrom, cleanFaceBox, padWhite, blendFace } from '../lib/face.js'
 import { EMOTIONS, EMOTION_POSE, EMOTION_FACE, POSES } from '../lib/vocab.js'
 import { writeSpritePrompts } from '../lib/sprites.js'
 import { resolveConfig } from '../lib/config.js'
@@ -90,10 +90,36 @@ test('gate: 动作组：内置情绪默认分四组，每组底图画代表情�
 test('gate: 表情 tag：情绪词、眉眼嘴、脸红、泪、视线算；瞳色、眼型、睫毛、手的动作、构图不算', () => {
   for (const t of ['smile', 'light smile', 'gentle neutral expression', 'expressionless', 'closed eyes', 'half-closed eyes', 'one eye closed', 'wide-eyed', 'open mouth', 'parted lips',
     'clenched teeth', 'v-shaped eyebrows', 'furrowed brow', 'blush', 'full-face blush', 'tears', 'streaming tears', 'looking away', 'looking at viewer', 'sideways glance', 'puffed cheeks',
-    'heart-shaped pupils', 'jitome', 'naughty face', 'shy', 'angry', '0.7::frown::', ':d', '>_<', 'sweatdrop', 'bags under eyes', 'cold eyes']) assert.ok(isFaceTag(t), t)
+    'heart-shaped pupils', 'jitome', 'naughty face', 'shy', 'angry', '0.7::frown::', ':d', '>_<', 'sweatdrop', 'bags under eyes', 'cold eyes',
+    'calm eyes', 'determined eyes', 'sad eyes', 'tearful eyes', 'upturned eyes', 'bedroom eyes']) assert.ok(isFaceTag(t), t)
   for (const t of ['lake blue eyes', 'blue eyes', 'tareme', 'long eyelashes', 'soft face', 'pale skin', 'long curly light brown hair', 'hand over mouth', 'hand on own cheek', 'eye-level',
     'facing viewer', 'black haori', 'cowboy shot', 'crossed arms', 'head tilt', 'eyepatch', 'lipstick', 'girl']) assert.ok(!isFaceTag(t), t)
   assert.equal(faceTags('1girl, long black hair, shy, light blush, looking away, hand on own cheek, school uniform'), 'shy, light blush, looking away')
+  // 底图「坚定」写的 calm eyes 要跟着表情一起换掉，不然「难过」的脸上还留着平静的眼神
+  const sad = swapFace({ positive: 'a', negative: '', characters: ['girl, lake blue eyes, tareme, determined, serious, slightly furrowed brow, calm eyes, closed mouth, looking at viewer, hand on own chest'], characterNegatives: [''] }, faceFor('sad', 'sad, drooping eyebrows, tearing up, closed mouth, looking down, light blush'))
+  assert.equal(sad.characters[0], 'girl, lake blue eyes, tareme, sad, drooping eyebrows, tearing up, closed mouth, looking down, light blush, hand on own chest')
+})
+
+test('gate: 换脸压住原来的表情：底图的表情这张没有的写进角色负面，这张的表情词加重（玩家报的：「坚定」换「难过」只多了眼泪）', () => {
+  const drawn = { positive: 'a, looking at viewer', negative: '', characters: ['girl, lake blue eyes, tareme, determined, serious, slightly furrowed brow, calm eyes, closed mouth, looking at viewer, hand on own chest'], characterNegatives: ['black hair'] }
+  const sad = swapFace(drawn, faceFor('sad', 'sad, drooping eyebrows, looking down, closed mouth, tearing up'), { emphasis: 1.2, oldNegative: true })
+  assert.equal(sad.characters[0], 'girl, lake blue eyes, tareme, 1.2::sad::, 1.2::drooping eyebrows::, 1.2::looking down::, 1.2::closed mouth::, 1.2::tearing up::, hand on own chest')
+  assert.equal(sad.characterNegatives[0], 'black hair, determined, serious, slightly furrowed brow, calm eyes, looking at viewer', '两张都有的 closed mouth 不压')
+  assert.equal(sad.prompt, 'a', '看别处：Base 的 looking at viewer 也拿掉')
+  // 默认不加：老调用照旧
+  assert.equal(swapFace(drawn, faceFor('sad', 'sad, tearing up')).characterNegatives[0], 'black hair')
+  // 已经带权重的（收轻过的 0.6::dark circles::）不再套一层；加重 1 等于不加
+  assert.match(swapFace(drawn, { tags: 'tired, 0.6::bags under eyes::', negative: '' }, { emphasis: 1.3 }).characters[0], /1\.3::tired::, 0\.6::bags under eyes::/)
+  assert.doesNotMatch(swapFace(drawn, faceFor('sad', 'sad'), { emphasis: 1 }).characters[0], /::/)
+  // 没有角色块的老记录：压进 Base 的负面
+  const old = swapFace({ positive: '1girl, black hair, smile, closed eyes, school uniform', negative: 'bad' }, faceFor('angry', 'angry, frown, glaring'), { oldNegative: true })
+  assert.equal(old.negative, 'bad, smile, closed eyes')
+  // 嘴、视线：这张写了才压；泪、红晕、汗：这张也有就不压，没有才压；互相包含的算同一样
+  const was = ['light smile', 'closed mouth', 'looking at viewer', 'light blush', 'tears', 'happy']
+  assert.equal(oldFaceNegative(was, ['sad', 'tearing up']), 'light blush, happy')
+  assert.equal(oldFaceNegative(was, ['surprised', 'open mouth', 'looking away', 'blush']), 'light smile, closed mouth, looking at viewer, tears, happy')
+  assert.equal(oldFaceNegative(['furrowed brow', 'closed eyes'], ['slightly furrowed brow', 'looking down']), 'closed eyes')
+  assert.equal(oldFaceNegative(['1.2::serious::'], ['sad']), 'serious', '权重写法去掉')
 })
 
 test('gate: 换脸的表情：设计师写的里挑脸上的，没有就用内置的；负面里跟这张表情打架的去掉', () => {
@@ -220,13 +246,13 @@ async function settle(engine, gameId, done, what = '') {
   }
 }
 
-test('gate: 只换脸整条流程（以前的画法：不放大、硬方框、不比对）：要「生气」→ 先画抱臂底图「冷淡」→ 等认脸 → 收到脸框换脸（框外和底图一模一样）→ 换种子重画 → 底图重画后跟着重换 → 关掉只换脸就整张画', async () => {
+test('gate: 只换脸整条流程（以前的画法：不放大、硬方框、不对色调、不比对）：要「生气」→ 先画抱臂底图「冷淡」→ 等认脸 → 收到脸框换脸（框外和底图一模一样）→ 换种子重画 → 底图重画后跟着重换 → 关掉只换脸就整张画', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-face-'))
   try {
     const store = createStore(dir)
     const { requests, fetchImpl } = fakeNai()
     const engine = createEngine({ store, services: {}, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] }, face: { crop: false, soft: false, check: false } } })
+    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] }, face: { crop: false, soft: false, tone: false, check: false } } })
     await engine.setSecret('novelai', 'official', 'k')
     await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair, blue eyes', seed: 7 } })
     const look = { appearance: '1girl, long black hair, blue eyes', outfit: '', states: [] }
@@ -251,8 +277,9 @@ test('gate: 只换脸整条流程（以前的画法：不放大、硬方框、�
     assert.equal(infill.model, 'nai-diffusion-4-5-full-inpainting')
     assert.equal(infill.parameters.seed, 7, '默认跟底图同一个种子')
     const caption = infill.parameters.v4_prompt.caption.char_captions[0].char_caption
-    assert.match(caption, /^long black hair, blue eyes, angry, v-shaped eyebrows/, '没设性别：角色块不加 girl / boy')
+    assert.match(caption, /^long black hair, blue eyes, 1\.2::angry::, 1\.2::v-shaped eyebrows::/, '没设性别：角色块不加 girl / boy；表情词加重')
     assert.doesNotMatch(caption, /expressionless|cold eyes/)
+    assert.match(infill.parameters.v4_negative_prompt.caption.char_captions[0].char_caption, /expressionless.*cold eyes|cold eyes.*expressionless/, '底图「冷淡」的表情压进负面')
     const mask = await decodePng(fromBase64(infill.parameters.mask))
     assert.equal(px(mask, 100, 100)[0], 255)
     assert.equal(px(mask, 87, 100)[0], 0)
@@ -263,7 +290,8 @@ test('gate: 只换脸整条流程（以前的画法：不放大、硬方框、�
     assert.deepEqual(px(face, 128, 120), [255, 0, 0, 255], '框里是重画的脸')
     const { paint, ...made } = lin.sprites[angry].face
     assert.deepEqual(made, { from: cold, pose: 'arms', body: lin.sprites[cold].assetId, box: BOX })
-    assert.deepEqual(paint, { level: 3, strength: 0.8, tries: 1, check: paint.check, crop: false, soft: false, reference: false }, '生气默认「强」，重绘强度 0.8')
+    assert.deepEqual(paint, { level: 3, strength: 0.8, tries: 1, check: paint.check, history: paint.history, pick: 0, rect: BOX, crop: false, soft: false, tone: [0, 0, 0], reference: false }, '生气默认「强」，重绘强度 0.8')
+    assert.equal(paint.history.length, 1)
     assert.equal(infill.parameters.inpaintImg2ImgStrength, 0.8)
     assert.deepEqual(infill.parameters.img2img, { strength: 0.8, color_correct: true })
     assert.match(lin.sprites[angry].characters[0], /angry/, '记下换脸用的提示词（逆转式工作台接着用）')
