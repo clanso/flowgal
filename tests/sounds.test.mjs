@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { VOICES, SOUND_SLOTS, DEFAULT_SOUNDS, resolveVoice, castVoices, lineVoice, soundFor, cleanVoice, voiceLabel, libraryPreset, builtinPreset, LIBRARY_VOICES } from '../lib/sounds.js'
+import { VOICES, SOUND_SLOTS, DEFAULT_SOUNDS, resolveVoice, castVoices, lineVoice, soundFor, cleanVoice, voiceLabel, libraryPreset, builtinPreset, LIBRARY_VOICES, AA_VOICES, aaPreset, narrationPatch, isFixedVoice } from '../lib/sounds.js'
 import { resolveConfig, applyPatch } from '../lib/config.js'
 import { editPerson, effectivePerson } from '../lib/cast.js'
 import { createStore } from '../lib/dsh/store.js'
@@ -22,6 +22,7 @@ test('gate: 声音目录：每个音色和音效版本都能照配方发声，�
       assert.ok(positive(part.f) && positive(part.dur) && positive(part.gain) && part.gain <= 0.4, `${name} 的频率 / 时长 / 音量`)
       for (const key of ['to', 'q', 'lp']) if (part[key] !== undefined) assert.ok(positive(part[key]), `${name} 的 ${key}`)
       for (const key of ['at', 'attack']) if (part[key] !== undefined) assert.ok(Number.isFinite(part[key]) && part[key] >= 0 && part[key] < part.dur + 0.5, `${name} 的 ${key}`)
+      if (part.hold !== undefined) assert.ok(part.hold > 0 && (part.attack ?? 0) + part.hold < part.dur, `${name} 的 hold 要在时长里收得住`)
     }
   }
   const unique = list => new Set(list).size === list.length
@@ -230,4 +231,46 @@ test('gate: 一键套用音效库里标了用途的声音，换回内置只动�
   const ui = resolveConfig({ ui: { ...patch, sounds: { ...patch.sounds, impact: 'boom' } } }).ui
   assert.deepEqual(builtinPreset(ui), { sounds: { slam: 'desk', select: 'pop' }, voiceDefault: 'auto', narrationVoice: 'classic', narrationPitch: -6 })
   assert.equal(builtinPreset(resolveConfig({}).ui), null)
+})
+
+test('gate: 逆转式音色：内置的逆转男声 / 女声 / 打字机随时能选；「逆转式」时同性别的人一个声音、不错开音高；一键套用和旁白换音色时的音高', () => {
+  const aa = Object.fromEntries(['aa-female', 'aa-male', 'aa-typewriter'].map(id => [id, VOICES.find(v => v.id === id)]))
+  assert.equal(aa['aa-female'].gender, 'female')
+  assert.equal(aa['aa-male'].gender, 'male')
+  assert.equal(aa['aa-typewriter'].gender, '')
+  // 女声、男声是同一串三连音（男声低一点），一帧一个音、接着响；打字机是两下
+  const freqs = id => aa[id].parts.map(x => x.f)
+  assert.deepEqual(freqs('aa-female'), [923, 3640, 2980])
+  assert.deepEqual(freqs('aa-male'), [780, 3120, 2521])
+  for (const id of ['aa-female', 'aa-male']) for (const [i, part] of aa[id].parts.entries()) assert.ok(Math.abs((part.at || 0) - i * 0.0163) < 0.001, `${id} 第 ${i + 1} 个音`)
+  assert.equal(new Set(aa['aa-typewriter'].parts.map(x => x.at)).size > 1, true)
+  for (const id of Object.keys(aa)) { assert.ok(isFixedVoice(id), id); assert.equal(cleanVoice(id), id) }
+  assert.ok(!isFixedVoice('classic') && isFixedVoice('lib:x1'))
+
+  const ui = resolveConfig({ ui: { voiceDefault: AA_VOICES } }).ui
+  assert.equal(ui.voiceDefault, AA_VOICES)
+  const people = [{ name: '春美', gender: 'female', createdTurn: 0 }, { name: '真宵', gender: 'female', createdTurn: 1 }, { name: '御剑', gender: 'male', createdTurn: 1 }, { name: '某人', createdTurn: 2 }]
+  const voices = castVoices(people, ui)
+  assert.deepEqual(voices.get('春美'), { id: 'aa-female', pitch: 0, auto: true })
+  assert.deepEqual(voices.get('真宵'), { id: 'aa-female', pitch: 0, auto: true })
+  assert.deepEqual(voices.get('御剑'), { id: 'aa-male', pitch: 0, auto: true })
+  assert.ok(['aa-female', 'aa-male'].includes(voices.get('某人').id))
+  // 档案里指定的和调的音高照样算
+  assert.deepEqual(resolveVoice({ gender: 'female', voice: 'bell', voicePitch: 2 }, '真宵', ui), { id: 'bell', pitch: 2, auto: false })
+  assert.deepEqual(resolveVoice({ gender: 'female', voicePitch: 3 }, '真宵', ui), { id: 'aa-female', pitch: 3, auto: true })
+  // 不选逆转式时自动分配照旧：逆转式的不进内置的自动那几组
+  assert.ok(![...castVoices(people, resolveConfig({}).ui).values()].some(v => v.id.startsWith('aa-')))
+
+  // 一键套用逆转式：没指定的角色按性别、旁白用逆转打字机放原调；已经是了就没得套
+  const patch = aaPreset(resolveConfig({}).ui)
+  assert.deepEqual(patch, { voiceDefault: AA_VOICES, narrationVoice: 'aa-typewriter', narrationPitch: 0 })
+  assert.equal(aaPreset(resolveConfig({ ui: patch }).ui), null)
+  // 旁白换成照原样放的音色放原调；换回合成的、音高还在 0 就回到默认的 -6；别的时候不动音高
+  assert.deepEqual(narrationPatch({ narrationVoice: 'classic', narrationPitch: -6 }, 'aa-typewriter'), { narrationVoice: 'aa-typewriter', narrationPitch: 0 })
+  assert.deepEqual(narrationPatch({ narrationVoice: 'classic', narrationPitch: -6 }, 'lib:tw'), { narrationVoice: 'lib:tw', narrationPitch: 0 })
+  assert.deepEqual(narrationPatch({ narrationVoice: 'aa-typewriter', narrationPitch: 0 }, 'classic'), { narrationVoice: 'classic', narrationPitch: -6 })
+  assert.deepEqual(narrationPatch({ narrationVoice: 'aa-typewriter', narrationPitch: 2 }, 'classic'), { narrationVoice: 'classic' })
+  assert.deepEqual(narrationPatch({ narrationVoice: 'bell', narrationPitch: 0 }, 'classic'), { narrationVoice: 'classic' })
+  assert.deepEqual(narrationPatch({ narrationVoice: 'aa-typewriter', narrationPitch: 0 }, 'off'), { narrationVoice: 'off' })
+  assert.deepEqual(lineVoice('narration', '', new Map(), resolveConfig({ ui: patch }).ui), { id: 'aa-typewriter', pitch: 0, auto: false })
 })

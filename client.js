@@ -3632,8 +3632,25 @@ function findLookTurn(timeline, key) {
 
 // lib/sounds.js
 var p = (wave, f, dur, gain, more = {}) => ({ wave, f, dur, gain, ...more });
+var aaBlip = (f1, f2, f3, lp) => [
+  p("square", f1, 0.0165, 72e-4, { attack: 8e-4, hold: 0.0142, lp }),
+  p("square", f2, 0.0165, 72e-4, { at: 0.0163, attack: 5e-4, hold: 0.0145, lp: 6e3 }),
+  p("square", f3, 0.0175, 72e-4, { at: 0.0326, attack: 5e-4, hold: 0.015, lp: 6e3 })
+];
+var aaClick = (at2, g, hold, fall) => [
+  p("noise", 1300, hold + fall, g * 1.3, { at: at2, q: 2, hold }),
+  p("noise", 2300, hold + fall * 0.9, g * 0.9, { at: at2, q: 3, hold }),
+  p("noise", 3800, hold + fall * 0.7, g * 0.6, { at: at2, q: 1.2, hold: hold * 0.7 }),
+  p("noise", 5600, hold + fall * 0.6, g * 0.55, { at: at2, q: 1.2, hold: hold * 0.6 }),
+  p("noise", 1700, 0.16, g * 0.3, { at: at2 + hold, q: 2.5, attack: 4e-3 })
+];
 var VOICES2 = Object.freeze([
   { id: "classic", label: "经典哔哔", desc: "逆转裁判式的三角波哔哔声", gender: "", parts: [p("triangle", 420, 0.05, 0.045, { attack: 4e-3 })] },
+  // 照逆转裁判（DS）的打字音量出来的：一声是一帧一个音的三连音，男声是同一串音整体低一点；打字机是「咔、嗒」两下。
+  // fixed：照原样放，自动分配时不按名字错开音高（逆转裁判里同性别的人都是同一个声音），当旁白也不压低。
+  { id: "aa-female", label: "逆转女声", desc: "照逆转裁判女性角色的哔哔声合成：方波三连音，又高又脆", gender: "female", fixed: true, parts: aaBlip(923, 3640, 2980, 1900) },
+  { id: "aa-male", label: "逆转男声", desc: "照逆转裁判男性角色的哔哔声合成：同一串音低一点", gender: "male", fixed: true, parts: aaBlip(780, 3120, 2521, 1600) },
+  { id: "aa-typewriter", label: "逆转打字机", desc: "照逆转裁判开场打日期、地点的打字机声合成：咔、嗒两下，适合旁白", gender: "", fixed: true, parts: [...aaClick(0, 0.05, 8e-3, 0.06), ...aaClick(0.045, 0.045, 5e-3, 0.03)] },
   { id: "bell", label: "清亮铃音", desc: "干净透亮，带一点泛音", gender: "female", parts: [p("sine", 660, 0.07, 0.05, { attack: 3e-3 }), p("sine", 1320, 0.04, 0.015, { attack: 3e-3 })] },
   { id: "chirp", label: "少女啾啾", desc: "每个字往上一挑，活泼", gender: "female", parts: [p("triangle", 520, 0.05, 0.045, { to: 640, attack: 4e-3 })] },
   { id: "soft", label: "温柔气声", desc: "软一点、带气息", gender: "female", parts: [p("sine", 480, 0.07, 0.04, { attack: 0.012 }), p("noise", 2400, 0.05, 0.025, { q: 1.5, attack: 0.01 })] },
@@ -3660,6 +3677,9 @@ var libRef = (id) => "lib:" + id;
 var libIdOf = (value) => isLibRef(value) ? String(value).slice(4) : "";
 var isVoice = (id) => VOICE_IDS.has(id) || isLibRef(id);
 var LIBRARY_VOICES = "library";
+var AA_VOICES = "aa";
+var AA_POOLS = { female: ["aa-female"], male: ["aa-male"], other: ["aa-female", "aa-male"], "": ["aa-female", "aa-male"] };
+var isFixedVoice = (id) => isLibRef(id) || Boolean(voiceById(id)?.fixed);
 var libraryBlips = (sounds2) => (sounds2 || []).filter((s) => s && s.kind === "blip" && s.id);
 function voiceLabel(id, blips) {
   if (isLibRef(id)) {
@@ -3825,12 +3845,13 @@ function poolOf(person, ui2, blips) {
   if (ui2?.voiceDefault === LIBRARY_VOICES) {
     const pool = libraryPool(libraryBlips(blips), person?.gender);
     if (pool.length) return pool;
-  } else if (isVoice(ui2?.voiceDefault)) return [ui2.voiceDefault];
+  } else if (ui2?.voiceDefault === AA_VOICES) return AA_POOLS[person?.gender] || AA_POOLS[""];
+  else if (isVoice(ui2?.voiceDefault)) return [ui2.voiceDefault];
   return VOICE_POOLS[person?.gender] || VOICE_POOLS[""];
 }
 function autoVoice(id, name2, pitch) {
   const h = nameHash(name2);
-  const spread = id === "classic" ? 12 * Math.log2((420 + h % 7 * 38) / 420) : isLibRef(id) ? 0 : (h >>> 8) % 5 - 2;
+  const spread = id === "classic" ? 12 * Math.log2((420 + h % 7 * 38) / 420) : isFixedVoice(id) ? 0 : (h >>> 8) % 5 - 2;
   return { id, pitch: pitch + spread, auto: true };
 }
 function resolveVoice(person, name2, ui2, blips) {
@@ -3893,6 +3914,18 @@ function builtinPreset(ui2) {
     patch.narrationPitch = -6;
   }
   return Object.keys(patch).length ? patch : null;
+}
+function aaPreset(ui2) {
+  const patch = {};
+  if (ui2?.voiceDefault !== AA_VOICES) patch.voiceDefault = AA_VOICES;
+  if (ui2?.narrationVoice !== "aa-typewriter" || ui2?.narrationPitch !== 0) Object.assign(patch, { narrationVoice: "aa-typewriter", narrationPitch: 0 });
+  return Object.keys(patch).length ? patch : null;
+}
+function narrationPatch(ui2, voice) {
+  const patch = { narrationVoice: voice };
+  if (isFixedVoice(voice)) patch.narrationPitch = 0;
+  else if (voice !== "off" && isFixedVoice(ui2?.narrationVoice) && !ui2?.narrationPitch) patch.narrationPitch = -6;
+  return patch;
 }
 
 // lib/stature.js
@@ -12516,19 +12549,23 @@ function SoundSection({ data }) {
   const narration = ui2.narrationVoice === "off" ? null : { id: ui2.narrationVoice, pitch: ui2.narrationPitch };
   const preset2 = libraryPreset(library);
   const builtin = builtinPreset(ui2);
+  const aa = aaPreset(ui2);
   const usable = library.filter((s) => s.use).length;
   const choose = (slot, value) => {
     p4({ sounds: { [slot]: value } });
     previewSound(slot, value, ui2);
   };
-  const defaultOptions = [["auto", "自动（按性别分）"], ...blips.length || ui2.voiceDefault === LIBRARY_VOICES ? [[LIBRARY_VOICES, "音效库里的打字音（按性别分）"]] : [], ...VOICES2.map((v) => [v.id, `都用「${v.label}」`]), { group: "都用音效库里的", options: blipOptions(blips, ui2.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }];
-  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, (preset2 || builtin) && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note fg-libpreset" }, usable > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, "音效库里有 ", usable, " 个标了用途的声音（比如逆转裁判音效包里的男声 / 女声哔哔、打字机、拍桌子、法槌）。"), preset2 && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-primary", onClick: () => {
+  const defaultOptions = [["auto", "自动（按性别分）"], [AA_VOICES, "逆转式（女性都用逆转女声、男性都用逆转男声）"], ...blips.length || ui2.voiceDefault === LIBRARY_VOICES ? [[LIBRARY_VOICES, "音效库里的打字音（按性别分）"]] : [], ...VOICES2.map((v) => [v.id, `都用「${v.label}」`]), { group: "都用音效库里的", options: blipOptions(blips, ui2.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }];
+  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, (aa || preset2 || builtin) && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note fg-libpreset" }, aa && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, "逆转裁判那样的打字音：内置的逆转男声 / 女声 / 打字机，不用导入。"), aa && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-primary", onClick: () => {
+    p4(aa);
+    toast("已换成逆转式：男女各一个声音，旁白用逆转打字机");
+  } }, "套用逆转式"), usable > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, "音效库里有 ", usable, " 个标了用途的声音（比如逆转裁判音效包里的男声 / 女声哔哔、打字机、拍桌子、法槌）。"), preset2 && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-primary", onClick: () => {
     p4(preset2);
     toast("已套用音效库里的声音");
   } }, "一键套用"), builtin && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
     p4(builtin);
     toast("已换回内置的声音");
-  } }, "换回内置")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。" }, /* @__PURE__ */ import_react12.default.createElement(Select, { value: ui2.voiceDefault, options: defaultOptions, onChange: (v) => p4({ voiceDefault: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), { group: "音效库里的打字音", options: blipOptions(blips, ui2.narrationVoice) }, ["off", "不出声"]], style: INLINE, onChange: (v) => p4({ narrationVoice: v }) }), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length + blips.length, " 个（点一下试听）"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.map((v) => /* @__PURE__ */ import_react12.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react12.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react12.default.createElement("span", null, VOICE_GENDER[v.gender], " · ", v.desc))), blips.map((b) => /* @__PURE__ */ import_react12.default.createElement("button", { key: b.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: libRef(b.id), pitch: 0 }, ui2) }, /* @__PURE__ */ import_react12.default.createElement("b", null, "▶ ", b.name), /* @__PURE__ */ import_react12.default.createElement("span", null, "音效库 · ", VOICE_GENDER[b.gender || ""], b.use === "narration" ? " · 旁白用" : "", b.description ? " · " + b.description : "")))), !blips.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "想用逆转裁判那样的哔哔声：把打字音导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, { key: group }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）；也可以从音效库里挑一个。自己的文件和音效库的声音都按默认版本的响度放。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
+  } }, "换回内置")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。" }, /* @__PURE__ */ import_react12.default.createElement(Select, { value: ui2.voiceDefault, options: defaultOptions, onChange: (v) => p4({ voiceDefault: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), { group: "音效库里的打字音", options: blipOptions(blips, ui2.narrationVoice) }, ["off", "不出声"]], style: INLINE, onChange: (v) => p4(narrationPatch(ui2, v)) }), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length + blips.length, " 个（点一下试听）"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.map((v) => /* @__PURE__ */ import_react12.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react12.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react12.default.createElement("span", null, VOICE_GENDER[v.gender], " · ", v.desc))), blips.map((b) => /* @__PURE__ */ import_react12.default.createElement("button", { key: b.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: libRef(b.id), pitch: 0 }, ui2) }, /* @__PURE__ */ import_react12.default.createElement("b", null, "▶ ", b.name), /* @__PURE__ */ import_react12.default.createElement("span", null, "音效库 · ", VOICE_GENDER[b.gender || ""], b.use === "narration" ? " · 旁白用" : "", b.description ? " · " + b.description : "")))), !blips.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "逆转女声、逆转男声、逆转打字机是照逆转裁判的声音合成的，不用导入。想用原版录音：把逆转裁判音效包（或别的打字音）导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, { key: group }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）；也可以从音效库里挑一个。自己的文件和音效库的声音都按默认版本的响度放。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
     const mine = ui2.customSounds[slot.id];
     const current = ui2.sounds[slot.id];
     const suggested = library.filter((s) => s.use === slot.id);
