@@ -16,7 +16,7 @@ const STATUS = { running: ['进行中', 'is-running'], ok: ['完成', 'is-ok'], 
 const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词', cg: '写插画提示词', acting: '设计动作与表情' }
 const WRITER = { ai: '模型写的', fallback: '按档案拼的', user: '玩家改的' }
 // 宿主在启动后才定（酒馆版换了传输），所以现取
-const sourceLabel = source => ({ tavern: hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern 后台模型', plugin: '插件设置里指定', cg: '插画分镜师单独选的', custom: '插画分镜师的自定义接口' })[source]
+const sourceLabel = (source, who = '插画分镜师') => ({ tavern: hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern 后台模型', plugin: '插件设置里指定', cg: '插画分镜师单独选的', listen: '听音师单独选的', custom: who + '的自定义接口' })[source]
 const USAGE_LABEL = { inputTokens: '输入', outputTokens: '输出', reasoningTokens: '思考', cachedInputTokens: '缓存命中', cacheReadTokens: '缓存读', cacheWriteTokens: '缓存写', totalTokens: '合计' }
 const SHAPE_LABEL = { landscape: '横版', portrait: '竖版', square: '方形' }
 /** 段落里一个人当时的样子：「柯萝伊 魔导师长袍 · 无状态 · 外貌另写」。 */
@@ -315,6 +315,40 @@ function CgsView({ cgs }) {
   )
 }
 
+/**
+ * 听音师这一轮列出的声音：每条在哪一句、听到什么、拿哪些词去找，找到了哪些候选（导演从候选里挑，不一定都用上）。
+ * 听音师失败时说一声：候选按正文对词挑的。
+ */
+function HeardView({ listen }) {
+  if (listen.error) return <Block label="先听一遍"><div className="fg-err fg-dlog-error">听音师失败，这一轮音效候选按正文对词挑：{listen.error}</div></Block>
+  const heard = listen.heard
+  if (!heard) return null
+  const rows = [...heard.ambience.map(h => ['环境音', h]), ...heard.sfx.map(h => ['音效', h])]
+  return (
+    <Block label={`先听一遍 · 环境音 ${heard.ambience.length} · 音效 ${heard.sfx.length}`}>
+      {!rows.length && <div className="fg-note">听音师觉得这一轮没有听得见的声音，候选按正文对词挑。</div>}
+      {rows.map(([kind, h], i) => (
+        <div key={i} className="fg-dlog-card">
+          <div className="fg-dlog-chips">{h.at && <Chip k="句">{h.at}</Chip>}<Chip k={kind}>{h.what || h.words[0]}</Chip>{h.cats.map(c => <Chip key={c} k="分类">{c}</Chip>)}</div>
+          <div className="fg-note">找词：{h.words.join('、') || '—'}</div>
+          <div className="fg-dlog-mono">{h.found ? (h.found.length ? '找到：' + h.found.join('、') : '库里没找到像的') : '—'}</div>
+        </div>
+      ))}
+    </Block>
+  )
+}
+
+/** 听音师那一次请求的原始输出（放在导演的几次尝试前面）。 */
+function ListenRaw({ listen }) {
+  return (
+    <Block text={listen.output} label={<>先听一遍 · {listen.model || '—'} · 最大输出 {num(listen.maxTokens)} · {secs(listen.ms)}{listen.usage ? ` · ${usageText(listen.usage)}` : ''}</>}>
+      {listen.error && <div className="fg-err fg-dlog-error">{listen.error}</div>}
+      {listen.reasoning && <details className="fg-dlog-think"><summary>模型思考 · {num(listen.reasoning.length)} 字</summary><Pre text={listen.reasoning} /></details>}
+      <Pre text={listen.output} empty="（模型没有输出文字）" />
+    </Block>
+  )
+}
+
 function Attempts({ attempts }) {
   if (!attempts.length) return <div className="fg-note">还没有发出请求。</div>
   return attempts.map((a, i) => (
@@ -367,7 +401,8 @@ function LogDetail({ gameId, summary }) {
           <div><i>模型窗口</i>{summary.window ? `${num(summary.window)} token` : '宿主没给窗口大小，按设置原样发'}{entry && entry.outputDefault ? <span className="fg-note"> · 模型默认输出 {num(entry.outputDefault)}</span> : null}</div>
           {entry && <div><i>资料</i>{entry.contextLength ? `发了 ${num(entry.contextChars)} 字（人物卡与世界书共 ${num(entry.contextLength)} 字）` : '这张卡没有人物卡 / 世界书资料'}</div>}
           {entry && writer && <div><i>剧情</i>{`发了 ${num(entry.storyChars)} 字（到这一轮为止共 ${num(entry.storyLength)} 字）`}</div>}
-          {summary.usage && <div><i>用量</i>{usageText(summary.usage)}</div>}
+          {entry?.listen && <div><i>先听一遍</i>{entry.listen.model || '—'}{sourceLabel(entry.listen.source, '听音师') ? <span className="fg-note">（{sourceLabel(entry.listen.source, '听音师')}）</span> : null} · {entry.listen.ms ? secs(entry.listen.ms) : '进行中'}{entry.listen.error ? <span className="fg-err"> · 失败</span> : entry.listen.heard ? ` · 听到 ${entry.listen.heard.ambience.length + entry.listen.heard.sfx.length} 个声音` : ''}</div>}
+          {summary.usage && <div><i>用量</i>{usageText(summary.usage)}{entry?.listen?.usage ? <span className="fg-note">（含先听一遍）</span> : null}</div>}
         </div>
         {summary.notes.map((n, i) => <div key={i} className="fg-dlog-notice">⚠ {n}</div>)}
         {summary.error && <div className="fg-err fg-dlog-error">{summary.error}</div>}
@@ -383,12 +418,14 @@ function LogDetail({ gameId, summary }) {
           <Block label="模型输出（实时）"><Pre text={live.output} follow cursor empty="还没有输出" /></Block>
         </>
       )}
-      {tab === 'result' && (entry ? (sprite ? <SpritesView sprites={entry.sprites} acting={entry.acting} /> : acting ? <ActingView acting={entry.acting} /> : cg ? <CgsView cgs={entry.cgs} /> : <ScriptView script={entry.script} units={entry.units || []} />) : <div className="fg-note">读取中…</div>)}
-      {tab === 'raw' && (entry ? <Attempts attempts={entry.attempts || []} /> : <div className="fg-note">读取中…</div>)}
+      {tab === 'result' && (entry ? (sprite ? <SpritesView sprites={entry.sprites} acting={entry.acting} /> : acting ? <ActingView acting={entry.acting} /> : cg ? <CgsView cgs={entry.cgs} /> : <>{entry.listen && <HeardView listen={entry.listen} />}<ScriptView script={entry.script} units={entry.units || []} /></>) : <div className="fg-note">读取中…</div>)}
+      {tab === 'raw' && (entry ? <>{entry.listen && <ListenRaw listen={entry.listen} />}<Attempts attempts={entry.attempts || []} /></> : <div className="fg-note">读取中…</div>)}
       {tab === 'prompt' && (entry ? (
         <>
           <Block label={`系统提示词 · ${num((entry.system || '').length)} 字`} text={entry.system}><Pre text={entry.system} /></Block>
           <Block label={`用户消息 · ${num((entry.user || '').length)} 字${sprite ? '（资料 + 全部剧情 + 角色档案 + 要画的差分）' : acting ? '（资料 + 全部剧情 + 角色档案 + 要设计的情绪）' : cg ? '（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）' : '（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）'}`} text={entry.user}><Pre text={entry.user} /></Block>
+          {entry.listen && <Block label={`先听一遍 · 系统提示词 · ${num((entry.listen.system || '').length)} 字`} text={entry.listen.system}><Pre text={entry.listen.system} /></Block>}
+          {entry.listen && <Block label={`先听一遍 · 用户消息 · ${num((entry.listen.user || '').length)} 字（上一幕 + 库里的分类 + 本轮正文单元）`} text={entry.listen.user}><Pre text={entry.listen.user} /></Block>}
         </>
       ) : <div className="fg-note">读取中…</div>)}
     </div>

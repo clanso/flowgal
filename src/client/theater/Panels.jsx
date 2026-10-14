@@ -1535,7 +1535,8 @@ function DirectorSection({ data, onDirectorLog, onTab = null }) {
       <Field label="最大输出" hint="自动：模型报了输出上限就用它报的，没报按 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。导演、立绘设计师、插画分镜师都用这一个。"><Limit value={cfg.director.maxTokens} fallback={128000} min={1000} width="9cqw" free="自动" onCommit={v => p({ maxTokens: v })} /></Field>
       <Field label="温度"><Text type="number" style={{ width: '7cqw' }} value={cfg.director.temperature} onCommit={v => p({ temperature: v })} /></Field>
       <Field label="资料长度" hint="给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认不限，整份给；超出模型窗口时自动缩短。"><Limit value={cfg.director.contextChars} fallback={1000000} width="9cqw" unit="字" onCommit={v => p({ contextChars: v })} /></Field>
-      <CgModelFields data={data} providers={llm.providers} />
+      <OwnModelFields data={data} providers={llm.providers} which="cg" />
+      <OwnModelFields data={data} providers={llm.providers} which="listen" />
       <div className="fg-section">每轮上限</div>
       <div className="fg-note">导演一轮里最多写几次。默认都不限：提示词里「只给真正需要的地方」「平常的句子不写」那几句一直在，靠它让导演自己收着用。限了数的，提示词里会写上这个数，导演写多了也只按正文顺序留前面那么多。</div>
       <div className="fg-limits">
@@ -1544,31 +1545,36 @@ function DirectorSection({ data, onDirectorLog, onTab = null }) {
         ))}
       </div>
       <div className="fg-section">提示词{onTab && <button type="button" className="fg-btn" onClick={() => onTab('prompts')}>打开提示词页</button>}</div>
-      <div className="fg-note">导演、表演设计师、立绘设计师、插画分镜师的每一段提示词，连出图固定词和过滤规则，都在「提示词」页全文显示、能改、能单段恢复默认，还能照这一局预览完整的提示词。</div>
+      <div className="fg-note">导演、听音师、表演设计师、立绘设计师、插画分镜师的每一段提示词，连出图固定词和过滤规则，都在「提示词」页全文显示、能改、能单段恢复默认，还能照这一局预览完整的提示词。</div>
       <Field label="共用开头" hint="导演和几位设计师的系统提示词都换成同一句，各自的规矩放进用户消息的【你的工作】一节，资料和剧情放在最前面一字不差：会自动缓存的模型接口（DeepSeek 等）第二次读就便宜、快。关掉就照以前，规矩放在系统提示词里。"><Toggle value={cfg.director.sharedPrefix} onChange={v => p({ sharedPrefix: v })} /></Field>
       <Field label="补设计合进写词" hint="已经设计过的人要画还没设计的情绪（或重新设计表情）时，补设计和写立绘提示词一次请求做完，资料和剧情只读一遍。关掉就先单独补设计、再写词。第一次整套设计一直是单独一次。"><Toggle value={cfg.director.combineDesign} onChange={v => p({ combineDesign: v })} /></Field>
     </>
   )
 }
 
-/** 插画分镜师单独用的模型：跟导演一样 / 宿主里另选一个 / 自己接一个 OpenAI 兼容接口（Key 存在宿主）。 */
-function CgModelFields({ data, providers }) {
-  const own = data.config.director.cgLlm
+/** 插画分镜师（cg）、听音师（listen）各自能单独用的模型：跟导演一样 / 宿主里另选一个 / 自己接一个 OpenAI 兼容接口（Key 存在宿主）。 */
+const OWN_MODEL = {
+  cg: { field: 'cgLlm', secret: 'cgllm', window: '这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收；最大输出、温度、资料长度跟导演用同一套设置。接口报出更小的输出上限时自动按它重试。', label: '插画分镜师的模型', hint: '写 CG 提示词的模型可以和导演分开。有的模型不肯把露骨的画面写具体，就给分镜师单独换一个；自定义接口填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行。' },
+  listen: { field: 'listenLlm', secret: 'listenllm', window: '这个模型一次能读多少 token，最大输出按它往下收（听音师最多要 16000）；温度跟导演用同一个。接口报出更小的输出上限时自动按它重试。', label: '听音师的模型', hint: '音效库比每轮给导演看的候选多时（设置 → 音效库 →「先听一遍」），导演之前先让听音师读一遍正文、列出听得见的声音，候选照它列的找。活很简单，可以换个便宜、快的模型，省钱也少等一会儿；自定义接口同上。' },
+}
+function OwnModelFields({ data, providers, which }) {
+  const meta = OWN_MODEL[which]
+  const own = data.config.director[meta.field]
   const [busy, run] = useBusy()
   const [hostModels, setHostModels] = React.useState([])
   const [list, setList] = React.useState(null)
-  const p = patch => patchConfig({ director: { cgLlm: patch } }).catch(e => toast(e.message, 'error'))
+  const p = patch => patchConfig({ director: { [meta.field]: patch } }).catch(e => toast(e.message, 'error'))
   React.useEffect(() => {
     if (own.source !== 'host' || !own.provider) return setHostModels([])
     api.llm(own.provider).then(r => setHostModels(r.models || [])).catch(() => setHostModels([]))
   }, [own.source, own.provider])
-  const loadList = () => run('m', async () => setList(await api.cgModels()))
+  const loadList = () => run('m', async () => setList(await api.ownModels(which)))
   // 地址或 Key 换了就重新读模型列表
-  React.useEffect(() => { setList(null); if (own.source === 'custom' && own.baseURL) loadList() }, [own.source, own.baseURL, data.keys.cgllm])
+  React.useEffect(() => { setList(null); if (own.source === 'custom' && own.baseURL) loadList() }, [own.source, own.baseURL, data.keys[meta.secret]])
   const sources = [['', '跟导演一样'], ['host', hostName() === 'st' ? '另选一套酒馆连接配置' : '另选一个 Tavern 里的模型'], ['custom', '自定义接口（OpenAI 兼容）']]
   return (
     <>
-      <Field label="插画分镜师的模型" hint="写 CG 提示词的模型可以和导演分开。有的模型不肯把露骨的画面写具体，就给分镜师单独换一个；自定义接口填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行。">
+      <Field label={meta.label} hint={meta.hint}>
         <div className="fg-row">
           <Select value={own.source} style={INLINE} onChange={v => p({ source: v, provider: '', model: '' })} options={sources} />
           {own.source === 'host' && <Select value={own.provider} style={INLINE} onChange={v => p({ provider: v, model: '' })} options={[['', '（选一个）'], ...providers.map(x => [x.id, x.name])]} />}
@@ -1580,14 +1586,14 @@ function CgModelFields({ data, providers }) {
       {own.source === 'custom' && (
         <>
           <Field label="接口地址"><Text value={own.baseURL} placeholder="https://api.deepseek.com/v1" style={{ flex: 1, width: '100%' }} onCommit={v => p({ baseURL: String(v).trim() })} /></Field>
-          <Field label="Key" hint={`存在宿主（${data.secretStorage || '插件目录'}），不会发到浏览器。本机的接口不要 Key 就空着。`}><KeyInput backend="cgllm" has={data.keys.cgllm} /></Field>
+          <Field label="Key" hint={`存在宿主（${data.secretStorage || '插件目录'}），不会发到浏览器。本机的接口不要 Key 就空着。`}><KeyInput backend={meta.secret} has={data.keys[meta.secret]} /></Field>
           <Field label="模型" hint={list ? list.note : own.baseURL ? '正在读取模型列表…' : '先填接口地址'}>
             <div className="fg-row">
               <ModelField value={own.model} options={(list && list.models) || []} placeholder="模型 ID" onCommit={v => p({ model: v, ...((list?.models || []).find(m => m.id === v)?.window ? { contextWindow: list.models.find(m => m.id === v).window } : {}) })} />
               <button type="button" className="fg-btn" disabled={busy === 'm' || !own.baseURL} onClick={loadList}>{busy === 'm' ? '读取中…' : '刷新列表'}</button>
             </div>
           </Field>
-          <Field label="上下文窗口" hint="这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收；最大输出、温度、资料长度跟导演用同一套设置。接口报出更小的输出上限时自动按它重试。"><Text type="number" style={{ width: '9cqw' }} value={own.contextWindow} onCommit={v => p({ contextWindow: v })} /></Field>
+          <Field label="上下文窗口" hint={meta.window}><Text type="number" style={{ width: '9cqw' }} value={own.contextWindow} onCommit={v => p({ contextWindow: v })} /></Field>
         </>
       )}
     </>
@@ -2180,8 +2186,36 @@ function ErosField({ cfg, p }) {
 // 音效库页列音效和打字音，环境音库页列环境音；导演挑候选时本来就分开挑。清空只清这一页的音效或环境音，
 // 打字音和「声音」页正在用的（落字音效、界面音的槽，旁白、默认音色）留着。
 const LIB_PAGE = {
-  sfx: { kinds: ['sfx', 'blip'], title: '音效库', unit: '个音效', other: '环境音库', empty: '音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。', note: '推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪句配什么音效。所以标签要写正文里会出现的词。' },
-  ambience: { kinds: ['ambience'], title: '环境音库', unit: '个环境音', other: '音效库', empty: '环境音库还是空的。没有环境音时剧场不放环境音。', note: '雨声、蝉鸣、车站广播这类循环的底。后台导演整理每一轮时按地点、天气和正文挑一批候选，决定每一幕放哪个，跨轮沿用。标签写地点、天气、时段这类词最管用。' },
+  sfx: { kinds: ['sfx', 'blip'], title: '音效库', unit: '个音效', other: '环境音库', empty: '音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。', note: '推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时只看几十个候选，再决定哪句配什么音效。候选怎么挑见下面「导演怎么挑」；标签写正文里会出现的说法最稳。' },
+  ambience: { kinds: ['ambience'], title: '环境音库', unit: '个环境音', other: '音效库', empty: '环境音库还是空的。没有环境音时剧场不放环境音。', note: '雨声、蝉鸣、车站广播这类循环的底。后台导演整理每一轮时从一批候选里给每一幕挑一个，跨轮沿用。候选怎么挑见下面「导演怎么挑」；标签写地点、天气、时段这类词最管用。' },
+}
+
+/**
+ * 导演怎么挑候选：每轮给导演看几个（这一页的种类），和「先听一遍」（音效库、环境音库两页是同一个开关）。
+ * 库没超过名额时全给导演看，用不着找；超过了，开着先听一遍就先让听音师列出听得见的声音、照它找，关着只按正文对词。
+ */
+function PickingFields({ cfg, kind, count }) {
+  const quota = cfg.director.soundCandidates[kind]
+  const listen = cfg.director.listen
+  const pd = patch => patchConfig({ director: patch }).catch(e => toast(e.message, 'error'))
+  const word = KIND_LABEL[kind]
+  const state = count <= quota
+    ? `现在${word}有 ${count} 个，没超过 ${quota}：每轮全给导演看，不用找。`
+    : listen
+      ? `现在${word}有 ${count} 个，比 ${quota} 多：每轮导演之前先听一遍，照听到的声音找，剩下的名额按正文对词补。`
+      : `现在${word}有 ${count} 个，比 ${quota} 多：每轮按正文对词挑 ${quota} 个（标签、名字、分类要在正文里原样出现）。`
+  return (
+    <>
+      <div className="fg-section">导演怎么挑</div>
+      <div className="fg-note">{state}</div>
+      <Field label="每轮候选" hint={`后台导演每一轮能看到几个${word}（编号、名字、分类和描述各一行，越多提示词越长）。库没超过这个数时全给它看。`}>
+        <div className="fg-row"><Text type="number" style={{ width: '7cqw' }} value={quota} onCommit={v => { const n = Math.trunc(Number(v)); if (n >= 1) pd({ soundCandidates: { [kind]: n } }) }} /><span className="fg-note">个，最多 300</span></div>
+      </Field>
+      <Field label="先听一遍" hint={'库比候选多时，导演之前先让听音师读一遍这一轮正文，列出听得见的声音和找它们的近义词（「砸了杯子」会去找摔碎、打碎、玻璃……），候选照它列的找，正文里没有原词的声音也找得到。每轮多一次模型调用，会慢一点；听音师可以在「导演」页单独换个便宜、快的模型，提示词在「提示词 → 听音师」里改。它出错时退回按正文对词，导演照常整理。音效库和环境音库共用这一个开关。'}>
+        <Toggle value={listen} onChange={v => pd({ listen: v })} />
+      </Field>
+    </>
+  )
 }
 
 function SoundLibSection({ data, kind = 'sfx' }) {
@@ -2282,6 +2316,7 @@ function SoundLibSection({ data, kind = 'sfx' }) {
       {kind === 'ambience' && <Field label="环境音" hint="雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。"><div className="fg-row"><Toggle value={cfg.ui.amb} onChange={v => p({ amb: v })} /><input type="range" min="0" max="1" step="0.05" value={cfg.ui.ambVolume} onChange={e => p({ ambVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>}
       {kind === 'sfx' && <Field label="剧情音效" hint="推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。"><div className="fg-row"><Toggle value={cfg.ui.storySfx} onChange={v => p({ storySfx: v })} /><input type="range" min="0" max="2" step="0.05" value={cfg.ui.storySfxVolume} onChange={e => p({ storySfxVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>}
       {kind === 'sfx' && <ErosField cfg={cfg} p={p} />}
+      <PickingFields cfg={cfg} kind={kind} count={(sounds || []).filter(s => s.kind === kind).length} />
       <div className="fg-section">我的{page.title}{sounds ? ` · ${sounds.length} 个` : ''}</div>
       <div className="fg-note">{page.note}</div>
       <div className="fg-row" style={{ margin: '1cqw 0' }}>

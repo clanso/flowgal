@@ -88,6 +88,8 @@ export const api = {
   models: () => call('/models'),
   llm: provider => call(`/llm?provider=${encodeURIComponent(provider || '')}`),
   cgModels: () => call('/cg-models'),
+  /** 插画分镜师（cg）/ 听音师（listen）自定义接口上的模型。 */
+  ownModels: which => call(`/own-models?which=${encodeURIComponent(which)}`),
   update: check => call(`/update${check ? `?check=${check}` : ''}`),
   runUpdate: action => call('/update', { action }),
   music: () => call('/music'),
