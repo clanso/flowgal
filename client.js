@@ -2985,7 +2985,58 @@ var FACE_WORDS = lines(
   "bags under eyes",
   "eye contact"
 );
-var FACE_EYE_BEFORE = lines("closed", "half-closed", "narrowed", "downcast", "squinting", "sparkling", "empty", "half-lidded", "watery", "teary", "rolling", "averted", "averting", "crazy", "shaded", "cold", "gentle", "sleepy", "tired", "wide", "dull", "glazed", "shining", "soft", "lowered");
+var FACE_EYE_BEFORE = lines(
+  "closed",
+  "half-closed",
+  "narrowed",
+  "downcast",
+  "squinting",
+  "sparkling",
+  "empty",
+  "half-lidded",
+  "watery",
+  "teary",
+  "rolling",
+  "averted",
+  "averting",
+  "crazy",
+  "shaded",
+  "cold",
+  "gentle",
+  "sleepy",
+  "tired",
+  "wide",
+  "dull",
+  "glazed",
+  "shining",
+  "soft",
+  "lowered",
+  "calm",
+  "serious",
+  "determined",
+  "sad",
+  "kind",
+  "fierce",
+  "stern",
+  "focused",
+  "tearful",
+  "misty",
+  "glistening",
+  "unfocused",
+  "distant",
+  "hopeful",
+  "pleading",
+  "worried",
+  "nervous",
+  "happy",
+  "smiling",
+  "loving",
+  "lustful",
+  "seductive",
+  "bedroom",
+  "upturned",
+  "puppy"
+);
 var FACE_EYE_AFTER = lines("closed", "open", "widened", "narrowed", "shut", "lowered");
 var FACE_NOT = lines("hair", "hand", "hands", "finger", "fingers", "arm", "arms", "holding", "covering", "eye-level", "eyewear", "eyepatch", "eyeshadow", "eyeliner", "mascara", "lipstick", "eyelashes", "facing", "mask", "paint", "mark", "whisker", "whiskers");
 var TEXT_DEFAULTS = Object.freeze({
@@ -3910,16 +3961,22 @@ var DEFAULT_FACE = Object.freeze({
   // 每档的重绘强度：低的留住原来的线条和颜色，高的改得动
   wholePeak: true,
   // 「极」那一档不换脸，在同一个动作、同一个种子上整张画（脸由主模型画，画风自然一致）
+  tone: true,
+  // 色调对齐底图：重画的脸整体偏亮、偏暗、偏色时按底图拉回来（只动整体色调，眉眼口、泪、红晕不动）
   check: true,
-  // 画完自动比对，跑偏了换种子、调强度再来，留最像的那张
-  retries: 5,
-  // 跑偏了最多再画几次
+  // 画完自动比对：表情没换上调高强度再来，画风跑偏换种子、调低强度再来，留最像的那张
+  retries: 10,
+  // 没过最多再画几次
+  expression: 3,
+  // 表情至少变多少：眉眼口的线条比底图变了百分之几（见 expressionChange），少于这个算没换上；0 不查
   tolerance: 1,
-  // 比对的宽严：小于 1 更严（更容易重来），大于 1 更松
+  // 画风比对的宽严：小于 1 更严（更容易重来），大于 1 更松
+  floor: 0.5,
+  // 画风跑偏往下调强度最低调到这里（再低表情就换不上了）；起步强度本来就更低的不往上抬
   reference: false
   // 把底图当角色参考一起发给 NovelAI，锁住人物和画风（只有 V4.5 支持，V5 还没有；每张多花 5 Anlas；接口不认时自动不带）
 });
-var FACE_LIMITS = { cropScale: [1.5, 4], cropSize: [512, 1536], feather: [0, 0.6], strength: [0.2, 1], retries: [0, 5], tolerance: [0.5, 2.5] };
+var FACE_LIMITS = { cropScale: [1.5, 4], cropSize: [512, 1536], feather: [0, 0.6], strength: [0.2, 1], retries: [0, 10], expression: [0, 30], tolerance: [0.5, 2.5], floor: [0.2, 1] };
 
 // lib/face.js
 var POSE_IDS = Object.keys(POSES);
@@ -11212,9 +11269,11 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
       paint.crop ? "放大重画" : "",
       paint.soft ? "软边" : "",
       paint.reference ? "带角色参考" : "",
-      paint.check ? `比对：接缝 ${paint.check.seam}、明暗 ${paint.check.shade}、变化 ${paint.check.change}${paint.tries > 1 ? `（画了 ${paint.tries} 次，${paint.check.ok ? "这张过了" : "都没完全过，留了最像的"}）` : paint.check.ok ? "" : "（没过）"}` : ""
+      paint.tone && paint.tone.some(Boolean) ? `色调拉回 ${paint.tone.map((v) => (v > 0 ? "+" : "") + v).join("/")}` : "",
+      paint.check ? `比对：${Number.isFinite(paint.check.expr) ? `表情变化 ${paint.check.expr}、` : ""}接缝 ${paint.check.seam}、明暗 ${paint.check.shade}${paint.tries > 1 ? `（画了 ${paint.tries} 次，${paint.check.ok ? "这张过了" : paint.check.flat ? "表情都没换上，留了变得最多的" : "表情换上了，画风都没完全过，留了最像的"}）` : paint.check.ok ? "" : paint.check.flat ? "（表情没换上）" : "（画风没过）"}` : ""
     ].filter(Boolean).join(" · ") : "";
-    return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-face-info" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "只换脸：在「", bodyLabel, "」这张「", record.poseLabel || (POSES[record.face.pose] || {}).label || "动作", "」底图上重画脸，身体衣服跟底图一样", Number.isInteger(record.face.seed) ? ` · 脸的种子 ${record.face.seed}` : ""), record.assetId && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "redo", onClick: () => redo(void 0) }, "换个种子重画脸")), how && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, how), record.assetId && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "这张的重绘强度"), /* @__PURE__ */ import_react12.default.createElement(
+    const history = paint && Array.isArray(paint.history) && paint.history.length > 1 ? paint.history.map((t, i) => `第 ${i + 1} 次 ${Number(t.strength).toFixed(2)}：表情 ${t.expr}、接缝 ${t.seam}、明暗 ${t.shade}${t.ok ? "，过了" : t.flat ? "，表情没换上" : "，画风跑偏"}`).join("；") : "";
+    return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-face-info" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "只换脸：在「", bodyLabel, "」这张「", record.poseLabel || (POSES[record.face.pose] || {}).label || "动作", "」底图上重画脸，身体衣服跟底图一样", Number.isInteger(record.face.seed) ? ` · 脸的种子 ${record.face.seed}` : ""), record.assetId && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "redo", onClick: () => redo(void 0) }, "换个种子重画脸")), how && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, how), history && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, history), record.assetId && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "这张的重绘强度"), /* @__PURE__ */ import_react12.default.createElement(
       Select,
       {
         value: fixed ? record.face.strength.toFixed(2) : "",
@@ -11222,7 +11281,7 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
         onChange: (v) => redo(v === "" ? null : Number(v)),
         options: [["", "自动（按强弱）"], ...[.../* @__PURE__ */ new Set([0.3, 0.4, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1, ...fixed ? [record.face.strength] : []])].sort((a, b) => a - b).map((n) => [n.toFixed(2), n.toFixed(2) + (n <= 0.5 ? "（改得少，留住画风）" : n >= 0.95 ? "（从零重画）" : "")])]
       }
-    ), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "改了就按它重画这张；表情没换上调高，画风跑偏调低")));
+    ), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "改了就按它重画这张（定死了就不自动调）；表情没换上调高，画风跑偏调低")));
   }
   const deps = Object.values(sprites).filter((r) => r && r.face && r.face.from === emotionKey);
   if (!record || !record.assetId || !deps.length && !record.pose) return null;
@@ -11887,7 +11946,7 @@ function FaceSettings({ cfg, onPatch }) {
     if (window.confirm("换脸的这些设置都回到默认？")) set(JSON.parse(JSON.stringify(DEFAULT_FACE)));
   };
   const [lo, hi] = FACE_LIMITS.strength;
-  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement(Field, { label: "放大重画", hint: `照 SD 里 ADetailer 的做法：把头那一块（脸框长边的 ${f.cropScale} 倍，带上头发和脸的轮廓）裁出来放大到 ${f.cropSize}×${f.cropSize} 再重画，画完缩回去贴上。脸在整张立绘里只有一两百像素见方，放大了模型才有足够的像素照底图的画法画眼睛。NovelAI Opus 会员 1024×1024 以内不花 Anlas，再大要扣。关掉就像以前一样整张图上原尺寸重画。` }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.crop, onChange: (v) => set({ crop: v }) }), f.crop && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "裁脸框的"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.cropScale, min: FACE_LIMITS.cropScale[0], max: FACE_LIMITS.cropScale[1], step: 0.1, digits: 1, label: "裁多大", onCommit: (v) => set({ cropScale: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "倍，放大到"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(f.cropSize), options: [512, 640, 768, 896, 1024, 1152, 1280, 1408, 1536].map((n) => [String(n), `${n}×${n}${n > 1024 ? "（扣 Anlas）" : ""}`]), onChange: (v) => set({ cropSize: Number(v) }), style: INLINE })))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "软边遮罩", hint: "重画的范围是围着眉眼口和两颊的圆角，往外一圈慢慢过渡到底图，不再是看得出框边的硬方框，脸边的头发尽量留原图。宽度是脸框半边长的几成：宽一点接缝更看不出，窄一点头发动得更少。关掉是以前的硬方框（框边 8 像素羽化）。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.soft, onChange: (v) => set({ soft: v }) }), f.soft && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "过渡宽度"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.feather, min: FACE_LIMITS.feather[0], max: FACE_LIMITS.feather[1], step: 0.05, label: "过渡宽度", onCommit: (v) => set({ feather: v }) })))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "重绘强度", hint: "按这个人这种情绪的强弱定（表演设计师给每种情绪标微 / 中 / 强 / 极，人物志「动作与表情」里点情绪名能改）。低的留住底图原来的线条、颜色和光影，只动得了眉眼嘴；高的改得动大表情，但越高越可能跑出底图的画风。人物志里点开一张换脸的差分还能单独定这张的强度。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-face-levels" }, FACE_LEVELS.map((l) => /* @__PURE__ */ import_react12.default.createElement("label", { key: l, className: "fg-row", title: LEVEL_HINT[l] }, /* @__PURE__ */ import_react12.default.createElement("b", null, FACE_LEVEL_LABEL[l]), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.strength[l], min: lo, max: hi, step: 0.01, label: `${FACE_LEVEL_LABEL[l]}的重绘强度`, onCommit: (v) => set({ strength: { [l]: v } }) }), l === 4 && f.wholePeak && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "（开着「最激烈的整张画」时不用）"))))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "最激烈的整张画", hint: "强弱是「极」的情绪（大笑、大哭、惊恐这类五官都在用力的）不换脸，在同一个动作上、用同一个种子整张画：脸由主模型画，画风跟底图自然一致，身子会跟着情绪动一点。" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.wholePeak, onChange: (v) => set({ wholePeak: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "画完自动比对", hint: "换完量一下：软边那一圈新旧对不上（会有重影、色差），或者脸上大块的明暗变了（原来的阴影、排线没了，画风跑偏），就换个种子、调低强度再画；整张脸几乎没变（表情没换上）就调高强度再画；留最像的那张。宽严：小于 1 更严、更容易重来，大于 1 更松。每次重来都是一次出图。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.check, onChange: (v) => set({ check: v }) }), f.check && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "跑偏了最多再画"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(f.retries), options: [0, 1, 2, 3, 4, 5].map((n) => [String(n), `${n} 次`]), onChange: (v) => set({ retries: Number(v) }), style: INLINE }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "宽严"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.tolerance, min: FACE_LIMITS.tolerance[0], max: FACE_LIMITS.tolerance[1], step: 0.1, digits: 1, label: "比对的宽严", onCommit: (v) => set({ tolerance: v }) })))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "底图当角色参考", hint: `把整张底图当 NovelAI 的角色参考（Precise Reference，人物和画风一起参考）跟换脸一起发，锁住画风。NovelAI 只给 V4.5 训了带参考的重绘模型，V5 还没有；每张多花 5 Anlas。${refOk ? "" : `现在用的模型（${cfg.novelai && cfg.novelai.model || ""}）不支持，开着也不会带。`}接口不认时自动不带。` }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.reference, onChange: (v) => set({ reference: v }) })), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !edited, onClick: reset }, "换脸设置恢复默认")));
+  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement(Field, { label: "放大重画", hint: `照 SD 里 ADetailer 的做法：把头那一块（脸框长边的 ${f.cropScale} 倍，带上头发和脸的轮廓）裁出来放大到 ${f.cropSize}×${f.cropSize} 再重画，画完缩回去贴上。脸在整张立绘里只有一两百像素见方，放大了模型才有足够的像素照底图的画法画眼睛。NovelAI Opus 会员 1024×1024 以内不花 Anlas，再大要扣。关掉就像以前一样整张图上原尺寸重画。` }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.crop, onChange: (v) => set({ crop: v }) }), f.crop && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "裁脸框的"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.cropScale, min: FACE_LIMITS.cropScale[0], max: FACE_LIMITS.cropScale[1], step: 0.1, digits: 1, label: "裁多大", onCommit: (v) => set({ cropScale: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "倍，放大到"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(f.cropSize), options: [512, 640, 768, 896, 1024, 1152, 1280, 1408, 1536].map((n) => [String(n), `${n}×${n}${n > 1024 ? "（扣 Anlas）" : ""}`]), onChange: (v) => set({ cropSize: Number(v) }), style: INLINE })))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "软边遮罩", hint: "重画的范围是围着眉眼口和两颊的圆角，往外一圈慢慢过渡到底图，不再是看得出框边的硬方框，脸边的头发尽量留原图。宽度是脸框半边长的几成：宽一点接缝更看不出，窄一点头发动得更少。关掉是以前的硬方框（框边 8 像素羽化）。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.soft, onChange: (v) => set({ soft: v }) }), f.soft && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "过渡宽度"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.feather, min: FACE_LIMITS.feather[0], max: FACE_LIMITS.feather[1], step: 0.05, label: "过渡宽度", onCommit: (v) => set({ feather: v }) })))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "重绘强度", hint: "按这个人这种情绪的强弱定（表演设计师给每种情绪标微 / 中 / 强 / 极，人物志「动作与表情」里点情绪名能改）。低的留住底图原来的线条、颜色和光影，只动得了眉眼嘴；高的改得动大表情，但越高越可能跑出底图的画风。人物志里点开一张换脸的差分还能单独定这张的强度。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-face-levels" }, FACE_LEVELS.map((l) => /* @__PURE__ */ import_react12.default.createElement("label", { key: l, className: "fg-row", title: LEVEL_HINT[l] }, /* @__PURE__ */ import_react12.default.createElement("b", null, FACE_LEVEL_LABEL[l]), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.strength[l], min: lo, max: hi, step: 0.01, label: `${FACE_LEVEL_LABEL[l]}的重绘强度`, onCommit: (v) => set({ strength: { [l]: v } }) }), l === 4 && f.wholePeak && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "（开着「最激烈的整张画」时不用）"))))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "最激烈的整张画", hint: "强弱是「极」的情绪（大笑、大哭、惊恐这类五官都在用力的）不换脸，在同一个动作上、用同一个种子整张画：脸由主模型画，画风跟底图自然一致，身子会跟着情绪动一点。" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.wholePeak, onChange: (v) => set({ wholePeak: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "色调对齐底图", hint: "重画的脸整体偏亮、偏暗、偏色时，按底图的肤色拉回来再贴：每个颜色通道取脸上「底图减重画」的中位数，整块加上它（最多拉 40 级）。中位数跟着大片皮肤走，所以红晕、泪、眉眼口这些小块的变化不会被抹掉。关掉就照重画的原样贴。" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.tone, onChange: (v) => set({ tone: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "画完自动比对", hint: `换完量两样，没过就换个种子再画，留最像的那张（每次重来都是一次出图）。①表情换上没有：脸框分成 4×4 格，比每格里眉、眼线、瞳孔、嘴线这些线条，挪了一两个像素、深浅差三成以内的不算，新长出来和没了的占这格线条的百分之几，取变得最多的那格。少于「表情至少变」就算没换上，下次调高强度。拿以前换过的脸实测：真换了表情的 6~30，强度 0.3 原样描一遍的不到 1。填 0 不查。②画风跑偏没有：软边那一圈新旧大块色调差太多（看得出一圈色差），或者脸上大块明暗变了（原来的阴影、排线没了），下次调低一点强度，最低到「强度下限」，再低表情就换不上了。宽严只管画风：小于 1 更严、更容易重来，大于 1 更松。表情没换上的那几张排在最后，不会被留下。` }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.check, onChange: (v) => set({ check: v }) }), f.check && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "没过最多再画"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(f.retries), options: Array.from({ length: FACE_LIMITS.retries[1] + 1 }, (_, n) => [String(n), `${n} 次`]), onChange: (v) => set({ retries: Number(v) }), style: INLINE }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "表情至少变"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.expression, min: FACE_LIMITS.expression[0], max: FACE_LIMITS.expression[1], step: 0.5, digits: 1, label: "表情至少变多少", onCommit: (v) => set({ expression: v }) }))), f.check && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "画风宽严"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.tolerance, min: FACE_LIMITS.tolerance[0], max: FACE_LIMITS.tolerance[1], step: 0.1, digits: 1, label: "画风比对的宽严", onCommit: (v) => set({ tolerance: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "强度下限"), /* @__PURE__ */ import_react12.default.createElement(Dial, { value: f.floor, min: FACE_LIMITS.floor[0], max: FACE_LIMITS.floor[1], step: 0.01, label: "画风跑偏时强度最低调到", onCommit: (v) => set({ floor: v }) }))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "底图当角色参考", hint: `把整张底图当 NovelAI 的角色参考（Precise Reference，人物和画风一起参考）跟换脸一起发，锁住画风。NovelAI 只给 V4.5 训了带参考的重绘模型，V5 还没有；每张多花 5 Anlas。${refOk ? "" : `现在用的模型（${cfg.novelai && cfg.novelai.model || ""}）不支持，开着也不会带。`}接口不认时自动不带。` }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: f.reference, onChange: (v) => set({ reference: v }) })), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end" } }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !edited, onClick: reset }, "换脸设置恢复默认")));
 }
 var SIZE_SHAPES = [["landscape", "横版"], ["portrait", "竖版"], ["square", "方形"]];
 var parseSize = (text) => {

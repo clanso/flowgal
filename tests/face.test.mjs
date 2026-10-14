@@ -90,10 +90,14 @@ test('gate: 动作组：内置情绪默认分四组，每组底图画代表情�
 test('gate: 表情 tag：情绪词、眉眼嘴、脸红、泪、视线算；瞳色、眼型、睫毛、手的动作、构图不算', () => {
   for (const t of ['smile', 'light smile', 'gentle neutral expression', 'expressionless', 'closed eyes', 'half-closed eyes', 'one eye closed', 'wide-eyed', 'open mouth', 'parted lips',
     'clenched teeth', 'v-shaped eyebrows', 'furrowed brow', 'blush', 'full-face blush', 'tears', 'streaming tears', 'looking away', 'looking at viewer', 'sideways glance', 'puffed cheeks',
-    'heart-shaped pupils', 'jitome', 'naughty face', 'shy', 'angry', '0.7::frown::', ':d', '>_<', 'sweatdrop', 'bags under eyes', 'cold eyes']) assert.ok(isFaceTag(t), t)
+    'heart-shaped pupils', 'jitome', 'naughty face', 'shy', 'angry', '0.7::frown::', ':d', '>_<', 'sweatdrop', 'bags under eyes', 'cold eyes',
+    'calm eyes', 'determined eyes', 'sad eyes', 'tearful eyes', 'upturned eyes', 'bedroom eyes']) assert.ok(isFaceTag(t), t)
   for (const t of ['lake blue eyes', 'blue eyes', 'tareme', 'long eyelashes', 'soft face', 'pale skin', 'long curly light brown hair', 'hand over mouth', 'hand on own cheek', 'eye-level',
     'facing viewer', 'black haori', 'cowboy shot', 'crossed arms', 'head tilt', 'eyepatch', 'lipstick', 'girl']) assert.ok(!isFaceTag(t), t)
   assert.equal(faceTags('1girl, long black hair, shy, light blush, looking away, hand on own cheek, school uniform'), 'shy, light blush, looking away')
+  // 底图「坚定」写的 calm eyes 要跟着表情一起换掉，不然「难过」的脸上还留着平静的眼神
+  const sad = swapFace({ positive: 'a', negative: '', characters: ['girl, lake blue eyes, tareme, determined, serious, slightly furrowed brow, calm eyes, closed mouth, looking at viewer, hand on own chest'], characterNegatives: [''] }, faceFor('sad', 'sad, drooping eyebrows, tearing up, closed mouth, looking down, light blush'))
+  assert.equal(sad.characters[0], 'girl, lake blue eyes, tareme, sad, drooping eyebrows, tearing up, closed mouth, looking down, light blush, hand on own chest')
 })
 
 test('gate: 换脸的表情：设计师写的里挑脸上的，没有就用内置的；负面里跟这张表情打架的去掉', () => {
@@ -220,13 +224,13 @@ async function settle(engine, gameId, done, what = '') {
   }
 }
 
-test('gate: 只换脸整条流程（以前的画法：不放大、硬方框、不比对）：要「生气」→ 先画抱臂底图「冷淡」→ 等认脸 → 收到脸框换脸（框外和底图一模一样）→ 换种子重画 → 底图重画后跟着重换 → 关掉只换脸就整张画', async () => {
+test('gate: 只换脸整条流程（以前的画法：不放大、硬方框、不对色调、不比对）：要「生气」→ 先画抱臂底图「冷淡」→ 等认脸 → 收到脸框换脸（框外和底图一模一样）→ 换种子重画 → 底图重画后跟着重换 → 关掉只换脸就整张画', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'flowgal-face-'))
   try {
     const store = createStore(dir)
     const { requests, fetchImpl } = fakeNai()
     const engine = createEngine({ store, services: {}, fetchImpl, logger: { warn() {}, info() {} } })
-    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] }, face: { crop: false, soft: false, check: false } } })
+    await engine.patchConfig({ images: { auto: false, backgrounds: false, spriteWriter: false, sizes: { portrait: [W, H] }, face: { crop: false, soft: false, tone: false, check: false } } })
     await engine.setSecret('novelai', 'official', 'k')
     await engine.castAction('g', 'save', { name: '林岚', patch: { appearance: '1girl, long black hair, blue eyes', seed: 7 } })
     const look = { appearance: '1girl, long black hair, blue eyes', outfit: '', states: [] }
@@ -263,7 +267,8 @@ test('gate: 只换脸整条流程（以前的画法：不放大、硬方框、�
     assert.deepEqual(px(face, 128, 120), [255, 0, 0, 255], '框里是重画的脸')
     const { paint, ...made } = lin.sprites[angry].face
     assert.deepEqual(made, { from: cold, pose: 'arms', body: lin.sprites[cold].assetId, box: BOX })
-    assert.deepEqual(paint, { level: 3, strength: 0.8, tries: 1, check: paint.check, crop: false, soft: false, reference: false }, '生气默认「强」，重绘强度 0.8')
+    assert.deepEqual(paint, { level: 3, strength: 0.8, tries: 1, check: paint.check, history: paint.history, crop: false, soft: false, tone: [0, 0, 0], reference: false }, '生气默认「强」，重绘强度 0.8')
+    assert.equal(paint.history.length, 1)
     assert.equal(infill.parameters.inpaintImg2ImgStrength, 0.8)
     assert.deepEqual(infill.parameters.img2img, { strength: 0.8, color_correct: true })
     assert.match(lin.sprites[angry].characters[0], /angry/, '记下换脸用的提示词（逆转式工作台接着用）')
