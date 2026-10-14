@@ -148,6 +148,9 @@ var api = {
   /** 某一种音效换成自己的文件（最大 5 MB）；返回最新设置。 */
   uploadSound: (slot, file2) => uploadFile(`/sound/upload?slot=${encodeURIComponent(slot)}&name=${encodeURIComponent(file2.name || "")}`, file2),
   removeSound: (slot) => call("/sound", { action: "remove", slot }),
+  /** 上传一个字体（ttf / otf / woff / woff2，最大 128 MB）；返回最新设置和 font: { assetId, name }。 */
+  uploadFont: (file2) => uploadFile(`/font/upload?name=${encodeURIComponent(file2.name || "")}`, file2),
+  removeFont: (id) => call("/font", { action: "remove", id }),
   soundlib: () => call("/soundlib"),
   updateLibSound: (id, patch) => call("/soundlib", { action: "update", id, patch }),
   removeLibSounds: (ids) => call("/soundlib", { action: "remove", ids }),
@@ -1281,7 +1284,10 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-iconbtn:hover { transform: rotate(90deg); background: rgba(255, 255, 255, .14); }
 
 /* ── 对话框 ── */
-.fg-dialog { position: absolute; left: 4%; right: 4%; bottom: 3.6%; height: 27%; z-index: 20; transition: opacity .3s, transform .3s; }
+/* 高度、字号、字体可以在设置里改（Theater.jsx 的 dialogVars）：--fg-dlg-h 横屏高度、--fg-dlg-h-p 竖屏高度、--fg-text-scale / --fg-name-scale 字号倍数、--fg-text-font / --fg-name-font 字体。
+   --fg-dlg-ref 是皮肤原来的高度（cqh：舞台高的百分之几）。对话框比它高时，正文、底下那排按钮离框边的距离停在原来的样子（min / clamp 封顶），多出来的地方都给正文；
+   比它矮时照旧按比例缩。默认高度下和以前一模一样 */
+.fg-dialog { position: absolute; left: 4%; right: 4%; bottom: 3.6%; height: var(--fg-dlg-h, 27%); --fg-dlg-ref: 27cqh; z-index: 20; transition: opacity .3s, transform .3s; }
 .fg-ui-hidden .fg-dialog, .fg-ui-hidden .fg-hud, .fg-ui-hidden .fg-topright, .fg-ui-hidden .fg-quick { opacity: 0; pointer-events: none; }
 /* 插画出现时对话框先让开（淡出、往下沉一点），画面出来后再回来 */
 .fg-dialog.is-away { opacity: 0; transform: translateY(1.2cqw); pointer-events: none; }
@@ -1289,8 +1295,9 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-box::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), var(--accent3), transparent); background-size: 200% 100%; animation: fg-shimmer 6s linear infinite; opacity: .9; }
 .fg-box::after { content: ""; position: absolute; right: -6cqw; bottom: -10cqw; width: 26cqw; height: 26cqw; border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--speaker, var(--accent)) 28%, transparent), transparent 65%); pointer-events: none; transition: background .6s; }
 @keyframes fg-shimmer { from { background-position: 200% 0; } to { background-position: 0 0; } }
-.fg-name { position: absolute; left: 3.2%; top: -2.3cqw; z-index: 2; display: flex; align-items: flex-end; gap: .8cqw; animation: fg-name-in .35s cubic-bezier(.2, .8, .2, 1) both; }
-.fg-name-plate { position: relative; padding: .5cqw 2.4cqw .55cqw 1.6cqw; font-family: var(--font-display); font-weight: 700; font-size: 1.75cqw; letter-spacing: .2em; color: var(--name-ink);
+/* 名牌字号是整块按底边缩放（scale 不占位置）：调大时往上长，不压到正文 */
+.fg-name { position: absolute; left: 3.2%; top: -2.3cqw; z-index: 2; display: flex; align-items: flex-end; gap: .8cqw; transform-origin: 0 100%; scale: var(--fg-name-scale, 1); animation: fg-name-in .35s cubic-bezier(.2, .8, .2, 1) both; }
+.fg-name-plate { position: relative; padding: .5cqw 2.4cqw .55cqw 1.6cqw; font-family: var(--fg-name-font, var(--font-display)); font-weight: 700; font-size: 1.75cqw; letter-spacing: .2em; color: var(--name-ink);
   background: linear-gradient(100deg, var(--speaker, var(--accent)), color-mix(in oklab, var(--speaker, var(--accent)) 55%, var(--accent2)));
   clip-path: polygon(0 0, 100% 0, calc(100% - 1.2cqw) 100%, 0 100%); box-shadow: 0 .4cqw 1.6cqw rgba(0, 0, 0, .35); text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
 .fg-name-plate::after { content: ""; position: absolute; left: 1.6cqw; right: 2.4cqw; bottom: .3cqw; height: 1px; background: rgba(255, 255, 255, .55); }
@@ -1393,10 +1400,10 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-dialog[data-recall="haze"] .fg-char { animation-name: fg-char-mist; animation-duration: 1.1s; }
 @keyframes fg-line-haze { 0%, 100% { filter: none; } 50% { filter: blur(.5px); } }
 @keyframes fg-char-mist { from { opacity: 0; filter: blur(7px); } to { opacity: 1; filter: none; } }
-.fg-text { position: absolute; left: 4.2%; right: 5%; top: 23%; bottom: 20%; font-size: 1.95cqw; line-height: 1.78; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0, 0, 0, .45); overflow: hidden; }
+.fg-text { position: absolute; left: 4.2%; right: 5%; top: clamp(1.6cqw, 23%, calc(.23 * var(--fg-dlg-ref))); bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-family: var(--fg-text-font, var(--font-body)); font-size: calc(1.95cqw * var(--fg-text-scale, 1)); line-height: 1.78; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0, 0, 0, .45); overflow: hidden; }
 .fg-text.is-narration { color: color-mix(in oklab, var(--ink) 92%, var(--accent3)); }
 .fg-text.is-thought { font-style: italic; color: color-mix(in oklab, var(--ink) 70%, var(--accent2)); }
-.fg-text.is-cardhint { color: var(--ink-dim); font-size: 1.3cqw; letter-spacing: .4em; text-align: center; }
+.fg-text.is-cardhint { color: var(--ink-dim); font-size: calc(1.3cqw * var(--fg-text-scale, 1)); letter-spacing: .4em; text-align: center; }
 .fg-text.is-thought .fg-line::before { content: "（"; } .fg-text.is-thought .fg-line::after { content: "）"; }
 /* 双语对照：像注音一样，上方小字原文，下方是打出来的翻译；原文的字跟着翻译的进度一起出（Dialog.jsx 的 origChars） */
 .fg-orig { font-size: .62em; line-height: 1.45; letter-spacing: .02em; opacity: .72; margin-bottom: .2em; font-style: normal; font-weight: normal; }
@@ -1444,16 +1451,16 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-tx-wave { 0%, 100% { transform: translateY(.1em); } 50% { transform: translateY(-.16em); } }
 @keyframes fg-tx-slam { from { opacity: 0; transform: scale(2.6) rotate(-4deg); } 50% { opacity: 1; transform: scale(.88); } 75% { opacity: 1; transform: scale(1.06); } to { opacity: 1; transform: none; } }
 @keyframes fg-tx-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
-.fg-wait { position: absolute; right: 2.6%; bottom: 20%; font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }
+.fg-wait { position: absolute; right: 2.6%; bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }
 .fg-wait::before { content: var(--wait-glyph); }
 @keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }
-.fg-quick { position: absolute; right: 2.4%; bottom: 7%; display: flex; gap: 1.5cqw; font-family: var(--font-latin); font-size: .98cqw; font-weight: 600; letter-spacing: .2em; z-index: 3; }
+.fg-quick { position: absolute; right: 2.4%; bottom: min(7%, calc(.07 * var(--fg-dlg-ref))); display: flex; gap: 1.5cqw; font-family: var(--font-latin); font-size: .98cqw; font-weight: 600; letter-spacing: .2em; z-index: 3; }
 .fg-quick button { color: var(--ink-dim); transition: color .2s, text-shadow .2s; position: relative; }
 .fg-quick button:hover, .fg-quick button.is-on { color: var(--ink); text-shadow: 0 0 .8cqw var(--accent); }
 .fg-quick button.is-on::after { content: ""; position: absolute; left: 0; right: .2em; bottom: -.3cqw; height: 1px; background: var(--accent); }
-.fg-progress { position: absolute; left: 4.2%; right: 30%; bottom: 8.6%; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.fg-progress { position: absolute; left: 4.2%; right: 30%; bottom: min(8.6%, calc(.086 * var(--fg-dlg-ref))); height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; }
 .fg-progress i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); box-shadow: 0 0 6px var(--accent); transition: width .4s ease; }
-.fg-status { position: absolute; left: 4.2%; bottom: 7%; font-size: .9cqw; letter-spacing: .1em; color: var(--ink-dim); display: flex; align-items: center; gap: .5cqw; }
+.fg-status { position: absolute; left: 4.2%; bottom: min(7%, calc(.07 * var(--fg-dlg-ref))); font-size: .9cqw; letter-spacing: .1em; color: var(--ink-dim); display: flex; align-items: center; gap: .5cqw; }
 .fg-status::before { content: ""; width: .6cqw; height: .6cqw; border-radius: 50%; background: var(--accent3); box-shadow: 0 0 .6cqw var(--accent3); animation: fg-pulse 1.4s ease-in-out infinite; }
 
 /* ── 情境卡片（短信、信件……） ── */
@@ -1476,14 +1483,14 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 /* ── 选项 ── */
 .fg-choices { position: absolute; inset: 0; z-index: 26; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.3cqw; background: radial-gradient(70% 60% at 50% 45%, rgba(0, 0, 0, .25), rgba(0, 0, 0, .6)); animation: fg-fade-in .4s ease both; }
 .fg-choices-title { font-family: var(--font-latin); letter-spacing: .6em; font-size: 1.05cqw; color: var(--ink-dim); margin-bottom: .6cqw; }
-.fg-choice { position: relative; width: 46cqw; padding: 1.25cqw 2.4cqw 1.25cqw 6cqw; text-align: left; font-size: 1.7cqw; letter-spacing: .08em; border-radius: 99px; background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .35); transition: transform .25s cubic-bezier(.2, .8, .2, 1), border-color .25s, box-shadow .25s; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); overflow: hidden; }
+.fg-choice { position: relative; width: 46cqw; padding: 1.25cqw 2.4cqw 1.25cqw 6cqw; text-align: left; font-family: var(--fg-text-font, var(--font-body)); font-size: 1.7cqw; letter-spacing: .08em; border-radius: 99px; background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .35); transition: transform .25s cubic-bezier(.2, .8, .2, 1), border-color .25s, box-shadow .25s; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); overflow: hidden; }
 .fg-choice::before { content: attr(data-n); position: absolute; left: 2.2cqw; top: 50%; transform: translateY(-50%); font-family: var(--font-latin); font-size: 1.5cqw; font-weight: 700; color: var(--accent); letter-spacing: .1em; }
 .fg-choice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .16) 50%, transparent 70%); transform: translateX(-100%); transition: transform .6s ease; }
 .fg-choice:hover { transform: translateX(1.2cqw) scale(1.02); border-color: var(--accent); box-shadow: 0 0 2.4cqw color-mix(in oklab, var(--accent) 45%, transparent); }
 .fg-choice:hover::after { transform: translateX(100%); }
 @keyframes fg-choice-in { from { opacity: 0; transform: translateY(1.4cqw); } }
 .fg-free { display: flex; gap: .8cqw; width: 46cqw; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); }
-.fg-free input { flex: 1; min-width: 0; padding: 1cqw 1.8cqw; font: inherit; font-size: 1.45cqw; color: var(--ink); border-radius: 99px; border: 1px dashed var(--box-border); background: rgba(0, 0, 0, .35); outline: none; user-select: text; }
+.fg-free input { flex: 1; min-width: 0; padding: 1cqw 1.8cqw; font: inherit; font-family: var(--fg-text-font, var(--font-body)); font-size: 1.45cqw; color: var(--ink); border-radius: 99px; border: 1px dashed var(--box-border); background: rgba(0, 0, 0, .35); outline: none; user-select: text; }
 .fg-free input:focus { border-color: var(--accent); border-style: solid; }
 .fg-free button { padding: 0 2cqw; border-radius: 99px; background: linear-gradient(100deg, var(--accent), var(--accent2)); font-size: 1.4cqw; font-weight: 700; letter-spacing: .2em; color: #fff; }
 
@@ -1517,7 +1524,8 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 
 .fg-log-item { display: grid; grid-template-columns: 9cqw 1fr; gap: 1.4cqw; padding: 1cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .06); cursor: pointer; font-size: 1.35cqw; line-height: 1.7; }
 .fg-log-item:hover { background: linear-gradient(90deg, rgba(255, 255, 255, .04), transparent); }
-.fg-log-name { font-family: var(--font-display); font-weight: 700; text-align: right; letter-spacing: .1em; }
+.fg-log-text { font-family: var(--fg-text-font, var(--font-body)); }
+.fg-log-name { font-family: var(--fg-name-font, var(--font-display)); font-weight: 700; text-align: right; letter-spacing: .1em; }
 .fg-log-turn { grid-column: 1 / -1; font-family: var(--font-latin); font-size: .95cqw; letter-spacing: .5em; color: var(--accent); padding-top: 1.4cqw; }
 .fg-log-scene { grid-column: 1 / -1; display: flex; align-items: center; gap: 1cqw; font-size: .9cqw; letter-spacing: .3em; color: var(--ink-dim); padding: .6cqw 0 .2cqw; }
 .fg-log-scene::before, .fg-log-scene::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .18), transparent); }
@@ -1852,6 +1860,14 @@ button.fg-pm-name:hover { color: var(--accent); }
 .fg-switch.is-on::after { transform: translateX(1.5cqw); }
 .fg-note { font-size: .95cqw; color: var(--ink-dim); line-height: 1.6; }
 .fg-ok { color: #6ef0a8; } .fg-err { color: #ff8a8a; }
+/* 设置 → 对话框：缩小版的舞台（自己是 stage 容器，里面的 cqw 按它的宽算），对话框跟剧场里一模一样；百分比滑块；上传的字体清单 */
+.fg-dlg-preview { position: relative; container-type: size; container-name: stage; width: min(100%, 44cqw); aspect-ratio: var(--stage-ar, 1.4615); margin: .4cqw auto 0; border-radius: .8cqw; overflow: hidden; border: 1px solid var(--box-border); pointer-events: none;
+  background: radial-gradient(60% 50% at 30% 30%, rgba(255, 190, 170, .45), transparent 70%), radial-gradient(50% 60% at 78% 40%, rgba(150, 120, 255, .35), transparent 70%), linear-gradient(180deg, #2b2140, #8a4058 62%, #2a1830); }
+.fg-pct input[type=range] { width: 18cqw; }
+.fg-pct .fg-input { width: 6.4cqw; }
+.fg-fontlist { display: grid; gap: .3cqw; }
+.fg-fontitem { padding: .4cqw .2cqw; border-bottom: 1px solid rgba(255, 255, 255, .06); flex-wrap: nowrap; }
+.fg-fontname { font-size: 1.3cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .fg-section { margin: 1.6cqw 0 .6cqw; font-family: var(--font-display); font-size: 1.4cqw; letter-spacing: .2em; display: flex; align-items: center; gap: .8cqw; }
 .fg-section::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--box-border), transparent); }
 /* 设置 → 特效：每组一个标题行（名字、开着几个、总开关），下面一排排小开关 */
@@ -1936,10 +1952,11 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
 @container stage (max-aspect-ratio: 4/5) {
-  .fg-face-levels { grid-template-columns: minmax(0, 1fr); } .fg-dial input[type=range] { width: 30cqw; }
+  .fg-face-levels { grid-template-columns: minmax(0, 1fr); } .fg-dial input[type=range], .fg-pct input[type=range] { width: 30cqw; }
+  .fg-pct .fg-input { width: 14cqw; } .fg-dlg-preview { width: 100%; } .fg-fontname { font-size: 3.2cqw; }
   .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
-  .fg-dialog { left: 3%; right: 3%; height: 22%; }
+  .fg-dialog { left: 3%; right: 3%; height: var(--fg-dlg-h-p, 22%); --fg-dlg-ref: 22cqh; }
   .fg-recall-face { width: 17cqw; }
   .fg-phone { top: 16%; } .fg-phone-card { width: 34cqw; padding: 3cqw 2.6cqw; border-radius: 4cqw; }
   .fg-phone-label { font-size: 2.4cqw; } .fg-phone-label svg { width: 2.6cqw; height: 2.6cqw; }
@@ -1952,12 +1969,12 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-notify-icon { width: 8cqw; height: 8cqw; border-radius: 2cqw; font-size: 4cqw; }
   .fg-notify-head { font-size: 2.8cqw; } .fg-notify-head span { font-size: 2.4cqw; } .fg-notify-text { font-size: 3.2cqw; }
   .fg-notify-wave { height: 4.4cqw; gap: .5cqw; } .fg-notify-wave i { width: .5cqw; }
-  .fg-text { font-size: 4.6cqw; top: 18%; bottom: 26%; }
-  .fg-progress { bottom: 12%; right: 4.2%; }
-  .fg-quick { bottom: 5%; left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }
-  .fg-wait { bottom: 28%; }
+  .fg-text { font-size: calc(4.6cqw * var(--fg-text-scale, 1)); top: clamp(3cqw, 18%, calc(.18 * var(--fg-dlg-ref))); bottom: min(26%, calc(.26 * var(--fg-dlg-ref))); }
+  .fg-progress { bottom: min(12%, calc(.12 * var(--fg-dlg-ref))); right: 4.2%; }
+  .fg-quick { bottom: min(5%, calc(.05 * var(--fg-dlg-ref))); left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }
+  .fg-wait { bottom: min(28%, calc(.28 * var(--fg-dlg-ref))); }
   .fg-status { display: none; }
-  .fg-name-plate { font-size: 4cqw; } .fg-name { top: -5cqw; }
+  .fg-name-plate { font-size: 4cqw; } .fg-name { top: -5cqw; } .fg-name-sub { font-size: 2.4cqw; } /* 情绪小字：以前沿用横屏的 1cqw，手机上只有 4px */
   .fg-iconbtn { width: 9cqw; height: 9cqw; font-size: 4cqw; }
   .fg-hud-place { font-size: 4cqw; } .fg-hud-meta { font-size: 2.6cqw; }
   .fg-choice, .fg-free { width: 88cqw; font-size: 4cqw; }
@@ -2159,18 +2176,25 @@ var skins_default = `/* ───────────── 皮肤 ───
   --font-display: "Noto Serif SC", "Songti SC", "SimSun", serif;
   --wait-glyph: "▼";
 }
-.fg-theater[data-skin="noir"] .fg-dialog { left: 0; right: 0; bottom: 0; height: 31%; }
+/* 名字、金线、正文的位置按对话框高度的比例；对话框调高时停在原来的位置（min 封顶，见 theater.css 的 --fg-dlg-ref），多出来的地方给正文 */
+.fg-theater[data-skin="noir"] .fg-dialog { left: 0; right: 0; bottom: 0; height: var(--fg-dlg-h, 31%); --fg-dlg-ref: 31cqh; }
 /* 不要边框：透明边框底下会露出对话框底色从下往上重复的那一行（最黑的那行），成了名字上方横贯整个画面的一条黑线 */
 .fg-theater[data-skin="noir"] .fg-box { box-shadow: none; border: 0; }
-.fg-theater[data-skin="noir"] .fg-box::before { top: 26%; left: 20%; right: 20%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: none; }
+.fg-theater[data-skin="noir"] .fg-box::before { top: min(26%, calc(.26 * var(--fg-dlg-ref))); left: 20%; right: 20%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: none; }
 .fg-theater[data-skin="noir"] .fg-box::after { display: none; }
-.fg-theater[data-skin="noir"] .fg-name { left: 0; right: 0; top: 10%; justify-content: center; }
+.fg-theater[data-skin="noir"] .fg-name { left: 0; right: 0; top: min(10%, calc(.1 * var(--fg-dlg-ref))); justify-content: center; transform-origin: 50% 100%; }
 .fg-theater[data-skin="noir"] .fg-name-plate { background: none; clip-path: none; box-shadow: none; color: var(--accent); font-size: 1.5cqw; letter-spacing: .6em; padding: 0; }
 .fg-theater[data-skin="noir"] .fg-name-plate::after { display: none; }
-.fg-theater[data-skin="noir"] .fg-text { left: 14%; right: 14%; top: 36%; text-align: center; font-size: 2.05cqw; }
+.fg-theater[data-skin="noir"] .fg-text { left: 14%; right: 14%; top: min(36%, calc(.36 * var(--fg-dlg-ref))); text-align: center; font-size: calc(2.05cqw * var(--fg-text-scale, 1)); }
 .fg-theater[data-skin="noir"] .fg-progress { left: 30%; right: 30%; }
 .fg-theater[data-skin="noir"] .fg-stage::after { content: ""; position: absolute; inset: 0; z-index: 45; pointer-events: none; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.06'/></svg>"); mix-blend-mode: overlay; }
 .fg-theater[data-skin="noir"] .fg-camera { filter: saturate(.75) contrast(1.06); }
+/* 竖屏（手机）：字跟别的皮肤一样大（以前沿用横屏的字号，只有 8px 左右） */
+@container stage (max-aspect-ratio: 4/5) {
+  .fg-theater[data-skin="noir"] .fg-dialog { height: var(--fg-dlg-h-p, 31%); }
+  .fg-theater[data-skin="noir"] .fg-name-plate { font-size: 3.4cqw; }
+  .fg-theater[data-skin="noir"] .fg-text { left: 8%; right: 8%; font-size: calc(4.6cqw * var(--fg-text-scale, 1)); }
+}
 
 /* 赛博：扫描线、等宽、青品红。 */
 .fg-theater[data-skin="cyber"] {
@@ -10101,32 +10125,102 @@ function useFaceFramer(gameId, view) {
   }, [gameId, view]);
 }
 
-// src/client/theater/skins.js
+// lib/fonts.js
 var FONT_PACKS = {
-  sans: { pkg: "@fontsource/noto-sans-sc@5.3.0", css: ["400.css"] },
-  // 思源黑体（Noto Sans SC）
-  serif: { pkg: "@fontsource/noto-serif-sc@5.3.0", css: ["400.css", "700.css"] },
-  // 思源宋体（Noto Serif SC）
-  wenkai: { pkg: "lxgw-wenkai-webfont@1.7.0", css: ["lxgwwenkai-regular.css"] },
-  // 霞鹜文楷
-  brush: { pkg: "@fontsource/ma-shan-zheng@5.3.1", css: ["400.css"] },
-  // 马善政毛笔楷书
-  mono: { pkg: "@fontsource/jetbrains-mono@5.3.0", css: ["400.css"] },
-  latin: { pkg: "@fontsource/cormorant-garamond@5.3.0", css: ["400.css", "600.css"] }
+  sans: { pkg: "@fontsource/noto-sans-sc@5.3.0", css: ["400.css"], family: "Noto Sans SC", name: "思源黑体", group: "zh" },
+  serif: { pkg: "@fontsource/noto-serif-sc@5.3.0", css: ["400.css", "700.css"], family: "Noto Serif SC", name: "思源宋体", group: "zh" },
+  wenkai: { pkg: "lxgw-wenkai-webfont@1.7.0", css: ["lxgwwenkai-regular.css"], family: "LXGW WenKai", name: "霞鹜文楷", group: "zh" },
+  xiaowei: { pkg: "@fontsource/zcool-xiaowei@5.3.0", css: ["400.css"], family: "ZCOOL XiaoWei", name: "站酷小薇（文艺细宋）", group: "zh" },
+  kuaile: { pkg: "@fontsource/zcool-kuaile@5.3.0", css: ["400.css"], family: "ZCOOL KuaiLe", name: "站酷快乐体（圆润可爱）", group: "zh" },
+  huangyou: { pkg: "@fontsource/zcool-qingke-huangyou@5.3.0", css: ["400.css"], family: "ZCOOL QingKe HuangYou", name: "站酷庆科黄油体（方正醒目）", group: "zh" },
+  brush: { pkg: "@fontsource/ma-shan-zheng@5.3.1", css: ["400.css"], family: "Ma Shan Zheng", name: "马善政毛笔楷书", group: "zh" },
+  longcang: { pkg: "@fontsource/long-cang@5.3.0", css: ["400.css"], family: "Long Cang", name: "龙藏体（手写行楷）", group: "zh" },
+  zhimang: { pkg: "@fontsource/zhi-mang-xing@5.3.0", css: ["400.css"], family: "Zhi Mang Xing", name: "志莽行书", group: "zh" },
+  maocao: { pkg: "@fontsource/liu-jian-mao-cao@5.3.0", css: ["400.css"], family: "Liu Jian Mao Cao", name: "刘建毛草", group: "zh" },
+  wenkaitc: { pkg: "@fontsource/lxgw-wenkai-tc@5.3.1", css: ["400.css", "700.css"], family: "LXGW WenKai TC", name: "霞鹜文楷 繁体", group: "tc" },
+  seriftc: { pkg: "@fontsource/noto-serif-tc@5.3.1", css: ["400.css", "700.css"], family: "Noto Serif TC", name: "思源宋体 繁体", group: "tc" },
+  sanstc: { pkg: "@fontsource/noto-sans-tc@5.3.1", css: ["400.css", "700.css"], family: "Noto Sans TC", name: "思源黑体 繁体", group: "tc" },
+  maru: { pkg: "@fontsource/zen-maru-gothic@5.3.1", css: ["400.css", "700.css"], family: "Zen Maru Gothic", name: "Zen 丸ゴシック（圆体）", group: "jp" },
+  rounded: { pkg: "@fontsource/m-plus-rounded-1c@5.3.0", css: ["400.css", "700.css"], family: "M PLUS Rounded 1c", name: "M+ Rounded（圆体）", group: "jp" },
+  klee: { pkg: "@fontsource/klee-one@5.3.1", css: ["400.css", "600.css"], family: "Klee One", name: "Klee（铅笔手写）", group: "jp" },
+  mincho: { pkg: "@fontsource/zen-old-mincho@5.3.1", css: ["400.css", "700.css"], family: "Zen Old Mincho", name: "Zen 旧明朝", group: "jp" },
+  serifjp: { pkg: "@fontsource/noto-serif-jp@5.3.1", css: ["400.css", "700.css"], family: "Noto Serif JP", name: "思源明朝 日文", group: "jp" },
+  sansjp: { pkg: "@fontsource/noto-sans-jp@5.3.1", css: ["400.css", "700.css"], family: "Noto Sans JP", name: "思源角黑 日文", group: "jp" },
+  latin: { pkg: "@fontsource/cormorant-garamond@5.3.0", css: ["400.css", "600.css"], family: "Cormorant Garamond", name: "Cormorant Garamond", group: "latin", latin: true },
+  mono: { pkg: "@fontsource/jetbrains-mono@5.3.0", css: ["400.css"], family: "JetBrains Mono", name: "JetBrains Mono（等宽）", group: "latin", latin: true }
 };
+var FONT_GROUPS = [
+  ["zh", "中文网页字体"],
+  ["tc", "繁体中文"],
+  ["jp", "日文（缺的简体字用皮肤字体补）"],
+  ["latin", "西文（中文用皮肤字体）"]
+];
+var LOCAL_FONTS = [
+  ["Microsoft YaHei", "微软雅黑"],
+  ["DengXian", "等线"],
+  ["SimSun", "宋体"],
+  ["SimHei", "黑体"],
+  ["KaiTi", "楷体"],
+  ["FangSong", "仿宋"],
+  ["STKaiti", "华文楷体"],
+  ["STSong", "华文宋体"],
+  ["STZhongsong", "华文中宋"],
+  ["STXingkai", "华文行楷"],
+  ["YouYuan", "幼圆"],
+  ["LiSu", "隶书"],
+  ["PingFang SC", "苹方"],
+  ["Songti SC", "宋体-简（苹果）"],
+  ["Kaiti SC", "楷体-简（苹果）"],
+  ["Hiragino Sans GB", "冬青黑体"],
+  ["Yu Mincho", "游明朝"],
+  ["Yu Gothic", "游ゴシック"],
+  ["Meiryo", "メイリオ"]
+];
+var MAX_FONT_BYTES = 128 * 1024 * 1024;
+var FONT_ASSET_ID = /^[a-f0-9]{32}\.(woff2|woff|ttf|otf)$/;
+var fileFamily = (assetId) => "FlowGal " + String(assetId).slice(0, 12);
+var cleanFontName = (name2) => String(name2 || "").replace(/["'\\;{}<>()\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim().slice(0, 100);
+function fontFamilyOf(choice) {
+  const text = String(choice || "");
+  const at2 = text.indexOf(":");
+  if (at2 < 0) return "";
+  const kind = text.slice(0, at2);
+  const rest = text.slice(at2 + 1);
+  if (kind === "pack") return FONT_PACKS[rest] ? `"${FONT_PACKS[rest].family}"` : "";
+  if (kind === "local") {
+    const name2 = cleanFontName(rest);
+    return name2 ? `"${name2}"` : "";
+  }
+  if (kind === "file") return FONT_ASSET_ID.test(rest) ? `"${fileFamily(rest)}"` : "";
+  return "";
+}
+var fontPackOf = (choice) => String(choice || "").startsWith("pack:") && FONT_PACKS[String(choice).slice(5)] ? String(choice).slice(5) : "";
+var DIALOG_LIMITS = {
+  textScale: { min: 0.3, max: 4, step: 0.05, fallback: 1 },
+  nameScale: { min: 0.3, max: 4, step: 0.05, fallback: 1 },
+  dialogHeight: { min: 5, max: 100, step: 1 }
+};
+var SKIN_DIALOG_HEIGHT = { landscape: { default: 27, noir: 31 }, portrait: { default: 22, noir: 31 } };
+var skinDialogHeight = (skin, orientation = "landscape") => SKIN_DIALOG_HEIGHT[orientation][skin] ?? SKIN_DIALOG_HEIGHT[orientation].default;
+
+// src/client/theater/skins.js
 var SKINS = [
-  { id: "stellar", name: "星穹", desc: "深空玻璃 · 霓虹渐变", swatch: "linear-gradient(120deg, #120c2c, #ff7eb6 55%, #5ee7ff)", fonts: ["sans", "serif", "latin"] },
-  { id: "sakura", name: "樱色", desc: "浅色毛玻璃 · 文楷", swatch: "linear-gradient(120deg, #fff4f8, #ffb3cf 55%, #c7b8ff)", fonts: ["wenkai", "latin"] },
-  { id: "ink", name: "水墨", desc: "宣纸 · 朱印 · 毛笔", swatch: "linear-gradient(120deg, #f3ead6, #3a3530 60%, #b3261e)", fonts: ["wenkai", "brush", "latin"] },
-  { id: "noir", name: "夜金", desc: "黑金 · 电影字幕", swatch: "linear-gradient(120deg, #070707, #2a2318 50%, #d8b26a)", fonts: ["serif", "latin"] },
-  { id: "cyber", name: "赛博", desc: "扫描线 · 终端", swatch: "linear-gradient(120deg, #031014, #00f0ff 50%, #ff2bd6)", fonts: ["sans", "mono"] }
+  // textFont / nameFont：皮肤自己的对话、名牌字体叫什么（设置里「跟皮肤」时显示）
+  { id: "stellar", name: "星穹", desc: "深空玻璃 · 霓虹渐变", swatch: "linear-gradient(120deg, #120c2c, #ff7eb6 55%, #5ee7ff)", fonts: ["sans", "serif", "latin"], textFont: "思源黑体", nameFont: "思源宋体" },
+  { id: "sakura", name: "樱色", desc: "浅色毛玻璃 · 文楷", swatch: "linear-gradient(120deg, #fff4f8, #ffb3cf 55%, #c7b8ff)", fonts: ["wenkai", "latin"], textFont: "霞鹜文楷", nameFont: "霞鹜文楷" },
+  { id: "ink", name: "水墨", desc: "宣纸 · 朱印 · 毛笔", swatch: "linear-gradient(120deg, #f3ead6, #3a3530 60%, #b3261e)", fonts: ["wenkai", "brush", "latin"], textFont: "霞鹜文楷", nameFont: "马善政毛笔楷书" },
+  { id: "noir", name: "夜金", desc: "黑金 · 电影字幕", swatch: "linear-gradient(120deg, #070707, #2a2318 50%, #d8b26a)", fonts: ["serif", "latin"], textFont: "思源宋体", nameFont: "思源宋体" },
+  { id: "cyber", name: "赛博", desc: "扫描线 · 终端", swatch: "linear-gradient(120deg, #031014, #00f0ff 50%, #ff2bd6)", fonts: ["sans", "mono"], textFont: "JetBrains Mono + 思源黑体", nameFont: "JetBrains Mono + 思源黑体" }
 ];
 var sheets = /* @__PURE__ */ new Map();
-function loadSkinFonts(skinId, base) {
+function loadSkinFonts(skinId, base, ui2 = null) {
   const skin = SKINS.find((s) => s.id === skinId) || SKINS[0];
-  if (!base) return Promise.resolve();
+  const chosen = ui2 ? [ui2.textFont, ui2.nameFont] : [];
+  const uploaded = Promise.all(chosen.filter((c) => String(c || "").startsWith("file:")).map((c) => loadFontFile(String(c).slice(5))));
+  if (!base) return uploaded;
   const root = base.replace(/\/?$/, "/");
-  const pending2 = skin.fonts.flatMap((key) => FONT_PACKS[key].css.map((file2) => {
+  const packs2 = [.../* @__PURE__ */ new Set([...skin.fonts, ...chosen.map(fontPackOf).filter(Boolean)])];
+  const pending2 = packs2.flatMap((key) => FONT_PACKS[key].css.map((file2) => {
     const href = `${root}${FONT_PACKS[key].pkg}/${file2}`;
     if (!sheets.has(href)) {
       const link = document.createElement("link");
@@ -10141,14 +10235,39 @@ function loadSkinFonts(skinId, base) {
     }
     return sheets.get(href);
   }));
-  return Promise.all(pending2);
+  return Promise.all([...pending2, uploaded]);
+}
+var fontFiles = /* @__PURE__ */ new Map();
+function loadFontFile(assetId) {
+  if (!assetId || typeof FontFace === "undefined" || typeof document === "undefined" || !document.fonts) return Promise.resolve();
+  if (!fontFiles.has(assetId)) {
+    const face = new FontFace(fileFamily(assetId), `url("${assetUrl(assetId)}")`, { display: "swap" });
+    fontFiles.set(assetId, face.load().then((loaded) => {
+      document.fonts.add(loaded);
+    }).catch(() => {
+    }));
+  }
+  return fontFiles.get(assetId);
+}
+function dialogVars(ui2) {
+  if (!ui2) return {};
+  const vars = {};
+  const text = fontFamilyOf(ui2.textFont);
+  const name2 = fontFamilyOf(ui2.nameFont);
+  if (text) vars["--fg-text-font"] = `${text}, var(--font-body)`;
+  if (name2) vars["--fg-name-font"] = `${name2}, var(--font-display)`;
+  if (Number.isFinite(ui2.textScale) && ui2.textScale !== 1) vars["--fg-text-scale"] = String(ui2.textScale);
+  if (Number.isFinite(ui2.nameScale) && ui2.nameScale !== 1) vars["--fg-name-scale"] = String(ui2.nameScale);
+  if (Number.isFinite(ui2.dialogHeight)) vars["--fg-dlg-h"] = ui2.dialogHeight + "%";
+  if (Number.isFinite(ui2.dialogHeightPortrait)) vars["--fg-dlg-h-p"] = ui2.dialogHeightPortrait + "%";
+  return vars;
 }
 function loadGlyphs(el, { body = "", display = "" }, limit = 0) {
   if (!el || typeof document === "undefined" || !document.fonts) return Promise.resolve();
   const style = getComputedStyle(el);
-  const jobs = [["--font-body", body], ["--font-display", display]].map(([name2, text]) => {
-    const family = style.getPropertyValue(name2).trim();
-    return family && text ? document.fonts.load(`${name2 === "--font-display" ? 700 : 400} 16px ${family}`, text).catch(() => {
+  const jobs = [["--fg-text-font", "--font-body", body, 400], ["--fg-name-font", "--font-display", display, 700]].map(([own, skin, text, weight]) => {
+    const family = style.getPropertyValue(own).trim() || style.getPropertyValue(skin).trim();
+    return family && text ? document.fonts.load(`${weight} 16px ${family}`, text).catch(() => {
     }) : null;
   }).filter(Boolean);
   const all = Promise.all(jobs);
@@ -10435,7 +10554,21 @@ var DEFAULT_CONFIG = {
     fontBase: "https://cdn.jsdelivr.net/npm/",
     effects: {},
     // 特效开关：关掉的写 false（{ 'cam.shake': false }，编号见 src/client/theater/effects.js），没写的都开着
-    fontScale: 1,
+    // 对话框（lib/fonts.js）：字体 '' 跟皮肤 / pack:<字体包> / local:<电脑里的字体名> / file:<上传的字体>；字号是倍数；高度占画面高的百分比，null 跟皮肤
+    textFont: "",
+    // 对话字体：对话框、选项、回想里的台词
+    nameFont: "",
+    // 名牌字体：名牌和回想里的名字
+    textScale: 1,
+    // 对话字号（倍数）
+    nameScale: 1,
+    // 名牌字号（倍数）
+    dialogHeight: null,
+    // 对话框高度（横屏）
+    dialogHeightPortrait: null,
+    // 对话框高度（竖屏，手机上）
+    customFonts: [],
+    // 上传的字体 [{ assetId, name }]，只经上传接口改
     autoOpen: false,
     // 新一轮写完后自动打开剧场
     updateCheck: true
@@ -10496,7 +10629,7 @@ function Backlog({ beats, index, onJump, onClose, gameId }) {
     return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, { key: b.key }, head && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-log-turn fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", null, "TURN ", b.turn, " · ", b.scene.location || "—", " · ", TIME_LABEL[b.scene.time] || ""), /* @__PURE__ */ import_react12.default.createElement("span", { style: { flex: 1 } }), b.status === "directing" && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill is-busy" }, "导演整理中"), b.status === "failed" && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill fg-err", title: b.error }, "整理失败"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "r" + b.turn, onClick: (e) => {
       e.stopPropagation();
       run("r" + b.turn, () => api.replan(gameId, b.turn), "已重新整理这一轮");
-    } }, "重新整理")), !head && (b.sceneEnter || b.cut) && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-log-scene" }, [b.cut && b.cut.text, MODE_LABEL[b.mode], b.sceneEnter && b.scene.location].filter(Boolean).join(" · ") || MODE_LABEL.real), /* @__PURE__ */ import_react12.default.createElement("div", { className: `fg-log-item${i === index ? " is-current" : ""}`, onClick: () => onJump(i), style: i === index ? { background: "rgba(255,255,255,.06)" } : null }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-log-name" }, b.type === "narration" ? "" : b.alias || b.speaker), /* @__PURE__ */ import_react12.default.createElement("div", { style: b.type === "thought" ? { fontStyle: "italic", opacity: 0.8 } : null }, b.orig && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-orig" }, b.orig), b.type === "dialogue" ? `「${b.text}」` : b.type === "thought" ? `（${b.text}）` : b.text)));
+    } }, "重新整理")), !head && (b.sceneEnter || b.cut) && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-log-scene" }, [b.cut && b.cut.text, MODE_LABEL[b.mode], b.sceneEnter && b.scene.location].filter(Boolean).join(" · ") || MODE_LABEL.real), /* @__PURE__ */ import_react12.default.createElement("div", { className: `fg-log-item${i === index ? " is-current" : ""}`, onClick: () => onJump(i), style: i === index ? { background: "rgba(255,255,255,.06)" } : null }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-log-name" }, b.type === "narration" ? "" : b.alias || b.speaker), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-log-text", style: b.type === "thought" ? { fontStyle: "italic", opacity: 0.8 } : null }, b.orig && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-orig" }, b.orig), b.type === "dialogue" ? `「${b.text}」` : b.type === "thought" ? `（${b.text}）` : b.text)));
   }), !beats.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "还没有可以回想的内容。")));
 }
 var CG_WRITER_LABEL = { ai: "插画分镜师写的", fallback: "按档案拼的（分镜师没写出来）", user: "你改的", director: "导演写的（旧版）" };
@@ -11413,10 +11546,175 @@ var landscapeSize = (cfg) => {
   const { width, height } = sizeFor(cfg, "landscape");
   return `${width}×${height}`;
 };
+var localFamilies = null;
+var OTHER_FONT = "__other__";
+var PREVIEW_LINE = "好巧啊。今天的月色真美，要不要一起走一段？";
+function Percent({ value, fallback, min, max, step: step2 = 1, onCommit, onReset, changed, label, empty = "" }) {
+  const shown = value ?? fallback;
+  const [v, setV] = import_react12.default.useState(shown);
+  import_react12.default.useEffect(() => {
+    setV(shown);
+  }, [shown]);
+  const commit = (next) => {
+    const n = Math.min(max, Math.max(min, Number(next)));
+    if (Number.isFinite(n) && n !== value) onCommit(n);
+    else setV(shown);
+  };
+  return /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-row fg-pct" }, /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min, max, step: step2, value: v, "aria-label": label, onChange: (e) => setV(Number(e.target.value)), onPointerUp: (e) => commit(e.target.value), onKeyUp: (e) => commit(e.target.value) }), /* @__PURE__ */ import_react12.default.createElement("input", { className: "fg-input", type: "number", min, max, step: 1, value: v, "aria-label": label, onChange: (e) => setV(e.target.value), onBlur: (e) => commit(e.target.value), onKeyDown: (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") commit(e.target.value);
+  } }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "%", value == null && empty ? ` · ${empty}` : ""), changed && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: onReset }, "恢复默认"));
+}
+function FontField({ label, hint, value, skinFont, fonts, families, onPick, onUpload, busy }) {
+  const [typing, setTyping] = import_react12.default.useState(false);
+  const fileRef = import_react12.default.useRef(null);
+  const local = value.startsWith("local:") ? value.slice(6) : "";
+  const known = /* @__PURE__ */ new Set([...LOCAL_FONTS.map(([f]) => f), ...families || []]);
+  const options = [
+    ["", `跟皮肤（${skinFont}）`],
+    ...FONT_GROUPS.map(([g, name2]) => ({ group: name2, options: Object.entries(FONT_PACKS).filter(([, f]) => f.group === g).map(([key, f]) => ["pack:" + key, f.name]) })),
+    { group: "上传的字体", options: fonts.map((f) => ["file:" + f.assetId, f.name]) },
+    { group: "电脑里常见的（装了才有）", options: LOCAL_FONTS.map(([f, name2]) => ["local:" + f, `${name2}（${f}）`]) },
+    { group: `这台电脑里的字体（${(families || []).length} 个）`, options: (families || []).map((f) => ["local:" + f, f]) },
+    ...local && !known.has(local) ? [["local:" + local, `${local}（自己填的）`]] : [],
+    [OTHER_FONT, "其他字体：自己填名字…"]
+  ];
+  return /* @__PURE__ */ import_react12.default.createElement(Field, { label, hint }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Select, { value: typing ? OTHER_FONT : value, options, style: INLINE, onChange: (v) => {
+    if (v === OTHER_FONT) setTyping(true);
+    else {
+      setTyping(false);
+      onPick(v);
+    }
+  } }), typing && /* @__PURE__ */ import_react12.default.createElement(Text, { value: local, placeholder: "字体名，比如 方正兰亭黑_GBK", style: { width: "16cqw" }, onCommit: (v) => {
+    const name2 = cleanFontName(v);
+    if (name2) {
+      onPick("local:" + name2);
+      setTyping(false);
+    }
+  } }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy, onClick: () => fileRef.current && fileRef.current.click() }, busy ? "上传中…" : "上传字体用在这里"), value && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => {
+    setTyping(false);
+    onPick("");
+  } }, "恢复默认"), /* @__PURE__ */ import_react12.default.createElement("input", { ref: fileRef, type: "file", accept: ".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2", hidden: true, onChange: (e) => {
+    const file2 = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (file2) onUpload(file2);
+  } })));
+}
+function DialogPreview() {
+  return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-dlg-preview", "aria-hidden": "true" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-dialog" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-box" }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-name" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-name-plate" }, "苏晴"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-name-sub" }, "调侃")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-text is-dialogue is-done" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-line" }, PREVIEW_LINE)), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-wait" }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-progress" }, /* @__PURE__ */ import_react12.default.createElement("i", { style: { width: "40%" } })), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-quick" }, ["AUTO", "SKIP", "LOG", "CONFIG"].map((t) => /* @__PURE__ */ import_react12.default.createElement("button", { key: t, type: "button", tabIndex: -1 }, t)))));
+}
+function DialogSection({ data }) {
+  const ui2 = data.config.ui;
+  const p4 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
+  const [busy, run] = useBusy3();
+  const [families, setFamilies] = import_react12.default.useState(localFamilies);
+  const fonts = ui2.customFonts || [];
+  const skin = SKINS.find((s) => s.id === ui2.skin) || SKINS[0];
+  import_react12.default.useEffect(() => {
+    for (const f of fonts) loadFontFile(f.assetId);
+  }, [fonts.map((f) => f.assetId).join()]);
+  const upload = (file2, slot) => run("font" + slot, async () => {
+    const res = await api.uploadFont(file2);
+    setConfig(res);
+    if (slot && res.font) await patchConfig({ ui: { [slot]: "file:" + res.font.assetId } });
+  }, slot ? "已上传，正在用这个字体" : "已上传");
+  const readLocal = () => run("local", async () => {
+    if (typeof window === "undefined" || typeof window.queryLocalFonts !== "function") throw new Error("这个浏览器不让网页读字体清单（Chrome / Edge 103 以上可以）。可以在下拉框里选「其他字体」直接填名字");
+    const list3 = await window.queryLocalFonts();
+    localFamilies = [...new Set(list3.map((f) => cleanFontName(f.family)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh"));
+    setFamilies(localFamilies);
+    if (!localFamilies.length) throw new Error("没读到字体：浏览器问要不要让网页看字体时要点「允许」");
+    return localFamilies.length;
+  }, "已读取这台电脑里的字体，在下拉框最后一组");
+  const land = skinDialogHeight(skin.id, "landscape");
+  const port = skinDialogHeight(skin.id, "portrait");
+  const allDefault = !ui2.textFont && !ui2.nameFont && ui2.textScale === 1 && ui2.nameScale === 1 && ui2.dialogHeight == null && ui2.dialogHeightPortrait == null;
+  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "对话框"), /* @__PURE__ */ import_react12.default.createElement(DialogPreview, null), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: { justifyContent: "flex-end", marginTop: ".6cqw" } }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note", style: { flex: 1 } }, "上面是现在的样子（皮肤「", skin.name, "」）。改完马上生效，剧场里正在读的那句也会跟着变。"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "local", onClick: readLocal }, busy === "local" ? "读取中…" : families ? `重新读取电脑里的字体（${families.length} 个）` : "读取电脑里的字体"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: allDefault, onClick: () => p4({ textFont: "", nameFont: "", textScale: 1, nameScale: 1, dialogHeight: null, dialogHeightPortrait: null }) }, "对话框全部恢复默认")), /* @__PURE__ */ import_react12.default.createElement(
+    FontField,
+    {
+      label: "对话字体",
+      hint: "对话框里的台词和旁白，也用在选项和回想里。选的字体缺字时（比如日文字体里没有的简体字）用皮肤的字体补上。电脑里的字体只在装了它的电脑上生效；上传的字体每台设备都能用。",
+      value: ui2.textFont || "",
+      skinFont: skin.textFont,
+      fonts,
+      families,
+      busy: busy === "fonttextFont",
+      onPick: (v) => p4({ textFont: v }),
+      onUpload: (file2) => upload(file2, "textFont")
+    }
+  ), /* @__PURE__ */ import_react12.default.createElement(
+    FontField,
+    {
+      label: "名牌字体",
+      hint: "说话人的名字，也用在回想里的名字上。",
+      value: ui2.nameFont || "",
+      skinFont: skin.nameFont,
+      fonts,
+      families,
+      busy: busy === "fontnameFont",
+      onPick: (v) => p4({ nameFont: v }),
+      onUpload: (file2) => upload(file2, "nameFont")
+    }
+  ), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "对话字号", hint: `皮肤原来的大小是 100%。调大以后一屏放不下的话，把下面的对话框高度也调高。` }, /* @__PURE__ */ import_react12.default.createElement(
+    Percent,
+    {
+      value: Math.round(ui2.textScale * 100),
+      fallback: 100,
+      min: DIALOG_LIMITS.textScale.min * 100,
+      max: DIALOG_LIMITS.textScale.max * 100,
+      step: DIALOG_LIMITS.textScale.step * 100,
+      label: "对话字号",
+      changed: ui2.textScale !== 1,
+      onCommit: (n) => p4({ textScale: Math.round(n) / 100 }),
+      onReset: () => p4({ textScale: 1 })
+    }
+  )), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "名牌字号", hint: "名牌整块跟着放大缩小，往上长，不压到台词。" }, /* @__PURE__ */ import_react12.default.createElement(
+    Percent,
+    {
+      value: Math.round(ui2.nameScale * 100),
+      fallback: 100,
+      min: DIALOG_LIMITS.nameScale.min * 100,
+      max: DIALOG_LIMITS.nameScale.max * 100,
+      step: DIALOG_LIMITS.nameScale.step * 100,
+      label: "名牌字号",
+      changed: ui2.nameScale !== 1,
+      onCommit: (n) => p4({ nameScale: Math.round(n) / 100 }),
+      onReset: () => p4({ nameScale: 1 })
+    }
+  )), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "对话框高度", hint: `占画面高度的百分比；「${skin.name}」原来是 ${land}%。调高时名牌、台词离上边的距离不变，多出来的地方都给台词。` }, /* @__PURE__ */ import_react12.default.createElement(
+    Percent,
+    {
+      value: ui2.dialogHeight,
+      fallback: land,
+      min: DIALOG_LIMITS.dialogHeight.min,
+      max: DIALOG_LIMITS.dialogHeight.max,
+      step: DIALOG_LIMITS.dialogHeight.step,
+      label: "对话框高度",
+      empty: "跟皮肤",
+      changed: ui2.dialogHeight != null,
+      onCommit: (n) => p4({ dialogHeight: n }),
+      onReset: () => p4({ dialogHeight: null })
+    }
+  )), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "竖屏时的高度", hint: `手机竖着拿时单独算（画面是竖的，同样的百分比看起来不一样）；「${skin.name}」原来是 ${port}%。` }, /* @__PURE__ */ import_react12.default.createElement(
+    Percent,
+    {
+      value: ui2.dialogHeightPortrait,
+      fallback: port,
+      min: DIALOG_LIMITS.dialogHeight.min,
+      max: DIALOG_LIMITS.dialogHeight.max,
+      step: DIALOG_LIMITS.dialogHeight.step,
+      label: "竖屏时的对话框高度",
+      empty: "跟皮肤",
+      changed: ui2.dialogHeightPortrait != null,
+      onCommit: (n) => p4({ dialogHeightPortrait: n }),
+      onReset: () => p4({ dialogHeightPortrait: null })
+    }
+  )), fonts.length > 0 && /* @__PURE__ */ import_react12.default.createElement(Field, { label: "上传的字体", hint: "存在数据目录的素材里，删掉后正用着它的地方回到皮肤的字体。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-fontlist" }, fonts.map((f) => /* @__PURE__ */ import_react12.default.createElement("div", { key: f.assetId, className: "fg-row fg-fontitem" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-fontname", style: { fontFamily: `${fontFamilyOf("file:" + f.assetId)}, var(--font-body)` } }, f.name, " · ", PREVIEW_LINE.slice(0, 8)), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: ui2.textFont === "file:" + f.assetId, onClick: () => p4({ textFont: "file:" + f.assetId }) }, "用作对话"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: ui2.nameFont === "file:" + f.assetId, onClick: () => p4({ nameFont: "file:" + f.assetId }) }, "用作名牌"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "rm" + f.assetId, onClick: () => run("rm" + f.assetId, async () => setConfig(await api.removeFont(f.assetId)), "已删掉") }, "删除"))))));
+}
 function LookSection({ data }) {
   const cfg = data.config;
   const p4 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
-  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "界面皮肤"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-skins" }, SKINS.map((s) => /* @__PURE__ */ import_react12.default.createElement("button", { key: s.id, type: "button", className: `fg-skin${cfg.ui.skin === s.id ? " is-on" : ""}`, onClick: () => p4({ skin: s.id }) }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-skin-swatch", style: { background: s.swatch } }), /* @__PURE__ */ import_react12.default.createElement("b", null, s.name), /* @__PURE__ */ import_react12.default.createElement("span", null, s.desc)))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "画面"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "画面比例", hint: "跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.ratio, onChange: (e) => p4({ ratio: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "cg" }, "跟横版插画一样（", landscapeSize(data.config), "）"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "wide" }, "16:9 宽屏"))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "同屏最多几人", hint: "台上的人多于这个数时，最久没说话、没登场的先下场，轮到他说话再回来。人越多立绘越小，按站位从左到右排开。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: String(cfg.ui.maxOnStage ?? 8), onChange: (e) => p4({ maxOnStage: Number(e.target.value) }) }, STAGE_SIZES.filter(Boolean).map((n) => /* @__PURE__ */ import_react12.default.createElement("option", { key: n, value: String(n) }, n, " 人")), /* @__PURE__ */ import_react12.default.createElement("option", { value: "0" }, "不限"))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "演出"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "短闪回", hint: "正文里一两句的回忆（「她说过：……」）怎么演。要换到当时的地方慢慢演的长回忆，导演会换成整段回忆场景，不受这里影响。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recall || "text", onChange: (e) => p4({ recall: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "text" }, "画面不动，对话框换成回忆的样子"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "ghost" }, "画面压暗，回忆里的人浮到台前"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "portrait" }, "对话框换样子，旁边再出说话人的小头像"))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "短闪回的名牌", hint: "回忆里说话的人的名字。模糊压暗时认得出是谁，又像隔着一层看不清。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallName || "blur", onChange: (e) => p4({ recallName: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "blur" }, "模糊、压暗"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "hide" }, "不显示"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "show" }, "照常显示"))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "短闪回的基调", hint: "切进闪回的方式和色调，对话框和回忆里的声音也跟着变：温暖怀念慢慢泛黄，甜蜜泛起粉光，伤感褪成冷灰，不安画面撕裂泛红、像心跳一样一暗一暗，猛然想起白闪一下，朦胧如梦起雾。自动时导演按剧情选，没选的按闪回里的情绪和当时的氛围挑。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallTone || "auto", onChange: (e) => p4({ recallTone: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "auto" }, "自动（按剧情和氛围）"), RECALL_TONES.map((t) => /* @__PURE__ */ import_react12.default.createElement("option", { key: t, value: t }, "都用「", RECALL_TONE_NAMES[t], "」")))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "文字速度", hint: "每字毫秒，0 为瞬间显示。" }, /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "80", value: cfg.ui.textSpeed, onChange: (e) => p4({ textSpeed: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "自动播放间隔" }, /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "400", max: "4000", step: "100", value: cfg.ui.autoDelay, onChange: (e) => p4({ autoDelay: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "写完自动打开剧场" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: cfg.ui.autoOpen, onChange: (v) => p4({ autoOpen: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "字体地址", hint: "皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。立绘工作台的认脸模型也从这里下它的运行库。" }, /* @__PURE__ */ import_react12.default.createElement(Text, { value: cfg.ui.fontBase, onCommit: (v) => p4({ fontBase: v }) })), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "认脸模型（立绘工作台的自动框）"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "下载来源", hint: "模型在 HuggingFace：自动是先连官网、连不上换镜像；只下一次，存在数据目录的 models 文件夹。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.vision.source, onChange: (e) => patchConfig({ vision: { source: e.target.value } }).catch((err) => toast(err.message, "error")) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "auto" }, "自动（先官网，连不上换镜像）"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "official" }, "只用官网"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "mirror" }, "先用镜像"))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "镜像地址", hint: "HuggingFace 的镜像站，默认 hf-mirror.com；路径规则要跟官网一样（…/仓库/resolve/版本/文件）。" }, /* @__PURE__ */ import_react12.default.createElement(Text, { value: cfg.vision.mirror, onCommit: (v) => patchConfig({ vision: { mirror: v } }).catch((err) => toast(err.message, "error")) })));
+  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "界面皮肤"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-skins" }, SKINS.map((s) => /* @__PURE__ */ import_react12.default.createElement("button", { key: s.id, type: "button", className: `fg-skin${cfg.ui.skin === s.id ? " is-on" : ""}`, onClick: () => p4({ skin: s.id }) }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-skin-swatch", style: { background: s.swatch } }), /* @__PURE__ */ import_react12.default.createElement("b", null, s.name), /* @__PURE__ */ import_react12.default.createElement("span", null, s.desc)))), /* @__PURE__ */ import_react12.default.createElement(DialogSection, { data }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "画面"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "画面比例", hint: "跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.ratio, onChange: (e) => p4({ ratio: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "cg" }, "跟横版插画一样（", landscapeSize(data.config), "）"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "wide" }, "16:9 宽屏"))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "同屏最多几人", hint: "台上的人多于这个数时，最久没说话、没登场的先下场，轮到他说话再回来。人越多立绘越小，按站位从左到右排开。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: String(cfg.ui.maxOnStage ?? 8), onChange: (e) => p4({ maxOnStage: Number(e.target.value) }) }, STAGE_SIZES.filter(Boolean).map((n) => /* @__PURE__ */ import_react12.default.createElement("option", { key: n, value: String(n) }, n, " 人")), /* @__PURE__ */ import_react12.default.createElement("option", { value: "0" }, "不限"))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "演出"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "短闪回", hint: "正文里一两句的回忆（「她说过：……」）怎么演。要换到当时的地方慢慢演的长回忆，导演会换成整段回忆场景，不受这里影响。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recall || "text", onChange: (e) => p4({ recall: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "text" }, "画面不动，对话框换成回忆的样子"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "ghost" }, "画面压暗，回忆里的人浮到台前"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "portrait" }, "对话框换样子，旁边再出说话人的小头像"))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "短闪回的名牌", hint: "回忆里说话的人的名字。模糊压暗时认得出是谁，又像隔着一层看不清。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallName || "blur", onChange: (e) => p4({ recallName: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "blur" }, "模糊、压暗"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "hide" }, "不显示"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "show" }, "照常显示"))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "短闪回的基调", hint: "切进闪回的方式和色调，对话框和回忆里的声音也跟着变：温暖怀念慢慢泛黄，甜蜜泛起粉光，伤感褪成冷灰，不安画面撕裂泛红、像心跳一样一暗一暗，猛然想起白闪一下，朦胧如梦起雾。自动时导演按剧情选，没选的按闪回里的情绪和当时的氛围挑。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.ui.recallTone || "auto", onChange: (e) => p4({ recallTone: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "auto" }, "自动（按剧情和氛围）"), RECALL_TONES.map((t) => /* @__PURE__ */ import_react12.default.createElement("option", { key: t, value: t }, "都用「", RECALL_TONE_NAMES[t], "」")))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "文字速度", hint: "每字毫秒，0 为瞬间显示。" }, /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "80", value: cfg.ui.textSpeed, onChange: (e) => p4({ textSpeed: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "自动播放间隔" }, /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "400", max: "4000", step: "100", value: cfg.ui.autoDelay, onChange: (e) => p4({ autoDelay: Number(e.target.value) }), style: { width: "100%" } })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "写完自动打开剧场" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: cfg.ui.autoOpen, onChange: (v) => p4({ autoOpen: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "字体地址", hint: "皮肤字体从这里按 npm 包名加载（默认 jsDelivr 上的 @fontsource 官方包）；连不上时可以换成 unpkg 或自己的镜像，地址以 / 结尾。立绘工作台的认脸模型也从这里下它的运行库。" }, /* @__PURE__ */ import_react12.default.createElement(Text, { value: cfg.ui.fontBase, onCommit: (v) => p4({ fontBase: v }) })), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "认脸模型（立绘工作台的自动框）"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "下载来源", hint: "模型在 HuggingFace：自动是先连官网、连不上换镜像；只下一次，存在数据目录的 models 文件夹。" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: cfg.vision.source, onChange: (e) => patchConfig({ vision: { source: e.target.value } }).catch((err) => toast(err.message, "error")) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "auto" }, "自动（先官网，连不上换镜像）"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "official" }, "只用官网"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "mirror" }, "先用镜像"))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "镜像地址", hint: "HuggingFace 的镜像站，默认 hf-mirror.com；路径规则要跟官网一样（…/仓库/resolve/版本/文件）。" }, /* @__PURE__ */ import_react12.default.createElement(Text, { value: cfg.vision.mirror, onCommit: (v) => patchConfig({ vision: { mirror: v } }).catch((err) => toast(err.message, "error")) })));
 }
 function EffectsSection({ data }) {
   const saved = data.config.ui.effects || {};
@@ -12374,23 +12672,25 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const cam = useCamera(title ? null : beat, cameraRef);
   useParallax(stageRef, cameraRef, !off.has("look.parallax"));
   const atEnd = beat && index === beats.length - 1;
+  const fontKey = [ui0.skin, ui0.fontBase, ui0.textFont || "", ui0.nameFont || ""].join("|");
+  const fontUi = import_react16.default.useMemo(() => ({ textFont: ui0.textFont, nameFont: ui0.nameFont }), [ui0.textFont, ui0.nameFont]);
   import_react16.default.useEffect(() => {
-    loadSkinFonts(ui0.skin, ui0.fontBase);
-  }, [ui0.skin, ui0.fontBase]);
+    loadSkinFonts(ui0.skin, ui0.fontBase, fontUi);
+  }, [fontKey]);
   import_react16.default.useEffect(() => {
     if (!beat) return void 0;
     let live = true;
-    loadSkinFonts(ui0.skin, ui0.fontBase).then(() => loadGlyphs(rootRef.current, glyphsOf([beat]), GLYPH_WAIT)).then(() => {
+    loadSkinFonts(ui0.skin, ui0.fontBase, fontUi).then(() => loadGlyphs(rootRef.current, glyphsOf([beat]), GLYPH_WAIT)).then(() => {
       if (live) setGlyphKey(beat.key);
     });
     return () => {
       live = false;
     };
-  }, [beat && beat.key, ui0.skin, ui0.fontBase]);
+  }, [beat && beat.key, fontKey]);
   import_react16.default.useEffect(() => {
     if (index < 0) return;
-    loadSkinFonts(ui0.skin, ui0.fontBase).then(() => loadGlyphs(rootRef.current, glyphsOf(beats.slice(index + 1, index + 1 + GLYPH_AHEAD))));
-  }, [index, beats, ui0.skin, ui0.fontBase]);
+    loadSkinFonts(ui0.skin, ui0.fontBase, fontUi).then(() => loadGlyphs(rootRef.current, glyphsOf(beats.slice(index + 1, index + 1 + GLYPH_AHEAD))));
+  }, [index, beats, fontKey]);
   import_react16.default.useEffect(() => {
     if (index < 0 || !view) return;
     const seen = /* @__PURE__ */ new Set();
@@ -12612,7 +12912,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     } },
     { id: "quit", label: "回到聊天", en: "Return", run: close }
   ].filter(Boolean);
-  return /* @__PURE__ */ import_react16.default.createElement("div", { ref: rootRef, className: `fg-theater${closing ? " is-closing" : ""}${hidden ? " fg-ui-hidden" : ""}`, "data-skin": ui0.skin, "data-off": cssOff(off) || void 0, style: { "--stage-ar": stageRatio(cfg) }, role: "dialog", "aria-label": "FlowGal 剧场" }, /* @__PURE__ */ import_react16.default.createElement(StageFlags.Provider, { value: stageFlags }, /* @__PURE__ */ import_react16.default.createElement(
+  return /* @__PURE__ */ import_react16.default.createElement("div", { ref: rootRef, className: `fg-theater${closing ? " is-closing" : ""}${hidden ? " fg-ui-hidden" : ""}`, "data-skin": ui0.skin, "data-off": cssOff(off) || void 0, style: { "--stage-ar": stageRatio(cfg), ...dialogVars(cfg && cfg.ui) }, role: "dialog", "aria-label": "FlowGal 剧场" }, /* @__PURE__ */ import_react16.default.createElement(StageFlags.Provider, { value: stageFlags }, /* @__PURE__ */ import_react16.default.createElement(
     "div",
     {
       className: "fg-stage",
