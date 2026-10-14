@@ -139,7 +139,7 @@ test('gate: 动作与表情设计师：读完资料、剧情和档案再设计�
   assert.match(system, /角色表演设计师[\s\S]*先读人[\s\S]*动作表 poses[\s\S]*表情表 faces/)
   assert.match(system, /不设上限/)
   assert.doesNotMatch(system, /"side"|side: true|侧身/)
-  assert.match(system, /表演笔记（玩家写的，必须遵守）」时[\s\S]*read 照抄那一条/)
+  assert.match(system, /表演笔记·本性（玩家写的，必须遵守）」时[\s\S]*read 照抄那一条/)
   for (const part of [/学生会长，嘴硬心软/, /被同学孤立过/, /我才没有在等你/, /名字：林岚（女）/, /立绘备注（玩家写的，必须遵守）：别画眼镜/, /- angry（生气）/, /- 赌气地道谢（新情绪，接近 pout 赌气）/, /给这个人设计一套动作表/]) assert.match(user, part)
   assert.doesNotMatch(user, /老存档里导演写的描述/, '情绪库的描述不进提示词')
   assert.doesNotMatch(user, /已有的动作与表情设计/)
@@ -153,7 +153,7 @@ test('gate: 动作与表情设计师：读完资料、剧情和档案再设计�
   const llm2 = { stream(request) { more.push(request); return reply(JSON.stringify({ poses: [{ id: 'p2', emotions: ['委屈'] }], faces: [{ emotion: '委屈', desc: '咬着嘴唇不吭声', tags: 'biting lip, teary eyes, looking down' }, { emotion: 'angry', desc: '冷下来', tags: 'cold eyes, closed mouth' }] })).stream() } }
   const next = await writeActing({ llm: llm2, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', context, story, turn: 2, person, emotions: ['委屈', 'angry'], current: sheet, custom: [] })
   const addUser = more[0].messages[0].content[0].text
-  assert.match(addUser, /【已有的动作与表情设计】\n表演笔记：嘴硬心软的学生会长[\s\S]*- p2「抱着胳膊别过脸」：嘴硬的时候；身体 arms crossed, head turned away；情绪：赌气（底图）、生气、害羞/)
+  assert.match(addUser, /【已有的动作与表情设计】\n表演笔记·本性：嘴硬心软的学生会长[\s\S]*- p2「抱着胳膊别过脸」［没标本性还是处境］：嘴硬的时候；身体 arms crossed, head turned away；情绪：赌气（底图）、生气、害羞/)
   assert.doesNotMatch(addUser, /新加一个动作（id 写 new1，总共不超过/)
   assert.match(addUser, /- 委屈（新情绪）\n- angry（生气）：已在动作 p2「抱着胳膊别过脸」里，只重新设计表情/)
   assert.match(addUser, /还没分组的放进最合适的已有动作/)
@@ -167,8 +167,8 @@ test('gate: 动作与表情设计师：读完资料、剧情和档案再设计�
   const llm3 = { stream(request) { noted.push(request); return reply(JSON.stringify({ faces: [{ emotion: 'angry', tags: 'cold eyes' }] })).stream() } }
   await writeActing({ llm: llm3, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', context, story, turn: 2, person: { ...person, actingNote: '生气时会笑，越生气笑得越甜' }, emotions: ['angry'], current: sheet, custom: [] })
   const notedUser = noted[0].messages[0].content[0].text
-  assert.match(notedUser, /表演笔记（玩家写的，必须遵守）：生气时会笑，越生气笑得越甜/)
-  assert.doesNotMatch(notedUser, /表演笔记：嘴硬心软/)
+  assert.match(notedUser, /表演笔记·本性（玩家写的，必须遵守）：生气时会笑，越生气笑得越甜/)
+  assert.doesNotMatch(notedUser, /表演笔记·本性：嘴硬心软/)
 
   // 写不出能用的：回 null（调用方按已有的或通用动作组画）
   assert.equal(await writeActing({ llm: { stream: () => reply('{}').stream() }, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', person, emotions: ['neutral'] }), null)
@@ -185,9 +185,9 @@ test('gate: 表演笔记：玩家写的优先、设计师起草的垫底；让�
   const read = await writeActingNote({ llm, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', context: {}, story: [], turn: 3, person, current: sheet })
   assert.equal(read, '新的笔记：嘴硬，眼神先软下来。')
   const user = calls[0].messages[0].content[0].text
-  assert.match(user, /这次只重写这个人的表演笔记（read）/)
+  assert.match(user, /这次只重写这个人的表演笔记·本性（read）/)
   assert.match(user, /【已有的动作与表情设计】[\s\S]*- p2「抱着胳膊别过脸」/)
-  assert.doesNotMatch(user, /玩家写的旧笔记|表演笔记：嘴硬心软/)
+  assert.doesNotMatch(user, /玩家写的旧笔记|表演笔记·本性：嘴硬心软/)
   assert.equal(calls.length, 1)
 })
 
@@ -208,14 +208,14 @@ test('gate: 立绘设计师照设计写：底图写这个人的动作和表情�
   ]
   await writeSpritePrompts({ llm, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', person: { name: '林岚', gender: 'female', appearance: '1girl, long black hair', acting, timeline: {} }, targets })
   const user = ownText(calls[0])
-  assert.match(user, /表演笔记（表演设计师读完资料写的）：嘴硬心软的学生会长/)
+  assert.match(user, /表演笔记·本性（表演设计师读完资料写的）：嘴硬心软的学生会长/)
   assert.match(user, /- s1：.*情绪「赌气」；这个人的动作「抱着胳膊别过脸」：嘴硬的时候（身体 arms crossed, head turned away）；这个人的表情：鼓着脸不看人（脸 pout, puffed cheeks, looking to the side）；这张是「抱着胳膊别过脸」动作的底图：同一个动作的生气、害羞会在这张上只换脸/)
   assert.match(user, /- s2：.*情绪「开心」；这个人的动作「背手站着」：背着手站得笔直（身体 hands behind back）$/m, '整张画（不换脸）的也照设计的动作，没设计表情的不硬塞')
   assert.doesNotMatch(user, /动作参考/)
   assert.match(rulesText(calls[0]), /写了「这个人的动作」「这个人的表情」的，是读完资料和剧情专门为他设计好的/)
   // 玩家写了表演笔记：用玩家的，当硬规矩
   await writeSpritePrompts({ llm, provider: 'f', model: 'f', config: resolveConfig({}), backend: 'novelai', person: { name: '林岚', gender: 'female', appearance: '1girl, long black hair', acting, actingNote: '笑的时候总先低头', timeline: {} }, targets })
-  assert.match(calls[1].messages[0].content[0].text, /表演笔记（玩家写的，必须遵守）：笑的时候总先低头/)
+  assert.match(calls[1].messages[0].content[0].text, /表演笔记·本性（玩家写的，必须遵守）：笑的时候总先低头/)
   assert.doesNotMatch(calls[1].messages[0].content[0].text, /嘴硬心软的学生会长/)
 })
 
