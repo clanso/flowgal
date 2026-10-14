@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { createChatLlm, chatModels } from '../lib/chat-llm.js'
 import { callModel, retryMaxTokens } from '../lib/director.js'
 import { resolveConfig } from '../lib/config.js'
+import { writeCgPrompts } from '../lib/illustrator.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine, KIND_CG } from '../lib/engine.js'
 import { roleText, rulesText, userText } from './roles.mjs'
@@ -229,4 +230,33 @@ test('gate: 分镜师的 JSON 最后少一个 }（DeepSeek 常见）：照样收
   } finally {
     await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 })
   }
+})
+
+test('gate: 分镜师一批里有一张只占了个坑（"placeholder"、只有人数）：不当写好了，跟漏写的一起补要', async () => {
+  const full = key => ({ key, tag: '1girl, ruined temple, kneeling, from side', nl: 'She kneels by the carcass in the pale fungal light.', characters: [{ name: '柯萝伊', tag: 'girl, looking back, surprised', nl: 'She turns her head back over her shoulder.' }] })
+  const replies = [
+    // 第一次：c1 写全了，c2 只占个坑，c3 漏了
+    JSON.stringify({ images: [full('c1'), { key: 'c2', tag: '2girls', nl: 'placeholder', characters: [] }] }),
+    JSON.stringify({ images: [full('c2'), full('c3')] }),
+  ]
+  const asked = []
+  const llm = {
+    stream(request) {
+      asked.push(userText(request))
+      const text = replies[asked.length - 1]
+      return (async function* () { yield { type: 'text-delta', text }; yield { type: 'finish', reason: { kind: 'stop' } } })()
+    },
+  }
+  const targets = ['a', 'b', 'c'].map((key, i) => ({ key, after: 'U' + (i + 1), title: '插画' + key, moment: '柯萝伊蹲着回头', who: ['柯萝伊'] }))
+  const units = [1, 2, 3].map(i => ({ id: 'U' + i, type: 'narration', text: '第' + i + '句。' }))
+  const results = await writeCgPrompts({ llm, provider: 'p', model: 'm', config: resolveConfig({}), backend: 'novelai', context: null, turn: 2, units, targets })
+  assert.equal(asked.length, 2)
+  // 补要的是 c2 和 c3，不再要 c1
+  assert.match(asked[1], /^- c2：/m)
+  assert.match(asked[1], /^- c3：/m)
+  assert.doesNotMatch(asked[1], /^- c1：/m)
+  assert.deepEqual([...results.keys()].sort(), ['a', 'b', 'c'])
+  assert.equal(results.get('b').desc, 'She kneels by the carcass in the pale fungal light.')
+  assert.equal(results.get('b').characters.length, 1)
+  for (const image of results.values()) assert.doesNotMatch(JSON.stringify(image), /placeholder/)
 })
