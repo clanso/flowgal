@@ -22,6 +22,8 @@ const SHAPE_LABEL = { landscape: '横版', portrait: '竖版', square: '方形' 
 /** 段落里一个人当时的样子：「柯萝伊 魔导师长袍 · 无状态 · 外貌另写」。 */
 const thenText = t => [t.name, t.outfit, t.states ? (t.states.length ? t.states.map(s => s.name).join('、') : '无状态') : '', t.change ? '外貌另写' : ''].filter(Boolean).join(' ')
 // 一轮中途变的样子：「柯萝伊 换上睡衣 +手腕发带 −项链」
+/** 处境变了（lib/pose-life.js）：收起 / 放回谁的哪个动作、为什么。 */
+const situText = s => [s.name, s.off && s.off.length ? `收起 ${s.off.join('、')}` : '', s.on && s.on.length ? `放回 ${s.on.join('、')}` : '', !(s.off && s.off.length) && !(s.on && s.on.length) ? '处境转了' : ''].filter(Boolean).join(' ') + (s.why ? `：${s.why}` : '')
 const shiftText = s => [s.name, s.outfit ? `换上${s.outfit}` : '', ...(s.on || []).map(x => '+' + x.name), ...(s.off || []).map(x => '−' + x.name)].filter(Boolean).join(' ')
 /** 一条记录的标题：导演按轮次，立绘和动作与表情设计按人，插画按轮次。 */
 const entryTitle = e => (e.kind === 'sprite' ? `立绘 · ${e.name}` : e.kind === 'acting' ? `动作与表情 · ${e.name}` : e.kind === 'cg' ? `插画 · 第 ${e.turn} 轮` : `第 ${e.turn} 轮`)
@@ -163,6 +165,7 @@ function ScriptView({ script, units }) {
               l.recall && <Chip key="recall" k="段落">短闪回{RECALL_TONE_LABEL[l.recall] ? ` · ${RECALL_TONE_LABEL[l.recall]}` : ''}</Chip>,
               l.then && <Chip key="then" k="当时的样子">{l.then.map(thenText).join('；')}</Chip>,
               l.look && <Chip key="look" k="从这句起">{l.look.map(shiftText).join('；')}</Chip>,
+              l.situ && <Chip key="situ" k="动作">{l.situ.map(situText).join('；')}</Chip>,
               l.scene && <Chip key="scene" k="场景">{sceneChange(l.scene)}</Chip>,
               l.bgm && (l.bgm === 'hush' ? <Chip key="bgm" k="配乐">留白</Chip> : <Chip key="bgm" k="换歌">{l.bgm === 'none' ? '停' : l.bgm}</Chip>),
               l.amb && <Chip key="amb" k="环境音">{l.amb === 'none' ? '停' : l.amb}</Chip>,
@@ -265,11 +268,18 @@ function ActingView({ acting }) {
   const label = e => emotionLabel(e)
   return (
     <>
-      {acting.read && <Block label="表演笔记"><div>{acting.read}</div></Block>}
+      {acting.read && <Block label="表演笔记·本性"><div>{acting.read}</div></Block>}
+      {acting.now && <Block label="表演笔记·这一局"><div>{acting.now}</div></Block>}
       <Block label={`动作 · ${acting.poses.length}`}>
         {acting.poses.map(p => (
           <div key={p.id} className="fg-dlog-card">
-            <div className="fg-dlog-chips"><Chip k={p.id}>{p.label}</Chip><Chip k="底图">{label(p.emotions[0])}</Chip></div>
+            <div className="fg-dlog-chips">
+              <Chip k={p.id}>{p.label}</Chip><Chip k="底图">{label(p.emotions[0])}</Chip>
+              {p.kind && <Chip k={p.kind === 'self' ? '本性' : '处境'}>{p.kind === 'situ' ? p.premise || '没写前提' : '跟着人走'}</Chip>}
+              {p.needs && p.needs.length > 0 && <Chip k="靠">{p.needs.map(n => n.name).join('、')}</Chip>}
+              {p.from && <Chip k="从">第 {p.from.turn} 轮起</Chip>}
+              {(p.life || []).filter(e => !e.dropped).slice(-1).map(e => <Chip key="life" k={e.on ? '放回' : '收起'}>第 {e.turn} 轮{e.why ? `：${e.why}` : ''}</Chip>)}
+            </div>
             {p.desc && <div>{p.desc}</div>}
             <div className="fg-dlog-mono">{p.tags || '—'}</div>
             <div className="fg-note">情绪：{p.emotions.map(label).join('、')}</div>

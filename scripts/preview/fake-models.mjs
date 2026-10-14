@@ -47,10 +47,10 @@ const ACTING = {
     height: 166,
     read: '安静、爱捉弄人的学姐：情绪很少写在脸上，开心时只是嘴角压不住，被说中心事时会别过脸去，越在意越装得若无其事。',
     poses: [
-      { label: '指尖搭在琴凳边', desc: '弹琴的人的习惯：一只手垂着，指尖轻轻搭着，站得很稳', tags: 'one hand at side, fingers slightly curled, relaxed shoulders, weight on one leg', emotions: ['neutral', 'smile', 'happy', 'laugh', 'thinking', 'serious', 'tired', 'sad', 'cry'] },
-      { label: '手背在身后歪头', desc: '捉弄人、等你上钩的时候', tags: 'hands behind back, head tilt, weight on one leg', emotions: ['teasing', 'smug', 'love', 'confused', 'surprised', 'smile', 'neutral'] },
-      { label: '别过脸按着胸口', desc: '被说中心事、强装镇定的时候', tags: 'hand on own chest, head turned away, shoulders drawn in', emotions: ['shy', 'blush', 'pout', '害羞地强装镇定', 'worried', 'scared', 'smile'] },
-      { label: '抱着胳膊', desc: '冷下来、拒绝再说下去的时候', tags: 'arms crossed, straight posture', emotions: ['cold', 'angry', 'determined'] },
+      { label: '指尖搭在琴凳边', kind: 'self', desc: '弹琴的人的习惯：一只手垂着，指尖轻轻搭着，站得很稳', tags: 'one hand at side, fingers slightly curled, relaxed shoulders, weight on one leg', emotions: ['neutral', 'smile', 'happy', 'laugh', 'thinking', 'serious', 'tired', 'sad', 'cry'] },
+      { label: '手背在身后歪头', kind: 'self', desc: '捉弄人、等你上钩的时候', tags: 'hands behind back, head tilt, weight on one leg', emotions: ['teasing', 'smug', 'love', 'confused', 'surprised', 'smile', 'neutral'] },
+      { label: '别过脸按着胸口', kind: 'self', desc: '被说中心事、强装镇定的时候', tags: 'hand on own chest, head turned away, shoulders drawn in', emotions: ['shy', 'blush', 'pout', '害羞地强装镇定', 'worried', 'scared', 'smile'] },
+      { label: '抱着胳膊', kind: 'self', desc: '冷下来、拒绝再说下去的时候', tags: 'arms crossed, straight posture', emotions: ['cold', 'angry', 'determined'] },
     ],
     faces: {
       neutral: { desc: '眉眼放松，嘴角微微收着，看不出在想什么', tags: 'closed mouth, calm, half-closed eyes' },
@@ -64,9 +64,10 @@ const ACTING = {
   苏晴: {
     height: 154,
     read: '元气的同学：什么都写在脸上，笑起来眯成一条缝，难过和生气也来得快去得快。',
+    now: '心里压着三年前旧校舍的事：一提起来，元气就撑不住。',
     poses: [
-      { label: '双手叉腰', desc: '风风火火跑过来、精神十足的时候', tags: 'hands on hips, wide stance, energetic', emotions: ['neutral', 'smile', 'happy', 'laugh', 'smug', 'determined', 'angry', 'teasing', 'worried'] },
-      { label: '攥着衣角', desc: '心里没底、不知道该不该说的时候', tags: 'hands clasped in front, gripping own skirt, shoulders drawn in', emotions: ['sad', 'cry', 'worried', 'scared', 'shy', 'surprised', 'serious', 'smile', 'neutral'] },
+      { label: '双手叉腰', kind: 'self', desc: '风风火火跑过来、精神十足的时候', tags: 'hands on hips, wide stance, energetic', emotions: ['neutral', 'smile', 'happy', 'laugh', 'smug', 'determined', 'angry', 'teasing', 'worried'] },
+      { label: '攥着衣角', kind: 'situ', premise: '心里瞒着三年前旧校舍的事，一提起就慌', desc: '心里没底、不知道该不该说的时候', tags: 'hands clasped in front, gripping own skirt, shoulders drawn in', emotions: ['sad', 'cry', 'worried', 'scared', 'shy', 'surprised', 'serious', 'smile', 'neutral'] },
     ],
     faces: {
       smile: { desc: '笑得眼睛眯成一条缝', tags: 'happy, wide smile, closed eyes, open mouth' },
@@ -74,9 +75,21 @@ const ACTING = {
     },
   },
 }
+// 复盘：苏晴说出了三年前的事，「攥着衣角」收起；难过、哭、害怕搬进一个新动作（从说出口那一句起才有）
+const REVIEW = {
+  苏晴: {
+    poses: [{ id: 'new1', label: '抱紧自己的胳膊', kind: 'situ', premise: '刚说出三年前的事，还没缓过来', desc: '说出口以后撑不住了，抱着自己发抖', tags: 'hugging own arms, shoulders drawn in, looking down', emotions: ['sad', 'cry', 'scared', 'worried'] }, { id: 'p1', emotions: ['serious', 'shy', 'surprised'] }],
+    faces: [{ emotion: 'cry', desc: '咬着嘴唇，眼泪一直往下掉', tags: 'crying, tears, biting lip' }],
+    now: '说出三年前的事以后，强撑的元气垮了下来，还没缓过来。',
+  },
+}
 function actingWriterReply(prompt) {
   const name = (prompt.slice(prompt.indexOf('【角色档案】\n')).match(/名字：([^（\n]+)/) || [])[1] || ''
   const plan = ACTING[name] || { read: '', poses: [{ label: '站着', desc: '', tags: 'hands at sides', emotions: ['neutral'] }], faces: {} }
+  // 动作跟着剧情变（lib/pose-life.js）：处境变了的复盘、到了新世界、给老设计标本性和处境
+  if (prompt.includes('的处境在第')) return JSON.stringify(REVIEW[name] || {}, null, 1)
+  if (prompt.includes('这个人从别的世界')) return JSON.stringify({ now: plan.now || '' })
+  if (prompt.includes('还没分本性和处境')) return JSON.stringify({ read: plan.read, now: plan.now || '', poses: plan.poses.map((p, i) => ({ id: 'p' + (i + 1), kind: p.kind || 'self', premise: p.premise || '' })) }, null, 1)
   // 只重写表演笔记（人物志里「让设计师重写」）：换一种说法，看得出是新写的
   if (prompt.includes('这次只重写这个人的表演笔记')) return JSON.stringify({ read: plan.read ? '（重读资料后）' + plan.read : '情绪都写在脸上，来得快去得快。' })
   const head = prompt.includes('【要先设计的情绪】\n') ? '【要先设计的情绪】\n' : '【要设计的情绪】\n'
@@ -86,7 +99,7 @@ function actingWriterReply(prompt) {
   if (adding) return JSON.stringify({ poses: [{ id: 'p1', emotions: list }], faces }, null, 1)
   const placed = new Set(plan.poses.flatMap(p => p.emotions))
   const poses = plan.poses.map((p, i) => ({ id: 'p' + (i + 1), ...p, emotions: [...p.emotions, ...(i ? [] : list.filter(e => !placed.has(e)))] }))
-  return JSON.stringify({ read: plan.read, height: plan.height, poses, faces }, null, 1)
+  return JSON.stringify({ read: plan.read, now: plan.now || '', height: plan.height, poses, faces }, null, 1)
 }
 
 // 假插画分镜师：按「要画的插画」里的标题回 story.mjs 写好的 Base + 角色块。
