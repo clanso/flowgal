@@ -96,6 +96,10 @@ export const api = {
   updateTrack: (id, patch) => call('/music', { action: 'update', id, patch }),
   removeTrack: id => call('/music', { action: 'remove', id }),
   clearMusic: () => call('/music', { action: 'clear' }),
+  /** 整理界面的批量操作：一批一起改（分类、描述、addTags / removeTags）、一起删、分类改名（子分类跟着走）。 */
+  updateTracks: (ids, patch) => call('/music', { action: 'update-many', ids, patch }),
+  removeTracks: ids => call('/music', { action: 'remove-many', ids }),
+  renameMusicCategory: (from, to) => call('/music', { action: 'rename-category', from, to }),
   /** 上传一首配乐：请求体直接是文件字节（最大 50 MB），不走 JSON。 */
   async uploadTrack(file) {
     return (await uploadFile(`/music/upload?name=${encodeURIComponent(file.name || '')}`, file)).track
@@ -110,6 +114,8 @@ export const api = {
   updateLibSound: (id, patch) => call('/soundlib', { action: 'update', id, patch }),
   removeLibSounds: ids => call('/soundlib', { action: 'remove', ids }),
   clearLibSounds: kind => call('/soundlib', { action: 'clear', kind }),
+  updateLibSounds: (ids, patch) => call('/soundlib', { action: 'update-many', ids, patch }),
+  renameLibCategory: (from, to, kinds) => call('/soundlib', { action: 'rename-category', from, to, kinds }),
   /** 往音效库导入一个（最大 100 MB）：path 是相对导入文件夹的路径，meta 是描述文件里这一条。 */
   async uploadLibSound(file, path, meta) {
     const query = `name=${encodeURIComponent(path || file.name || '')}${meta ? `&meta=${encodeURIComponent(JSON.stringify(meta))}` : ''}`
