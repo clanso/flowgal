@@ -13,8 +13,9 @@ const stop = e => e.stopPropagation()
  * prefix：新动作的编号前缀（设计里 p，通用动作组 g）；word：「动作」或「组」（提示里用）。
  * lockLast：每个放进过动作的情绪至少留在一个动作里（人物志：设计里的情绪不能一个动作都不在）；keepOne：至少留一个动作。
  * cell(pose, emotion)：格子里多显示的东西（小图）；rowOpen(emotion)：点情绪名展开的那一行（表情设计），不给就不能展开。
+ * extra(pose)：动作卡片下面多显示的东西（人物志：本性还是处境、前提、靠的长期状态、收起放回）；off：此刻收起了的动作 { 编号: 为什么 }，那一列暗下来。
  */
-export function PoseMatrix({ poses, rows, lib, onChange, prefix = 'p', word = '动作', lockLast = false, keepOne = false, cell = null, rowOpen = null, newLabel = '新动作' }) {
+export function PoseMatrix({ poses, rows, lib, onChange, prefix = 'p', word = '动作', lockLast = false, keepOne = false, cell = null, rowOpen = null, newLabel = '新动作', extra = null, off = null }) {
   const [closed, setClosed] = React.useState(() => new Set())
   const [open, setOpen] = React.useState('')
   const label = e => emotionEntry(e, lib).label
@@ -48,7 +49,7 @@ export function PoseMatrix({ poses, rows, lib, onChange, prefix = 'p', word = '�
     <div className="fg-pm">
       <div className="fg-pm-poses">
         {poses.map((p, i) => (
-          <div key={p.id} className="fg-pm-pose">
+          <div key={p.id} className={`fg-pm-pose${off && off[p.id] ? ' is-off' : ''}`}>
             <div className="fg-row">
               <small className="fg-pm-id" title={`${word}编号：导演点名换${word}时写它`}>{p.id}</small>
               {input(p.label, v => patchPose(p.id, { label: v.slice(0, 12) }), `${word}名`, 'fg-pm-label')}
@@ -57,6 +58,7 @@ export function PoseMatrix({ poses, rows, lib, onChange, prefix = 'p', word = '�
             {input(p.desc, v => patchPose(p.id, { desc: v.slice(0, 200) }), `这个${word}什么样${i === 0 ? '（平时最常有的样子）' : ''}`)}
             {input(p.tags, v => patchPose(p.id, { tags: v }), '身体的英文 tag：hands behind back, weight on one leg')}
             <span className="fg-note">{p.emotions.length ? `${p.emotions.length} 种情绪 · 底图「${label(p.emotions[0])}」` : '还没放情绪：在下面的表里勾'}</span>
+            {extra ? extra(p) : null}
           </div>
         ))}
         <button type="button" className="fg-pm-add" onClick={addPose}>＋ 加{word}</button>
@@ -68,8 +70,8 @@ export function PoseMatrix({ poses, rows, lib, onChange, prefix = 'p', word = '�
               <tr>
                 <th className="fg-pm-corner">情绪 \ {word}</th>
                 {poses.map(p => (
-                  <th key={p.id}>
-                    <div className="fg-pm-head"><b title={p.desc || p.label}>{p.label || p.id}</b>
+                  <th key={p.id} className={off && off[p.id] ? 'is-off' : ''} title={off && off[p.id] ? `此刻不用：${off[p.id]}` : undefined}>
+                    <div className="fg-pm-head"><b title={p.desc || p.label}>{p.label || p.id}</b>{off && off[p.id] ? <small className="fg-pm-offtag">收起</small> : null}
                       <button type="button" className="fg-btn is-mini" disabled={rows.every(e => p.emotions.includes(e))} title={`把表里的情绪都放进「${p.label}」`} onClick={() => fillPose(p)}>全选</button>
                     </div>
                   </th>
@@ -107,7 +109,7 @@ export function PoseMatrix({ poses, rows, lib, onChange, prefix = 'p', word = '�
                               const anchor = on && p.emotions[0] === e
                               const locked = on && (lockedCell(p, e) || lastOne(e))
                               return (
-                                <td key={p.id} className={`fg-pm-cell${on ? ' is-on' : ''}${anchor ? ' is-anchor' : ''}`}>
+                                <td key={p.id} className={`fg-pm-cell${on ? ' is-on' : ''}${anchor ? ' is-anchor' : ''}${off && off[p.id] ? ' is-off' : ''}`}>
                                   <label title={locked ? (lockedCell(p, e) ? '平静总在第一个动作的底图上（登场立绘就是它）' : `至少留在一个${word}里`) : on ? `从「${p.label}」拿掉` : `放进「${p.label}」`}>
                                     <input type="checkbox" checked={on} disabled={locked} onChange={() => toggle(p, e)} />
                                   </label>
