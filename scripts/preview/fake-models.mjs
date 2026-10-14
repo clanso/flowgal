@@ -113,8 +113,23 @@ export function roleOf(system = '', prompt = '') {
   return i < 0 ? system : prompt.slice(i + 7, i + 87)
 }
 
+// 假听音师：正文单元里认几种常见的声音，每种回一条带近义词的（真模型会读懂整段再列）。
+const HEARD = [
+  [/门/, '开门', ['开门', '推门', '门', '吱呀']], [/手机|电话/, '手机震动', ['手机', '震动', '来电', '铃声']], [/钢琴|琴/, '钢琴', ['钢琴', '琴声', '弹琴']],
+  [/脚步|走/, '脚步声', ['脚步', '走路', '脚步声']], [/雨/, '雨声', ['雨', '下雨', '雨声']], [/风/, '风声', ['风', '风声']], [/铃/, '铃声', ['铃声', '铃', '钟声']],
+]
+function listenerReply(prompt) {
+  const sfx = []
+  for (const m of prompt.matchAll(/^\[(U\d+)\|[^\]]*\] (.*)$/gm)) {
+    for (const [re, what, words] of HEARD) if (re.test(m[2]) && !sfx.some(h => h.what === what)) sfx.push({ at: m[1], what, words, cats: [] })
+  }
+  const place = (prompt.match(/【上一幕结束时】(.*)/) || [])[1] || ''
+  return JSON.stringify({ amb: place && !place.includes('第一幕') ? [{ at: 'U1', what: place.split(' ')[0], words: place.split(' ').filter(Boolean), cats: [] }] : [], sfx }, null, 1)
+}
+
 export function fakeLlmReply({ system: raw = '', prompt = '', decorate = (turn, units, reply) => reply }) {
   const system = roleOf(raw, prompt)
+  if (system.includes('你是视觉小说的拟音师')) return { reasoning: '', text: listenerReply(prompt) }
   if (system.includes('立绘设计师')) return { reasoning: '', text: spriteWriterReply(prompt) }
   if (system.includes('你是视觉小说的角色表演设计师')) return { reasoning: '', text: actingWriterReply(prompt) }
   if (system.includes('你是视觉小说的插画分镜师')) return { reasoning: CG_THINKING, text: cgWriterReply(prompt) }

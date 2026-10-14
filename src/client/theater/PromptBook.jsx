@@ -14,7 +14,7 @@ function useBusy() {
 }
 
 const KIND_HINT = { tags: '逗号隔开的英文 tag', list: '一行一个', pairs: '一行「原词 → 换成」', map: '一行「编号：内容」' }
-const ROLES = [['director', '导演'], ['acting', '表演设计师'], ['sprite', '立绘设计师'], ['cg', '插画分镜师']]
+const ROLES = [['director', '导演'], ['listen', '听音师'], ['acting', '表演设计师'], ['sprite', '立绘设计师'], ['cg', '插画分镜师']]
 const FILTERS = [['all', '全部'], ['edited', '改过的'], ['stale', '内置有新版的']]
 const num = n => Number(n || 0).toLocaleString()
 
@@ -188,7 +188,7 @@ function Preview({ gameId }) {
         {person && <select className="fg-select" value={name} onChange={e => { setName(e.target.value); setResult(null) }}>{cast.length ? cast.map(n => <option key={n} value={n}>{n}</option>) : <option value="">（这一局还没有人建档）</option>}</select>}
         <button type="button" className="fg-btn is-primary" disabled={Boolean(busy) || (person && !name)} onClick={() => run('p', async () => setResult((await api.previewPrompt(gameId, role, person ? name : '')).preview))}>{busy ? '拼装中…' : '拼出来看看'}</button>
       </div>
-      <div className="fg-note">走的是真的拼装：用现在存着的提示词（改了没保存的先点别处保存）、这一局最新的资料、剧情和档案，按模型窗口截短的也照截。不发给模型，不花额度。{role === 'sprite' ? '立绘设计师按这个人每个动作的底图拼（还没有设计时画平静）。' : role === 'acting' ? '表演设计师按整套设计拼。' : role === 'cg' ? '插画分镜师按最新一轮导演挑的插画拼。' : '导演按最新一轮拼。'}</div>
+      <div className="fg-note">走的是真的拼装：用现在存着的提示词（改了没保存的先点别处保存）、这一局最新的资料、剧情和档案，按模型窗口截短的也照截。不发给模型，不花额度。{role === 'sprite' ? '立绘设计师按这个人每个动作的底图拼（还没有设计时画平静）。' : role === 'acting' ? '表演设计师按整套设计拼。' : role === 'cg' ? '插画分镜师按最新一轮导演挑的插画拼。' : role === 'listen' ? '听音师按最新一轮拼（音效库比候选多、开着「先听一遍」时，整理前先发它）。' : '导演按最新一轮拼。'}</div>
       {result && (
         <>
           <div className="fg-note">第 {result.turn} 轮 · {result.model || '宿主默认模型'}{result.provider ? `（${result.provider}）` : ''}</div>
@@ -228,7 +228,7 @@ export function PromptBook({ onTab = null }) {
   const stale = book.items.filter(i => i.stale).length
   return (
     <div className="fg-pb">
-      <div className="fg-note">导演、表演设计师、立绘设计师、插画分镜师用的每一段提示词，连插件自己加的出图固定词和过滤规则，都在这里全文显示、能改。改完点别处就保存，改坏了点「恢复默认」。变量写成 {'{{名字}}'}，每段下面列着能用哪些；用 [[ … ]] 括起来的一截，里面有变量是空的就整截不要。</div>
+      <div className="fg-note">导演、听音师、表演设计师、立绘设计师、插画分镜师用的每一段提示词，连插件自己加的出图固定词和过滤规则，都在这里全文显示、能改。改完点别处就保存，改坏了点「恢复默认」。变量写成 {'{{名字}}'}，每段下面列着能用哪些；用 [[ … ]] 括起来的一截，里面有变量是空的就整截不要。</div>
       <div className="fg-note">
         画风的质量词和负面词在每套画风里定{onTab && <button type="button" className="fg-btn is-mini" onClick={() => onTab('style')}>去画风与配图</button>}；
         每种情绪默认的表情 tag 在人物志 → 情绪库。
