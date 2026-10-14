@@ -774,8 +774,8 @@ export function PhoneRing({ beat, view, sound = true }) {
   )
 }
 
-/** 接通后右上角的「通话中」：对方的名字和走着的计时，视频通话是摄像机的小标。 */
-export function CallChip({ call, sound = true }) {
+/** 接通后右上角的「通话中」：对方的名字和走着的计时，视频通话是摄像机的小标。hidden 时不显示，接通的声音和计时照旧。 */
+export function CallChip({ call, sound = true, hidden = false }) {
   const [now, setNow] = React.useState(() => Date.now())
   React.useEffect(() => {
     if (!callClock.has(call.id)) callClock.set(call.id, Date.now())
@@ -783,6 +783,7 @@ export function CallChip({ call, sound = true }) {
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
+  if (hidden) return null
   return (
     <span className="fg-pill fg-call-chip" data-video={call.video ? '' : undefined} title={call.video ? '视频通话中' : '通话中'}>
       <i className="fg-call-dot" />{call.video ? CAMERA : HANDSET}{call.who || '通话中'}<b>{clock(now - (callClock.get(call.id) || now))}</b>
