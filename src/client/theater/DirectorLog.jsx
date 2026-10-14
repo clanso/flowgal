@@ -16,7 +16,7 @@ const STATUS = { running: ['进行中', 'is-running'], ok: ['完成', 'is-ok'], 
 const REASON = { auto: '正文写完后自动整理', force: '手动重新整理', sprite: '写立绘提示词', cg: '写插画提示词', acting: '设计动作与表情' }
 const WRITER = { ai: '模型写的', fallback: '按档案拼的', user: '玩家改的' }
 // 宿主在启动后才定（酒馆版换了传输），所以现取
-const sourceLabel = (source, who = '插画分镜师') => ({ tavern: hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern 后台模型', plugin: '插件设置里指定', cg: '插画分镜师单独选的', listen: '听音师单独选的', custom: who + '的自定义接口' })[source]
+const sourceLabel = (source, who = '插画分镜师') => ({ tavern: hostName() === 'st' ? '跟着酒馆当前的连接' : '跟随 Tavern 后台模型', plugin: '插件设置里指定', directorCustom: '导演的自定义接口', cg: '插画分镜师单独选的', listen: '听音师单独选的', custom: who + '的自定义接口' })[source]
 const USAGE_LABEL = { inputTokens: '输入', outputTokens: '输出', reasoningTokens: '思考', cachedInputTokens: '缓存命中', cacheReadTokens: '缓存读', cacheWriteTokens: '缓存写', totalTokens: '合计' }
 const SHAPE_LABEL = { landscape: '横版', portrait: '竖版', square: '方形' }
 /** 段落里一个人当时的样子：「柯萝伊 魔导师长袍 · 无状态 · 外貌另写」。 */
@@ -405,13 +405,13 @@ function LogDetail({ gameId, summary }) {
           {running && <button type="button" className="fg-btn" disabled={stopping} onClick={stop}>{writer ? '停止' : '停止整理'}</button>}
         </div>
         <div className="fg-dlog-facts">
-          <div><i>模型</i>{summary.model || '—'}{summary.provider ? <span className="fg-note"> · {summary.provider}</span> : null}{sourceLabel(summary.source) ? <span className="fg-note">（{sourceLabel(summary.source)}）</span> : null}</div>
+          <div><i>模型</i>{summary.model || '—'}{summary.provider ? <span className="fg-note"> · {summary.provider}</span> : null}{sourceLabel(summary.source) ? <span className="fg-note">（{sourceLabel(summary.source)}）</span> : null}{summary.stream === false ? <span className="fg-note"> · 不流式</span> : null}</div>
           <div><i>时间</i>{clock(summary.at)} · {secs(elapsed)} · {REASON[summary.reason] || summary.reason}</div>
           <div><i>最大输出</i>{num(summary.maxTokens)} token{entry && entry.temperature != null ? ` · 温度 ${entry.temperature}` : ''}</div>
           <div><i>模型窗口</i>{summary.window ? `${num(summary.window)} token` : '宿主没给窗口大小，按设置原样发'}{entry && entry.outputDefault ? <span className="fg-note"> · 模型默认输出 {num(entry.outputDefault)}</span> : null}</div>
           {entry && <div><i>资料</i>{entry.contextLength ? `发了 ${num(entry.contextChars)} 字（人物卡与世界书共 ${num(entry.contextLength)} 字）` : '这张卡没有人物卡 / 世界书资料'}</div>}
           {entry && writer && <div><i>剧情</i>{`发了 ${num(entry.storyChars)} 字（到这一轮为止共 ${num(entry.storyLength)} 字）`}</div>}
-          {entry?.listen && <div><i>先听一遍</i>{entry.listen.model || '—'}{sourceLabel(entry.listen.source, '听音师') ? <span className="fg-note">（{sourceLabel(entry.listen.source, '听音师')}）</span> : null} · {entry.listen.ms ? secs(entry.listen.ms) : '进行中'}{entry.listen.error ? <span className="fg-err"> · 失败</span> : entry.listen.heard ? ` · 听到 ${entry.listen.heard.ambience.length + entry.listen.heard.sfx.length} 个声音` : ''}</div>}
+          {entry?.listen && <div><i>先听一遍</i>{entry.listen.model || '—'}{sourceLabel(entry.listen.source, '听音师') ? <span className="fg-note">（{sourceLabel(entry.listen.source, '听音师')}）</span> : null}{entry.listen.stream === false ? <span className="fg-note"> · 不流式</span> : null} · {entry.listen.ms ? secs(entry.listen.ms) : '进行中'}{entry.listen.error ? <span className="fg-err"> · 失败</span> : entry.listen.heard ? ` · 听到 ${entry.listen.heard.ambience.length + entry.listen.heard.sfx.length} 个声音` : ''}</div>}
           {summary.usage && <div><i>用量</i>{usageText(summary.usage)}{entry?.listen?.usage ? <span className="fg-note">（含先听一遍）</span> : null}</div>}
         </div>
         {summary.notes.map((n, i) => <div key={i} className="fg-dlog-notice">⚠ {n}</div>)}
@@ -423,7 +423,7 @@ function LogDetail({ gameId, summary }) {
       {loadError && <div className="fg-err">{loadError}</div>}
       {tab === 'live' && (
         <>
-          <div className="fg-dlog-meter"><span className="fg-dlog-dot" />{live.note || `第 ${summary.attempts || 1} 次请求`} · 已收到 {num(live.chars)} 字{live.chars ? '' : live.reasoning ? ' · 模型在思考' : ' · 等模型开口…'}</div>
+          <div className="fg-dlog-meter"><span className="fg-dlog-dot" />{live.note || `第 ${summary.attempts || 1} 次请求`} · 已收到 {num(live.chars)} 字{live.chars ? '' : live.reasoning ? ' · 模型在思考' : summary.stream === false ? ' · 不流式：模型整段写完才一次拿回' : ' · 等模型开口…'}</div>
           {live.reasoning && <Block label="模型思考（实时）"><Pre text={live.reasoning} follow /></Block>}
           <Block label="模型输出（实时）"><Pre text={live.output} follow cursor empty="还没有输出" /></Block>
         </>
