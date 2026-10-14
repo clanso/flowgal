@@ -2692,8 +2692,8 @@ function MusicPicking({ cfg, count }) {
     <>
       <div className="fg-section">导演怎么挑</div>
       <div className="fg-note">{state}</div>
-      <Field label="每轮候选" hint="后台导演每一轮能看到几首（编号、曲名、描述、分类和标签各一行，越多提示词越长）。曲库没超过这个数时全给它看。">
-        <div className="fg-row"><Text type="number" style={{ width: '7cqw' }} value={quota} onCommit={v => { const n = Math.trunc(Number(v)); if (n >= 1) pd({ musicCandidates: n }) }} /><span className="fg-note">首，最多 300</span></div>
+      <Field label="每轮候选" hint="后台导演每一轮能看到几首（编号、曲名、描述、分类和标签各一行，每首大约一百字）。曲库没超过这个数时全给它看。填得很大时提示词会很长，超出模型窗口时先缩人物卡资料。">
+        <div className="fg-row"><Text type="number" style={{ width: '7cqw' }} value={quota} onCommit={v => { const n = Math.trunc(Number(v)); if (n >= 1) pd({ musicCandidates: n }) }} /><span className="fg-note">首，最多 5000（填到曲库的首数就是整张都给）</span></div>
       </Field>
       <Field label="先听一遍" hint="曲子比候选多时，导演之前先让听音师读一遍这一轮正文，说出该放什么样的音乐（开头的基调，中途情绪转折再各一段），连同找它们的词（会参照曲库里常用的标签）。候选照它说的去对标签和描述，跟你怎么分类没关系。每轮多一次模型调用（跟音效共用这一次），听音师的模型在「导演」页换，提示词在「提示词 → 听音师」里改。它出错时退回按分组轮流挑。音效库、环境音库和配乐共用这一个开关。">
         <Toggle value={listen} onChange={v => pd({ listen: v })} />
