@@ -2,6 +2,7 @@
 // 核心（lib/director.js 的 callModel）不用改。
 // 「提供方」就是酒馆的连接配置（Connection Profile）：current = 跟着酒馆当前选中的配置；也可以在设置里指定某一套。
 // 走 ConnectionManagerRequestService（支持流式、用那套配置的预设参数）；酒馆没开连接管理、或者一套配置都没有时退回 generateRaw（不流式）。
+// 流式还是不流式按设置：引擎调 stream 时带 stream: false 就让连接配置整段写完一次拿回（streamSwitch 告诉引擎这个宿主认这个开关）。
 export const CURRENT = 'current'
 
 const textOf = content => (Array.isArray(content) ? content.map(p => (typeof p === 'string' ? p : p?.text || '')).join('') : String(content ?? ''))
@@ -22,6 +23,7 @@ export function createStLlm({ getContext = () => globalThis.SillyTavern.getConte
   const profileIdOf = provider => (provider && provider !== CURRENT ? provider : selectedProfile())
 
   return {
+    streamSwitch: true,
     listProviders() {
       // 「跟着酒馆当前的连接」是设置里的默认项（留空），这里只列存好的连接配置
       return profiles().map(p => ({ id: p.id, name: '连接配置：' + (p.name || p.id) }))
@@ -45,16 +47,16 @@ export function createStLlm({ getContext = () => globalThis.SillyTavern.getConte
     },
 
     /**
-     * 流式调用，吐出跟 DSH 一样的事件：text-delta / reasoning-delta / finish。
-     * 酒馆的流式给的是累计全文，这里换成增量。
+     * 调用一次，吐出跟 DSH 一样的事件：text-delta / reasoning-delta / finish。
+     * 酒馆的流式给的是累计全文，这里换成增量；stream: false 时整段一次给。
      */
-    async *stream({ provider, system, temperature, maxTokens, signal, messages = [] }) {
+    async *stream({ provider, system, temperature, maxTokens, signal, messages = [], stream = true }) {
       const chat = [...(system ? [{ role: 'system', content: system }] : []), ...messages.map(m => ({ role: m.role || 'user', content: textOf(m.content) }))]
       try {
         const service = manager()
         const id = profileIdOf(provider)
         if (service && id) {
-          const out = await service.sendRequest(id, chat, maxTokens, { stream: true, signal, extractData: true, includePreset: true }, Number.isFinite(temperature) ? { temperature } : {})
+          const out = await service.sendRequest(id, chat, maxTokens, { stream: stream !== false, signal, extractData: true, includePreset: true }, Number.isFinite(temperature) ? { temperature } : {})
           if (typeof out === 'function') {
             let text = '', reasoning = ''
             for await (const part of out()) {
