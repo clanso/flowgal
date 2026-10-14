@@ -656,8 +656,13 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
       paint.crop ? '放大重画' : '',
       paint.soft ? '软边' : '',
       paint.reference ? '带角色参考' : '',
-      paint.check ? `比对：接缝 ${paint.check.seam}、明暗 ${paint.check.shade}、变化 ${paint.check.change}${paint.tries > 1 ? `（画了 ${paint.tries} 次，${paint.check.ok ? '这张过了' : '都没完全过，留了最像的'}）` : paint.check.ok ? '' : '（没过）'}` : '',
+      paint.tone && paint.tone.some(Boolean) ? `色调拉回 ${paint.tone.map(v => (v > 0 ? '+' : '') + v).join('/')}` : '',
+      paint.check ? `比对：${Number.isFinite(paint.check.expr) ? `表情变化 ${paint.check.expr}、` : ''}接缝 ${paint.check.seam}、明暗 ${paint.check.shade}${paint.tries > 1 ? `（画了 ${paint.tries} 次，${paint.check.ok ? '这张过了' : paint.check.flat ? '表情都没换上，留了变得最多的' : '表情换上了，画风都没完全过，留了最像的'}）` : paint.check.ok ? '' : paint.check.flat ? '（表情没换上）' : '（画风没过）'}` : '',
     ].filter(Boolean).join(' · ') : ''
+    // 每次画的强度和比对：哪次表情没换上、哪次画风跑偏
+    const history = paint && Array.isArray(paint.history) && paint.history.length > 1
+      ? paint.history.map((t, i) => `第 ${i + 1} 次 ${Number(t.strength).toFixed(2)}：表情 ${t.expr}、接缝 ${t.seam}、明暗 ${t.shade}${t.ok ? '，过了' : t.flat ? '，表情没换上' : '，画风跑偏'}`).join('；')
+      : ''
     return (
       <div className="fg-face-info">
         <div className="fg-row">
@@ -665,12 +670,13 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
           {record.assetId && <button type="button" className="fg-btn is-mini" disabled={busy === 'redo'} onClick={() => redo(undefined)}>换个种子重画脸</button>}
         </div>
         {how && <div className="fg-note">{how}</div>}
+        {history && <div className="fg-note">{history}</div>}
         {record.assetId && (
           <div className="fg-row">
             <span className="fg-note">这张的重绘强度</span>
             <Select value={fixed ? record.face.strength.toFixed(2) : ''} style={INLINE} onChange={v => redo(v === '' ? null : Number(v))}
               options={[['', '自动（按强弱）'], ...[...new Set([0.3, 0.4, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1, ...(fixed ? [record.face.strength] : [])])].sort((a, b) => a - b).map(n => [n.toFixed(2), n.toFixed(2) + (n <= 0.5 ? '（改得少，留住画风）' : n >= 0.95 ? '（从零重画）' : '')])]} />
-            <span className="fg-note">改了就按它重画这张；表情没换上调高，画风跑偏调低</span>
+            <span className="fg-note">改了就按它重画这张（定死了就不自动调）；表情没换上调高，画风跑偏调低</span>
           </div>
         )}
       </div>
@@ -1791,7 +1797,7 @@ function Dial({ value, min, max, step, onCommit, digits = 2, label = '' }) {
 
 const LEVEL_HINT = { 1: '微：微笑、害羞这类小变化', 2: '中：开心、难过、担心', 3: '强：生气、惊讶', 4: '极：大笑、大哭、惊恐' }
 
-/** 换脸怎么画（lib/face-paint.js）：放大重画、软边遮罩、每档强弱的重绘强度、最激烈的整张画、画完比对、角色参考。 */
+/** 换脸怎么画（lib/face-paint.js）：放大重画、软边遮罩、每档强弱的重绘强度、最激烈的整张画、色调对齐、画完比对、角色参考。 */
 function FaceSettings({ cfg, onPatch }) {
   const f = cfg.images.face || DEFAULT_FACE
   const set = patch => onPatch({ face: patch })
@@ -1823,11 +1829,19 @@ function FaceSettings({ cfg, onPatch }) {
         </div>
       </Field>
       <Field label="最激烈的整张画" hint="强弱是「极」的情绪（大笑、大哭、惊恐这类五官都在用力的）不换脸，在同一个动作上、用同一个种子整张画：脸由主模型画，画风跟底图自然一致，身子会跟着情绪动一点。"><Toggle value={f.wholePeak} onChange={v => set({ wholePeak: v })} /></Field>
-      <Field label="画完自动比对" hint="换完量一下：软边那一圈新旧对不上（会有重影、色差），或者脸上大块的明暗变了（原来的阴影、排线没了，画风跑偏），就换个种子、调低强度再画；整张脸几乎没变（表情没换上）就调高强度再画；留最像的那张。宽严：小于 1 更严、更容易重来，大于 1 更松。每次重来都是一次出图。">
+      <Field label="色调对齐底图" hint="重画的脸整体偏亮、偏暗、偏色时，按底图的肤色拉回来再贴：每个颜色通道取脸上「底图减重画」的中位数，整块加上它（最多拉 40 级）。中位数跟着大片皮肤走，所以红晕、泪、眉眼口这些小块的变化不会被抹掉。关掉就照重画的原样贴。"><Toggle value={f.tone} onChange={v => set({ tone: v })} /></Field>
+      <Field label="画完自动比对" hint={`换完量两样，没过就换个种子再画，留最像的那张（每次重来都是一次出图）。①表情换上没有：脸框分成 4×4 格，比每格里眉、眼线、瞳孔、嘴线这些线条，挪了一两个像素、深浅差三成以内的不算，新长出来和没了的占这格线条的百分之几，取变得最多的那格。少于「表情至少变」就算没换上，下次调高强度。拿以前换过的脸实测：真换了表情的 6~30，强度 0.3 原样描一遍的不到 1。填 0 不查。②画风跑偏没有：软边那一圈新旧大块色调差太多（看得出一圈色差），或者脸上大块明暗变了（原来的阴影、排线没了），下次调低一点强度，最低到「强度下限」，再低表情就换不上了。宽严只管画风：小于 1 更严、更容易重来，大于 1 更松。表情没换上的那几张排在最后，不会被留下。`}>
         <div className="fg-row">
           <Toggle value={f.check} onChange={v => set({ check: v })} />
-          {f.check && <><span className="fg-note">跑偏了最多再画</span><Select value={String(f.retries)} options={[0, 1, 2, 3, 4, 5].map(n => [String(n), `${n} 次`])} onChange={v => set({ retries: Number(v) })} style={INLINE} /><span className="fg-note">宽严</span><Dial value={f.tolerance} min={FACE_LIMITS.tolerance[0]} max={FACE_LIMITS.tolerance[1]} step={0.1} digits={1} label="比对的宽严" onCommit={v => set({ tolerance: v })} /></>}
+          {f.check && <><span className="fg-note">没过最多再画</span><Select value={String(f.retries)} options={Array.from({ length: FACE_LIMITS.retries[1] + 1 }, (_, n) => [String(n), `${n} 次`])} onChange={v => set({ retries: Number(v) })} style={INLINE} />
+            <span className="fg-note">表情至少变</span><Dial value={f.expression} min={FACE_LIMITS.expression[0]} max={FACE_LIMITS.expression[1]} step={0.5} digits={1} label="表情至少变多少" onCommit={v => set({ expression: v })} /></>}
         </div>
+        {f.check && (
+          <div className="fg-row">
+            <span className="fg-note">画风宽严</span><Dial value={f.tolerance} min={FACE_LIMITS.tolerance[0]} max={FACE_LIMITS.tolerance[1]} step={0.1} digits={1} label="画风比对的宽严" onCommit={v => set({ tolerance: v })} />
+            <span className="fg-note">强度下限</span><Dial value={f.floor} min={FACE_LIMITS.floor[0]} max={FACE_LIMITS.floor[1]} step={0.01} label="画风跑偏时强度最低调到" onCommit={v => set({ floor: v })} />
+          </div>
+        )}
       </Field>
       <Field label="底图当角色参考" hint={`把整张底图当 NovelAI 的角色参考（Precise Reference，人物和画风一起参考）跟换脸一起发，锁住画风。NovelAI 只给 V4.5 训了带参考的重绘模型，V5 还没有；每张多花 5 Anlas。${refOk ? '' : `现在用的模型（${(cfg.novelai && cfg.novelai.model) || ''}）不支持，开着也不会带。`}接口不认时自动不带。`}><Toggle value={f.reference} onChange={v => set({ reference: v })} /></Field>
       <div className="fg-row" style={{ justifyContent: 'flex-end' }}><button type="button" className="fg-btn is-mini" disabled={!edited} onClick={reset}>换脸设置恢复默认</button></div>
