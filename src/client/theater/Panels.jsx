@@ -658,11 +658,12 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
       paint.soft ? '软边' : '',
       paint.reference ? '带角色参考' : '',
       paint.tone && paint.tone.some(Boolean) ? `色调拉回 ${paint.tone.map(v => (v > 0 ? '+' : '') + v).join('/')}` : '',
-      paint.check ? `比对：${Number.isFinite(paint.check.expr) ? `表情变化 ${paint.check.expr}、` : ''}接缝 ${paint.check.seam}、明暗 ${paint.check.shade}${paint.tries > 1 ? `（画了 ${paint.tries} 次，${paint.check.ok ? '这张过了' : paint.check.flat ? '表情都没换上，留了变得最多的' : '表情换上了，画风都没完全过，留了最像的'}）` : paint.check.ok ? '' : paint.check.flat ? '（表情没换上）' : '（画风没过）'}` : '',
+      eyeText(paint.eyes),
+      paint.check ? `比对：${Number.isFinite(paint.check.expr) ? `表情变化 ${paint.check.expr}、` : ''}接缝 ${paint.check.seam}、明暗 ${paint.check.shade}${Number.isFinite(paint.check.eye) ? `、瞳色 ${paint.check.eye}` : ''}${paint.tries > 1 ? `（画了 ${paint.tries} 次，${paint.check.ok ? '这张过了' : paint.check.flat ? '表情都没换上，留了变得最多的' : '表情换上了，画风都没完全过，留了最像的'}）` : paint.check.ok ? '' : paint.check.flat ? '（表情没换上）' : '（画风没过）'}` : '',
     ].filter(Boolean).join(' · ') : ''
     // 每次画的强度和比对：哪次表情没换上、哪次画风跑偏；每次画的脸都留着（以前画的只有分数），点开能换成那次的
     const tries = paint && Array.isArray(paint.history) ? paint.history : []
-    const tryText = (t, i) => `第 ${i + 1} 次 ${Number(t.strength).toFixed(2)}：表情 ${t.expr}、接缝 ${t.seam}、明暗 ${t.shade}${t.ok ? '，过了' : t.flat ? '，表情没换上' : '，画风跑偏'}`
+    const tryText = (t, i) => `第 ${i + 1} 次 ${Number(t.strength).toFixed(2)}：表情 ${t.expr}、接缝 ${t.seam}、明暗 ${t.shade}${Number.isFinite(t.eye) ? `、瞳色 ${t.eye}` : ''}${t.ok ? '，过了' : t.flat ? '，表情没换上' : '，画风跑偏'}`
     const pickable = tries.length > 0 && tries.every(t => t && t.assetId) && Array.isArray(paint.rect)
     const current = paint && Number.isInteger(paint.pick) ? paint.pick : -1
     const history = !pickable && tries.length > 1 ? tries.map(tryText).join('；') : ''
@@ -674,6 +675,7 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
           {record.assetId && <button type="button" className="fg-btn is-mini" disabled={busy === 'redo'} onClick={() => redo(undefined)}>换个种子重画脸</button>}
         </div>
         {how && <div className="fg-note">{how}</div>}
+        {record.eyeFix && record.eyeFix.original && <div className="fg-note">底图照瞳色基准补过色，这张跟着照新底图补了瞳色（{eyeText(record.eyeFix.eyes, '')}）</div>}
         {history && <div className="fg-note">{history}</div>}
         {pickable && (
           <>
@@ -731,6 +733,49 @@ function FaceInfo({ gameId, person, group, emotionKey, record, emotions }) {
   )
 }
 
+// 两只眼睛补瞳色的结果（lib/eye-color.js 的 status）
+const EYE_STATUS = { same: '颜色本来就一样', closed: '闭着没补', gray: '灰黑色不补', none: '没认出虹膜', nobase: '基准上这只没量出' }
+/** 「瞳色：左 补前差 12、右 闭着没补」；两只都没量的回 ''。 */
+function eyeText(eyes, lead = '瞳色：') {
+  if (!Array.isArray(eyes) || !eyes.some(e => e && (e.status === 'fixed' || e.status === 'same'))) return ''
+  return lead + eyes.map((e, i) => `${i ? '右' : '左'} ${!e ? '?' : e.status === 'fixed' ? (e.fixed === false ? `差 ${e.before}（没开补色）` : `补前差 ${e.before}、补后 ${e.after}`) : EYE_STATUS[e.status] || e.status}`).join('、')
+}
+
+/**
+ * 不同立绘瞳色统一（整张画的立绘）：这张是不是瞳色基准、照基准补过没有；能把它设成基准、换回原图、让别的照它补一遍。
+ * 换脸的差分照自己的底图补，不在这里显示。
+ */
+function EyeInfo({ gameId, person, spriteKey, record, emotions }) {
+  const [busy, run] = useBusy()
+  if (!record || !record.assetId || record.face) return null
+  const ref = person.eyeRef
+  const sprites = person.sprites || {}
+  const refRecord = ref && sprites[ref.key]
+  const refLabel = ref ? (refRecord ? `${emotionEntry(refRecord.emotion || keyEmotion(ref.key), emotions).label}${refRecord.poseLabel ? ` · ${refRecord.poseLabel}` : ''}` : '（那张已经删了，颜色还记着）') : ''
+  const isRef = Boolean(ref && ref.key === spriteKey)
+  const cmd = (action, extra, ok) => run(action, () => api.cast(gameId, action, { name: person.name, ...extra }), ok)
+  let text
+  if (isRef) text = '瞳色基准：这个角色别的整张立绘都照这张补瞳色（换脸的差分照自己的底图补）。'
+  else if (record.eyeKeep) text = '瞳色：这张用原图，不照基准补。'
+  else if (record.uploaded) text = '上传的立绘不补瞳色（可以设成基准）。'
+  else if (record.aa) text = '做了逆转式动态的立绘不补瞳色（补了贴片会对不上）。'
+  else if (!record.faceBox) text = '瞳色：量好脸框后照基准补（开着剧场时自动量，也可以框一下脸）。'
+  else if (!ref) text = '瞳色：这个角色还没有瞳色基准（最早画的那张量好脸框后自动当基准）。'
+  else if (record.eyeFix) text = record.eyeFix.original ? `瞳色：照基准「${refLabel}」补过（${eyeText(record.eyeFix.eyes, '') || '没补'}）。` : `瞳色：跟基准「${refLabel}」比过，没补（${(record.eyeFix.eyes || []).map((e, i) => `${i ? '右' : '左'} ${EYE_STATUS[e && e.status] || '颜色一样'}`).join('、')}）。`
+  else text = `瞳色：还没照基准「${refLabel}」补（「统一瞳色」关着时不自动补，点下面补）。`
+  return (
+    <div className="fg-row fg-face-info">
+      <span className="fg-note">{text}</span>
+      {isRef && <button type="button" className="fg-btn is-mini" disabled={busy === 'eye-unify'} onClick={() => cmd('eye-unify', {}, '别的立绘都照它补了一遍瞳色')}>别的立绘照它补一遍</button>}
+      {!isRef && record.faceBox && <button type="button" className="fg-btn is-mini" disabled={busy === 'eye-ref'} onClick={() => cmd('eye-ref', { key: spriteKey }, '已设成瞳色基准，别的立绘照它补了一遍')}>设成瞳色基准</button>}
+      {!isRef && !record.uploaded && !record.aa && record.faceBox && ref && (record.eyeKeep
+        ? <button type="button" className="fg-btn is-mini" disabled={busy === 'eye-keep'} onClick={() => cmd('eye-keep', { key: spriteKey, keep: false }, '照基准补了瞳色')}>照基准补瞳色</button>
+        : (record.eyeFix && record.eyeFix.original ? <button type="button" className="fg-btn is-mini" disabled={busy === 'eye-keep'} onClick={() => cmd('eye-keep', { key: spriteKey, keep: true }, '换回原图了，这张不再照基准补')}>这张用原图</button>
+          : !record.eyeFix && <button type="button" className="fg-btn is-mini" disabled={busy === 'eye-keep'} onClick={() => cmd('eye-keep', { key: spriteKey, keep: false }, '照基准补了瞳色')}>照基准补瞳色</button>))}
+    </div>
+  )
+}
+
 /**
  * 选中的一张差分：看 / 改提示词，让立绘设计师重写，按自己的词画，上传，删除。
  * token 是「情绪」（在它的主动作上）或「情绪@动作」（动作与表情的表里点开的那一格，lib/poses.js）；sheet 是这个人的那套动作（不分动作为 null）。
@@ -764,6 +809,7 @@ function VariantEditor({ gameId, person, group, emotion: token, emotions, sheet 
         {emotion !== 'neutral' && <div className="fg-note">替身「{emotionLabel(nearestOf(emotion, emotions) || 'neutral', emotions)}」：这张还没画好时先用那张（情绪库里能改）{entry.off ? ' · 这种情绪停用了，导演不再用它' : ''}</div>}
         {st && st.error && <div className={`fg-note${st.status === 'face' || st.status === 'writing' ? '' : ' fg-err'}`}>{st.error}</div>}
         <FaceInfo gameId={gameId} person={person} group={group} emotionKey={key} record={record} emotions={emotions} />
+        <EyeInfo gameId={gameId} person={person} spriteKey={key} record={record} emotions={emotions} />
         <textarea className="fg-textarea" value={tags} onChange={e => setTags(e.target.value)} onKeyDown={e => e.stopPropagation()} placeholder={record && record.face ? '只换脸：这里只写表情（眉、眼、嘴、脸红、泪、视线）' : '还没有提示词：点「让设计师写」，它会读完资料和剧情来写'} />
         <div className="fg-note">{record && record.writer ? WRITER_LABEL[record.writer] || record.writer : ''}{record && record.seed != null ? ` · 种子 ${record.seed}` : ''}{!reachable ? ' · 这套样子在剧情里已经不会再出现（外貌改过），只能删除或上传' : ''}</div>
         <div className="fg-row">
@@ -1870,7 +1916,9 @@ function FaceSettings({ cfg, onPatch }) {
         </div>
       </Field>
       <Field label="色调对齐底图" hint="重画的脸整体偏亮、偏暗、偏色时，按底图的肤色拉回来再贴：每个颜色通道取脸上「底图减重画」的中位数，整块加上它（最多拉 40 级）。中位数跟着大片皮肤走，所以红晕、泪、眉眼口这些小块的变化不会被抹掉。关掉就照重画的原样贴。"><Toggle value={f.tone} onChange={v => set({ tone: v })} /></Field>
-      <Field label="画完自动比对" hint={`换完量两样，没过就换个种子再画，留最像的那张（每次重来都是一次出图）。①表情换上没有：脸框分成 4×4 格，比每格里眉、眼线、瞳孔、嘴线这些线条，挪了一两个像素、深浅差三成以内的不算，新长出来和没了的占这格线条的百分之几，取变得最多的那格。少于「表情至少变」就算没换上，下次调高强度。拿以前换过的脸实测：真换了表情的 6~30，强度 0.3 原样描一遍的不到 1。填 0 不查。②画风跑偏没有：软边那一圈新旧大块色调差太多（看得出一圈色差），或者脸上大块明暗变了（原来的阴影、排线没了），就换个种子再画。「跑偏时强度最多降」默认 0：只换种子不降强度，因为强度一降眉眼就改不动了，换上的只剩泪和红晕；调大了每次跑偏降 0.06，最多比起步低这么多，也不会降回已经试出表情没换上的强度。宽严只管画风：小于 1 更严、更容易重来，大于 1 更松。表情没换上的那几张排在最后，不会被留下。每次画的脸都留着，人物志里点开那张差分能挑。`}>
+      <Field label="瞳色对齐底图" hint="提示词里只有「blue eyes」这种粗词，每次重画模型都自己挑一种蓝，渐变和高光也重画一遍，换完的脸眼睛颜色常跟底图对不上。打开时，在底图和重画的脸上各找出虹膜（眼睛里有彩度、不是皮肤也不是眼白的那一团；提示词写了瞳色就只在那个色相附近找，压在眼睛上的头发不算），把底图虹膜从上到下分三层量好亮度、彩度、色相，重画的虹膜每层照着拉过去：只换颜色，眼形、高光、瞳孔大小这些表情是重画自己的。两只眼分开量，异色瞳也对得上；闭着、被头发挡住、灰黑色的眼睛不动。不出图、不花 Anlas。"><Toggle value={f.eyeColor} onChange={v => set({ eyeColor: v })} /></Field>
+      <Field label="不同立绘瞳色统一" hint="别的动作、别的衣服、整张画的「极」各自是整张画的，眼睛颜色也会各画各的。打开时，每个角色最早画的那张（量好脸框的整张立绘；闭着眼、认不出虹膜的往后找）当瞳色基准，别的整张立绘量好脸框后照它补瞳色（脸的大小位置不一样，分层按各自的虹膜分），换脸的差分照自己的底图补。补过的原图都留着：人物志里点开一张能换成基准（别的全照它重补）、能这张用原图。上传的、做了逆转式动态的不补。不出图、不花 Anlas。"><Toggle value={f.eyeUnify} onChange={v => set({ eyeUnify: v })} /></Field>
+      <Field label="画完自动比对" hint={`换完量三样，没过就换个种子再画，留最像的那张（每次重来都是一次出图）。①表情换上没有：脸框分成 4×4 格，比每格里眉、眼线、瞳孔、嘴线这些线条，挪了一两个像素、深浅差三成以内的不算，新长出来和没了的占这格线条的百分之几，取变得最多的那格。少于「表情至少变」就算没换上，下次调高强度。拿以前换过的脸实测：真换了表情的 6~30，强度 0.3 原样描一遍的不到 1。填 0 不查。②画风跑偏没有：软边那一圈新旧大块色调差太多（看得出一圈色差），或者脸上大块明暗变了（原来的阴影、排线没了），就换个种子再画。「跑偏时强度最多降」默认 0：只换种子不降强度，因为强度一降眉眼就改不动了，换上的只剩泪和红晕；调大了每次跑偏降 0.06，最多比起步低这么多，也不会降回已经试出表情没换上的强度。③瞳色跑偏没有：虹膜跟底图的色差（Lab，开着「瞳色对齐底图」时量补色之后的，一般不到 3；关着量重画原样的），差到「瞳色差到」就换个种子再画，填 0 不查。宽严管②③：小于 1 更严、更容易重来，大于 1 更松。表情没换上的那几张排在最后，不会被留下。每次画的脸都留着，人物志里点开那张差分能挑。`}>
         <div className="fg-row">
           <Toggle value={f.check} onChange={v => set({ check: v })} />
           {f.check && <><span className="fg-note">没过最多再画</span><Select value={String(f.retries)} options={Array.from({ length: FACE_LIMITS.retries[1] + 1 }, (_, n) => [String(n), `${n} 次`])} onChange={v => set({ retries: Number(v) })} style={INLINE} />
@@ -1880,6 +1928,7 @@ function FaceSettings({ cfg, onPatch }) {
           <div className="fg-row">
             <span className="fg-note">画风宽严</span><Dial value={f.tolerance} min={FACE_LIMITS.tolerance[0]} max={FACE_LIMITS.tolerance[1]} step={0.1} digits={1} label="画风比对的宽严" onCommit={v => set({ tolerance: v })} />
             <span className="fg-note">跑偏时强度最多降</span><Dial value={f.drop} min={FACE_LIMITS.drop[0]} max={FACE_LIMITS.drop[1]} step={0.02} label="画风跑偏时强度最多往下调多少" onCommit={v => set({ drop: v })} />
+            <span className="fg-note">瞳色差到</span><Dial value={f.eyeLimit} min={FACE_LIMITS.eyeLimit[0]} max={FACE_LIMITS.eyeLimit[1]} step={1} digits={0} label="瞳色差多少算跑偏" onCommit={v => set({ eyeLimit: v })} /><span className="fg-note">算跑偏</span>
           </div>
         )}
       </Field>
