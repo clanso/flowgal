@@ -1228,17 +1228,43 @@
 .fg-thumb.is-locked { cursor: default; display: grid; place-items: center; color: var(--ink-dim); font-size: 1cqw; background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .03) 0 1cqw, transparent 1cqw 2cqw); }
 
 .fg-person { display: grid; grid-template-columns: 13cqw 1fr; gap: 2cqw; padding: 1.6cqw; margin-bottom: 1.4cqw; border-radius: 1.2cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }
-.fg-track { display: grid; grid-template-columns: 4.2cqw 1fr; gap: 1.4cqw; padding: 1.2cqw 1.4cqw; margin-bottom: 1cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }
-.fg-track-body { display: grid; gap: .6cqw; min-width: 0; }
-.fg-track-play { width: 4.2cqw; height: 4.2cqw; border-radius: 50%; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink); font-size: 1.3cqw; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s; }
-.fg-track-play:hover { border-color: var(--accent); }
-.fg-track-play.is-on { background: var(--accent); border-color: var(--accent); color: #111; box-shadow: 0 0 1.4cqw color-mix(in oklab, var(--accent) 55%, transparent); }
 .fg-track-desc { min-height: 4.6cqw; font-family: var(--font-body); font-size: 1.05cqw; }
-.fg-libgroup { margin-bottom: .6cqw; }
-.fg-libgroup-head { padding: .5cqw .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }
-.fg-libgroup-head + .fg-track, .fg-libgroup-head + .fg-note { margin-top: .8cqw; }
-.fg-libsound { padding: .8cqw 1.2cqw; margin-bottom: .6cqw; }
-.fg-libsound-tags { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* 曲库、音效库、环境音库的整理界面（LibBrowser）：左边分类树，右边一行一条（点名字展开编辑），勾选后底部浮着一条批量操作。 */
+.fg-lib { display: grid; grid-template-columns: 15cqw minmax(0, 1fr); gap: 1.4cqw; align-items: start; margin-top: 1cqw; }
+.fg-lib-tree { position: sticky; top: .6cqw; display: flex; flex-direction: column; gap: .15cqw; max-height: 44cqw; overflow-y: auto; padding: .6cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); scrollbar-width: thin; }
+.fg-libcat { display: flex; align-items: center; gap: .6cqw; width: 100%; padding: .35cqw .8cqw; border: 0; border-radius: .6cqw; background: none; color: inherit; font: inherit; font-size: 1cqw; text-align: left; cursor: pointer; }
+.fg-libcat span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fg-libcat i { font-style: normal; font-size: .85cqw; opacity: .55; }
+.fg-libcat:hover { background: rgba(255, 255, 255, .06); }
+.fg-libcat.is-sub { padding-left: 2cqw; font-size: .95cqw; }
+.fg-libcat.is-on { background: color-mix(in oklab, var(--accent) 22%, transparent); color: var(--accent); }
+.fg-lib-main { min-width: 0; }
+.fg-lib-tools { margin-bottom: .6cqw; }
+.fg-lib-search { flex: 1; width: auto; min-width: 14cqw; }
+.fg-lib-cathead { padding: .5cqw .9cqw; margin-bottom: .6cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
+.fg-lib-count { gap: .6cqw; padding: .2cqw .9cqw .4cqw; }
+.fg-lib-count label { gap: .5cqw; cursor: pointer; }
+.fg-lib-count input, .fg-librow input[type="checkbox"] { width: 1.2cqw; height: 1.2cqw; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.fg-lib-empty { margin: 1cqw 0; }
+.fg-librow { display: grid; grid-template-columns: auto 2.6cqw minmax(0, 1fr) auto 5cqw; align-items: center; gap: .8cqw; padding: .45cqw .9cqw; border-radius: .7cqw; border: 1px solid transparent; }
+.fg-librow:hover { background: rgba(255, 255, 255, .04); }
+.fg-librow.is-picked { background: color-mix(in oklab, var(--accent) 10%, transparent); border-color: color-mix(in oklab, var(--accent) 35%, transparent); }
+.fg-librow.is-open { background: rgba(255, 255, 255, .06); border-color: var(--box-border); border-radius: .7cqw .7cqw 0 0; }
+.fg-librow-play { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink); font-size: .9cqw; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s; }
+.fg-librow-play:hover { border-color: var(--accent); }
+.fg-librow-play.is-on { background: var(--accent); border-color: var(--accent); color: #111; box-shadow: 0 0 1.2cqw color-mix(in oklab, var(--accent) 55%, transparent); }
+.fg-librow-main { display: grid; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.fg-librow-main b, .fg-librow-main span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fg-librow-main b { font-size: 1.05cqw; font-weight: 600; }
+.fg-librow-main span { font-size: .85cqw; color: var(--ink-dim); }
+.fg-librow-main:hover b { color: var(--accent); }
+.fg-libchip { max-width: 14cqw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: .15cqw .8cqw; border-radius: 99px; border: 1px solid color-mix(in oklab, var(--accent2) 50%, transparent); background: color-mix(in oklab, var(--accent2) 14%, transparent); color: inherit; font: inherit; font-size: .85cqw; cursor: pointer; }
+.fg-libchip.is-none { border-style: dashed; border-color: var(--box-border); background: none; opacity: .6; }
+.fg-librow-size { font-size: .85cqw; color: var(--ink-dim); text-align: right; }
+.fg-libedit { display: grid; gap: .6cqw; padding: .8cqw 1.2cqw 1cqw; margin-bottom: .6cqw; border: 1px solid var(--box-border); border-top: 0; border-radius: 0 0 .8cqw .8cqw; background: rgba(255, 255, 255, .06); }
+.fg-lib-more { margin: .8cqw 0; }
+.fg-lib-bar { position: sticky; bottom: 0; z-index: 3; display: grid; gap: .5cqw; margin-top: 1cqw; padding: .9cqw 1.2cqw; border-radius: 1cqw; background: rgb(20, 14, 40); border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent); box-shadow: 0 -.6cqw 1.4cqw rgba(0, 0, 0, .45); }
+.fg-lib-bar .fg-row { flex-wrap: nowrap; }
 /* 声音页：一键套用音效库里标了用途的声音；给落字音效 / 界面音从音效库挑一个 */
 .fg-libpreset { display: flex; flex-wrap: wrap; align-items: center; gap: .6cqw; padding: .8cqw 1.2cqw; margin-bottom: 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
 .fg-libpicker { margin-top: .6cqw; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }
@@ -1704,9 +1730,24 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-face-editor .fg-aa-frame { height: 80cqw; }
   .fg-aa-frame, .fg-aa-play { height: 90cqw; } .fg-aa-play.is-close { width: 90cqw; }
   .fg-aa-item img { width: 9cqw; height: 11cqw; } .fg-aa-item { grid-template-columns: auto 9cqw 1fr; }
-  .fg-track { grid-template-columns: 9cqw 1fr; gap: 2cqw; padding: 2cqw; }
-  .fg-track-play { width: 9cqw; height: 9cqw; font-size: 3cqw; }
   .fg-track-desc { min-height: 12cqw; font-size: 3cqw; }
+  .fg-lib { grid-template-columns: 1fr; }
+  .fg-lib-tree { position: static; flex-direction: row; flex-wrap: wrap; gap: 1cqw; max-height: 40cqw; padding: 1.2cqw; border-radius: 2cqw; }
+  .fg-libcat { width: auto; max-width: 100%; gap: 1cqw; padding: .8cqw 1.8cqw; border: 1px solid var(--box-border); border-radius: 99px; font-size: 2.6cqw; }
+  .fg-libcat.is-sub { padding-left: 1.8cqw; font-size: 2.4cqw; border-style: dashed; }
+  .fg-libcat i { font-size: 2.2cqw; }
+  .fg-lib-search { flex-basis: 100%; }
+  .fg-lib-cathead, .fg-lib-count { padding: 1cqw 1.6cqw; border-radius: 1.6cqw; }
+  .fg-lib-count input, .fg-librow input[type="checkbox"] { width: 3.6cqw; height: 3.6cqw; }
+  .fg-librow { grid-template-columns: auto 7cqw minmax(0, 1fr) auto; gap: 1.6cqw; padding: 1.2cqw 1.6cqw; border-radius: 1.6cqw; }
+  .fg-librow.is-open { border-radius: 1.6cqw 1.6cqw 0 0; }
+  .fg-librow-size { display: none; }
+  .fg-librow-play { width: 7cqw; height: 7cqw; font-size: 2.4cqw; }
+  .fg-librow-main b { font-size: 3cqw; } .fg-librow-main span { font-size: 2.4cqw; }
+  .fg-libchip { max-width: 22cqw; padding: .4cqw 1.4cqw; font-size: 2.4cqw; }
+  .fg-libedit { gap: 1.2cqw; padding: 1.6cqw 2cqw; border-radius: 0 0 1.6cqw 1.6cqw; }
+  .fg-lib-bar { gap: 1.2cqw; padding: 1.6cqw 2cqw; border-radius: 2cqw; }
+  .fg-lib-bar .fg-row { flex-wrap: wrap; }
 }
 
 /* 亲密场面（lib/eros.js、Eros.jsx）：潮红 .fg-eros（scene.eros，节奏越快越深，余韵时转成一层暖雾）、触手的影子 .fg-tentacle（scene.tentacle）、
