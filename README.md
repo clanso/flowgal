@@ -181,6 +181,7 @@ FlowGal 不自带音乐，放的都是你自己的曲子。设置 → 配乐：
 - **阅读**：逐字显示、自动、快进、回想（滚轮或 L）、隐藏界面（H）、每局记住读到哪里。键盘：空格 / 回车 / → 翻页，← 后退，A 自动，Ctrl 快进，Esc 回到聊天。
 - **选项**：一轮的最后给出导演写的选项和自由输入框。选好后文字会填进 Tavern 的输入框（同时复制到剪贴板），剧场收起，下一轮写完会自动回来接着演。
 - **皮肤**：星穹（默认）、樱色、水墨、夜金、赛博五套。手机竖屏自动换布局。
+- **对话框**：设置 → 外观与演出 → 对话框里能换对话字体和名牌字体（20 多种网页字体、电脑里装的字体、自己上传的 ttf / otf / woff / woff2），调对话字号、名牌字号（30%–400%）和对话框高度（占画面 5%–100%，横屏、竖屏分开），上面有缩小版的预览，每项都能恢复默认。
 
 | ![苏晴还在画外喊，只显示名牌](docs/screenshots/40-offstage-voice.webp) | ![下一句她才从右边跑进来](docs/screenshots/41-actor-enter.webp) |
 |---|---|
@@ -364,4 +365,4 @@ npm run screenshots    # 需要 playwright；截图输出到 .tmp-screenshots/
 
 ## 鸣谢
 
-- 字体（均为 SIL Open Font License）：思源黑体 / 思源宋体（Noto Sans SC / Noto Serif SC）、霞鹜文楷（LXGW WenKai）、马善政毛笔楷书（Ma Shan Zheng）、Cormorant Garamond、JetBrains Mono，经 [Fontsource](https://fontsource.org/) 与 lxgw-wenkai-webfont 的 npm 包加载。
+- 字体（均为 SIL Open Font License）：思源黑体 / 思源宋体（Noto Sans SC / Noto Serif SC，及繁体、日文版）、霞鹜文楷（LXGW WenKai，及繁体版）、马善政毛笔楷书（Ma Shan Zheng）、站酷小薇 / 快乐体 / 庆科黄油体、龙藏体、志莽行书、刘建毛草、Zen Maru Gothic、M PLUS Rounded 1c、Klee One、Zen Old Mincho、Cormorant Garamond、JetBrains Mono，经 [Fontsource](https://fontsource.org/) 与 lxgw-wenkai-webfont 的 npm 包加载；完整清单见 `lib/fonts.js`。

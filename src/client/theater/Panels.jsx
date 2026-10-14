@@ -15,7 +15,8 @@ import { SpriteArt, SpriteViewer } from './AaPreview.jsx'
 import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn, LOOK_FIELDS, LOOK_FIELD_LABELS, lookTags, keyEmotion } from '../../../lib/look.js'
 import { Silhouette } from './Stage.jsx'
 import { stateSpans } from '../../../lib/cast.js'
-import { SKINS } from './skins.js'
+import { SKINS, loadFontFile } from './skins.js'
+import { FONT_PACKS, FONT_GROUPS, LOCAL_FONTS, DIALOG_LIMITS, cleanFontName, fontFamilyOf, skinDialogHeight } from '../../../lib/fonts.js'
 import { EFFECT_GROUPS, EFFECT_IDS } from './effects.js'
 import { previewTrack, stopPreview, previewVoice, previewSound, erosFoley, previewEros, erosPeak } from './audio.js'
 import { EROS_SFX, EROS_PACES, EROS_LABEL, TENTACLE, TENTACLE_LABEL, PEAKS, PEAK_LABEL } from '../../../lib/eros.js'
@@ -113,7 +114,7 @@ export function Backlog({ beats, index, onJump, onClose, gameId }) {
               )}
               <div className={`fg-log-item${i === index ? ' is-current' : ''}`} onClick={() => onJump(i)} style={i === index ? { background: 'rgba(255,255,255,.06)' } : null}>
                 <div className="fg-log-name">{b.type === 'narration' ? '' : b.alias || b.speaker}</div>
-                <div style={b.type === 'thought' ? { fontStyle: 'italic', opacity: 0.8 } : null}>
+                <div className="fg-log-text" style={b.type === 'thought' ? { fontStyle: 'italic', opacity: 0.8 } : null}>
                   {b.orig && <div className="fg-orig">{b.orig}</div>}
                   {b.type === 'dialogue' ? `「${b.text}」` : b.type === 'thought' ? `（${b.text}）` : b.text}
                 </div>
@@ -1750,6 +1751,148 @@ function ImagesSection({ data }) {
 
 const landscapeSize = cfg => { const { width, height } = sizeFor(cfg, 'landscape'); return `${width}×${height}` }
 
+// ───────────────────────── 对话框：字体、字号、高度 ─────────────────────────
+let localFamilies = null // 「读取电脑里的字体」读到的字体名（这次打开网页期间记着）
+const OTHER_FONT = '__other__'
+const PREVIEW_LINE = '好巧啊。今天的月色真美，要不要一起走一段？'
+
+/** 一个百分比：滑块 + 数字框，松手 / 回车才存；改过了显示「恢复默认」。value 为 null 时显示 empty（跟皮肤）。 */
+function Percent({ value, fallback, min, max, step = 1, onCommit, onReset, changed, label, empty = '' }) {
+  const shown = value ?? fallback
+  const [v, setV] = React.useState(shown)
+  React.useEffect(() => { setV(shown) }, [shown])
+  const commit = next => { const n = Math.min(max, Math.max(min, Number(next))); if (Number.isFinite(n) && n !== value) onCommit(n); else setV(shown) }
+  return (
+    <span className="fg-row fg-pct">
+      <input type="range" min={min} max={max} step={step} value={v} aria-label={label} onChange={e => setV(Number(e.target.value))} onPointerUp={e => commit(e.target.value)} onKeyUp={e => commit(e.target.value)} />
+      <input className="fg-input" type="number" min={min} max={max} step={1} value={v} aria-label={label} onChange={e => setV(e.target.value)} onBlur={e => commit(e.target.value)} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commit(e.target.value) }} />
+      <span className="fg-note">%{value == null && empty ? ` · ${empty}` : ''}</span>
+      {changed && <button type="button" className="fg-btn is-mini" onClick={onReset}>恢复默认</button>}
+    </span>
+  )
+}
+
+/** 选字体：跟皮肤 / 网页字体 / 电脑里的 / 上传的 / 自己填名字；旁边能直接上传一个字体用在这里。 */
+function FontField({ label, hint, value, skinFont, fonts, families, onPick, onUpload, busy }) {
+  const [typing, setTyping] = React.useState(false)
+  const fileRef = React.useRef(null)
+  const local = value.startsWith('local:') ? value.slice(6) : ''
+  const known = new Set([...LOCAL_FONTS.map(([f]) => f), ...(families || [])])
+  const options = [
+    ['', `跟皮肤（${skinFont}）`],
+    ...FONT_GROUPS.map(([g, name]) => ({ group: name, options: Object.entries(FONT_PACKS).filter(([, f]) => f.group === g).map(([key, f]) => ['pack:' + key, f.name]) })),
+    { group: '上传的字体', options: fonts.map(f => ['file:' + f.assetId, f.name]) },
+    { group: '电脑里常见的（装了才有）', options: LOCAL_FONTS.map(([f, name]) => ['local:' + f, `${name}（${f}）`]) },
+    { group: `这台电脑里的字体（${(families || []).length} 个）`, options: (families || []).map(f => ['local:' + f, f]) },
+    ...(local && !known.has(local) ? [['local:' + local, `${local}（自己填的）`]] : []),
+    [OTHER_FONT, '其他字体：自己填名字…'],
+  ]
+  return (
+    <Field label={label} hint={hint}>
+      <div className="fg-row">
+        <Select value={typing ? OTHER_FONT : value} options={options} style={INLINE} onChange={v => { if (v === OTHER_FONT) setTyping(true); else { setTyping(false); onPick(v) } }} />
+        {typing && <Text value={local} placeholder="字体名，比如 方正兰亭黑_GBK" style={{ width: '16cqw' }} onCommit={v => { const name = cleanFontName(v); if (name) { onPick('local:' + name); setTyping(false) } }} />}
+        <button type="button" className="fg-btn is-mini" disabled={busy} onClick={() => fileRef.current && fileRef.current.click()}>{busy ? '上传中…' : '上传字体用在这里'}</button>
+        {value && <button type="button" className="fg-btn is-mini" onClick={() => { setTyping(false); onPick('') }}>恢复默认</button>}
+        <input ref={fileRef} type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden onChange={e => { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) onUpload(file) }} />
+      </div>
+    </Field>
+  )
+}
+
+/** 对话框的样子在设置里的缩小版：跟剧场同一套样式（舞台的 cqw 换成这个小框的宽），字体、字号、高度改了马上看到。 */
+function DialogPreview() {
+  return (
+    <div className="fg-dlg-preview" aria-hidden="true">
+      <div className="fg-dialog">
+        <div className="fg-box" />
+        <div className="fg-name"><div className="fg-name-plate">苏晴</div><div className="fg-name-sub">调侃</div></div>
+        <div className="fg-text is-dialogue is-done"><span className="fg-line">{PREVIEW_LINE}</span></div>
+        <div className="fg-wait" />
+        <div className="fg-progress"><i style={{ width: '40%' }} /></div>
+        <div className="fg-quick">{['AUTO', 'SKIP', 'LOG', 'CONFIG'].map(t => <button key={t} type="button" tabIndex={-1}>{t}</button>)}</div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 设置 → 外观与演出 → 对话框：对话字体、名牌字体（网页字体、电脑里装的、上传的、自己填名字）、对话字号、名牌字号、对话框高度（横屏、竖屏）。
+ * 每一项都能恢复默认；默认就是皮肤原来的样子。上传的字体存在素材目录，在这里能删。
+ */
+function DialogSection({ data }) {
+  const ui = data.config.ui
+  const p = patch => patchConfig({ ui: patch }).catch(e => toast(e.message, 'error'))
+  const [busy, run] = useBusy()
+  const [families, setFamilies] = React.useState(localFamilies)
+  const fonts = ui.customFonts || []
+  const skin = SKINS.find(s => s.id === ui.skin) || SKINS[0]
+  // 上传的字体都装上，下面的清单里每个名字用它自己的字体显示
+  React.useEffect(() => { for (const f of fonts) loadFontFile(f.assetId) }, [fonts.map(f => f.assetId).join()])
+  const upload = (file, slot) => run('font' + slot, async () => {
+    const res = await api.uploadFont(file)
+    setConfig(res)
+    if (slot && res.font) await patchConfig({ ui: { [slot]: 'file:' + res.font.assetId } })
+  }, slot ? '已上传，正在用这个字体' : '已上传')
+  const readLocal = () => run('local', async () => {
+    if (typeof window === 'undefined' || typeof window.queryLocalFonts !== 'function') throw new Error('这个浏览器不让网页读字体清单（Chrome / Edge 103 以上可以）。可以在下拉框里选「其他字体」直接填名字')
+    const list = await window.queryLocalFonts()
+    localFamilies = [...new Set(list.map(f => cleanFontName(f.family)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh'))
+    setFamilies(localFamilies)
+    if (!localFamilies.length) throw new Error('没读到字体：浏览器问要不要让网页看字体时要点「允许」')
+    return localFamilies.length
+  }, '已读取这台电脑里的字体，在下拉框最后一组')
+  const land = skinDialogHeight(skin.id, 'landscape')
+  const port = skinDialogHeight(skin.id, 'portrait')
+  const allDefault = !ui.textFont && !ui.nameFont && ui.textScale === 1 && ui.nameScale === 1 && ui.dialogHeight == null && ui.dialogHeightPortrait == null
+  return (
+    <>
+      <div className="fg-section">对话框</div>
+      <DialogPreview />
+      <div className="fg-row" style={{ justifyContent: 'flex-end', marginTop: '.6cqw' }}>
+        <span className="fg-note" style={{ flex: 1 }}>上面是现在的样子（皮肤「{skin.name}」）。改完马上生效，剧场里正在读的那句也会跟着变。</span>
+        <button type="button" className="fg-btn is-mini" disabled={busy === 'local'} onClick={readLocal}>{busy === 'local' ? '读取中…' : families ? `重新读取电脑里的字体（${families.length} 个）` : '读取电脑里的字体'}</button>
+        <button type="button" className="fg-btn is-mini" disabled={allDefault} onClick={() => p({ textFont: '', nameFont: '', textScale: 1, nameScale: 1, dialogHeight: null, dialogHeightPortrait: null })}>对话框全部恢复默认</button>
+      </div>
+      <FontField label="对话字体" hint="对话框里的台词和旁白，也用在选项和回想里。选的字体缺字时（比如日文字体里没有的简体字）用皮肤的字体补上。电脑里的字体只在装了它的电脑上生效；上传的字体每台设备都能用。"
+        value={ui.textFont || ''} skinFont={skin.textFont} fonts={fonts} families={families} busy={busy === 'fonttextFont'} onPick={v => p({ textFont: v })} onUpload={file => upload(file, 'textFont')} />
+      <FontField label="名牌字体" hint="说话人的名字，也用在回想里的名字上。"
+        value={ui.nameFont || ''} skinFont={skin.nameFont} fonts={fonts} families={families} busy={busy === 'fontnameFont'} onPick={v => p({ nameFont: v })} onUpload={file => upload(file, 'nameFont')} />
+      <Field label="对话字号" hint={`皮肤原来的大小是 100%。调大以后一屏放不下的话，把下面的对话框高度也调高。`}>
+        <Percent value={Math.round(ui.textScale * 100)} fallback={100} min={DIALOG_LIMITS.textScale.min * 100} max={DIALOG_LIMITS.textScale.max * 100} step={DIALOG_LIMITS.textScale.step * 100} label="对话字号"
+          changed={ui.textScale !== 1} onCommit={n => p({ textScale: Math.round(n) / 100 })} onReset={() => p({ textScale: 1 })} />
+      </Field>
+      <Field label="名牌字号" hint="名牌整块跟着放大缩小，往上长，不压到台词。">
+        <Percent value={Math.round(ui.nameScale * 100)} fallback={100} min={DIALOG_LIMITS.nameScale.min * 100} max={DIALOG_LIMITS.nameScale.max * 100} step={DIALOG_LIMITS.nameScale.step * 100} label="名牌字号"
+          changed={ui.nameScale !== 1} onCommit={n => p({ nameScale: Math.round(n) / 100 })} onReset={() => p({ nameScale: 1 })} />
+      </Field>
+      <Field label="对话框高度" hint={`占画面高度的百分比；「${skin.name}」原来是 ${land}%。调高时名牌、台词离上边的距离不变，多出来的地方都给台词。`}>
+        <Percent value={ui.dialogHeight} fallback={land} min={DIALOG_LIMITS.dialogHeight.min} max={DIALOG_LIMITS.dialogHeight.max} step={DIALOG_LIMITS.dialogHeight.step} label="对话框高度" empty="跟皮肤"
+          changed={ui.dialogHeight != null} onCommit={n => p({ dialogHeight: n })} onReset={() => p({ dialogHeight: null })} />
+      </Field>
+      <Field label="竖屏时的高度" hint={`手机竖着拿时单独算（画面是竖的，同样的百分比看起来不一样）；「${skin.name}」原来是 ${port}%。`}>
+        <Percent value={ui.dialogHeightPortrait} fallback={port} min={DIALOG_LIMITS.dialogHeight.min} max={DIALOG_LIMITS.dialogHeight.max} step={DIALOG_LIMITS.dialogHeight.step} label="竖屏时的对话框高度" empty="跟皮肤"
+          changed={ui.dialogHeightPortrait != null} onCommit={n => p({ dialogHeightPortrait: n })} onReset={() => p({ dialogHeightPortrait: null })} />
+      </Field>
+      {fonts.length > 0 && (
+        <Field label="上传的字体" hint="存在数据目录的素材里，删掉后正用着它的地方回到皮肤的字体。">
+          <div className="fg-fontlist">
+            {fonts.map(f => (
+              <div key={f.assetId} className="fg-row fg-fontitem">
+                <span className="fg-fontname" style={{ fontFamily: `${fontFamilyOf('file:' + f.assetId)}, var(--font-body)` }}>{f.name} · {PREVIEW_LINE.slice(0, 8)}</span>
+                <span className="fg-spacer" />
+                <button type="button" className="fg-btn is-mini" disabled={ui.textFont === 'file:' + f.assetId} onClick={() => p({ textFont: 'file:' + f.assetId })}>用作对话</button>
+                <button type="button" className="fg-btn is-mini" disabled={ui.nameFont === 'file:' + f.assetId} onClick={() => p({ nameFont: 'file:' + f.assetId })}>用作名牌</button>
+                <button type="button" className="fg-btn is-mini" disabled={busy === 'rm' + f.assetId} onClick={() => run('rm' + f.assetId, async () => setConfig(await api.removeFont(f.assetId)), '已删掉')}>删除</button>
+              </div>
+            ))}
+          </div>
+        </Field>
+      )}
+    </>
+  )
+}
+
 export function LookSection({ data }) {
   const cfg = data.config
   const p = patch => patchConfig({ ui: patch }).catch(e => toast(e.message, 'error'))
@@ -1764,6 +1907,7 @@ export function LookSection({ data }) {
           </button>
         ))}
       </div>
+      <DialogSection data={data} />
       <div className="fg-section">画面</div>
       <Field label="画面比例" hint="跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。">
         <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.ratio} onChange={e => p({ ratio: e.target.value })}>

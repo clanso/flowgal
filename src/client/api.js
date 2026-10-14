@@ -103,6 +103,9 @@ export const api = {
   /** 某一种音效换成自己的文件（最大 5 MB）；返回最新设置。 */
   uploadSound: (slot, file) => uploadFile(`/sound/upload?slot=${encodeURIComponent(slot)}&name=${encodeURIComponent(file.name || '')}`, file),
   removeSound: slot => call('/sound', { action: 'remove', slot }),
+  /** 上传一个字体（ttf / otf / woff / woff2，最大 128 MB）；返回最新设置和 font: { assetId, name }。 */
+  uploadFont: file => uploadFile(`/font/upload?name=${encodeURIComponent(file.name || '')}`, file),
+  removeFont: id => call('/font', { action: 'remove', id }),
   soundlib: () => call('/soundlib'),
   updateLibSound: (id, patch) => call('/soundlib', { action: 'update', id, patch }),
   removeLibSounds: ids => call('/soundlib', { action: 'remove', ids }),
