@@ -427,7 +427,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const status = beat ? (beat.status === 'directing' ? `第 ${beat.turn} 轮 · 导演整理中，先按原文演` : beat.status === 'failed' ? `第 ${beat.turn} 轮 · 没整理好，按原文演` : '') : ''
   const quick = {
     speed,
-    emoLabel: beat && beat.emo ? emotionLabel(beat.emo) : '',
+    emoLabel: ui0.showEmotion && beat && beat.emo ? emotionLabel(beat.emo) : '',
     items: [
       { id: 'auto', label: 'AUTO', title: '自动播放（A）', on: auto, run: () => { setAuto(v => !v); setSkip(false) } },
       { id: 'skip', label: 'SKIP', title: '快进（按住 Ctrl）', on: skip, run: () => { setSkip(v => !v); setAuto(false) } },
@@ -526,7 +526,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {beat && !title && !off.has('title.place') && (!change || phase === 'cast' || phase === 'settle') && <TitleCard beat={beat} delay={speed > 0 ? (beat.cut && !hold.change ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0) : 0} />}
         {beat && !title && beat.cut && speed > 0 && cutShown.current === visit && <CutCard beat={beat} out={!cutOn} />}
 
-        {!title && beat && (
+        {!title && beat && ui0.showHud && (
           <div className="fg-hud">
             <div className="fg-hud-bar" />
             <div>
@@ -546,10 +546,11 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         )}
         {!title && (
           <div className="fg-topright" onClick={e => e.stopPropagation()}>
-            {directing && <button type="button" className="fg-pill is-busy is-link" title="看导演正在写什么" onClick={() => setPanel('director')}>导演整理中 ›</button>}
-            {drawing > 0 && <span className="fg-pill is-busy">出图 {drawing}</span>}
+            {/* 导演整理中、出图进度、曲名是调试用的（设置 → 外观与演出 → 调试信息）；通话中、连接中断、关闭按钮一直在 */}
+            {ui0.showStatus && directing && <button type="button" className="fg-pill is-busy is-link" title="看导演正在写什么" onClick={() => setPanel('director')}>导演整理中 ›</button>}
+            {ui0.showStatus && drawing > 0 && <span className="fg-pill is-busy">出图 {drawing}</span>}
             {beat && beat.call && beat.call.state === 'live' && <CallChip key={beat.call.id} call={beat.call} sound={sfxOn} />}
-            {track && <span className={'fg-pill' + (hushed ? ' is-hushed' : '')} title={hushed ? `${track.name}（留白，一会儿回来）` : track.name}>♪ {track.name}</span>}
+            {ui0.showStatus && track && <span className={'fg-pill' + (hushed ? ' is-hushed' : '')} title={hushed ? `${track.name}（留白，一会儿回来）` : track.name}>♪ {track.name}</span>}
             {viewError && <span className="fg-pill fg-err" title={viewError}>连接中断，重连中</span>}
             <button type="button" className="fg-iconbtn" title="回到聊天（Esc）" onClick={close}>✕</button>
           </div>

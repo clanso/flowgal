@@ -1898,12 +1898,12 @@ function FontField({ label, hint, value, skinFont, fonts, families, onPick, onUp
 }
 
 /** 对话框的样子在设置里的缩小版：跟剧场同一套样式（舞台的 cqw 换成这个小框的宽），字体、字号、高度改了马上看到。 */
-function DialogPreview() {
+function DialogPreview({ emotion = true }) {
   return (
     <div className="fg-dlg-preview" aria-hidden="true">
       <div className="fg-dialog">
         <div className="fg-box" />
-        <div className="fg-name"><div className="fg-name-plate">苏晴</div><div className="fg-name-sub">调侃</div></div>
+        <div className="fg-name"><div className="fg-name-plate">苏晴</div>{emotion && <div className="fg-name-sub">调侃</div>}</div>
         <div className="fg-text is-dialogue is-done"><span className="fg-line">{PREVIEW_LINE}</span></div>
         <div className="fg-wait" />
         <div className="fg-progress"><i style={{ width: '40%' }} /></div>
@@ -1945,7 +1945,7 @@ function DialogSection({ data }) {
   return (
     <>
       <div className="fg-section">对话框</div>
-      <DialogPreview />
+      <DialogPreview emotion={ui.showEmotion} />
       <div className="fg-row" style={{ justifyContent: 'flex-end', marginTop: '.6cqw' }}>
         <span className="fg-note" style={{ flex: 1 }}>上面是现在的样子（皮肤「{skin.name}」）。改完马上生效，剧场里正在读的那句也会跟着变。</span>
         <button type="button" className="fg-btn is-mini" disabled={busy === 'local'} onClick={readLocal}>{busy === 'local' ? '读取中…' : families ? `重新读取电脑里的字体（${families.length} 个）` : '读取电脑里的字体'}</button>
@@ -2005,6 +2005,17 @@ export function LookSection({ data }) {
         ))}
       </div>
       <DialogSection data={data} />
+      <div className="fg-section">调试信息</div>
+      <div className="fg-note" style={{ marginBottom: '.6cqw' }}>看导演判断得对不对时打开，平常读剧情可以都关着。</div>
+      <Field label="名牌旁的情绪" hint="说话人名字旁边的小字（调侃、得意……），是导演给这句标的情绪。立绘的表情照样跟着换，只是不写出来。">
+        <Toggle value={cfg.ui.showEmotion} onChange={v => p({ showEmotion: v })} />
+      </Field>
+      <Field label="左上角的场景信息" hint="地点、时段、天气、光线、画面效果、氛围、配乐情绪这些标签。换地方时出来的那张地点标题不归这里管，在「特效 → 地点标题与过场字卡」里关。">
+        <Toggle value={cfg.ui.showHud} onChange={v => p({ showHud: v })} />
+      </Field>
+      <Field label="右上角的状态" hint="导演整理中（点它看导演正在写什么）、出图进度、正在放的曲子。关闭按钮、连接中断的提示和通话中的小卡一直显示。">
+        <Toggle value={cfg.ui.showStatus} onChange={v => p({ showStatus: v })} />
+      </Field>
       <div className="fg-section">画面</div>
       <Field label="画面比例" hint="跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。">
         <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.ratio} onChange={e => p({ ratio: e.target.value })}>
