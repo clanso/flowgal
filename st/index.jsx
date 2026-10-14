@@ -1,7 +1,7 @@
 // FlowGal 酒馆版入口（SillyTavern UI 扩展，manifest.json 的 hooks.activate 指向 onActivate）。
 // 核心、引擎都在这个页面里跑（st/host.js）；界面跟 DSH 版是同一套（src/client/），只是挂的位置换成酒馆的：
 //   · 剧场覆盖层：页面最上层的一个 div
-//   · 入口：魔杖菜单（#extensionsMenu）里「FlowGal 剧场」
+//   · 入口：魔杖菜单（#extensionsMenu）里「FlowGal 剧场」；斜杠命令 /flowgal；设置卡里的「打开剧场」
 //   · 设置卡：扩展面板（#extensions_settings2）里一个可折叠的「FlowGal」
 //   · 楼层：AI 楼层正文下面挂场景卡、插画卡；楼层的「…」按钮里加「剧场」「配一张」
 import React from 'react'
@@ -89,6 +89,13 @@ function onChatClick(event) {
 }
 
 // ───────── 入口、设置卡、剧场 ─────────
+/** 打开剧场到现在这一局（没打开聊天时提示先开一局）；panel 给 'settings' 时直接进完整设置。 */
+function openCurrent(panel = '') {
+  const gameId = host.tavern.currentGameId()
+  if (gameId) rememberGame(gameId)
+  openTheater(gameId || '', panel ? { panel } : {})
+}
+
 function addWandItem() {
   const menu = document.getElementById('extensionsMenu')
   if (!menu || document.getElementById('flowgal_wand')) return
@@ -96,13 +103,25 @@ function addWandItem() {
   item.id = 'flowgal_wand'
   item.className = 'list-group-item flex-container flexGap5'
   item.innerHTML = '<div class="fa-solid fa-film extensionsMenuExtensionButton"></div><span>FlowGal 剧场</span>'
-  item.addEventListener('click', () => {
-    const gameId = host.tavern.currentGameId()
-    if (gameId) rememberGame(gameId)
-    openTheater(gameId || '')
-  })
+  item.addEventListener('click', () => openCurrent())
   menu.appendChild(item)
   cleanups.push(() => item.remove())
+}
+
+/** 斜杠命令 /flowgal（打开剧场）、/flowgal settings（打开完整设置），快速回复里也能用。 */
+function addSlashCommand() {
+  const { SlashCommandParser, SlashCommand, SlashCommandArgument, ARGUMENT_TYPE } = ctx()
+  if (!SlashCommandParser?.addCommandObject || !SlashCommand?.fromProps) return
+  const unnamedArgumentList = SlashCommandArgument?.fromProps
+    ? [SlashCommandArgument.fromProps({ description: 'settings：打开完整设置', typeList: [ARGUMENT_TYPE?.STRING ?? 'string'], isRequired: false, enumList: ['settings'] })]
+    : []
+  SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+    name: 'flowgal',
+    callback: (_args, value) => { openCurrent(/^\s*(settings|设置)\s*$/i.test(String(value ?? '')) ? 'settings' : ''); return '' },
+    unnamedArgumentList,
+    helpString: '打开 FlowGal 剧场（从现在这一局开始看）。<code>/flowgal settings</code> 打开完整设置。',
+  }))
+  cleanups.push(() => { if (SlashCommandParser.commands?.flowgal) delete SlashCommandParser.commands.flowgal })
 }
 
 function addSettings() {
@@ -156,10 +175,14 @@ export async function onActivate() {
   ]
   for (const [type, fn] of events) { eventSource.on(type, fn); cleanups.push(() => eventSource.removeListener(type, fn)) }
   cleanups.push(host.tavern.onItemsChanged(gameId => { if (gameId === host.tavern.currentGameId()) refreshItems() }))
-  // 界面在酒馆准备好以后再挂（APP_READY 已经过了的话会马上叫）
+  // 入口马上挂：酒馆调 activate 时魔杖菜单、扩展面板都已经在页面上了。不等 APP_READY，免得酒馆初始化中途出错（别的扩展、联网失败）时入口一个都不出来。
+  addOverlay()
+  addWandItem()
+  addSettings()
+  try { addSlashCommand() } catch (error) { console.warn('[flowgal] 注册 /flowgal 失败', error) }
+  // 楼层在酒馆准备好以后再挂（APP_READY 已经过了的话会马上叫）
   eventSource.once(eventTypes.APP_READY, () => {
-    addOverlay()
-    addWandItem()
+    addWandItem() // 万一当时魔杖菜单还没建好，这里补上（已经挂了的不会重复）
     addSettings()
     const chat = document.getElementById('chat')
     chat?.addEventListener('click', onChatClick)

@@ -56,8 +56,10 @@ export function SettingsSection() {
       </div>
       <div className="fg-settings-row">
         <span style={{ color: data.ready ? '#4caf7a' : '#d9822b' }}>{data.ready ? '● 生图已就绪' : '● ' + data.readyReason}</span>
-        <button type="button" className="fg-play" onClick={() => openTheater('', { panel: 'settings' })}>打开完整设置</button>
+        <button type="button" className="fg-play" onClick={() => openTheater('')}>打开剧场</button>
+        <button type="button" className="fg-ghost" onClick={() => openTheater('', { panel: 'settings' })}>打开完整设置</button>
       </div>
+      {hostName() === 'st' && <div className="fg-settings-row" style={{ opacity: 0.7, fontSize: 12.5 }}>平时从这里进：输入框左边的魔杖菜单 →「FlowGal 剧场」，或者在输入框里打 /flowgal；每条 AI 回复下面的场景卡、回复的「…」菜单里也有「剧场」。</div>}
       <UpdateLine />
     </div>
   )
