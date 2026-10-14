@@ -330,12 +330,13 @@ function CgsView({ cgs }) {
  * 听音师失败时说一声：候选按正文对词挑的。
  */
 function HeardView({ listen }) {
-  if (listen.error) return <Block label="先听一遍"><div className="fg-err fg-dlog-error">听音师失败，这一轮音效候选按正文对词挑：{listen.error}</div></Block>
+  if (listen.error) return <Block label="先听一遍"><div className="fg-err fg-dlog-error">听音师失败，这一轮音效和配乐候选按正文对词挑：{listen.error}</div></Block>
   const heard = listen.heard
   if (!heard) return null
-  const rows = [...heard.ambience.map(h => ['环境音', h]), ...heard.sfx.map(h => ['音效', h])]
+  const bgm = heard.bgm || []
+  const rows = [...bgm.map(h => ['配乐', h]), ...heard.ambience.map(h => ['环境音', h]), ...heard.sfx.map(h => ['音效', h])]
   return (
-    <Block label={`先听一遍 · 环境音 ${heard.ambience.length} · 音效 ${heard.sfx.length}`}>
+    <Block label={`先听一遍${bgm.length ? ` · 配乐 ${bgm.length}` : ''} · 环境音 ${heard.ambience.length} · 音效 ${heard.sfx.length}`}>
       {!rows.length && <div className="fg-note">听音师觉得这一轮没有听得见的声音，候选按正文对词挑。</div>}
       {rows.map(([kind, h], i) => (
         <div key={i} className="fg-dlog-card">
@@ -411,7 +412,7 @@ function LogDetail({ gameId, summary }) {
           <div><i>模型窗口</i>{summary.window ? `${num(summary.window)} token` : '宿主没给窗口大小，按设置原样发'}{entry && entry.outputDefault ? <span className="fg-note"> · 模型默认输出 {num(entry.outputDefault)}</span> : null}</div>
           {entry && <div><i>资料</i>{entry.contextLength ? `发了 ${num(entry.contextChars)} 字（人物卡与世界书共 ${num(entry.contextLength)} 字）` : '这张卡没有人物卡 / 世界书资料'}</div>}
           {entry && writer && <div><i>剧情</i>{`发了 ${num(entry.storyChars)} 字（到这一轮为止共 ${num(entry.storyLength)} 字）`}</div>}
-          {entry?.listen && <div><i>先听一遍</i>{entry.listen.model || '—'}{sourceLabel(entry.listen.source, '听音师') ? <span className="fg-note">（{sourceLabel(entry.listen.source, '听音师')}）</span> : null}{entry.listen.stream === false ? <span className="fg-note"> · 不流式</span> : null} · {entry.listen.ms ? secs(entry.listen.ms) : '进行中'}{entry.listen.error ? <span className="fg-err"> · 失败</span> : entry.listen.heard ? ` · 听到 ${entry.listen.heard.ambience.length + entry.listen.heard.sfx.length} 个声音` : ''}</div>}
+          {entry?.listen && <div><i>先听一遍</i>{entry.listen.model || '—'}{sourceLabel(entry.listen.source, '听音师') ? <span className="fg-note">（{sourceLabel(entry.listen.source, '听音师')}）</span> : null}{entry.listen.stream === false ? <span className="fg-note"> · 不流式</span> : null} · {entry.listen.ms ? secs(entry.listen.ms) : '进行中'}{entry.listen.error ? <span className="fg-err"> · 失败</span> : entry.listen.heard ? ` · 听到 ${entry.listen.heard.ambience.length + entry.listen.heard.sfx.length} 个声音${entry.listen.heard.bgm?.length ? `、${entry.listen.heard.bgm.length} 段配乐` : ''}` : ''}</div>}
           {summary.usage && <div><i>用量</i>{usageText(summary.usage)}{entry?.listen?.usage ? <span className="fg-note">（含先听一遍）</span> : null}</div>}
         </div>
         {summary.notes.map((n, i) => <div key={i} className="fg-dlog-notice">⚠ {n}</div>)}
@@ -435,7 +436,7 @@ function LogDetail({ gameId, summary }) {
           <Block label={`系统提示词 · ${num((entry.system || '').length)} 字`} text={entry.system}><Pre text={entry.system} /></Block>
           <Block label={`用户消息 · ${num((entry.user || '').length)} 字${sprite ? '（资料 + 全部剧情 + 角色档案 + 要画的差分）' : acting ? '（资料 + 全部剧情 + 角色档案 + 要设计的情绪）' : cg ? '（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）' : '（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）'}`} text={entry.user}><Pre text={entry.user} /></Block>
           {entry.listen && <Block label={`先听一遍 · 系统提示词 · ${num((entry.listen.system || '').length)} 字`} text={entry.listen.system}><Pre text={entry.listen.system} /></Block>}
-          {entry.listen && <Block label={`先听一遍 · 用户消息 · ${num((entry.listen.user || '').length)} 字（上一幕 + 库里的分类 + 本轮正文单元）`} text={entry.listen.user}><Pre text={entry.listen.user} /></Block>}
+          {entry.listen && <Block label={`先听一遍 · 用户消息 · ${num((entry.listen.user || '').length)} 字（上一幕 + 库里的分类 + 曲库 + 本轮正文单元）`} text={entry.listen.user}><Pre text={entry.listen.user} /></Block>}
         </>
       ) : <div className="fg-note">读取中…</div>)}
     </div>

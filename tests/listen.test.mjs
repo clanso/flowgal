@@ -69,7 +69,7 @@ test('gate: 听音师的输出规整：单元编号认 U5 和 5、空词去掉�
   assert.equal(heard.sfx[0].words.length, 12)
   assert.deepEqual(heard.sfx[0].cats, ['厨房/餐具', 'a/b', 'c/d'])
   assert.equal(heard.sfx[1].at, '', '对不上的单元编号空着')
-  assert.deepEqual(cleanHeard(null, units), { ambience: [], sfx: [] })
+  assert.deepEqual(cleanHeard(null, units), { ambience: [], sfx: [], bgm: [] })
 })
 
 test('gate: 照听到的声音找：正文没有原词也找得到；每条先保证一个、轮流取；剩下的名额按正文补；上一幕的环境音一定在', () => {
@@ -146,7 +146,7 @@ test('gate: 听音师失败、回不出 JSON、没配好模型时退回按正文
   assert.ok(out.script)
   assert.equal(failing.calls.length, 2)
   assert.doesNotMatch(sfxBlock(userOf(directorCall(failing.calls))), /盘子摔碎/, '退回按正文对词')
-  assert.match(trace.notes.join(), /听音师失败，音效候选按正文对词挑：content filtered/)
+  assert.match(trace.notes.join(), /听音师失败，音效和配乐候选按正文对词挑：content filtered/)
   assert.equal(trace.listen.error, 'content filtered')
   // 回的不是 JSON
   const chatty = fakeLlm({ listen: () => '这一轮有摔杯子的声音。' })
