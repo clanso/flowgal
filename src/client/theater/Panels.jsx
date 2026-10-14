@@ -1321,12 +1321,12 @@ function Field({ label, hint, children }) {
 function Toggle({ value, onChange, disabled = false }) {
   return <button type="button" className={`fg-switch${value ? ' is-on' : ''}`} aria-pressed={Boolean(value)} disabled={disabled} onClick={() => onChange(!value)} />
 }
-/** 文本框：失焦或回车时才提交。 */
-function Text({ value, onCommit, type = 'text', placeholder, style }) {
+/** 文本框：失焦或回车时才提交。list 是候选列表（datalist）的编号。 */
+function Text({ value, onCommit, type = 'text', placeholder, style, list }) {
   const [v, setV] = React.useState(value ?? '')
   React.useEffect(() => { setV(value ?? '') }, [value])
   const commit = () => { if (String(v) !== String(value ?? '')) onCommit(type === 'number' ? Number(v) : v) }
-  return <input className="fg-input" type={type} value={v} placeholder={placeholder} style={style} onChange={e => setV(e.target.value)} onBlur={commit} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commit() }} />
+  return <input className="fg-input" type={type} value={v} placeholder={placeholder} style={style} list={list} onChange={e => setV(e.target.value)} onBlur={commit} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commit() }} />
 }
 /**
  * 上限：一个数，或者勾上「不限」（存 null，后台就不设上限）。从不限改回限制时先填 fallback（以前写死的那个数）。
@@ -2433,26 +2433,26 @@ function LibPicker({ sounds, slot, current, ui, onPick }) {
 
 // ───────────────────────── 我的配乐 ─────────────────────────
 const sizeMB = bytes => (bytes / 1048576).toFixed(1) + ' MB'
+const MUSIC_LIST = 'fg-music-cats'
 
-/** 一首曲子：试听、改名、描述、标签（失焦保存）、删除。 */
-function TrackCard({ track, playing, onPlay }) {
+/** 展开的一首曲子：改名、分类、描述、标签（失焦保存）、删除。 */
+function TrackEditor({ track }) {
   const [busy, run] = useBusy()
   const save = patch => run('s', async () => { await api.updateTrack(track.id, patch); await loadMusic() })
   return (
-    <div className="fg-track">
-      <button type="button" className={`fg-track-play${playing ? ' is-on' : ''}`} title={playing ? '停止试听' : '试听'} onClick={onPlay}>{playing ? '■' : '▶'}</button>
-      <div className="fg-track-body">
-        <div className="fg-row">
-          <Text value={track.name} style={{ flex: 1, width: 'auto', fontWeight: 600 }} onCommit={v => save({ name: v })} />
-          <span className="fg-note" title={track.file}>{sizeMB(track.bytes)}</span>
-          <button type="button" className="fg-btn" disabled={busy === 'd'} onClick={() => { if (window.confirm(`从曲库删除「${track.name}」？电脑上的原文件不受影响。`)) run('d', async () => { await api.removeTrack(track.id); await loadMusic() }, '已删除') }}>删除</button>
-        </div>
-        <TextArea value={track.description} placeholder="听起来什么样、适合什么场面。例如：慢板萨克斯和雨声，深夜独处、心事重重，也适合告白前的沉默" onCommit={v => save({ description: v })} />
-        <Text value={(track.tags || []).join('、')} placeholder="标签，用顿号或逗号隔开：深夜、城市、雨、怀旧" style={{ width: '100%' }} onCommit={v => save({ tags: v })} />
+    <>
+      <div className="fg-row">
+        <Text value={track.name} style={{ flex: 2, width: 'auto', fontWeight: 600 }} onCommit={v => save({ name: v })} />
+        <Text value={track.category} list={MUSIC_LIST} placeholder="分类，两层用 / 隔开：日常/校园" style={{ flex: 1, width: 'auto' }} onCommit={v => save({ category: v })} />
+        <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'd'} onClick={() => { if (window.confirm(`从曲库删除「${track.name}」？电脑上的原文件不受影响。`)) run('d', async () => { await api.removeTrack(track.id); await loadMusic() }, '已删除') }}>删除</button>
       </div>
-    </div>
+      <TextArea value={track.description} placeholder="听起来什么样、适合什么场面。例如：慢板萨克斯和雨声，深夜独处、心事重重，也适合告白前的沉默" onCommit={v => save({ description: v })} />
+      <Text value={(track.tags || []).join('、')} placeholder="标签，用顿号或逗号隔开：深夜、城市、雨、怀旧" style={{ width: '100%' }} onCommit={v => save({ tags: v })} />
+      {track.file && <div className="fg-note">文件：{track.file}</div>}
+    </>
   )
 }
+const trackSummary = t => [(t.tags || []).join('、'), t.description].filter(Boolean).join(' · ') || '（还没有描述和标签）'
 
 /** 多行文本：失焦时才提交。 */
 function TextArea({ value, onCommit, placeholder }) {
@@ -2461,7 +2461,221 @@ function TextArea({ value, onCommit, placeholder }) {
   return <textarea className="fg-textarea fg-track-desc" value={v} placeholder={placeholder} onChange={e => setV(e.target.value)} onBlur={() => { if (v !== (value ?? '')) onCommit(v) }} onKeyDown={e => e.stopPropagation()} />
 }
 
-/** 配乐页：开关音量、导入整个音乐文件夹（带上里面的描述文件）、逐首编辑、导出描述。 */
+/** 导入文件夹时，曲子所在的子文件夹（最多两层）当分类：「我的歌/日常/校园/a.mp3」→「日常/校园」。直接选的文件没有。 */
+const folderCategory = file => String(file.webkitRelativePath || '').split('/').slice(1, -1).slice(0, 2).join('/')
+
+// ───────────────────────── 整理界面（曲库、音效库、环境音库共用） ─────────────────────────
+const NO_CAT = '\u0000未分类' // 分类树里「未分类」那一项
+const LIB_PAGE_SIZE = 200 // 一次列出多少条，再多点「再显示」
+const catOf = item => (item.category && item.category !== '未分类' ? item.category : '')
+const underCat = (item, cat) => { const c = catOf(item); return cat === NO_CAT ? !c : !cat || c === cat || c.startsWith(cat + '/') }
+const fmtBytes = bytes => (bytes >= 1073741824 ? (bytes / 1073741824).toFixed(1) + ' GB' : sizeMB(bytes))
+// 一行里的大小：音效常常只有几十 KB，不到 1 MB 的按 KB 写
+const rowSize = bytes => (bytes >= 1048576 ? sizeMB(bytes) : Math.max(1, Math.round(bytes / 1024)) + ' KB')
+const byZh = (a, b) => String(a).localeCompare(String(b), 'zh-CN', { numeric: true })
+const LIB_SORTS = [['name', '按名字'], ['new', '最近导入的在前'], ['size', '文件大的在前']]
+const LIB_FILTERS = [['all', '全部'], ['notag', '没标签的'], ['nodesc', '没描述的']]
+const splitTags = text => String(text || '').split(/[,，、\s]+/).filter(Boolean)
+
+/**
+ * 整理界面：左边分类树（两层，带数量；全部、未分类），右边按分类、搜索、筛选列出一行行条目，点一行展开编辑。
+ * 勾选（按住 Shift 连选一串）后底部一条批量操作：移到分类、加 / 去标签、删除，再加上 extras（音效库的改种类、音量……）。
+ * 分类可以改名（子分类跟着走，改成已有的名字就是并进去）、整类删。
+ *   items     这一页的条目（曲子或声音），都有 id、name、category、tags、description、bytes、addedAt
+ *   kinds     种类筛选 [[值, 名字]…]（音效库页的音效 / 打字音），没有就不显示；选了种类时分类树也只数这一种
+ *   editor    展开一行时的编辑区：item => JSX
+ *   summary   一行里名字下面那行小字：item => 文字
+ *   ops       { update(ids, patch), remove(ids), rename(from, to, kind) }：都回 Promise，做完自己刷新列表
+ *   extras    批量操作里多出来的一行：({ ids, run, busy }) => JSX
+ *   listId    分类输入框的候选列表（datalist）编号，编辑区的分类框也用它
+ */
+function LibBrowser({ items, unit = '个', kinds = null, playing, onPlay, editor, summary, ops, extras = null, listId }) {
+  const [cat, setCat] = React.useState('')
+  const [query, setQuery] = React.useState('')
+  const [filter, setFilter] = React.useState('all')
+  const [kind, setKind] = React.useState('')
+  const [sort, setSort] = React.useState('name')
+  const [selected, setSelected] = React.useState(() => new Set())
+  const [open, setOpen] = React.useState('')
+  const [limit, setLimit] = React.useState(LIB_PAGE_SIZE)
+  const [renaming, setRenaming] = React.useState(false)
+  const [moveTo, setMoveTo] = React.useState('')
+  const [tagText, setTagText] = React.useState('')
+  const [busy, run] = useBusy()
+  const last = React.useRef(-1)
+
+  const pool = React.useMemo(() => (kind ? items.filter(it => (it.kind || 'sfx') === kind) : items), [items, kind])
+  // 分类树：第一层（数量连子分类）→ 第二层
+  const tree = React.useMemo(() => {
+    const tops = new Map()
+    let none = 0
+    for (const it of pool) {
+      const c = catOf(it)
+      if (!c) { none++; continue }
+      const [top, sub] = c.split('/')
+      if (!tops.has(top)) tops.set(top, { n: 0, subs: new Map() })
+      const t = tops.get(top)
+      t.n++
+      if (sub) t.subs.set(sub, (t.subs.get(sub) || 0) + 1)
+    }
+    return { none, tops: [...tops.entries()].sort((a, b) => byZh(a[0], b[0])).map(([name, t]) => ({ name, n: t.n, subs: [...t.subs.entries()].sort((a, b) => byZh(a[0], b[0])) })) }
+  }, [pool])
+  const allCats = React.useMemo(() => [...new Set(items.map(catOf).filter(Boolean).flatMap(c => [c.split('/')[0], c]))].sort(byZh), [items])
+
+  const list = React.useMemo(() => {
+    const words = query.trim().split(/\s+/).filter(Boolean)
+    const out = pool.filter(it => {
+      if (!underCat(it, cat)) return false
+      if (filter === 'notag' && (it.tags || []).length) return false
+      if (filter === 'nodesc' && it.description) return false
+      if (words.length) {
+        const text = `${it.name} ${catOf(it)} ${(it.tags || []).join(' ')} ${it.description || ''} ${it.file || ''}`
+        if (!words.every(w => text.includes(w))) return false
+      }
+      return true
+    })
+    const cmp = { name: (a, b) => byZh(a.name, b.name), new: (a, b) => (b.addedAt || 0) - (a.addedAt || 0), size: (a, b) => (b.bytes || 0) - (a.bytes || 0) }[sort]
+    return out.sort(cmp)
+  }, [pool, cat, filter, sort, query])
+  React.useEffect(() => { setLimit(LIB_PAGE_SIZE); last.current = -1 }, [cat, kind, filter, sort, query])
+  React.useEffect(() => { setRenaming(false) }, [cat])
+  // 删掉了的不再算选中；选着的分类空了就回到全部
+  React.useEffect(() => {
+    const have = new Set(items.map(it => it.id))
+    setSelected(s => { const n = new Set([...s].filter(id => have.has(id))); return n.size === s.size ? s : n })
+    if (cat && !pool.some(it => underCat(it, cat))) setCat('')
+  }, [items, pool])
+
+  const pick = (index, e) => {
+    const id = list[index].id
+    // 上一次点的那个先记下来：setSelected 的更新函数可能等到下一次渲染才跑，那时 last 已经是这一次了
+    const from = e && e.shiftKey && last.current >= 0 && last.current < list.length ? last.current : -1
+    setSelected(s => {
+      const n = new Set(s)
+      const on = !n.has(id)
+      if (from >= 0) {
+        for (let i = Math.min(from, index); i <= Math.max(from, index); i++) on ? n.add(list[i].id) : n.delete(list[i].id)
+      } else if (on) n.add(id)
+      else n.delete(id)
+      return n
+    })
+    last.current = index
+  }
+  const allPicked = list.length > 0 && list.every(it => selected.has(it.id))
+  const pickAll = () => setSelected(s => { const n = new Set(s); for (const it of list) allPicked ? n.delete(it.id) : n.add(it.id); return n })
+  const ids = [...selected]
+
+  const moveSelected = () => {
+    const to = moveTo.trim()
+    run('move', () => ops.update(ids, { category: to }).then(() => toast(to ? `已把 ${ids.length} ${unit}移到「${to}」` : `已把 ${ids.length} ${unit}改成未分类`)))
+  }
+  const tagSelected = mode => {
+    const tags = splitTags(tagText)
+    if (!tags.length) return
+    run('tag', () => ops.update(ids, mode === 'add' ? { addTags: tags } : { removeTags: tags }).then(() => toast(mode === 'add' ? `已给 ${ids.length} ${unit}加上「${tags.join('、')}」` : `已从 ${ids.length} ${unit}去掉「${tags.join('、')}」`)))
+  }
+  const removeSelected = () => {
+    if (!window.confirm(`删掉选中的 ${ids.length} ${unit}？存进 FlowGal 的音频一起删，电脑上的原文件不受影响。`)) return
+    run('del', () => ops.remove(ids).then(() => { setSelected(new Set()); toast(`已删除 ${ids.length} ${unit}`) }))
+  }
+  const named = cat && cat !== NO_CAT
+  const inCat = named ? pool.filter(it => underCat(it, cat)) : []
+  const renameCat = to => {
+    const name = String(to || '').trim().split(/[\\/]/).map(s => s.trim()).filter(Boolean).slice(0, 2).join('/')
+    if (!name || name === cat) { setRenaming(false); return }
+    run('rename', () => ops.rename(cat, name, kind).then(() => { setCat(name); toast(`「${cat}」改名为「${name}」`) }))
+  }
+  const removeCat = () => {
+    if (!window.confirm(`把「${cat}」这一类的 ${inCat.length} ${unit}都删掉${cat.includes('/') ? '' : '（连子分类）'}？存进 FlowGal 的音频一起删，电脑上的原文件不受影响。`)) return
+    run('delcat', () => ops.remove(inCat.map(it => it.id)).then(() => { setCat(''); toast(`已删除「${cat}」这一类`) }))
+  }
+
+  const catButton = (value, label, n, sub = false) => (
+    <button key={value || '*'} type="button" className={`fg-libcat${sub ? ' is-sub' : ''}${cat === value ? ' is-on' : ''}`} title={label} onClick={() => setCat(value)}>
+      <span>{label}</span><i>{n}</i>
+    </button>
+  )
+  const shown = list.slice(0, limit)
+  return (
+    <div className="fg-lib">
+      <datalist id={listId}>{allCats.map(c => <option key={c} value={c} />)}</datalist>
+      <nav className="fg-lib-tree">
+        {catButton('', '全部', pool.length)}
+        {tree.tops.map(t => (
+          <React.Fragment key={t.name}>
+            {catButton(t.name, t.name, t.n)}
+            {(cat === t.name || cat.startsWith(t.name + '/')) && t.subs.map(([sub, n]) => catButton(`${t.name}/${sub}`, sub, n, true))}
+          </React.Fragment>
+        ))}
+        {tree.none > 0 && catButton(NO_CAT, '未分类', tree.none)}
+      </nav>
+      <div className="fg-lib-main">
+        <div className="fg-row fg-lib-tools">
+          <input className="fg-input fg-lib-search" value={query} placeholder="搜索名字、分类、标签、描述、文件名（空格隔开几个词）" onChange={e => setQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />
+          {kinds && <Select value={kind} options={kinds} style={INLINE} onChange={setKind} />}
+          <Select value={filter} options={LIB_FILTERS} style={INLINE} onChange={setFilter} />
+          <Select value={sort} options={LIB_SORTS} style={INLINE} onChange={setSort} />
+        </div>
+        {named && (
+          <div className="fg-row fg-lib-cathead">
+            {renaming
+              ? <><span className="fg-note">「{cat}」改名为</span><Text value={cat} list={listId} style={{ flex: 1, width: 'auto' }} onCommit={renameCat} /><button type="button" className="fg-btn is-mini" onClick={() => setRenaming(false)}>取消</button></>
+              : <><b>{cat}</b><span className="fg-note">{inCat.length} {unit}</span><span className="fg-spacer" />
+                <button type="button" className="fg-btn is-mini" disabled={Boolean(busy)} title="子分类跟着走；改成已有的分类名就是并进去" onClick={() => setRenaming(true)}>改名</button>
+                <button type="button" className="fg-btn is-mini fg-danger" disabled={Boolean(busy)} onClick={removeCat}>删除这一类</button></>}
+          </div>
+        )}
+        <div className="fg-row fg-lib-count">
+          <label className="fg-row"><input type="checkbox" checked={allPicked} disabled={!list.length} onChange={pickAll} /><span className="fg-note">全选这 {list.length} {unit}</span></label>
+          <span className="fg-spacer" />
+          <span className="fg-note">按住 Shift 点勾选框能连着选一串；点名字展开编辑</span>
+        </div>
+        {!list.length && <div className="fg-note fg-lib-empty">{pool.length ? '没有符合条件的。' : '还是空的。'}</div>}
+        {shown.map((it, i) => (
+          <React.Fragment key={it.id}>
+            <div className={`fg-librow${selected.has(it.id) ? ' is-picked' : ''}${open === it.id ? ' is-open' : ''}`}>
+              <input type="checkbox" checked={selected.has(it.id)} onChange={() => {}} onClick={e => pick(i, e)} aria-label={`选中 ${it.name}`} />
+              <button type="button" className={`fg-librow-play${playing === it.id ? ' is-on' : ''}`} title={playing === it.id ? '停止试听' : '试听'} onClick={() => onPlay(it)}>{playing === it.id ? '■' : '▶'}</button>
+              <button type="button" className="fg-librow-main" title={open === it.id ? '收起' : '点开编辑'} onClick={() => setOpen(o => (o === it.id ? '' : it.id))}>
+                <b>{it.name}</b>
+                <span>{summary(it)}</span>
+              </button>
+              <button type="button" className={`fg-libchip${catOf(it) ? '' : ' is-none'}`} title="只看这一类" onClick={() => setCat(catOf(it) || NO_CAT)}>{catOf(it) || '未分类'}</button>
+              <span className="fg-librow-size" title={it.file}>{rowSize(it.bytes || 0)}</span>
+            </div>
+            {open === it.id && <div className="fg-libedit">{editor(it)}</div>}
+          </React.Fragment>
+        ))}
+        {list.length > limit && <button type="button" className="fg-btn fg-lib-more" onClick={() => setLimit(n => n + LIB_PAGE_SIZE)}>再显示 {Math.min(LIB_PAGE_SIZE, list.length - limit)} {unit}（还有 {list.length - limit} {unit}没列出来）</button>}
+        {ids.length > 0 && (
+          <div className="fg-lib-bar">
+            <div className="fg-row">
+              <b>已选 {ids.length} {unit}</b>
+              <span className="fg-spacer" />
+              <button type="button" className="fg-btn is-mini fg-danger" disabled={Boolean(busy)} onClick={removeSelected}>删除</button>
+              <button type="button" className="fg-btn is-mini" onClick={() => setSelected(new Set())}>取消选择</button>
+            </div>
+            <div className="fg-row">
+              <span className="fg-note">移到分类</span>
+              <input className="fg-input" list={listId} style={{ flex: 1, width: 'auto' }} value={moveTo} placeholder="两层用 / 隔开，比如 日常/校园；空着就是未分类" onChange={e => setMoveTo(e.target.value)} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') moveSelected() }} />
+              <button type="button" className="fg-btn is-mini" disabled={Boolean(busy)} onClick={moveSelected}>移过去</button>
+            </div>
+            <div className="fg-row">
+              <span className="fg-note">标签</span>
+              <input className="fg-input" style={{ flex: 1, width: 'auto' }} value={tagText} placeholder="一个或几个标签，用顿号或空格隔开" onChange={e => setTagText(e.target.value)} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') tagSelected('add') }} />
+              <button type="button" className="fg-btn is-mini" disabled={Boolean(busy) || !tagText.trim()} onClick={() => tagSelected('add')}>都加上</button>
+              <button type="button" className="fg-btn is-mini" disabled={Boolean(busy) || !tagText.trim()} onClick={() => tagSelected('remove')}>都去掉</button>
+            </div>
+            {extras && extras({ ids, run, busy })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+
+/** 配乐页：开关音量、导入整个音乐文件夹（带上里面的描述文件）、按分类整理、导出描述、清空。 */
 function MusicSection({ data }) {
   const cfg = data.config
   const tracks = useMusic()
@@ -2480,7 +2694,10 @@ function MusicSection({ data }) {
     setPlaying(track.id)
   }
 
-  /** 逐首上传；文件夹里有描述文件时（子文件夹里各有一份也行），按文件名把曲名、描述、标签写上（描述文件优先）。 */
+  /**
+   * 逐首上传；文件夹里有描述文件时（子文件夹里各有一份也行），按文件名把曲名、分类、描述、标签写上（描述文件优先）。
+   * 描述文件没写分类、曲子也还没分类的，用所在的子文件夹当分类。
+   */
   const importFiles = async list => {
     const files = [...(list || [])]
     if (!files.length) return
@@ -2488,7 +2705,7 @@ function MusicSection({ data }) {
     for (const sidecar of files.filter(f => f.name === MUSIC_SIDECAR)) {
       try { for (const [file, m] of readSidecar(await sidecar.text())) meta.set(file, m) } catch (e) { toast(`${sidecar.webkitRelativePath || sidecar.name} 没读成：${e.message}。这份先不用`, 'error') }
     }
-    const audio = files.filter(f => AUDIO_FILE.test(f.name)).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN', { numeric: true }))
+    const audio = files.filter(f => AUDIO_FILE.test(f.name)).sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name, 'zh-CN', { numeric: true }))
     if (!audio.length) { toast('没找到音频文件（mp3、m4a、aac、ogg、opus、wav、flac）', 'error'); return }
     const failed = []
     let described = 0
@@ -2498,7 +2715,10 @@ function MusicSection({ data }) {
       try {
         const track = await api.uploadTrack(file)
         const m = meta.get(file.name)
-        if (m) { await api.updateTrack(track.id, m); described++ }
+        const folder = folderCategory(file)
+        const patch = { ...(m || {}), ...(folder && !track.category && (!m || m.category === undefined) ? { category: folder } : {}) }
+        if (Object.keys(patch).length) await api.updateTrack(track.id, patch)
+        if (m) described++
       } catch (e) {
         failed.push(`${file.name}：${e.message}`)
       }
@@ -2521,13 +2741,18 @@ function MusicSection({ data }) {
     setClearing(false)
     toast(`已清空曲库：删掉 ${cleared.tracks} 首${cleared.failed ? `；${cleared.failed} 个文件没删掉（可能正被占用），曲库里已经没有它们了` : ''}`, cleared.failed ? 'error' : undefined)
   })
+  const ops = {
+    update: (ids, patch) => api.updateTracks(ids, patch).then(() => loadMusic()),
+    remove: ids => { if (ids.includes(playing)) stopPreview(); return api.removeTracks(ids).then(() => loadMusic()) },
+    rename: (from, to) => api.renameMusicCategory(from, to).then(() => loadMusic()),
+  }
 
   return (
     <>
       <div className="fg-section">播放</div>
       <Field label="配乐"><div className="fg-row"><Toggle value={cfg.ui.bgm} onChange={v => p({ bgm: v })} /><input type="range" min="0" max="1" step="0.05" value={cfg.ui.bgmVolume} onChange={e => p({ bgmVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
       <div className="fg-section">我的曲库{tracks ? ` · ${tracks.length} 首` : ''}</div>
-      <div className="fg-note">后台导演整理每一轮时会读到下面每首的描述和标签，自己决定这一幕放哪首、哪句话换歌。描述随便写：听感、乐器、适合的场面和情绪都行，越具体导演选得越准。导演还没整理完的轮次会先按描述粗配一首。</div>
+      <div className="fg-note">后台导演整理每一轮时会读到每首的分类、描述和标签，自己决定这一幕放哪首、哪句话换歌。描述随便写：听感、乐器、适合的场面和情绪都行，越具体导演选得越准。导演还没整理完的轮次会先按描述粗配一首。曲子多的时候导演每轮按分类各挑几首看，分好类它就不会只看到一种情绪。</div>
       <div className="fg-row" style={{ margin: '1cqw 0' }}>
         <button type="button" className="fg-btn is-primary" disabled={Boolean(progress)} onClick={() => folderRef.current && folderRef.current.click()}>导入文件夹</button>
         <button type="button" className="fg-btn" disabled={Boolean(progress)} onClick={() => filesRef.current && filesRef.current.click()}>添加曲子</button>
@@ -2539,16 +2764,16 @@ function MusicSection({ data }) {
       </div>
       {clearing && tracks && tracks.length > 0 && (
         <div className="fg-row fg-manage">
-          <span className="fg-note">删掉曲库里全部 {tracks.length} 首（{totalBytes >= 1073741824 ? (totalBytes / 1073741824).toFixed(1) + ' GB' : sizeMB(totalBytes)}），描述、标签和存进 FlowGal 的音频一起删；电脑上的原文件不受影响。描述想留着的话先点「导出描述」。</span>
+          <span className="fg-note">删掉曲库里全部 {tracks.length} 首（{fmtBytes(totalBytes)}），分类、描述、标签和存进 FlowGal 的音频一起删；电脑上的原文件不受影响。描述想留着的话先点「导出描述」。</span>
           <span className="fg-spacer" />
           <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'clear'} onClick={clearAll}>{busy === 'clear' ? '清空中…' : '确认清空'}</button>
           <button type="button" className="fg-btn is-mini" disabled={busy === 'clear'} onClick={() => setClearing(false)}>取消</button>
         </div>
       )}
-      <div className="fg-note">文件夹里放一份 <code>{MUSIC_SIDECAR}</code>（就是「导出描述」得到的文件；分了子文件夹的，每个子文件夹各放一份也行），导入时会按文件名自动带上描述；同一首再导入不会重复存，但描述会以这个文件为准。</div>
+      <div className="fg-note">导入文件夹时，分了子文件夹的按子文件夹分类（最多两层，「日常/校园」）。文件夹里放一份 <code>{MUSIC_SIDECAR}</code>（就是「导出描述」得到的文件；每个子文件夹各放一份也行），导入时会按文件名自动带上分类和描述；同一首再导入不会重复存，但描述会以这个文件为准。</div>
       {!tracks && <div className="fg-note">读取中…</div>}
       {tracks && !tracks.length && <div className="fg-note" style={{ marginTop: '1cqw' }}>曲库还是空的。没有曲子时剧场不放音乐。</div>}
-      {tracks && tracks.map(t => <TrackCard key={t.id} track={t} playing={playing === t.id} onPlay={() => play(t)} />)}
+      {tracks && tracks.length > 0 && <LibBrowser items={tracks} unit="首" listId={MUSIC_LIST} playing={playing} onPlay={play} editor={t => <TrackEditor track={t} />} summary={trackSummary} ops={ops} />}
     </>
   )
 }
@@ -2565,54 +2790,74 @@ function saveText(text, name) {
 const KIND_LABEL = { ambience: '环境音', blip: '打字音', sfx: '音效' }
 /** 推荐用途：「声音」页一键套用时，标了哪个槽就放进哪个槽，标了旁白的打字音给旁白。 */
 const USE_OPTIONS = [['', '没有'], ...SOUND_SLOTS.map(s => [s.id, `${s.group === 'ui' ? '界面音' : '落字音效'} · ${s.label}`]), ['narration', '旁白的打字音']]
-const LIB_SHOWN = 200 // 搜索结果、一个分组里最多列出多少个
 // 单个声音的音量按分贝拖（-30 dB 到 +24 dB，最左是静音）：能放大到 16 倍，按倍数拖的话 1 倍以下挤在最左边一小段。
 const VOLUME_DB = [-30, 20 * Math.log10(MAX_SOUND_VOLUME)]
 const volumeDb = v => (v > 0 ? Math.min(VOLUME_DB[1], Math.max(VOLUME_DB[0], 20 * Math.log10(v))) : VOLUME_DB[0])
 const dbVolume = db => (db <= VOLUME_DB[0] ? 0 : Math.min(MAX_SOUND_VOLUME, Math.round(10 ** (db / 20) * 100) / 100))
 const volumeText = v => (v > 0 ? `${Number(v.toFixed(2))} 倍` : '静音')
 
-/** 音效库里的一个声音：试听、改名字 / 种类 / 分类 / 音量 / 标签 / 描述、删除。 */
-function LibSoundCard({ sound, playing, onPlay }) {
+const KIND_OPTIONS = [['sfx', '音效（响一次）'], ['ambience', '环境音（循环）'], ['blip', '打字音（一个字一下）']]
+const GENDER_OPTIONS = [['', '不分男女'], ['female', '女声'], ['male', '男声']]
+const useText = use => (USE_OPTIONS.find(([v]) => v === use) || [])[1] || use
+const soundSummary = s => [s.kind === 'blip' ? `打字音 · ${VOICE_GENDER[s.gender || '']}` : (s.tags || []).join('、'), s.use ? `推荐用途：${useText(s.use)}` : '', (s.volume ?? 1) !== 1 ? `音量 ${volumeText(s.volume ?? 1)}` : '', s.description].filter(Boolean).join(' · ') || '（还没有描述和标签）'
+
+/** 展开的一个声音：改名字 / 种类 / 分类 / 音量 / 推荐用途 / 标签 / 描述、删除。 */
+function LibSoundEditor({ sound, listId }) {
   const [busy, run] = useBusy()
-  const [open, setOpen] = React.useState(false)
   const save = patch => run('s', async () => { await api.updateLibSound(sound.id, patch); await loadSoundlib() })
   return (
-    <div className="fg-track fg-libsound">
-      <button type="button" className={`fg-track-play${playing ? ' is-on' : ''}`} title={playing ? '停止试听' : '试听'} onClick={onPlay}>{playing ? '■' : '▶'}</button>
-      <div className="fg-track-body">
-        <div className="fg-row">
-          <Text value={sound.name} style={{ flex: 1, width: 'auto', fontWeight: 600 }} onCommit={v => save({ name: v })} />
-          <span className="fg-note" title={sound.file}>{sizeMB(sound.bytes)}</span>
-          <button type="button" className="fg-btn" onClick={() => setOpen(v => !v)}>{open ? '收起' : '编辑'}</button>
-          <button type="button" className="fg-btn" disabled={busy === 'd'} onClick={() => { if (window.confirm(`从音效库删除「${sound.name}」？电脑上的原文件不受影响。`)) run('d', async () => { await api.removeLibSounds([sound.id]); await loadSoundlib() }, '已删除') }}>删除</button>
-        </div>
-        {!open && <div className="fg-note fg-libsound-tags">{sound.kind === 'blip' ? `打字音 · ${VOICE_GENDER[sound.gender || '']}` : (sound.tags || []).join('、') || '（没有标签）'}{sound.use ? ` · 推荐用途：${(USE_OPTIONS.find(([v]) => v === sound.use) || [])[1] || sound.use}` : ''}{sound.description ? ' · ' + sound.description : ''}</div>}
-        {open && (
-          <>
-            <div className="fg-row">
-              <select className="fg-select" style={{ width: 'auto' }} value={sound.kind} onChange={e => save({ kind: e.target.value })}>
-                <option value="sfx">音效（响一次）</option>
-                <option value="ambience">环境音（循环）</option>
-                <option value="blip">打字音（一个字一下）</option>
-              </select>
-              {sound.kind === 'blip' && <Select value={sound.gender || ''} options={[['', '不分男女'], ['female', '女声'], ['male', '男声']]} style={INLINE} onChange={v => save({ gender: v })} />}
-              <Text value={sound.category} placeholder="分类，两层用 / 隔开：门窗/敲门" style={{ flex: 1, width: 'auto' }} onCommit={v => save({ category: v })} />
-              <span className="fg-note">音量</span>
-              <input type="range" min={VOLUME_DB[0]} max={VOLUME_DB[1]} step="any" value={volumeDb(sound.volume ?? 1)} onChange={e => save({ volume: dbVolume(Number(e.target.value)) })} style={{ width: '8cqw' }} />
-              <span className="fg-note">{volumeText(sound.volume ?? 1)}</span>
-            </div>
-            <div className="fg-row">
-              <span className="fg-note">推荐用途</span>
-              <Select value={sound.use || ''} options={USE_OPTIONS} style={INLINE} onChange={v => save({ use: v })} />
-              <span className="fg-note">「声音」页一键套用时用</span>
-            </div>
-            {sound.kind !== 'blip' && <Text value={(sound.tags || []).join('、')} placeholder="标签：正文里会出现的词，用顿号隔开。导演按它们挑候选，例如：敲门、咚咚、门" style={{ width: '100%' }} onCommit={v => save({ tags: v })} />}
-            <TextArea value={sound.description} placeholder="听起来什么样、什么时候用。例如：木门被轻轻敲了两下，礼貌、迟疑" onCommit={v => save({ description: v })} />
-          </>
-        )}
+    <>
+      <div className="fg-row">
+        <Text value={sound.name} style={{ flex: 2, width: 'auto', fontWeight: 600 }} onCommit={v => save({ name: v })} />
+        <Text value={catOf(sound)} list={listId} placeholder="分类，两层用 / 隔开：门窗/敲门" style={{ flex: 1, width: 'auto' }} onCommit={v => save({ category: v })} />
+        <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'd'} onClick={() => { if (window.confirm(`从音效库删除「${sound.name}」？电脑上的原文件不受影响。`)) run('d', async () => { await api.removeLibSounds([sound.id]); await loadSoundlib() }, '已删除') }}>删除</button>
       </div>
-    </div>
+      <div className="fg-row">
+        <Select value={sound.kind} options={KIND_OPTIONS} style={INLINE} onChange={v => save({ kind: v })} />
+        {sound.kind === 'blip' && <Select value={sound.gender || ''} options={GENDER_OPTIONS} style={INLINE} onChange={v => save({ gender: v })} />}
+        <span className="fg-note">音量</span>
+        <input type="range" min={VOLUME_DB[0]} max={VOLUME_DB[1]} step="any" value={volumeDb(sound.volume ?? 1)} onChange={e => save({ volume: dbVolume(Number(e.target.value)) })} style={{ width: '8cqw' }} />
+        <span className="fg-note">{volumeText(sound.volume ?? 1)}</span>
+      </div>
+      <div className="fg-row">
+        <span className="fg-note">推荐用途</span>
+        <Select value={sound.use || ''} options={USE_OPTIONS} style={INLINE} onChange={v => save({ use: v })} />
+        <span className="fg-note">「声音」页一键套用时用</span>
+      </div>
+      {sound.kind !== 'blip' && <Text value={(sound.tags || []).join('、')} placeholder="标签：正文里会出现的词，用顿号隔开。导演按它们挑候选，例如：敲门、咚咚、门" style={{ width: '100%' }} onCommit={v => save({ tags: v })} />}
+      <TextArea value={sound.description} placeholder="听起来什么样、什么时候用。例如：木门被轻轻敲了两下，礼貌、迟疑" onCommit={v => save({ description: v })} />
+      {sound.file && <div className="fg-note">文件：{sound.file}</div>}
+    </>
+  )
+}
+
+/** 音效库、环境音库勾选后多出来的批量操作：改种类、统一音量，音效库页还有打字音的男女。 */
+function SoundBatch({ ids, run, busy, kind }) {
+  const [to, setTo] = React.useState(kind === 'sfx' ? 'blip' : 'sfx')
+  const [gender, setGender] = React.useState('female')
+  const [db, setDb] = React.useState(0)
+  const go = (patch, text) => run('batch', async () => { await api.updateLibSounds(ids, patch); await loadSoundlib(); toast(text) })
+  const pageOf = k => (k === 'ambience' ? 'ambience' : 'sfx')
+  const moved = pageOf(to) !== kind ? `，挪到了${LIB_PAGE[pageOf(to)].title}` : ''
+  return (
+    <>
+      <div className="fg-row">
+        <span className="fg-note">种类改成</span>
+        <Select value={to} options={KIND_OPTIONS} style={INLINE} onChange={setTo} />
+        <button type="button" className="fg-btn is-mini" disabled={Boolean(busy)} onClick={() => go({ kind: to }, `已把 ${ids.length} 个改成${KIND_LABEL[to]}${moved}`)}>改</button>
+        {kind === 'sfx' && <>
+          <span className="fg-note">打字音的男女</span>
+          <Select value={gender} options={GENDER_OPTIONS} style={INLINE} onChange={setGender} />
+          <button type="button" className="fg-btn is-mini" disabled={Boolean(busy)} onClick={() => go({ gender }, `已把 ${ids.length} 个标成${VOICE_GENDER[gender]}`)}>标上</button>
+        </>}
+      </div>
+      <div className="fg-row">
+        <span className="fg-note">音量</span>
+        <input type="range" min={VOLUME_DB[0]} max={VOLUME_DB[1]} step="any" value={db} onChange={e => setDb(Number(e.target.value))} style={{ flex: 1 }} />
+        <span className="fg-note">{volumeText(dbVolume(db))}</span>
+        <button type="button" className="fg-btn is-mini" disabled={Boolean(busy)} onClick={() => go({ volume: dbVolume(db) }, `已把 ${ids.length} 个的音量都设成 ${volumeText(dbVolume(db))}`)}>都设成这个音量</button>
+      </div>
+    </>
   )
 }
 
@@ -2640,11 +2885,11 @@ function ErosField({ cfg, p }) {
   )
 }
 
-// 音效库和环境音库各一页：开关音量、导入整个文件夹（带上里面的描述文件）、按分类分组浏览、搜索、试听、逐个改、整类删、导出描述、清空。
+// 音效库和环境音库各一页：开关音量、导入整个文件夹（带上里面的描述文件）、按分类整理（分类树、搜索、勾选批量改）、试听、逐个改、导出描述、清空。
 // 音效库页列音效和打字音，环境音库页列环境音；导演挑候选时本来就分开挑。清空只清这一页的音效或环境音，
 // 打字音和「声音」页正在用的（落字音效、界面音的槽，旁白、默认音色）留着。
 const LIB_PAGE = {
-  sfx: { kinds: ['sfx', 'blip'], title: '音效库', unit: '个音效', other: '环境音库', empty: '音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。', note: '推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时只看几十个候选，再决定哪句配什么音效。候选怎么挑见下面「导演怎么挑」；标签写正文里会出现的说法最稳。' },
+  sfx: { kinds: ['sfx', 'blip'], title: '音效库', unit: '个音效', filter: [['', '音效和打字音'], ['sfx', '只看音效'], ['blip', '只看打字音']], other: '环境音库', empty: '音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。', note: '推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时只看几十个候选，再决定哪句配什么音效。候选怎么挑见下面「导演怎么挑」；标签写正文里会出现的说法最稳。' },
   ambience: { kinds: ['ambience'], title: '环境音库', unit: '个环境音', other: '音效库', empty: '环境音库还是空的。没有环境音时剧场不放环境音。', note: '雨声、蝉鸣、车站广播这类循环的底。后台导演整理每一轮时从一批候选里给每一幕挑一个，跨轮沿用。候选怎么挑见下面「导演怎么挑」；标签写地点、天气、时段这类词最管用。' },
 }
 
@@ -2684,14 +2929,12 @@ function SoundLibSection({ data, kind = 'sfx' }) {
   const otherKind = kind === 'sfx' ? 'ambience' : 'sfx'
   const [playing, setPlaying] = React.useState('')
   const [progress, setProgress] = React.useState('')
-  const [query, setQuery] = React.useState('')
-  const [openGroup, setOpenGroup] = React.useState('')
   const [clearing, setClearing] = React.useState(false) // 清空这一库：确认那一行开着
   const [busy, run] = useBusy()
   const folderRef = React.useRef(null)
   const p = patch => patchConfig({ ui: patch }).catch(e => toast(e.message, 'error'))
   React.useEffect(() => () => stopPreview(), [])
-  React.useEffect(() => { setQuery(''); setOpenGroup(''); setClearing(false) }, [kind])
+  React.useEffect(() => { setClearing(false) }, [kind])
 
   const play = s => {
     if (playing === s.id) { stopPreview(); return }
@@ -2737,23 +2980,12 @@ function SoundLibSection({ data, kind = 'sfx' }) {
     toast(`新导入 ${added} 个${elsewhere ? `（其中 ${elsewhere} 个描述文件写的是${KIND_LABEL[otherKind]}，放进了${LIB_PAGE[otherKind].title}）` : ''}${updated ? `，更新了 ${updated} 个的描述` : ''}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join('；')}` : ''}${useful && !failed.length ? '。里面有打字音和标了用途的声音，到「声音」页可以一键套用' : ''}`, failed.length ? 'error' : undefined)
   }
 
-  // 分组：种类 → 分类（两层的按第一层分组，组里显示完整分类），这一页的种类排前面（音效库页的打字音排在音效后面）。搜索时不分组，直接列出匹配的。
-  const groups = React.useMemo(() => {
-    const map = new Map()
-    for (const s of sounds || []) {
-      const key = `${s.kind}|${String(s.category || '未分类').split('/')[0]}`
-      if (!map.has(key)) map.set(key, { key, kind: s.kind, name: key.split('|')[1], items: [] })
-      map.get(key).items.push(s)
-    }
-    return [...map.values()].sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name, 'zh-CN') : a.kind === kind ? -1 : 1))
-  }, [sounds, kind])
-  const words = query.trim().split(/\s+/).filter(Boolean)
-  const found = words.length ? (sounds || []).filter(s => { const text = `${s.name} ${s.category} ${(s.tags || []).join(' ')} ${s.description}`; return words.every(w => text.includes(w)) }) : null
-  const cards = list => list.slice(0, LIB_SHOWN).map(s => <LibSoundCard key={s.id} sound={s} playing={playing === s.id} onPlay={() => play(s)} />)
-  const removeGroup = g => {
-    if (!window.confirm(`把「${g.kind === kind ? g.name : `${KIND_LABEL[g.kind]} · ${g.name}`}」这一类 ${g.items.length} 个都从${page.title}删掉？电脑上的原文件不受影响。`)) return
-    run('g' + g.key, async () => { await api.removeLibSounds(g.items.map(s => s.id)); await loadSoundlib() }, '已删除')
+  const ops = {
+    update: (ids, patch) => api.updateLibSounds(ids, patch).then(() => loadSoundlib()),
+    remove: ids => { if (ids.includes(playing)) stopPreview(); return api.removeLibSounds(ids).then(() => loadSoundlib()) },
+    rename: (from, to, only) => api.renameLibCategory(from, to, only ? [only] : page.kinds).then(() => loadSoundlib()),
   }
+  const listId = `fg-lib-cats-${kind}`
   // 清空这一库：重新整理时一次删光，只删这一种，另一库不动；电脑上的原文件不动。打字音和「声音」页正在用的留着（服务端也按设置留）。
   const inUse = new Set([...Object.values(cfg.ui.sounds || {}), cfg.ui.narrationVoice, cfg.ui.voiceDefault].map(libIdOf).filter(Boolean))
   const doomed = (sounds || []).filter(s => s.kind === kind && !inUse.has(s.id))
@@ -2786,32 +3018,19 @@ function SoundLibSection({ data, kind = 'sfx' }) {
       </div>
       {clearing && doomed.length > 0 && (
         <div className="fg-row fg-manage">
-          <span className="fg-note">删掉{page.title}里的 {doomed.length} {page.unit}（{totalBytes >= 1073741824 ? (totalBytes / 1073741824).toFixed(1) + ' GB' : sizeMB(totalBytes)}），名字、分类、标签和存进 FlowGal 的音频一起删；{page.other}不动{kept.blips ? `，${kept.blips} 个打字音留着` : ''}{kept.used ? `，「声音」页正在用的 ${kept.used} 个留着` : ''}，电脑上的原文件也不受影响。描述想留着的话先点「导出描述」。</span>
+          <span className="fg-note">删掉{page.title}里的 {doomed.length} {page.unit}（{fmtBytes(totalBytes)}），名字、分类、标签和存进 FlowGal 的音频一起删；{page.other}不动{kept.blips ? `，${kept.blips} 个打字音留着` : ''}{kept.used ? `，「声音」页正在用的 ${kept.used} 个留着` : ''}，电脑上的原文件也不受影响。描述想留着的话先点「导出描述」。</span>
           <span className="fg-spacer" />
           <button type="button" className="fg-btn is-mini fg-danger" disabled={busy === 'clear'} onClick={clearAll}>{busy === 'clear' ? '清空中…' : '确认清空'}</button>
           <button type="button" className="fg-btn is-mini" disabled={busy === 'clear'} onClick={() => setClearing(false)}>取消</button>
         </div>
       )}
-      <div className="fg-note">文件夹最上面放一份 <code>{SOUND_SIDECAR}</code>（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹，在这一页导入的算{KIND_LABEL[kind]}。同一个文件再导入不会重复存，但描述会以描述文件为准。{kind === 'sfx' ? '种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。' : ''}</div>
+      <div className="fg-note">文件夹最上面放一份 <code>{SOUND_SIDECAR}</code>（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹（最多两层），在这一页导入的算{KIND_LABEL[kind]}。同一个文件再导入不会重复存，但描述会以描述文件为准。{kind === 'sfx' ? '种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。' : ''}</div>
       {!sounds && <div className="fg-note">读取中…</div>}
       {sounds && !sounds.length && <div className="fg-note" style={{ marginTop: '1cqw' }}>{page.empty}</div>}
       {sounds && sounds.length > 0 && (
-        <>
-          <input className="fg-input" style={{ width: '100%', margin: '0.6cqw 0 1cqw' }} value={query} placeholder="搜索名字、分类、标签、描述（空格隔开几个词）" onChange={e => setQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />
-          {found && <div className="fg-note">找到 {found.length} 个{found.length > LIB_SHOWN ? `，先列出前 ${LIB_SHOWN} 个` : ''}</div>}
-          {found && cards(found)}
-          {!found && groups.map(g => (
-            <div key={g.key} className="fg-libgroup">
-              <div className="fg-row fg-libgroup-head">
-                <button type="button" className="fg-btn" onClick={() => setOpenGroup(k => (k === g.key ? '' : g.key))}>{openGroup === g.key ? '▾' : '▸'} {g.kind === kind ? g.name : `${KIND_LABEL[g.kind]} · ${g.name}`}</button>
-                <span className="fg-note">{g.items.length} 个</span>
-                <span style={{ flex: 1 }} />
-                <button type="button" className="fg-btn" disabled={busy === 'g' + g.key} onClick={() => removeGroup(g)}>删除这一类</button>
-              </div>
-              {openGroup === g.key && <>{g.items.length > LIB_SHOWN && <div className="fg-note">这一类有 {g.items.length} 个，先列出前 {LIB_SHOWN} 个；用搜索找其余的。</div>}{cards(g.items)}</>}
-            </div>
-          ))}
-        </>
+        <LibBrowser key={kind} items={sounds} unit="个" kinds={page.filter || null} listId={listId} playing={playing} onPlay={play} ops={ops}
+          editor={s => <LibSoundEditor sound={s} listId={listId} />} summary={soundSummary}
+          extras={args => <SoundBatch {...args} kind={kind} />} />
       )}
     </>
   )
