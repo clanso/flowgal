@@ -208,16 +208,16 @@ export function Silhouette({ name, color, appearance, gender }) {
  * 段落里导演写了这个人当时的样子（then）就按当时的找；还没画好时先显示剪影，不借现在那套。
  * 这一轮中途才变的样子（pending：后面才缠上发带、才换衣服）还没发生时，按变化之前的样子找。
  * 分动作的人（lib/poses.js）：pose 是他此刻所在的动作（节拍里的 postures），先找这个动作上的这张脸，没画好再看主动作、别的动作上的。
- * groups 是没有设计的人用的通用动作组（视图里的 poseGroups）。
+ * groups 是没有设计的人用的通用动作组（视图里的 poseGroups）。off 是这一刻收起了的动作（节拍里的 offPoses）：没画好时不退到它们上面。
  */
-function spriteFor(person, turn, emo, emotions, then = null, pending = null, { pose = '', groups = [] } = {}) {
+function spriteFor(person, turn, emo, emotions, then = null, pending = null, { pose = '', groups = [], off = null } = {}) {
   if (!person || !person.timeline) return ''
   const lib = emotions || []
   const now = lookAt(person.timeline, turn)
   const over = then || (pending ? undoShifts(now, pending) : null)
   const look = over ? thenLook(now, over, person.timeline.outfits) : now
   const sheet = sheetOf(person, groups || [])
-  const keys = sheet ? e => slotKeys(person.sprites, look, sheet, pose, e, lib) : null
+  const keys = sheet ? e => slotKeys(person.sprites, look, sheet, pose, e, lib, { off }) : null
   return pickSprite(person.sprites, look, resolveEmotion(emo, lib) || emo, standIns(emo, lib), { strict: Boolean(then), keys })
 }
 
@@ -333,7 +333,7 @@ function Actor({ entry, person, beat, emo, emotions, groups = [], leaving = fals
     const t = setTimeout(() => { const [frames, ms] = TOUCH_FRAMES[touched]; el.animate(frames, { duration: ms, easing: 'cubic-bezier(.3, .7, .3, 1)' }) }, 150)
     return () => clearTimeout(t)
   }, [beat.key])
-  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name], { pose: beat.postures && beat.postures[entry.name], groups })
+  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name], { pose: beat.postures && beat.postures[entry.name], groups, off: beat.offPoses && beat.offPoses[entry.name] })
   const src = sprite ? assetUrl(sprite) : ''
   const color = (person && person.color) || '#9b7bff'
   // 显示中的那张（cur）和刚换下、正在淡出的那张（prev），都带着图的原始宽高（按脸框缩放要用）。
@@ -563,7 +563,7 @@ export function RecallLayer({ beat, view, talk, light = false, tone = '' }) {
 /** 这个人这一拍的脸（小头像用）：立绘的地址和裁成正方形小格的位置（faceCrop）；没有立绘时 src 为空。 */
 function useFace(person, beat, view, then = null) {
   const name = person ? person.name : ''
-  const sprite = person ? spriteFor(person, beat.turn, beat.emotions[name] || 'neutral', view && view.emotions, then, null, { pose: beat.postures && beat.postures[name], groups: view && view.poseGroups }) : ''
+  const sprite = person ? spriteFor(person, beat.turn, beat.emotions[name] || 'neutral', view && view.emotions, then, null, { pose: beat.postures && beat.postures[name], groups: view && view.poseGroups, off: beat.offPoses && beat.offPoses[name] }) : ''
   const src = sprite ? assetUrl(sprite) : ''
   const [size, setSize] = React.useState(null)
   React.useEffect(() => {

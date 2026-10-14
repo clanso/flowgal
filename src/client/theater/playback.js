@@ -12,7 +12,8 @@ import { reactsOf, poseTracker, blockLayout } from '../../../lib/blocking.js'
 
 export { placeKey, blockLayout, hintedSpeaker }
 import { emotionLabel as labelIn, resolveEmotion, standIns, isBuiltinEmotion } from '../../../lib/emotions.js'
-import { sheetOf, poseWalker, lineSteps } from '../../../lib/poses.js'
+import { sheetOf, poseWalker, lineSteps, homePose, fullSheet } from '../../../lib/poses.js'
+import { liveSheet, lineCtx, unitOrder, offPoses } from '../../../lib/pose-life.js'
 
 // 剧场拿到的情绪库（所有对局共用）：内置情绪改过名的按新名字显示，并掉的显示并进去的那个。Theater 每次拿到视图时记一下。
 let shownEmotions = []
@@ -74,7 +75,10 @@ export function buildBeats(view) {
   // 每个人此刻在哪个动作（lib/poses.js）：身子不动只换脸，情绪在当前动作里没有才换，导演点名的换过去；出图那边按同一套走
   const byName = new Map((view.cast || []).map(p => [p.name, p]))
   const sheets = new Map()
-  const sheetFor = name => { if (!sheets.has(name)) sheets.set(name, sheetOf(byName.get(name), view.poseGroups || [])); return sheets.get(name) }
+  const baseSheet = name => { if (!sheets.has(name)) sheets.set(name, sheetOf(byName.get(name), view.poseGroups || [])); return sheets.get(name) }
+  // 动作会跟着剧情收起、放回（lib/pose-life.js）：每一句设好这一刻（moment），walker 拿到的是这一刻还在的那几个动作，出图那边一样算
+  let moment = null
+  const sheetFor = name => { const full = baseSheet(name); return moment && full && full.designed ? liveSheet(full, moment(name)) : full }
   const bodies = poseWalker(sheetFor, view.emotions || [])
   turns.forEach((t, ti) => {
     // 正文里框起来的闪回、回忆里的声音：导演没写 recall 也按短闪回演
@@ -97,7 +101,7 @@ export function buildBeats(view) {
     const scenes = walkScenes({ scene, bgm, amb, layer: keep }, lines)
     const recalls = recallRuns(script, units)
     const ahead = shiftsAhead(lines) // 一轮中途变的样子：每一句还没发生的变化
-    const unitIndex = new Map(units.map((u, i) => [u.id, i]))
+    const unitIndex = unitOrder(units)
     // 挂在不演的单元上的插画（导演整理前就有的、手动配的）：算到它前面最近一个要演的单元。
     const indexOf = id => {
       for (let i = all.findIndex(u => u.id === id); i >= 0; i--) if (unitIndex.has(all[i].id)) return unitIndex.get(all[i].id)
@@ -146,9 +150,27 @@ export function buildBeats(view) {
       const onStageNames = steps[ui].cast.map(c => c.name)
       const reacts = reactsOf(line, onStageNames, speakers)
       for (const r of reacts) if (r.emo) emotions[r.name] = r.emo
-      for (const step of lineSteps(line, speakers, reacts)) bodies.step(step.name, step.emo, step.pose)
+      // 这一刻每个人还能用的动作：收起了的不站（回忆、梦里剧情上的收起不算；长期状态按这一句的样子）
+      const layerHere = recalls[ui] ? { mode: 'memory', then: recalls[ui].then, recall: recalls[ui] } : at.layer
+      moment = name => lineCtx(byName.get(name), { turn: t.turn, index: ui, order: unitIndex, layer: layerHere, pending: ahead[ui] && ahead[ui][name], needs: view.situNeeds !== false })
+      const stepped = new Set()
+      for (const step of lineSteps(line, speakers, reacts)) { bodies.step(step.name, step.emo, step.pose); stepped.add(step.name) }
+      for (const name of bodies.names()) if (!stepped.has(name)) bodies.settle(name) // 站着的动作这一句收起了：换到还在的动作上
       const postures = {}
       for (const [name, st] of Object.entries(bodies.save())) if (st.pose) postures[name] = st.pose
+      const offs = {}
+      for (const name of onStageNames) {
+        const live = sheetFor(name)
+        if (!live || !live.full) continue
+        offs[name] = offPoses(live)
+        // 还没走过一步的人站在他情绪的主动作上；主动作此刻收起了的，站到还在的动作上
+        if (!postures[name]) {
+          const e = resolveEmotion(emotions[name] || 'neutral', view.emotions || []) || 'neutral'
+          const home = homePose(fullSheet(live), e, view.emotions || [])
+          if (home && !live.poses.some(p => p.id === home.id)) postures[name] = (homePose(live, e, view.emotions || []) || live.poses[0]).id
+        }
+      }
+      moment = null
       // 走位和进出的样子
       const ways = Object.fromEntries((line.enter || []).filter(e => e.how && steps[ui].entered.includes(e.name)).map(e => [e.name, e.how]))
       Object.assign(exitWay, line.exitHow || {})
@@ -245,6 +267,7 @@ export function buildBeats(view) {
         ...(Object.keys(gone).length ? { exitHow: gone } : {}), // 甩头离开、跑开、慢慢走远
         emotions: { ...emotions },
         ...(Object.keys(postures).length ? { postures } : {}), // 每个人此刻在哪个动作（动作编号；没走到过的人按他情绪的主动作）
+        ...(Object.values(offs).some(list => list.length) ? { offPoses: offs } : {}), // 这一刻收起了的动作：剧场找图时不退到它们上面
         cg,
         cgAnchor: Boolean(cgEntry && cgEntry.at === ui),
         directed: Boolean(script),

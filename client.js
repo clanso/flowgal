@@ -3225,8 +3225,10 @@ var FRAGMENTS = {
     "此刻穿着：{{outfit}}]]",
     "长期状态：{{states}}[[",
     "临时状态（只影响插画，立绘不要画）：{{temp}}]][[",
-    "表演笔记（玩家写的，必须遵守）：{{userNote}}]][[",
-    "表演笔记（表演设计师读完资料写的）：{{aiNote}}]][[",
+    "表演笔记·本性（玩家写的，必须遵守）：{{userNote}}]][[",
+    "表演笔记·本性（表演设计师读完资料写的）：{{aiNote}}]][[",
+    "表演笔记·这一局（玩家写的，必须遵守）：{{userHere}}]][[",
+    "表演笔记·这一局（表演设计师按此刻的处境写的）：{{aiHere}}]][[",
     "立绘备注（玩家写的，必须遵守）：{{note}}]][[",
     "不要出现：{{negative}}]]"
   ].join("\n"),
@@ -3244,6 +3246,12 @@ var FRAGMENTS = {
   "director.previous.first": "（这是第一幕）",
   "director.cast": "- {{name}}[[（{{global}}，固定外貌冻结）]]：固定外貌：{{appearance}}[[；衣橱：{{wardrobe}}]][[；正在穿：{{outfit}}]][[；长期状态：{{states}}]][[；临时：{{temp}}]][[；动作：{{poses}}]]",
   "director.cast.none": "（暂无）",
+  "director.cast.pose": "{{id}} {{label}}{{situ}}[[（{{emotions}}）]]",
+  "director.cast.situ": "［处境[[：{{premise}}]][[；靠 {{needs}}]]］",
+  "director.cast.self": "[[［靠 {{needs}}］]]",
+  "director.cast.off": "；收起了的：{{list}}",
+  "director.cast.offPose": "{{id}} {{label}}［{{why}}］",
+  "director.situ": "- situ 动作跟着处境走：【角色档案】里一个人的动作标着［处境：前提］的，是从他眼下的处境来的（一段关系、一件信物、一道伤、一个心结）。剧情跨过了这个前提（找到了要找的人、和好了、伤好了、那件信物不再是那个意思了）的那一句，写 situ：name 写这个人，off 写不再合适的动作编号，why 写一句什么变了；又回到那种处境时（又分开了、又受伤了）写 on 放回，【角色档案】里「收起了的」就是已经收起的。标着「靠」某个长期状态的不用写：长期状态变了会自动收起、放回。本性的动作（没标处境的）不收。他的处境大变、整个人的样子该跟着变（重逢、决裂、失去亲人、换了身份），但没有动作要收起时，只写 name 和 why，设计师会按新的处境复盘他的动作。一个人往往很多轮才有一次，平常不写。",
   "director.emotions": "写左边的编号：内置情绪是英文键，新加的就是原词本身。\n{{list}}",
   "director.raw": "【本轮原文（模型写的原样，含标签。下面的单元就是从它切出来的；用它看清每句话在原文的什么位置，被状态栏、面板、变量这类标签包着的单元写进 skip）】\n{{raw}}",
   "director.music.now": "上一幕结束时在放：{{id}}（{{name}}）。",
@@ -3256,10 +3264,17 @@ var FRAGMENTS = {
   "acting.line.builtin": "- {{key}}（{{label}}）",
   "acting.line.custom": "- {{key}}（新情绪[[，接近 {{near}}]]）",
   "acting.line.placed": "{{line}}：已在动作 {{poses}}里，只重新设计表情",
-  "acting.current": "【已有的动作与表情设计】\n[[表演笔记：{{read}}\n]]动作：\n{{poses}}[[\n表情：\n{{faces}}]]",
-  "acting.current.pose": "- {{id}}「{{label}}」：{{desc}}[[；身体 {{tags}}]]；情绪：{{emotions}}",
+  "acting.current": "【已有的动作与表情设计】\n[[表演笔记·本性：{{read}}\n]][[表演笔记·这一局：{{now}}\n]]动作：\n{{poses}}[[\n表情：\n{{faces}}]]",
+  "acting.current.pose": "- {{id}}「{{label}}」［{{kind}}[[：{{premise}}]][[；靠 {{needs}}]]］：{{desc}}[[；身体 {{tags}}]]；情绪：{{emotions}}[[（现在{{status}}）]]",
   "acting.current.face": "- {{label}}[[［{{level}}］]]：{{desc}}[[（{{tags}}）]]",
-  "acting.blanks": mapText([["noDesc", "（没写描述）"], ["base", "（底图）"]]),
+  "acting.blanks": mapText([["noDesc", "（没写描述）"], ["base", "（底图）"], ["noKind", "没标本性还是处境"]]),
+  "acting.change": "- [[「{{quote}}」这一句起：]]{{what}}[[（{{why}}）]]",
+  "acting.change.off": "收起 {{poses}}",
+  "acting.change.on": "放回 {{poses}}",
+  "acting.change.shift": "处境变了，没有动作要收起",
+  "acting.change.needs": "长期状态里没有「{{states}}」了",
+  "acting.change.manual": "- 玩家让你按他现在的处境复盘一次",
+  "acting.noNewPoses": "这次不加新动作：设置里关了「复盘时设计新动作」，情绪都放进已有的动作。",
   // 立绘设计师
   "sprite.references": "【已经画好的立绘（固定外貌的写法要和它们一致）】\n{{list}}",
   "sprite.line.face": "- {{id}}：只换脸——在「{{anchor}}」那张「{{pose}}」动作底图上只重画脸，身体、衣服不动；情绪「{{emotion}}」[[；接近 {{near}}]]{{look}}；tags 只写这张脸的表情（情绪词 + 眉、眼、嘴的细节，需要时脸红、泪、汗、视线），不写外貌、衣服和动作",
@@ -3922,9 +3937,11 @@ function cleanPoseList(raw, { keepEmpty = true, prefix = "p", keepIds = true } =
 }
 var cleanPoseGroups = (raw, legacy = {}) => Array.isArray(raw) ? cleanPoseList(raw, { prefix: "g" }) : defaultPoseGroups(legacy);
 function sheetOf(person, groups = []) {
-  if (person?.acting?.poses?.length) return { poses: person.acting.poses, designed: true };
+  if (person?.acting?.poses?.length) return { poses: person.acting.poses, designed: true, ...person.acting.usedIds?.length ? { usedIds: person.acting.usedIds } : {} };
   return Array.isArray(groups) && groups.length ? { poses: groups, designed: false } : null;
 }
+var fullSheet = (sheet) => sheet?.full ? { ...sheet, poses: sheet.full, full: void 0 } : sheet;
+var knownPose = (sheet, id) => Boolean(id) && (sheet.poses.some((p4) => p4.id === id) || Boolean(sheet.usedIds?.includes(id)));
 var posesWith = (sheet, emotion) => (sheet?.poses || []).filter((p4) => p4.emotions?.includes(emotion));
 function findPose(sheet, ref) {
   const text = String(ref ?? "").trim();
@@ -3939,14 +3956,27 @@ function homePose(sheet, emotion, custom = []) {
   return find(id) || find(emotion) || standIns(id, custom).filter((x) => x !== "neutral").map(find).find(Boolean) || poses[0];
 }
 var fitsPose = (sheet, pose, emotion) => Boolean(pose) && (pose.emotions?.includes(emotion) || !posesWith(sheet, emotion).length);
-function poseFor(sheet, emotion, ref = "", custom = []) {
+function poseFor(sheet, emotion, ref = "", custom = [], force = false) {
   const id = resolveEmotion(emotion, custom) || emotion;
   const named = findPose(sheet, ref);
-  return named && fitsPose(sheet, named, id) ? named : homePose(sheet, id, custom);
+  return named && (force || fitsPose(sheet, named, id)) ? named : homePose(sheet, id, custom);
 }
 function poseWalker(sheetFor, custom = []) {
   const now = /* @__PURE__ */ new Map();
   return {
+    /**
+     * 他站着的动作此刻收起了（sheetFor 给的是这一刻的那份，见 lib/pose-life.js）：按他现在的情绪换到还在的动作上。
+     * 回换到的动作编号；没换（不在、还在原来的动作）回 ''。
+     */
+    settle(name2) {
+      const state2 = now.get(name2);
+      if (!state2?.pose) return "";
+      const sheet = sheetFor(name2);
+      if (!sheet?.poses?.length || sheet.poses.some((p4) => p4.id === state2.pose)) return "";
+      return this.step(name2, "", "");
+    },
+    /** 走过的人（settle 挨个看）。 */
+    names: () => [...now.keys()],
     step(name2, emo = "", ref = "") {
       const sheet = sheetFor(name2);
       const state2 = now.get(name2) || {};
@@ -3978,43 +4008,139 @@ function lineSteps(line, speakers = [], reacts = []) {
   for (const r of reacts) if (r.emo || r.pose) out.push({ name: r.name, emo: r.emo || "", pose: r.pose || "" });
   return out;
 }
-var poseToken = (emotion, pose = "") => pose ? `${emotion}@${pose}` : String(emotion);
+var poseToken = (emotion, pose = "", force = false) => pose ? `${emotion}@${pose}${force ? "!" : ""}` : String(emotion);
 function tokenFor(sheet, emotion, pose = "", custom = []) {
-  const home = pose && homePose(sheet, emotion, custom);
+  const full = fullSheet(sheet);
+  if (pose && sheet?.full) {
+    const p4 = full.poses.find((x) => x.id === pose);
+    if (p4 && !fitsPose(full, p4, emotion)) return poseToken(emotion, pose, true);
+  }
+  const home = pose && homePose(full, emotion, custom);
   return poseToken(emotion, home && home.id !== pose ? pose : "");
 }
 function parseToken(token) {
-  const text = String(token ?? "");
+  let text = String(token ?? "");
+  const force = text.endsWith("!") && text.includes("@");
+  if (force) text = text.slice(0, -1);
   const at2 = text.lastIndexOf("@");
-  return at2 > 0 ? { emotion: text.slice(0, at2), pose: text.slice(at2 + 1) } : { emotion: text, pose: "" };
+  return at2 > 0 ? { emotion: text.slice(0, at2), pose: text.slice(at2 + 1), ...force ? { force: true } : {} } : { emotion: text, pose: "" };
 }
 var recordPose = (record) => record?.poseId || record?.pose || record?.face?.pose || "";
 function slotKey(sprites, look, sheet, pose, emotion, custom = []) {
   const bare = variantKey(look, emotion);
   if (!sheet?.poses?.length || !pose) return bare;
-  const home = homePose(sheet, emotion, custom)?.id;
+  const all = fullSheet(sheet);
+  const home = homePose(all, emotion, custom)?.id;
   const record = sprites?.[bare];
   const drawnIn2 = recordPose(record);
   if (record && drawnIn2 === pose) return bare;
   if (pose !== home) return variantKey(look, emotion, pose);
-  return !record || !drawnIn2 || !sheet.poses.some((p4) => p4.id === drawnIn2) ? bare : variantKey(look, emotion, pose);
+  return !record || !knownPose(all, drawnIn2) ? bare : variantKey(look, emotion, pose);
 }
-function slotKeys(sprites, look, sheet, pose, emotion, custom = []) {
+function slotKeys(sprites, look, sheet, pose, emotion, custom = [], { off = null } = {}) {
   const keys = [];
   const add = (k) => {
     if (k && !keys.includes(k)) keys.push(k);
   };
+  const gone = new Set(off || []);
   if (sheet?.poses?.length) {
     if (pose) add(slotKey(sprites, look, sheet, pose, emotion, custom));
     const home = homePose(sheet, emotion, custom);
-    if (home) add(slotKey(sprites, look, sheet, home.id, emotion, custom));
-    for (const p4 of posesWith(sheet, emotion)) add(slotKey(sprites, look, sheet, p4.id, emotion, custom));
+    if (home && !gone.has(home.id)) add(slotKey(sprites, look, sheet, home.id, emotion, custom));
+    for (const p4 of posesWith(sheet, emotion)) if (!gone.has(p4.id)) add(slotKey(sprites, look, sheet, p4.id, emotion, custom));
   }
   const bare = variantKey(look, emotion);
-  add(bare);
-  for (const k of Object.keys(sprites || {})) if (k.startsWith(bare + "@")) add(k);
+  if (!gone.has(recordPose(sprites?.[bare]))) add(bare);
+  for (const k of Object.keys(sprites || {})) if (k.startsWith(bare + "@") && !gone.has(k.slice(bare.length + 1))) add(k);
   return keys;
 }
+
+// lib/pose-life.js
+function posOf(turn, at2, ctx2) {
+  if (turn < ctx2.turn) return -Infinity;
+  if (turn > ctx2.turn) return Infinity;
+  if (!at2) return -1;
+  if (!ctx2.order) return 0;
+  return ctx2.order.has(at2) ? ctx2.order.get(at2) : -1;
+}
+function later(a, b) {
+  for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k] > b[k];
+  return false;
+}
+function sameState(need, state2) {
+  const a = need.name, b = String(state2?.name || "");
+  if (!b) return false;
+  if (a === b || a.length >= 2 && b.includes(a) || b.length >= 2 && a.includes(b)) return true;
+  if (!need.tags || !state2.tags) return false;
+  const want = new Set(splitTags(need.tags).map(tagKey).filter(Boolean));
+  return splitTags(state2.tags).some((t) => want.has(tagKey(t)));
+}
+function missingNeeds(pose, states) {
+  if (!Array.isArray(states) || !pose?.needs?.length) return [];
+  return pose.needs.filter((n) => !states.some((s) => sameState(n, s))).map((n) => n.name);
+}
+function poseLife(pose, ctx2 = {}) {
+  const at2 = { turn: Number.isFinite(ctx2.turn) ? ctx2.turn : Infinity, index: ctx2.index ?? Infinity, order: ctx2.order || null };
+  if (pose?.from && posOf(pose.from.turn, pose.from.at, at2) > at2.index) return { live: false, why: "later" };
+  if (!ctx2.segment && pose?.life?.length) {
+    let last = null, lastKey = null;
+    pose.life.forEach((e, i) => {
+      if (e.dropped || ctx2.before && e.by === "ai" && e.turn >= at2.turn) return;
+      const pos = posOf(e.turn, e.at, at2);
+      if (pos > at2.index) return;
+      const key = [e.turn, pos, e.by === "user" ? 1 : 0, i];
+      if (!lastKey || later(key, lastKey)) {
+        last = e;
+        lastKey = key;
+      }
+    });
+    if (last && !last.on) return { live: false, why: "off", event: last };
+  }
+  const missing = missingNeeds(pose, ctx2.states);
+  if (missing.length) return { live: false, why: "needs", missing };
+  return { live: true, why: "" };
+}
+function lateEmotions(pose, ctx2) {
+  if (!pose?.joins) return [];
+  const at2 = { turn: Number.isFinite(ctx2.turn) ? ctx2.turn : Infinity, order: ctx2.order || null };
+  const index = ctx2.index ?? Infinity;
+  return Object.entries(pose.joins).filter(([, f]) => f && posOf(f.turn, f.at, at2) > index).map(([e]) => e);
+}
+function liveSheet(sheet, ctx2 = {}) {
+  if (!sheet?.designed || !sheet.poses?.length) return sheet;
+  let changed = false;
+  const poses = [];
+  for (const p4 of sheet.poses) {
+    if (!poseLife(p4, ctx2).live) {
+      changed = true;
+      continue;
+    }
+    const late = lateEmotions(p4, ctx2);
+    if (!late.length) {
+      poses.push(p4);
+      continue;
+    }
+    changed = true;
+    const emotions = p4.emotions.filter((e) => !late.includes(e));
+    if (emotions.length) poses.push({ ...p4, emotions });
+  }
+  if (!changed) return sheet;
+  if (!poses.length) poses.push(sheet.poses[0]);
+  if (!poses.some((p4) => p4.emotions.includes("neutral"))) poses[0] = { ...poses[0], emotions: [...poses[0].emotions, "neutral"] };
+  return { ...sheet, poses, full: sheet.full || sheet.poses };
+}
+var offPoses = (live) => live?.full ? live.full.filter((p4) => !live.poses.some((x) => x.id === p4.id)).map((p4) => p4.id) : [];
+function lineCtx(person, { turn, index, order = null, layer = null, pending: pending2 = null, needs = true }) {
+  const then = layer?.then?.[person?.name] || null;
+  let states = null;
+  if (needs && person?.timeline) {
+    const now = lookAt(person.timeline, turn);
+    const over = then || (pending2 ? undoShifts(now, pending2) : null);
+    states = (over ? thenLook(now, over, person.timeline.outfits) : now).states;
+  }
+  return { turn, index, order, states, segment: Boolean(layer?.mode || layer?.recall) };
+}
+var unitOrder = (units) => new Map((units || []).map((u, i) => [u.id, i]));
 
 // lib/cast.js
 var NAME_COLORS = ["#f2739b", "#7aa2ff", "#ffb35c", "#5fd3b3", "#c58bff", "#ff7a6b", "#59c3ff", "#e5c34f", "#9be36b", "#ff8ad8"];
@@ -4374,9 +4500,14 @@ function buildBeats(view) {
   const people = (view.cast || []).map((p4) => p4.name);
   const byName = new Map((view.cast || []).map((p4) => [p4.name, p4]));
   const sheets2 = /* @__PURE__ */ new Map();
-  const sheetFor = (name2) => {
+  const baseSheet = (name2) => {
     if (!sheets2.has(name2)) sheets2.set(name2, sheetOf(byName.get(name2), view.poseGroups || []));
     return sheets2.get(name2);
+  };
+  let moment = null;
+  const sheetFor = (name2) => {
+    const full = baseSheet(name2);
+    return moment && full && full.designed ? liveSheet(full, moment(name2)) : full;
   };
   const bodies = poseWalker(sheetFor, view.emotions || []);
   turns.forEach((t, ti) => {
@@ -4398,7 +4529,7 @@ function buildBeats(view) {
     const scenes = walkScenes({ scene, bgm, amb, layer: keep }, lines2);
     const recalls = recallRuns(script, units);
     const ahead = shiftsAhead(lines2);
-    const unitIndex = new Map(units.map((u, i) => [u.id, i]));
+    const unitIndex = unitOrder(units);
     const indexOf = (id) => {
       for (let i = all.findIndex((u) => u.id === id); i >= 0; i--) if (unitIndex.has(all[i].id)) return unitIndex.get(all[i].id);
       return -1;
@@ -4441,9 +4572,28 @@ function buildBeats(view) {
       const onStageNames = steps[ui2].cast.map((c) => c.name);
       const reacts = reactsOf(line, onStageNames, speakers);
       for (const r of reacts) if (r.emo) emotions[r.name] = r.emo;
-      for (const step2 of lineSteps(line, speakers, reacts)) bodies.step(step2.name, step2.emo, step2.pose);
+      const layerHere = recalls[ui2] ? { mode: "memory", then: recalls[ui2].then, recall: recalls[ui2] } : at2.layer;
+      moment = (name2) => lineCtx(byName.get(name2), { turn: t.turn, index: ui2, order: unitIndex, layer: layerHere, pending: ahead[ui2] && ahead[ui2][name2], needs: view.situNeeds !== false });
+      const stepped = /* @__PURE__ */ new Set();
+      for (const step2 of lineSteps(line, speakers, reacts)) {
+        bodies.step(step2.name, step2.emo, step2.pose);
+        stepped.add(step2.name);
+      }
+      for (const name2 of bodies.names()) if (!stepped.has(name2)) bodies.settle(name2);
       const postures = {};
       for (const [name2, st] of Object.entries(bodies.save())) if (st.pose) postures[name2] = st.pose;
+      const offs = {};
+      for (const name2 of onStageNames) {
+        const live = sheetFor(name2);
+        if (!live || !live.full) continue;
+        offs[name2] = offPoses(live);
+        if (!postures[name2]) {
+          const e = resolveEmotion(emotions[name2] || "neutral", view.emotions || []) || "neutral";
+          const home = homePose(fullSheet(live), e, view.emotions || []);
+          if (home && !live.poses.some((p4) => p4.id === home.id)) postures[name2] = (homePose(live, e, view.emotions || []) || live.poses[0]).id;
+        }
+      }
+      moment = null;
       const ways = Object.fromEntries((line.enter || []).filter((e) => e.how && steps[ui2].entered.includes(e.name)).map((e) => [e.name, e.how]));
       Object.assign(exitWay, line.exitHow || {});
       const gone = {};
@@ -4560,6 +4710,8 @@ function buildBeats(view) {
         emotions: { ...emotions },
         ...Object.keys(postures).length ? { postures } : {},
         // 每个人此刻在哪个动作（动作编号；没走到过的人按他情绪的主动作）
+        ...Object.values(offs).some((list3) => list3.length) ? { offPoses: offs } : {},
+        // 这一刻收起了的动作：剧场找图时不退到它们上面
         cg,
         cgAnchor: Boolean(cgEntry && cgEntry.at === ui2),
         directed: Boolean(script),
@@ -7254,14 +7406,14 @@ function Silhouette({ name: name2, color, appearance, gender }) {
   const bodyPath = st.wide ? SIL.bodyWide : SIL.body;
   return /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-silhouette", style: { "--c": color } }, /* @__PURE__ */ import_react4.default.createElement("svg", { viewBox: "0 0 200 400", "aria-hidden": "true" }, /* @__PURE__ */ import_react4.default.createElement("defs", null, /* @__PURE__ */ import_react4.default.createElement("linearGradient", { id: gid, x1: "0", y1: "0", x2: "0", y2: "1" }, /* @__PURE__ */ import_react4.default.createElement("stop", { offset: "0", stopColor: color, stopOpacity: ".95" }), /* @__PURE__ */ import_react4.default.createElement("stop", { offset: ".55", stopColor: color, stopOpacity: ".5" }), /* @__PURE__ */ import_react4.default.createElement("stop", { offset: "1", stopColor: color, stopOpacity: "0" })), /* @__PURE__ */ import_react4.default.createElement("linearGradient", { id: gid + "h", x1: "0", y1: "0", x2: "0", y2: "1" }, /* @__PURE__ */ import_react4.default.createElement("stop", { offset: "0", stopColor: st.hair, stopOpacity: ".95" }), /* @__PURE__ */ import_react4.default.createElement("stop", { offset: "1", stopColor: st.hair, stopOpacity: ".55" })), /* @__PURE__ */ import_react4.default.createElement("radialGradient", { id: gid + "f", cx: ".5", cy: ".42", r: ".62" }, /* @__PURE__ */ import_react4.default.createElement("stop", { offset: "0", stopColor: "#fff", stopOpacity: ".5" }), /* @__PURE__ */ import_react4.default.createElement("stop", { offset: "1", stopColor: "#fff", stopOpacity: ".06" }))), st.tails > 0 && /* @__PURE__ */ import_react4.default.createElement("path", { d: SIL.tailR, fill: `url(#${gid}h)` }), st.tails > 1 && /* @__PURE__ */ import_react4.default.createElement("path", { d: SIL.tailL, fill: `url(#${gid}h)` }), /* @__PURE__ */ import_react4.default.createElement("path", { d: hairPath, fill: `url(#${gid}h)` }), /* @__PURE__ */ import_react4.default.createElement("path", { d: bodyPath, fill: `url(#${gid})` }), /* @__PURE__ */ import_react4.default.createElement("path", { d: SIL.neck, fill: color, opacity: ".55" }), /* @__PURE__ */ import_react4.default.createElement("path", { d: SIL.face, fill: color, opacity: ".8" }), /* @__PURE__ */ import_react4.default.createElement("path", { d: SIL.face, fill: `url(#${gid}f)` }), /* @__PURE__ */ import_react4.default.createElement("path", { d: SIL.bangs, fill: st.hair, opacity: ".92" }), /* @__PURE__ */ import_react4.default.createElement("path", { d: st.short ? SIL.lockShortL : SIL.lockL, fill: st.hair, opacity: ".85" }), /* @__PURE__ */ import_react4.default.createElement("path", { d: st.short ? SIL.lockShortR : SIL.lockR, fill: st.hair, opacity: ".85" }), /* @__PURE__ */ import_react4.default.createElement("path", { d: SIL.collar, fill: "none", stroke: "#fff", strokeOpacity: ".5", strokeWidth: "2.5", strokeLinecap: "round" }), /* @__PURE__ */ import_react4.default.createElement("path", { className: "sil-rim", d: st.short ? SIL.rimShort : SIL.rimLong }), /* @__PURE__ */ import_react4.default.createElement("path", { className: "sil-rim", d: bodyPath })), /* @__PURE__ */ import_react4.default.createElement("div", { className: "fg-silhouette-name" }, name2));
 }
-function spriteFor(person, turn, emo, emotions, then = null, pending2 = null, { pose = "", groups = [] } = {}) {
+function spriteFor(person, turn, emo, emotions, then = null, pending2 = null, { pose = "", groups = [], off = null } = {}) {
   if (!person || !person.timeline) return "";
   const lib = emotions || [];
   const now = lookAt(person.timeline, turn);
   const over = then || (pending2 ? undoShifts(now, pending2) : null);
   const look = over ? thenLook(now, over, person.timeline.outfits) : now;
   const sheet = sheetOf(person, groups || []);
-  const keys = sheet ? (e) => slotKeys(person.sprites, look, sheet, pose, e, lib) : null;
+  const keys = sheet ? (e) => slotKeys(person.sprites, look, sheet, pose, e, lib, { off }) : null;
   return pickSprite(person.sprites, look, resolveEmotion(emo, lib) || emo, standIns(emo, lib), { strict: Boolean(then), keys });
 }
 var SIDE = { farleft: "-40%", left: "-28%", center: "0%", right: "28%", farright: "40%" };
@@ -7354,7 +7506,7 @@ function Actor({ entry, person, beat, emo, emotions, groups = [], leaving = fals
     }, 150);
     return () => clearTimeout(t);
   }, [beat.key]);
-  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name], { pose: beat.postures && beat.postures[entry.name], groups });
+  const sprite = spriteFor(person, beat.turn, emo, emotions, beat.then && beat.then[entry.name], beat.ahead && beat.ahead[entry.name], { pose: beat.postures && beat.postures[entry.name], groups, off: beat.offPoses && beat.offPoses[entry.name] });
   const src = sprite ? assetUrl(sprite) : "";
   const color = person && person.color || "#9b7bff";
   const [pics, setPics] = import_react4.default.useState(() => ({ cur: src && SIZES.has(src) ? { src, size: SIZES.get(src) } : null, prev: null, broken: "" }));
@@ -7523,7 +7675,7 @@ function RecallLayer({ beat, view, talk, light = false, tone = "" }) {
 }
 function useFace(person, beat, view, then = null) {
   const name2 = person ? person.name : "";
-  const sprite = person ? spriteFor(person, beat.turn, beat.emotions[name2] || "neutral", view && view.emotions, then, null, { pose: beat.postures && beat.postures[name2], groups: view && view.poseGroups }) : "";
+  const sprite = person ? spriteFor(person, beat.turn, beat.emotions[name2] || "neutral", view && view.emotions, then, null, { pose: beat.postures && beat.postures[name2], groups: view && view.poseGroups, off: beat.offPoses && beat.offPoses[name2] }) : "";
   const src = sprite ? assetUrl(sprite) : "";
   const [size, setSize] = import_react4.default.useState(null);
   import_react4.default.useEffect(() => {
@@ -10286,6 +10438,19 @@ var DEFAULT_CONFIG = {
     // 共用开头：导演和几位设计师的系统提示词换成同一句、各自的规矩挪进用户消息，资料和剧情放在最前面一字不差（模型接口能缓存）
     combineDesign: true,
     // 补设计合进写词：已经设计过的人要画没设计的情绪时，补设计和写立绘提示词一次请求做完（资料和剧情只读一遍）；关掉就先单独补设计再写
+    // 动作跟着剧情和世界线变（lib/pose-life.js）：动作分本性和处境，处境的写着前提
+    situPoses: true,
+    // 导演读剧情判断处境动作的前提还成不成立：跨过了从那一句起收起，又回到那种处境时放回
+    situNeeds: true,
+    // 动作靠的长期状态没了（项链摘了、伤好了）自动收起，状态回来放回
+    situReview: true,
+    // 收起之后（或者导演说处境转了）设计师读到这一轮的剧情复盘：情绪重新安家、重写这一局的表演笔记
+    situNewPoses: true,
+    // 复盘时设计师可以给新处境设计新动作（从那一句起才有）
+    situWorld: true,
+    // 全局角色到了新的一局只带本性动作，设计师按这个世界设计处境动作
+    situLabel: true,
+    // 以前设计的、还没分本性和处境的：这个人下次登场时让设计师标上
     // 插画分镜师用的模型：'' 跟导演一样；host 在宿主的模型里另选一个；custom 自己接一个 OpenAI 兼容接口（Key 存在宿主，见 secrets.js）
     cgLlm: { source: "", provider: "", model: "", baseURL: "", contextWindow: 128e3 }
   },
@@ -11581,7 +11746,7 @@ function saveText(text, name2) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1e3);
 }
-var KIND_LABEL = { ambience: "环境音", blip: "打字音", sfx: "音效" };
+var KIND_LABEL2 = { ambience: "环境音", blip: "打字音", sfx: "音效" };
 var USE_OPTIONS = [["", "没有"], ...SOUND_SLOTS.map((s) => [s.id, `${s.group === "ui" ? "界面音" : "落字音效"} · ${s.label}`]), ["narration", "旁白的打字音"]];
 var LIB_SHOWN = 200;
 function LibSoundCard({ sound, playing, onPlay }) {
@@ -11681,7 +11846,7 @@ function SoundLibSection({ data, kind = "sfx" }) {
     setProgress("");
     await loadSoundlib().catch(() => {
     });
-    toast(`新导入 ${added} 个${elsewhere ? `（其中 ${elsewhere} 个描述文件写的是${KIND_LABEL[otherKind]}，放进了${LIB_PAGE[otherKind].title}）` : ""}${updated ? `，更新了 ${updated} 个的描述` : ""}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join("；")}` : ""}${useful && !failed.length ? "。里面有打字音和标了用途的声音，到「声音」页可以一键套用" : ""}`, failed.length ? "error" : void 0);
+    toast(`新导入 ${added} 个${elsewhere ? `（其中 ${elsewhere} 个描述文件写的是${KIND_LABEL2[otherKind]}，放进了${LIB_PAGE[otherKind].title}）` : ""}${updated ? `，更新了 ${updated} 个的描述` : ""}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join("；")}` : ""}${useful && !failed.length ? "。里面有打字音和标了用途的声音，到「声音」页可以一键套用" : ""}`, failed.length ? "error" : void 0);
   };
   const groups = import_react12.default.useMemo(() => {
     const map = /* @__PURE__ */ new Map();
@@ -11699,7 +11864,7 @@ function SoundLibSection({ data, kind = "sfx" }) {
   }) : null;
   const cards = (list3) => list3.slice(0, LIB_SHOWN).map((s) => /* @__PURE__ */ import_react12.default.createElement(LibSoundCard, { key: s.id, sound: s, playing: playing === s.id, onPlay: () => play(s) }));
   const removeGroup = (g) => {
-    if (!window.confirm(`把「${g.kind === kind ? g.name : `${KIND_LABEL[g.kind]} · ${g.name}`}」这一类 ${g.items.length} 个都从${page.title}删掉？电脑上的原文件不受影响。`)) return;
+    if (!window.confirm(`把「${g.kind === kind ? g.name : `${KIND_LABEL2[g.kind]} · ${g.name}`}」这一类 ${g.items.length} 个都从${page.title}删掉？电脑上的原文件不受影响。`)) return;
     run("g" + g.key, async () => {
       await api.removeLibSounds(g.items.map((s) => s.id));
       await loadSoundlib();
@@ -11721,7 +11886,7 @@ function SoundLibSection({ data, kind = "sfx" }) {
   return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "播放"), kind === "ambience" && /* @__PURE__ */ import_react12.default.createElement(Field, { label: "环境音", hint: "雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: cfg.ui.amb, onChange: (v) => p4({ amb: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.ambVolume, onChange: (e) => p4({ ambVolume: Number(e.target.value) }), style: { flex: 1 } }))), kind === "sfx" && /* @__PURE__ */ import_react12.default.createElement(Field, { label: "剧情音效", hint: "推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: cfg.ui.storySfx, onChange: (v) => p4({ storySfx: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.05", value: cfg.ui.storySfxVolume, onChange: (e) => p4({ storySfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), kind === "sfx" && /* @__PURE__ */ import_react12.default.createElement(ErosField, { cfg, p: p4 }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "我的", page.title, sounds2 ? ` · ${sounds2.length} 个` : ""), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, page.note), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: !sounds2 || !sounds2.some((s) => s.file), onClick: () => saveText(writeSoundSidecar(sounds2 || []), SOUND_SIDECAR) }, "导出描述"), !clearing && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn fg-danger", disabled: !doomed.length || Boolean(progress), title: `把${page.title}删光，重新整理；${page.other}${kind === "sfx" ? "、打字音" : ""}和「声音」页正在用的不动`, onClick: () => setClearing(true) }, "清空", page.title), progress && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react12.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
     importFiles(e.target.files);
     e.target.value = "";
-  } })), clearing && doomed.length > 0 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-manage" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "删掉", page.title, "里的 ", doomed.length, " ", page.unit, "（", totalBytes >= 1073741824 ? (totalBytes / 1073741824).toFixed(1) + " GB" : sizeMB(totalBytes), "），名字、分类、标签和存进 FlowGal 的音频一起删；", page.other, "不动", kept.blips ? `，${kept.blips} 个打字音留着` : "", kept.used ? `，「声音」页正在用的 ${kept.used} 个留着` : "", "，电脑上的原文件也不受影响。描述想留着的话先点「导出描述」。"), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "clear", onClick: clearAll }, busy === "clear" ? "清空中…" : "确认清空"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "clear", onClick: () => setClearing(false) }, "取消")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "文件夹最上面放一份 ", /* @__PURE__ */ import_react12.default.createElement("code", null, SOUND_SIDECAR), "（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹，在这一页导入的算", KIND_LABEL[kind], "。同一个文件再导入不会重复存，但描述会以描述文件为准。", kind === "sfx" ? "种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。" : ""), !sounds2 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "读取中…"), sounds2 && !sounds2.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, page.empty), sounds2 && sounds2.length > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("input", { className: "fg-input", style: { width: "100%", margin: "0.6cqw 0 1cqw" }, value: query, placeholder: "搜索名字、分类、标签、描述（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), found && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "找到 ", found.length, " 个", found.length > LIB_SHOWN ? `，先列出前 ${LIB_SHOWN} 个` : ""), found && cards(found), !found && groups.map((g) => /* @__PURE__ */ import_react12.default.createElement("div", { key: g.key, className: "fg-libgroup" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-libgroup-head" }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpenGroup((k) => k === g.key ? "" : g.key) }, openGroup === g.key ? "▾" : "▸", " ", g.kind === kind ? g.name : `${KIND_LABEL[g.kind]} · ${g.name}`), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, g.items.length, " 个"), /* @__PURE__ */ import_react12.default.createElement("span", { style: { flex: 1 } }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "g" + g.key, onClick: () => removeGroup(g) }, "删除这一类")), openGroup === g.key && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, g.items.length > LIB_SHOWN && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "这一类有 ", g.items.length, " 个，先列出前 ", LIB_SHOWN, " 个；用搜索找其余的。"), cards(g.items))))));
+  } })), clearing && doomed.length > 0 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-manage" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "删掉", page.title, "里的 ", doomed.length, " ", page.unit, "（", totalBytes >= 1073741824 ? (totalBytes / 1073741824).toFixed(1) + " GB" : sizeMB(totalBytes), "），名字、分类、标签和存进 FlowGal 的音频一起删；", page.other, "不动", kept.blips ? `，${kept.blips} 个打字音留着` : "", kept.used ? `，「声音」页正在用的 ${kept.used} 个留着` : "", "，电脑上的原文件也不受影响。描述想留着的话先点「导出描述」。"), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "clear", onClick: clearAll }, busy === "clear" ? "清空中…" : "确认清空"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "clear", onClick: () => setClearing(false) }, "取消")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "文件夹最上面放一份 ", /* @__PURE__ */ import_react12.default.createElement("code", null, SOUND_SIDECAR), "（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹，在这一页导入的算", KIND_LABEL2[kind], "。同一个文件再导入不会重复存，但描述会以描述文件为准。", kind === "sfx" ? "种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。" : ""), !sounds2 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "读取中…"), sounds2 && !sounds2.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, page.empty), sounds2 && sounds2.length > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("input", { className: "fg-input", style: { width: "100%", margin: "0.6cqw 0 1cqw" }, value: query, placeholder: "搜索名字、分类、标签、描述（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), found && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "找到 ", found.length, " 个", found.length > LIB_SHOWN ? `，先列出前 ${LIB_SHOWN} 个` : ""), found && cards(found), !found && groups.map((g) => /* @__PURE__ */ import_react12.default.createElement("div", { key: g.key, className: "fg-libgroup" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-libgroup-head" }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpenGroup((k) => k === g.key ? "" : g.key) }, openGroup === g.key ? "▾" : "▸", " ", g.kind === kind ? g.name : `${KIND_LABEL2[g.kind]} · ${g.name}`), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, g.items.length, " 个"), /* @__PURE__ */ import_react12.default.createElement("span", { style: { flex: 1 } }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "g" + g.key, onClick: () => removeGroup(g) }, "删除这一类")), openGroup === g.key && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, g.items.length > LIB_SHOWN && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "这一类有 ", g.items.length, " 个，先列出前 ", LIB_SHOWN, " 个；用搜索找其余的。"), cards(g.items))))));
 }
 var stamp = (t) => new Date(t).toLocaleString("zh-CN", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 function UpdateSection({ data }) {
