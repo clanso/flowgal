@@ -22,7 +22,7 @@ import { CORNER_ITEMS, CORNER_DEFAULTS } from '../../../lib/corner.js'
 import { EFFECT_GROUPS, EFFECT_IDS } from './effects.js'
 import { previewTrack, stopPreview, previewVoice, previewSound, erosFoley, previewEros, erosPeak } from './audio.js'
 import { EROS_SFX, EROS_PACES, EROS_LABEL, TENTACLE, TENTACLE_LABEL, PEAKS, PEAK_LABEL } from '../../../lib/eros.js'
-import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, castVoices, libraryBlips, voiceLabel, isLibRef, libRef, libIdOf, LIBRARY_VOICES, libraryPreset, builtinPreset } from '../../../lib/sounds.js'
+import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, castVoices, libraryBlips, voiceLabel, isLibRef, libRef, libIdOf, LIBRARY_VOICES, AA_VOICES, libraryPreset, builtinPreset, aaPreset, narrationPatch } from '../../../lib/sounds.js'
 import { cleanPack, packFiles } from '../../../lib/aa-sprite.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
 import { SOUND_SIDECAR, MAX_SOUND_VOLUME, readSoundSidecar, soundMatcher, writeSoundSidecar } from '../../../lib/soundlib-sidecar.js'
@@ -2307,13 +2307,16 @@ function SoundSection({ data }) {
   const narration = ui.narrationVoice === 'off' ? null : { id: ui.narrationVoice, pitch: ui.narrationPitch }
   const preset = libraryPreset(library)
   const builtin = builtinPreset(ui)
+  const aa = aaPreset(ui)
   const usable = library.filter(s => s.use).length
   const choose = (slot, value) => { p({ sounds: { [slot]: value } }); previewSound(slot, value, ui) }
-  const defaultOptions = [['auto', '自动（按性别分）'], ...(blips.length || ui.voiceDefault === LIBRARY_VOICES ? [[LIBRARY_VOICES, '音效库里的打字音（按性别分）']] : []), ...VOICES.map(v => [v.id, `都用「${v.label}」`]), { group: '都用音效库里的', options: blipOptions(blips, ui.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }]
+  const defaultOptions = [['auto', '自动（按性别分）'], [AA_VOICES, '逆转式（女性都用逆转女声、男性都用逆转男声）'], ...(blips.length || ui.voiceDefault === LIBRARY_VOICES ? [[LIBRARY_VOICES, '音效库里的打字音（按性别分）']] : []), ...VOICES.map(v => [v.id, `都用「${v.label}」`]), { group: '都用音效库里的', options: blipOptions(blips, ui.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }]
   return (
     <>
-      {(preset || builtin) && (
+      {(aa || preset || builtin) && (
         <div className="fg-note fg-libpreset">
+          {aa && <>逆转裁判那样的打字音：内置的逆转男声 / 女声 / 打字机，不用导入。</>}
+          {aa && <button type="button" className="fg-btn is-primary" onClick={() => { p(aa); toast('已换成逆转式：男女各一个声音，旁白用逆转打字机') }}>套用逆转式</button>}
           {usable > 0 && <>音效库里有 {usable} 个标了用途的声音（比如逆转裁判音效包里的男声 / 女声哔哔、打字机、拍桌子、法槌）。</>}
           {preset && <button type="button" className="fg-btn is-primary" onClick={() => { p(preset); toast('已套用音效库里的声音') }}>一键套用</button>}
           {builtin && <button type="button" className="fg-btn" onClick={() => { p(builtin); toast('已换回内置的声音') }}>换回内置</button>}
@@ -2321,12 +2324,12 @@ function SoundSection({ data }) {
       )}
       <div className="fg-section">打字音</div>
       <Field label="打字音"><div className="fg-row"><Toggle value={ui.blip} onChange={v => p({ blip: v })} /><input type="range" min="0" max="2" step="0.1" value={ui.blipVolume} aria-label="打字音音量" onChange={e => p({ blipVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
-      <Field label="没指定的角色" hint="每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。">
+      <Field label="没指定的角色" hint="每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。">
         <Select value={ui.voiceDefault} options={defaultOptions} onChange={v => p({ voiceDefault: v })} />
       </Field>
       <Field label="旁白">
         <div className="fg-row">
-          <Select value={ui.narrationVoice} options={[...VOICES.map(v => [v.id, v.label]), { group: '音效库里的打字音', options: blipOptions(blips, ui.narrationVoice) }, ['off', '不出声']]} style={INLINE} onChange={v => p({ narrationVoice: v })} />
+          <Select value={ui.narrationVoice} options={[...VOICES.map(v => [v.id, v.label]), { group: '音效库里的打字音', options: blipOptions(blips, ui.narrationVoice) }, ['off', '不出声']]} style={INLINE} onChange={v => p(narrationPatch(ui, v))} />
           <Select value={String(ui.narrationPitch)} options={PITCHES} style={INLINE} onChange={v => p({ narrationPitch: Number(v) })} />
           <button type="button" className="fg-btn" disabled={!narration} onClick={() => previewVoice(narration, ui)}>▶ 试听</button>
         </div>
@@ -2344,7 +2347,7 @@ function SoundSection({ data }) {
           </button>
         ))}
       </div>
-      {!blips.length && <div className="fg-note">想用逆转裁判那样的哔哔声：把打字音导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。</div>}
+      {!blips.length && <div className="fg-note">逆转女声、逆转男声、逆转打字机是照逆转裁判的声音合成的，不用导入。想用原版录音：把逆转裁判音效包（或别的打字音）导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。</div>}
       <div className="fg-section">音效</div>
       <Field label="音效"><div className="fg-row"><Toggle value={ui.sfx} onChange={v => p({ sfx: v })} /><input type="range" min="0" max="2" step="0.1" value={ui.sfxVolume} aria-label="音效音量" onChange={e => p({ sfxVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
       {SOUND_GROUPS.map(([group, title, note]) => (
