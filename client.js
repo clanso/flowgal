@@ -10034,6 +10034,7 @@ function loadOrt(status) {
       (L ? import(await L.moduleUrl(status.paths.ort)) : import(FILES() + status.paths.ort));
       ort.env.wasm.wasmPaths = L ? await L.wasmPaths(status.paths.ortDir) : FILES() + status.paths.ortDir;
       ort.env.wasm.numThreads = 1;
+      ort.env.wasm.proxy = true;
       return ort;
     })();
     ortLoad.catch(() => {
@@ -10069,6 +10070,7 @@ function loadFlorence(status) {
         tjs.env.backends.onnx.wasm.wasmPaths = FILES() + status.paths.tjsDir;
       }
       tjs.env.backends.onnx.wasm.numThreads = 1;
+      tjs.env.backends.onnx.wasm.proxy = true;
       const id = status.paths.florence;
       const [model, processor, tokenizer] = await Promise.all([
         tjs.Florence2ForConditionalGeneration.from_pretrained(id, { dtype: "q8", device: "wasm", revision }),

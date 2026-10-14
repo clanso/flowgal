@@ -29,6 +29,7 @@ function loadOrt(status) {
       const ort = await import(/* 运行时才知道地址，打包时不碰它 */ L ? await L.moduleUrl(status.paths.ort) : FILES() + status.paths.ort)
       ort.env.wasm.wasmPaths = L ? await L.wasmPaths(status.paths.ortDir) : FILES() + status.paths.ortDir
       ort.env.wasm.numThreads = 1 // 页面没开跨源隔离，多线程用不了；单线程一张图也不到 1 秒
+      ort.env.wasm.proxy = true // 模型在后台线程（worker）里算，不占页面
       return ort
     })()
     ortLoad.catch(() => { ortLoad = null })
@@ -62,6 +63,9 @@ function loadFlorence(status) {
         tjs.env.backends.onnx.wasm.wasmPaths = FILES() + status.paths.tjsDir
       }
       tjs.env.backends.onnx.wasm.numThreads = 1
+      // 大模型一张图要算十几秒：放在后台线程（worker）里算。在页面上算的话这十几秒整页卡住点不动，
+      // 剧场开着时每张没量过脸框的立绘都要认一遍（表情整张画以后一套衣服就是十几张），一开剧场就卡好几分钟
+      tjs.env.backends.onnx.wasm.proxy = true
       const id = status.paths.florence
       const [model, processor, tokenizer] = await Promise.all([
         tjs.Florence2ForConditionalGeneration.from_pretrained(id, { dtype: 'q8', device: 'wasm', revision }),

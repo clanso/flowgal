@@ -117,3 +117,34 @@ test('gate: 设置里的认脸模型下载来源：只认三种，镜像地址�
   assert.equal(resolveConfig({ vision: { mirror: 'file:///etc/passwd' } }).vision.mirror, DEFAULT_MIRROR)
   assert.equal(resolveConfig(applyPatch({}, { vision: { source: 'mirror', mirror: 'https://hf.example.com' } })).vision.mirror, 'https://hf.example.com')
 })
+
+test('gate: 认脸模型在后台线程里算（onnxruntime 的 proxy），不在页面上算：大模型一张图十几秒，在页面上算整页卡住', async () => {
+  // 假的运行库：小模型什么都没认到，于是让大模型在上半身找脸（两种运行库都会载上）
+  const ort = {
+    env: { wasm: {} },
+    Tensor: class { constructor(type, data, dims) { Object.assign(this, { type, data, dims }) } },
+    InferenceSession: { create: async () => ({ run: async () => ({ output0: { data: new Float32Array(0), dims: [1, 5, 0] } }) }) },
+  }
+  const tjs = {
+    env: { backends: { onnx: { wasm: {} } } },
+    RawImage: { fromCanvas: () => ({ rgb: () => ({}) }) },
+    Florence2ForConditionalGeneration: { from_pretrained: async () => ({ generate: async () => [[0]] }) },
+    AutoProcessor: { from_pretrained: async () => Object.assign(async () => ({}), { construct_prompts: t => t, post_process_generation: (text, task) => ({ [task]: { bboxes: [], labels: [] } }) }) },
+    AutoTokenizer: { from_pretrained: async () => Object.assign(() => ({}), { batch_decode: () => [''] }) },
+  }
+  globalThis.__fgFake = { ort, tjs }
+  const mod = name => 'data:text/javascript,' + encodeURIComponent(`const m = globalThis.__fgFake.${name}; export const env = m.env; ${name === 'ort' ? 'export const Tensor = m.Tensor; export const InferenceSession = m.InferenceSession;' : 'export const RawImage = m.RawImage; export const Florence2ForConditionalGeneration = m.Florence2ForConditionalGeneration; export const AutoProcessor = m.AutoProcessor; export const AutoTokenizer = m.AutoTokenizer;'}`)
+  // 假的画布和图片（Node 里没有）
+  const W = 64, H = 96
+  globalThis.Image = class { set src(v) { this.naturalWidth = W; this.naturalHeight = H; setTimeout(() => this.onload()) } }
+  globalThis.document = { createElement: () => ({ getContext: () => ({ drawImage() {}, fillRect() {}, getImageData: (x, y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }) }) }) }
+  const { setTransport } = await import('../src/client/api.js')
+  const { frameSprite } = await import('../src/client/theater/vision.js')
+  setTransport({ visionLoader: { moduleUrl: async path => mod(/transformers/.test(path) ? 'tjs' : 'ort'), wasmPaths: async () => ({}), bytes: async () => new ArrayBuffer(8), florence: async () => ({ revision: 'main' }) } })
+  const status = { packs: { basic: { ready: true }, fine: { ready: true } }, paths: { ort: 'ort/ort.mjs', ortDir: 'ort/', tjs: 'transformers/t.js', tjsDir: 'transformers/', florence: 'org/florence' }, models: { face: { path: 'f.onnx', threshold: 0.3 }, head: { path: 'h.onnx', threshold: 0.3 }, eye: { path: 'e.onnx', threshold: 0.3 } } }
+  try {
+    assert.equal(await frameSprite(status, 'x.png'), null, '假模型什么都没认到')
+    assert.equal(ort.env.wasm.proxy, true, '小模型的 onnxruntime 走 worker')
+    assert.equal(tjs.env.backends.onnx.wasm.proxy, true, '大模型（transformers.js 自带的 onnxruntime）走 worker')
+  } finally { delete globalThis.__fgFake; delete globalThis.Image; delete globalThis.document }
+})
