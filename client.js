@@ -9902,32 +9902,119 @@ function blur(m, w, h, sigma) {
   };
   return pass(pass(m, 1, 0), 0, 1);
 }
+function convexHull(points) {
+  const p4 = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p4.length < 3) return p4;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower = [], upper = [];
+  for (const q of p4) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  for (const q of p4.slice().reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+function hullDistance(hull, x, y) {
+  let d = -Infinity;
+  for (let i = 0; i < hull.length; i++) {
+    const [ax, ay] = hull[i], [bx, by] = hull[(i + 1) % hull.length];
+    const ex = bx - ax, ey = by - ay, len = Math.hypot(ex, ey) || 1;
+    d = Math.max(d, ((x - ax) * ey - (y - ay) * ex) / len);
+  }
+  return Math.max(0, d);
+}
+function components(mask, w, h) {
+  const seen = new Uint8Array(w * h), out = [];
+  for (let s = 0; s < w * h; s++) {
+    if (!(mask[s] > 0) || seen[s]) continue;
+    const comp = [s], stack = [s];
+    seen[s] = 1;
+    while (stack.length) {
+      const k = stack.pop(), x = k % w;
+      for (const nb of [x > 0 ? k - 1 : -1, x < w - 1 ? k + 1 : -1, k - w, k + w]) {
+        if (nb < 0 || nb >= w * h || seen[nb] || !(mask[nb] > 0)) continue;
+        seen[nb] = 1;
+        stack.push(nb);
+        comp.push(nb);
+      }
+    }
+    out.push(comp);
+  }
+  return out;
+}
+var isSclera = (L, a, b) => L > 80 && Math.hypot(a, b) < 7;
+function eyeCore(r, { x0, y0, w, h, bl, g2, wb, wg, de }) {
+  const rx = (r[2] - r[0]) / 2, ry = (r[3] - r[1]) / 2, cx = r[0] + rx, cy = r[1] + ry;
+  const ell = (x, y) => ((x0 + x + 0.5 - cx) / rx) ** 2 + ((y0 + y + 0.5 - cy) / ry) ** 2;
+  const feat = new Float32Array(w * h), strong = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (ell(x, y) > 0.9) continue;
+    const fb = wb[i * 3] > 0.5 || isSclera(bl[i * 3], bl[i * 3 + 1], bl[i * 3 + 2]);
+    const fg = wg[i * 3] > 0.5 || isSclera(g2[i * 3], g2[i * 3 + 1], g2[i * 3 + 2]);
+    if (fb || fg) feat[i] = 1;
+    if (de(i) > 22) strong[i] = 1;
+  }
+  const feats = components(maxF(minF(feat, w, h, 3), w, h, 3), w, h);
+  const biggest = Math.max(0, ...feats.map((c) => c.length));
+  const points = [];
+  feat.fill(0);
+  for (const c of feats) if (c.length >= Math.max(6, biggest * 0.2)) for (const k of c) {
+    feat[k] = 1;
+    points.push([k % w, k / w | 0]);
+  }
+  if (points.length < 25) return null;
+  let top = Infinity, bot = -Infinity, left = Infinity, right = -Infinity;
+  for (const [x, y] of points) {
+    top = Math.min(top, y);
+    bot = Math.max(bot, y);
+    left = Math.min(left, x);
+    right = Math.max(right, x);
+  }
+  const eh = bot - top + 1, ew = right - left + 1;
+  const up = 2 + Math.min(eh * 0.7, ew * 0.22), down = 2 + Math.min(eh * 0.35, ew * 0.12), side = 2 + ew * 0.12;
+  const all = convexHull(points).flatMap(([x, y]) => [[x, y - up], [x, y + down], [x - side, y], [x + side, y]]);
+  const near = maxF(feat, w, h, 7);
+  for (const c of components(maxF(minF(strong, w, h, 3), w, h, 3), w, h)) {
+    if (c.some((k) => near[k])) for (const k of c) {
+      all.push([k % w, k / w | 0]);
+      points.push([k % w, k / w | 0]);
+    }
+  }
+  const hull = convexHull(all).map(([x, y]) => [x0 + x + 0.5, y0 + y + 0.5]);
+  return { hull, reach: 1, soft: 2.5 };
+}
 var median = (values) => {
   if (!values.length) return 0;
   const s = Float64Array.from(values).sort();
   const mid = s.length >> 1;
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 };
-function cleanPatch(base, gen, rects, { classes = true, keepHair = false, threshold = 7, grow: grow2 = 2, feather = 1.5 } = {}) {
+function cleanPatch(base, gen, rects, { classes = true, keepHair = false, mouth = null, threshold = 7, grow: grow2 = 2, feather = 1.5 } = {}) {
   const x0 = Math.max(0, Math.min(...rects.map((r) => r[0]))), y0 = Math.max(0, Math.min(...rects.map((r) => r[1])));
   const x1 = Math.min(base.width, Math.max(...rects.map((r) => r[2]))), y1 = Math.min(base.height, Math.max(...rects.map((r) => r[3])));
   const w = x1 - x0, h = y1 - y0;
   if (w <= 0 || h <= 0) throw new Error("框在图外");
   if (gen.width < x1 || gen.height < y1) throw new Error("重画结果比原图小，对不上");
   const n = w * h;
+  const fit = mouth ? mouthFit(base, gen, rects[0], mouth) : null;
+  const [dx, dy] = fit ? fit.shift : [0, 0];
   const bl = new Float32Array(n * 3), gl = new Float32Array(n * 3), inside = new Uint8Array(n), alpha = new Float32Array(n);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       const X = x0 + x, Y = y0 + y;
-      const bi = (Y * base.width + X) * 4, gi = (Y * gen.width + X) * 4;
+      const bi = (Y * base.width + X) * 4, gi = ((Y - dy) * gen.width + X - dx) * 4;
       const a = base.data[bi + 3] / 255;
       alpha[i] = a;
       const lb = rgbToLab(base.data[bi] * a + 255 * (1 - a), base.data[bi + 1] * a + 255 * (1 - a), base.data[bi + 2] * a + 255 * (1 - a));
       const lg = rgbToLab(gen.data[gi], gen.data[gi + 1], gen.data[gi + 2]);
       bl.set(lb, i * 3);
       gl.set(lg, i * 3);
-      inside[i] = rects.some((r) => X >= r[0] && X < r[2] && Y >= r[1] && Y < r[3]) ? 1 : 0;
+      inside[i] = rects.some((r) => X >= r[0] && X < r[2] && Y >= r[1] && Y < r[3] && X - dx >= r[0] && X - dx < r[2] && Y - dy >= r[1] && Y - dy < r[3]) ? 1 : 0;
     }
   }
   const de = (i) => Math.hypot(gl[i * 3] - bl[i * 3], gl[i * 3 + 1] - bl[i * 3 + 1], gl[i * 3 + 2] - bl[i * 3 + 2]);
@@ -9979,13 +10066,29 @@ function cleanPatch(base, gen, rects, { classes = true, keepHair = false, thresh
   used = maxF(minF(maxF(used, w, h, grow2 * 2 + 1), w, h, 3), w, h, 3);
   used = blur(used, w, h, feather);
   if (keepHair) {
+    const cores = rects.map((r) => eyeCore(r, { x0, y0, w, h, bl, g2, wb, wg, de }));
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const X = x0 + x + 0.5, Y = y0 + y + 0.5;
       let k = 0;
-      for (const r of rects) {
+      rects.forEach((r, ri) => {
         const rx = (r[2] - r[0]) / 2, ry = (r[3] - r[1]) / 2;
         const d = ((X - (r[0] + rx)) / rx) ** 2 + ((Y - (r[1] + ry)) / ry) ** 2;
-        k = Math.max(k, clamp01((1.08 - d) / 0.16));
+        let kk = clamp01((1.08 - d) / 0.16);
+        const c = cores[ri];
+        if (c) kk *= clamp01((c.reach + c.soft - hullDistance(c.hull, X, Y)) / c.soft);
+        k = Math.max(k, kk);
+      });
+      used[y * w + x] *= k;
+    }
+  }
+  if (fit) {
+    const g = fit.grow, f = 2;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const X = x0 + x + 0.5, Y = y0 + y + 0.5;
+      let k = 0;
+      for (const b of fit.areas) {
+        const d = Math.max(b[0] - X, X - b[2], b[1] - Y, Y - b[3], 0);
+        k = Math.max(k, clamp01((g + f - d) / f));
       }
       used[y * w + x] *= k;
     }
@@ -10000,7 +10103,101 @@ function cleanPatch(base, gen, rects, { classes = true, keepHair = false, thresh
     data[i * 4 + 2] = rgb[2];
     data[i * 4 + 3] = Math.round(255 * used[i] * alpha[i]);
   }
-  return { x: x0, y: y0, width: w, height: h, data, used };
+  return { x: x0, y: y0, width: w, height: h, data, used, shift: [dx, dy] };
+}
+function mouthFit(base, gen, rect, how) {
+  const a = mouthLine(base, rect), b = mouthLine(gen, rect);
+  if (!a || !b) return null;
+  let dx = Math.round(a.center[0] - b.center[0]);
+  let dy = how === "top" ? Math.max(0, a.box[1] - 1 - b.box[1]) : Math.round(a.center[1] - b.center[1]);
+  const lim = (v, lo, hi) => Math.max(Math.max(-6, lo), Math.min(Math.min(6, hi), v));
+  dx = lim(dx, -(rect[2] - a.box[2] - 1), a.box[0] - rect[0] - 1);
+  dy = lim(dy, -(rect[3] - a.box[3] - 1), a.box[1] - rect[1] - 1);
+  const moved = [b.box[0] + dx, b.box[1] + dy, b.box[2] + dx, b.box[3] + dy];
+  const grow2 = 3 + Math.max(a.box[3] - a.box[1], b.box[3] - b.box[1]) * 0.25;
+  return { shift: [dx, dy], areas: [a.box, moved], grow: grow2 };
+}
+function mouthLine(img, rect) {
+  const pad = 4;
+  const X0 = Math.max(0, rect[0] - pad), Y0 = Math.max(0, rect[1] - pad), X1 = Math.min(img.width, rect[2] + pad), Y1 = Math.min(img.height, rect[3] + pad);
+  const w = X1 - X0, h = Y1 - Y0;
+  if (w < 8 || h < 8) return null;
+  const L = new Float32Array(w * h), R = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = ((Y0 + y) * img.width + X0 + x) * 4, a = img.data[i + 3] / 255;
+    const r = img.data[i] * a + 255 * (1 - a), g = img.data[i + 1] * a + 255 * (1 - a), b = img.data[i + 2] * a + 255 * (1 - a);
+    L[y * w + x] = 0.299 * r + 0.587 * g + 0.114 * b;
+    R[y * w + x] = r - (g + b) / 2;
+  }
+  const ringL = [], ringR = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x < 3 || y < 3 || x >= w - 3 || y >= h - 3) {
+    ringL.push(L[y * w + x]);
+    ringR.push(R[y * w + x]);
+  }
+  const sL = median(ringL), sR = median(ringR);
+  const score = new Float32Array(w * h);
+  let max = 0;
+  for (let i = 0; i < w * h; i++) {
+    score[i] = Math.max(0, sL - L[i] - 18) + Math.max(0, R[i] - sR - 12) * 1.5;
+    max = Math.max(max, score[i]);
+  }
+  if (max < 25) return null;
+  const blobs = components(score.map((s) => s >= max * 0.3 ? 1 : 0), w, h).filter((c) => c.length >= 3).map((c) => {
+    let x0 = w, y0 = h, x1 = 0, y1 = 0, m2 = 0, sx2 = 0, sy2 = 0;
+    for (const k of c) {
+      const x = k % w, y = k / w | 0;
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x + 1);
+      y1 = Math.max(y1, y + 1);
+      m2 += score[k];
+      sx2 += x * score[k];
+      sy2 += y * score[k];
+    }
+    const off = ((sx2 / m2 - w / 2) / (w * 0.35)) ** 2 + ((sy2 / m2 - h / 2) / (h * 0.6)) ** 2;
+    return { box: [x0, y0, x1, y1], m: m2, sx: sx2, sy: sy2, value: m2 * Math.exp(-off / 2), edge: x0 === 0 || y0 === 0 || x1 === w || y1 === h };
+  }).filter((b) => !b.edge);
+  if (!blobs.length) return null;
+  blobs.sort((a, b) => b.value - a.value);
+  const main = blobs[0];
+  let box = main.box.slice(), m = main.m, sx = main.sx, sy = main.sy;
+  for (const b of blobs.slice(1)) {
+    const cy = (b.box[1] + b.box[3]) / 2, my = (box[1] + box[3]) / 2;
+    const gap = Math.max(b.box[0] - box[2], box[0] - b.box[2]);
+    if (Math.abs(cy - my) <= 4 && gap <= (rect[2] - rect[0]) * 0.3 && b.m > main.m * 0.08) {
+      box = [Math.min(box[0], b.box[0]), Math.min(box[1], b.box[1]), Math.max(box[2], b.box[2]), Math.max(box[3], b.box[3])];
+      m += b.m;
+      sx += b.sx;
+      sy += b.sy;
+    }
+  }
+  return { box: [X0 + box[0], Y0 + box[1], X0 + box[2], Y0 + box[3]], center: [X0 + sx / m + 0.5, Y0 + sy / m + 0.5] };
+}
+function fitMouthRect(rect, line, width, height) {
+  const [lx0, ly0, lx1, ly1] = line.box;
+  const cx = line.center[0];
+  const s8 = (v) => Math.round(v / 8) * 8;
+  let W = Math.max(rect[2] - rect[0], Math.ceil((lx1 - lx0 + 8) / 8) * 8);
+  let best = null;
+  for (const ww of [W, W + 8]) {
+    const x0 = s8(cx - ww / 2);
+    if (x0 > lx0 - 2 || x0 + ww < lx1 + 2) continue;
+    const err = Math.abs(x0 + ww / 2 - cx);
+    if (!best || err < best.err - 0.01) best = { x0, ww, err };
+  }
+  if (!best) {
+    W += 16;
+    best = { x0: s8(cx - W / 2), ww: W };
+  }
+  const y0 = Math.floor((ly0 - 2) / 8) * 8;
+  const y1 = Math.max(rect[3], Math.ceil((ly1 + 8) / 8) * 8, y0 + 16);
+  const out = [best.x0, y0, best.x0 + best.ww, y1];
+  return [Math.max(0, out[0]), Math.max(0, out[1]), Math.min(width, out[2]), Math.min(height, out[3])];
+}
+function fitMouth(img, rects) {
+  const r = rects.mouth && rects.mouth[0];
+  const line = r && mouthLine(img, r);
+  return line ? { ...rects, mouth: [fitMouthRect(r, line, img.width, img.height)] } : rects;
 }
 
 // src/client/theater/AaWorkbench.jsx
@@ -10028,7 +10225,7 @@ function cleanToPatch(gen, prep, rects, part, state2) {
   const c = makeCanvas(prep.padW, prep.padH);
   const g = c.getContext("2d");
   g.drawImage(gen, 0, 0, prep.padW, prep.padH);
-  const p4 = cleanPatch(prep.src, g.getImageData(0, 0, prep.padW, prep.padH), stateRects(rects, part, state2, prep.h), { classes: part === "eyes", keepHair: part === "eyes" });
+  const p4 = cleanPatch(prep.src, g.getImageData(0, 0, prep.padW, prep.padH), stateRects(rects, part, state2, prep.h), { classes: part === "eyes", keepHair: part === "eyes", mouth: part === "mouth" ? state2 === "half" || state2 === "open" ? "top" : "center" : null });
   const out = makeCanvas(p4.width, p4.height);
   out.getContext("2d").putImageData(new ImageData(p4.data, p4.width, p4.height), 0, 0);
   return { dataUrl: out.toDataURL("image/png"), x: p4.x, y: p4.y };
@@ -10300,7 +10497,7 @@ function AaWorkbench({ gameId, person, onClose }) {
   const make = async (v, only = null, given = null) => {
     job(v.key, { status: "running", step: 0, error: "" });
     const prep = await prepare(v.record);
-    const rects = cleanRects(given || rectsOf(v.key), prep.padW, prep.padH);
+    const rects = cleanRects(fitMouth(prep.src, cleanRects(given || rectsOf(v.key), prep.padW, prep.padH)), prep.padW, prep.padH);
     setSizes((s) => ({ ...s, [v.key]: { w: prep.w, h: prep.h } }));
     const patches = only ? await storedPatches(v.record) : {};
     const todo = only ? [only] : steps;
@@ -10354,7 +10551,7 @@ function AaWorkbench({ gameId, person, onClose }) {
     const m = 24;
     return [Math.max(0, x0 - m), Math.max(0, y0 - m), x1 + m, y1 + m];
   })() : null;
-  return /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-bench" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react10.default.createElement("b", null, person.name, " · 逆转式立绘工作台"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn", onClick: onClose }, "返回人物列表")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "给差分做眨眼和说话的口型：框好两只眼睛和嘴，每张差分用 NovelAI 局部重绘 6 次（眼睛半闭、闭；嘴齿缝、小开、开、圆），只重画框里那一小块，原图不动； 重画的结果会洗干净（颜色对齐原图、刘海用原图），眨眼时不闪色、头发不跳。路人可以勾「精简版」：只做闭眼和一个张嘴，每张 2 次。 同一个角色的差分姿势相同，框一次可以「套用到所选」。嘴框尽量扁：框多高，嘴最多张多大。生成要用 NovelAI 的额度（试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。"), variants.length > 0 && /* @__PURE__ */ import_react10.default.createElement(VisionBar, { status: vision, setStatus: setVision }), !variants.length && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "这个角色还没有画好的差分。先在人物志里画几张。"), variants.length > 0 && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-grid" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-list" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.map((v) => v.key))) }, "全选"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(/* @__PURE__ */ new Set()) }, "全不选"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.filter((v) => !v.record.aa).map((v) => v.key))) }, "选还没做的"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "已选 ", picked.size), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !visionReady || !picked.size || running || Boolean(framing), title: visionReady ? "用认脸模型给所选的差分框好眼睛和嘴" : "先在上面下载认脸小模型", onClick: () => autoFrameList(pickedList) }, "🪄 自动框所选")), variants.map((v) => /* @__PURE__ */ import_react10.default.createElement("div", { key: v.key, className: `fg-aa-item${v.key === focus ? " is-on" : ""}`, onClick: () => setFocus(v.key) }, /* @__PURE__ */ import_react10.default.createElement("input", { type: "checkbox", checked: picked.has(v.key), onClick: (e) => e.stopPropagation(), onChange: () => toggle(v.key), "aria-label": `选择 ${v.label}` }), /* @__PURE__ */ import_react10.default.createElement("img", { src: assetUrl(v.record.assetId), alt: "", loading: "lazy", title: "双击放大看", onDoubleClick: (e) => {
+  return /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-bench" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react10.default.createElement("b", null, person.name, " · 逆转式立绘工作台"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn", onClick: onClose }, "返回人物列表")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note" }, "给差分做眨眼和说话的口型：框好两只眼睛和嘴，每张差分用 NovelAI 局部重绘 6 次（眼睛半闭、闭；嘴齿缝、小开、开、圆），只重画框里那一小块，原图不动； 重画的结果会洗干净（颜色对齐原图，只改眼睛本身，压着的刘海、两眼之间的头发、眉毛都用原图），眨眼时不闪色、头发不跳。路人可以勾「精简版」：只做闭眼和一个张嘴，每张 2 次。 同一个角色的差分姿势相同，框一次可以「套用到所选」。嘴框尽量扁：框的下边到哪，嘴最多张到哪；生成时嘴框会自动对准原来的嘴线（左右对中、上边收到嘴线上方），画出来的嘴也会挪回原来的位置。生成要用 NovelAI 的额度（试的时候没扣 Anlas，以你的账户为准）；生成时别关这个面板。"), variants.length > 0 && /* @__PURE__ */ import_react10.default.createElement(VisionBar, { status: vision, setStatus: setVision }), !variants.length && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "这个角色还没有画好的差分。先在人物志里画几张。"), variants.length > 0 && /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-grid" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-list" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.map((v) => v.key))) }, "全选"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(/* @__PURE__ */ new Set()) }, "全不选"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setPicked(new Set(variants.filter((v) => !v.record.aa).map((v) => v.key))) }, "选还没做的"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, "已选 ", picked.size), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: !visionReady || !picked.size || running || Boolean(framing), title: visionReady ? "用认脸模型给所选的差分框好眼睛和嘴" : "先在上面下载认脸小模型", onClick: () => autoFrameList(pickedList) }, "🪄 自动框所选")), variants.map((v) => /* @__PURE__ */ import_react10.default.createElement("div", { key: v.key, className: `fg-aa-item${v.key === focus ? " is-on" : ""}`, onClick: () => setFocus(v.key) }, /* @__PURE__ */ import_react10.default.createElement("input", { type: "checkbox", checked: picked.has(v.key), onClick: (e) => e.stopPropagation(), onChange: () => toggle(v.key), "aria-label": `选择 ${v.label}` }), /* @__PURE__ */ import_react10.default.createElement("img", { src: assetUrl(v.record.assetId), alt: "", loading: "lazy", title: "双击放大看", onDoubleClick: (e) => {
     e.stopPropagation();
     setViewing(v);
   } }), /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("b", null, v.label, auto[v.key] && /* @__PURE__ */ import_react10.default.createElement("i", { className: `fg-aa-badge ${AUTO_BADGE[auto[v.key].confidence][1]}`, title: auto[v.key].notes.join("；") }, "自动框·", AUTO_BADGE[auto[v.key].confidence][0])), /* @__PURE__ */ import_react10.default.createElement("small", null, v.look), /* @__PURE__ */ import_react10.default.createElement("small", { className: jobs[v.key] && jobs[v.key].status === "failed" ? "fg-err" : "" }, statusText(v)))))), /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-aa-stage" }, current && /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: `fg-btn is-mini${tab === "frame" ? " is-on" : ""}`, onClick: () => setTab("frame") }, "框眼睛和嘴"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: `fg-btn is-mini${tab === "play" ? " is-on" : ""}`, disabled: !current.record.aa, title: current.record.aa ? "" : "这张还没做，生成后才能看动起来的样子", onClick: () => setTab("play") }, "看效果"), /* @__PURE__ */ import_react10.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setViewing(current) }, "🔍 放大看"), /* @__PURE__ */ import_react10.default.createElement("span", { className: "fg-note" }, current.label, current.look ? " · " + current.look : "")), tab === "frame" && /* @__PURE__ */ import_react10.default.createElement(import_react10.default.Fragment, null, /* @__PURE__ */ import_react10.default.createElement(RectEditor, { src: assetUrl(current.record.assetId), width: sizeOf(current.key).w, height: sizeOf(current.key).h, rects: rectsOf(current.key), zoom, onChange: (r) => {
