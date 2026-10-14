@@ -1,4 +1,4 @@
-// 对话框的字体、字号、高度：字体选择的校验、上传自己的字体、设置的范围。
+// 对话框的字体、字号、高度：字体选择的校验、上传自己的字体、设置的范围；还有画面上调试信息的开关。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -74,6 +74,14 @@ test('设置：默认都跟皮肤；字号、高度放在范围里，填坏了�
   assert.ok(DEFAULT_CONFIG.ui.customFonts.length === 0)
   // 上传的字体清单只经上传接口改
   assert.equal('customFonts' in (applyPatch({}, { ui: { customFonts: [{ assetId: ID }], textScale: 2 } }).ui), false)
+})
+
+test('调试信息（情绪小字、左上角、右上角）默认不显示；只有真的打开才显示', () => {
+  const keys = ['showEmotion', 'showHud', 'showStatus']
+  assert.deepEqual(keys.map(k => resolveConfig({}).ui[k]), [false, false, false])
+  assert.deepEqual(keys.map(k => resolveConfig({ ui: { showEmotion: true, showHud: true, showStatus: true } }).ui[k]), [true, true, true])
+  assert.deepEqual(keys.map(k => resolveConfig({ ui: { showEmotion: 'yes', showHud: 1, showStatus: null } }).ui[k]), [false, false, false])
+  assert.equal(applyPatch({}, { ui: { showHud: true } }).ui.showHud, true)
 })
 
 test('上传自己的字体：认格式、存素材、能选来用；删掉时正用着的回到跟皮肤，文件也删', async () => {
