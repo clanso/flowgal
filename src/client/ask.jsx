@@ -1,7 +1,7 @@
 // 页面里自己画的确认框、输入框，代替浏览器原生的 window.confirm / window.prompt。
 // DSH 桌面版（Electron）在 Windows 上：原生对话框一关，网页常常拿不回键盘焦点——输入框点了没光标、打不进字，
 // 下拉框点不开，要切到别的窗口再切回来才好（electron/electron#31917）；window.prompt 在 Electron 里干脆不支持。
-// 所以 FlowGal 的界面一律走这里：confirmBox 回 true / false，promptBox 回填的字或 null（取消）。
+// 所以 FlowGal 的界面一律走这里：confirmBox 回 true / false，promptBox 回填的字或 null（取消），choiceBox 回选的那一项或 null（取消）。
 import React from 'react'
 
 let queue = [] // 排着队的对话框：同时弹好几个时一个一个来
@@ -48,6 +48,12 @@ export const confirmBox = (text, opts = {}) => ask({ ...opts, text })
  */
 export const promptBox = (text, value = '', opts = {}) => ask({ ...opts, text, input: { value: value == null ? '' : String(value) } })
 
+/**
+ * 几选一：choices 是 [{ value, label, danger? }]，按顺序排在「取消」后面；opts 同确认框（cancel 改取消键的字）。
+ * @returns {Promise<any|null>} 选的那一项的 value，取消时是 null
+ */
+export const choiceBox = (text, choices, opts = {}) => ask({ ...opts, text, choices })
+
 export function AskHost() {
   const item = React.useSyncExternalStore(subscribe, current, current)
   return item ? <AskDialog key={item.id} item={item} /> : null
@@ -59,7 +65,7 @@ function AskDialog({ item }) {
   const firstRef = React.useRef(null)
   const downOutside = React.useRef(false)
   const yes = () => settle(item.input ? value : true)
-  const no = () => settle(item.input ? null : false)
+  const no = () => settle(item.input || item.choices ? null : false)
   React.useEffect(() => {
     const el = firstRef.current
     if (!el) return
@@ -100,7 +106,9 @@ function AskDialog({ item }) {
         )}
         <div className="fg-ask-row">
           <button type="button" className="fg-ask-btn" onClick={no}>{item.cancel || '取消'}</button>
-          <button type="button" ref={item.input ? undefined : firstRef} className="fg-ask-btn is-yes" onClick={yes}>{item.ok || '确定'}</button>
+          {item.choices ? item.choices.map((c, i) => (
+            <button key={i} type="button" ref={i === 0 ? firstRef : undefined} className={`fg-ask-btn is-yes${c.danger ? ' is-danger' : ''}`} onClick={() => settle(c.value)}>{c.label}</button>
+          )) : <button type="button" ref={item.input ? undefined : firstRef} className="fg-ask-btn is-yes" onClick={yes}>{item.ok || '确定'}</button>}
         </div>
       </div>
     </div>
