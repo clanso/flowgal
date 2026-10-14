@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createChatLlm, chatModels } from '../lib/chat-llm.js'
-import { callModel, retryMaxTokens } from '../lib/director.js'
+import { callModel, retryMaxTokens, jsonOf } from '../lib/director.js'
 import { resolveConfig } from '../lib/config.js'
 import { writeCgPrompts } from '../lib/illustrator.js'
 import { createStore } from '../lib/dsh/store.js'
@@ -259,4 +259,31 @@ test('gate: 分镜师一批里有一张只占了个坑（"placeholder"、只有�
   assert.equal(results.get('b').desc, 'She kneels by the carcass in the pale fungal light.')
   assert.equal(results.get('b').characters.length, 1)
   for (const image of results.values()) assert.doesNotMatch(JSON.stringify(image), /placeholder/)
+})
+
+test('自定义接口：被内容过滤拦下、回了却没有正文的，报错写清楚原因；分段的正文也认；写到上限的标截断', async () => {
+  const whole = body => async () => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } })
+  const call = fetchImpl => callModel(createChatLlm({ baseURL: 'https://relay.example.com/v1', stream: false, fetchImpl }), { provider: 'custom', model: 'gemini', system: 's', user: 'u' })
+  // 生成到一半被安全策略拦下：正文被拿掉，用量照算
+  const filtered = await call(whole({ choices: [{ index: 0, finish_reason: 'content_filter', message: { role: 'assistant', content: null } }], usage: { prompt_tokens: 35000, completion_tokens: 4203 } })).catch(e => e)
+  assert.equal(filtered.message, '被模型的内容过滤拦下了（finish_reason: content_filter）')
+  assert.equal(filtered.code, 'content_filter')
+  // 输入就被拦下（Gemini 的 promptFeedback）
+  const blocked = await call(whole({ choices: [], promptFeedback: { blockReason: 'PROHIBITED_CONTENT' } })).catch(e => e)
+  assert.equal(blocked.message, '被模型的内容过滤拦下了（block_reason: PROHIBITED_CONTENT）')
+  // 说是写完了，却一个字正文都没有：附上接口回的开头
+  const empty = await call(whole({ choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: '' } }], usage: { completion_tokens: 2498 } })).catch(e => e)
+  assert.match(empty.message, /^接口回了，但回复里没有正文（finish_reason: stop）：\{"choices"/)
+  assert.equal(retryMaxTokens(empty, 74319, null), 0, '不当成最大输出的问题')
+  // 正文是分段数组
+  const parts = await call(whole({ choices: [{ finish_reason: 'stop', message: { content: [{ type: 'text', text: '{"images":' }, { type: 'text', text: '[]}' }] } }] }))
+  assert.equal(parts.text, '{"images":[]}')
+  assert.equal(parts.cut, false)
+  // 流式：写到上限的标截断；写了一半被拦下的，解析报错时先写拦下的原因
+  const streamed = finish => async () => sse([chunk({ choices: [{ delta: { content: '{"images":[{"key":"c1"' } }] }), chunk({ choices: [{ delta: {}, finish_reason: finish }] }) + 'data: [DONE]\n\n'])
+  const long = await callModel(createChatLlm({ baseURL: 'https://relay.example.com', fetchImpl: streamed('length') }), { provider: 'custom', model: 'm', system: 's', user: 'u' })
+  assert.equal(long.cut, true)
+  const cut = await callModel(createChatLlm({ baseURL: 'https://relay.example.com', fetchImpl: streamed('SAFETY') }), { provider: 'custom', model: 'm', system: 's', user: 'u' })
+  assert.equal(cut.cut, true)
+  assert.throws(() => jsonOf(cut), /^Error: 被模型的内容过滤拦下了（finish_reason: SAFETY）（导演/)
 })
