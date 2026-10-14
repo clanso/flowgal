@@ -18,6 +18,7 @@ import { Silhouette } from './Stage.jsx'
 import { stateSpans } from '../../../lib/cast.js'
 import { SKINS, loadFontFile } from './skins.js'
 import { FONT_PACKS, FONT_GROUPS, LOCAL_FONTS, DIALOG_LIMITS, cleanFontName, fontFamilyOf, skinDialogHeight } from '../../../lib/fonts.js'
+import { CORNER_ITEMS, CORNER_DEFAULTS } from '../../../lib/corner.js'
 import { EFFECT_GROUPS, EFFECT_IDS } from './effects.js'
 import { previewTrack, stopPreview, previewVoice, previewSound, erosFoley, previewEros, erosPeak } from './audio.js'
 import { EROS_SFX, EROS_PACES, EROS_LABEL, TENTACLE, TENTACLE_LABEL, PEAKS, PEAK_LABEL } from '../../../lib/eros.js'
@@ -2027,6 +2028,44 @@ function DialogSection({ data }) {
   )
 }
 
+const CORNER_GROUPS = [
+  { side: 'left', label: '左上角', hint: '地点和这一幕的场景标签，点一下开关一样。地点没写时显示「第几轮」；别的标签只在这一幕有这一样时出现（晴天、正常光线不显示）。换地方时出来的那张地点标题不归这里管，在「特效 → 地点标题与过场字卡」里关。' },
+  { side: 'right', label: '右上角', hint: '导演整理中可以点进去看导演正在写什么；出图进度是还在画的图有几张；通话中是接通电话后对方的名字和计时，关掉后接通的声音照旧。右上角的关闭按钮一直在。' },
+]
+/** 剧场左上角、右上角每一样的开关（lib/corner.js），样子和「特效」页一样：一组一个总开关，下面每样一个。 */
+function CornerSection({ corner }) {
+  const p = patch => patchConfig({ ui: { corner: patch } }).catch(e => toast(e.message, 'error'))
+  const changed = CORNER_ITEMS.some(i => corner[i.id] !== i.on)
+  return (
+    <>
+      {CORNER_GROUPS.map(g => {
+        const items = CORNER_ITEMS.filter(i => i.side === g.side)
+        const count = items.filter(i => corner[i.id]).length
+        return (
+          <div key={g.side} className="fg-fx-group">
+            <div className="fg-fx-head">
+              <b>{g.label}</b>
+              <span className={`fg-fx-count${count && count < items.length ? ' is-part' : ''}`}>{count === items.length ? '全显示' : count ? `显示 ${count} / ${items.length}` : '全不显示'}</span>
+              <div className="fg-spacer" />
+              <Toggle value={count === items.length} onChange={() => p(Object.fromEntries(items.map(i => [i.id, count !== items.length])))} />
+            </div>
+            <div className="fg-note">{g.hint}</div>
+            <div className="fg-fx-items">
+              {items.map(i => {
+                const on = Boolean(corner[i.id])
+                return <button key={i.id} type="button" className={`fg-fx-chip${on ? ' is-on' : ''}`} aria-pressed={on} title={on ? '点一下不显示' : '点一下显示'} onClick={() => p({ [i.id]: !on })}><i />{i.label}</button>
+              })}
+            </div>
+          </div>
+        )
+      })}
+      <div className="fg-row" style={{ justifyContent: 'flex-end', marginTop: '.4cqw' }}>
+        <button type="button" className="fg-btn is-mini" disabled={!changed} onClick={() => p({ ...CORNER_DEFAULTS })}>角落恢复默认</button>
+      </div>
+    </>
+  )
+}
+
 export function LookSection({ data }) {
   const cfg = data.config
   const p = patch => patchConfig({ ui: patch }).catch(e => toast(e.message, 'error'))
@@ -2043,16 +2082,11 @@ export function LookSection({ data }) {
       </div>
       <DialogSection data={data} />
       <div className="fg-section">调试信息</div>
-      <div className="fg-note" style={{ marginBottom: '.6cqw' }}>看导演判断得对不对时打开，平常读剧情可以都关着。</div>
+      <div className="fg-note" style={{ marginBottom: '.6cqw' }}>看导演判断得对不对时打开，平常读剧情可以都关着。改完剧场里马上生效。</div>
       <Field label="名牌旁的情绪" hint="说话人名字旁边的小字（调侃、得意……），是导演给这句标的情绪。立绘的表情照样跟着换，只是不写出来。">
         <Toggle value={cfg.ui.showEmotion} onChange={v => p({ showEmotion: v })} />
       </Field>
-      <Field label="左上角的场景信息" hint="地点、时段、天气、光线、画面效果、氛围、配乐情绪这些标签。换地方时出来的那张地点标题不归这里管，在「特效 → 地点标题与过场字卡」里关。">
-        <Toggle value={cfg.ui.showHud} onChange={v => p({ showHud: v })} />
-      </Field>
-      <Field label="右上角的状态" hint="导演整理中（点它看导演正在写什么）、出图进度、正在放的曲子。关闭按钮、连接中断的提示和通话中的小卡一直显示。">
-        <Toggle value={cfg.ui.showStatus} onChange={v => p({ showStatus: v })} />
-      </Field>
+      <CornerSection corner={cfg.ui.corner || CORNER_DEFAULTS} />
       <div className="fg-section">画面</div>
       <Field label="画面比例" hint="跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。">
         <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.ratio} onChange={e => p({ ratio: e.target.value })}>

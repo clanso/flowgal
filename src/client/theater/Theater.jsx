@@ -112,6 +112,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   // 特效开关（设置 → 特效，effects.js）：关掉的演出在摊平成节拍前后拿掉，剩下几样在下面按 off 直接不演。
   // 按关掉的那几个的名字记：调音量这类别的设置变了不重新摊平
   const offKey = [...effectsOff(ui0)].sort().join(',')
+  const corner = ui0.corner || { call: true, error: true } // 设置还没读到时只留通话中和连接中断
   const off = React.useMemo(() => new Set(offKey ? offKey.split(',') : []), [offKey])
   const { beats, byKey } = React.useMemo(() => {
     const built = buildBeats(muteView(view, off))
@@ -526,32 +527,38 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {beat && !title && !off.has('title.place') && (!change || phase === 'cast' || phase === 'settle') && <TitleCard beat={beat} delay={speed > 0 ? (beat.cut && !hold.change ? CUT_MS : hold.wake ? WAKE_SWAP_MS + 300 : 0) : 0} />}
         {beat && !title && beat.cut && speed > 0 && cutShown.current === visit && <CutCard beat={beat} out={!cutOn} />}
 
-        {!title && beat && ui0.showHud && (
-          <div className="fg-hud">
-            <div className="fg-hud-bar" />
-            <div>
-              <div className="fg-hud-place">{hud.scene.location || `第 ${hud.turn} 轮`}</div>
-              <div className="fg-hud-meta">
-                {hud.mode && <span className="fg-hud-mode">{MODE_LABEL[hud.mode]}</span>}
-                <span>{TIME_LABEL[hud.scene.time] || ''}</span>
-                {hud.scene.weather && hud.scene.weather !== 'clear' && <span>{WEATHER_LABEL[hud.scene.weather]}</span>}
-                {LIGHT_LABEL[hud.scene.light] && <span>{LIGHT_LABEL[hud.scene.light]}</span>}
-                {FX_LABEL[hud.scene.fx] && <span>{FX_LABEL[hud.scene.fx]}</span>}
-                {ROMANCE_LABEL[hud.scene.romance] && <span className="fg-hud-romance">♡ {ROMANCE_LABEL[hud.scene.romance]}</span>}
-                {SENSE_LABEL[hud.scene.sense] && <span className="fg-hud-sense">{SENSE_LABEL[hud.scene.sense]}</span>}
-                {hud.scene.mood && <span>♪ {MOOD_LABEL[hud.scene.mood]}</span>}
+        {!title && beat && (() => {
+          // 左上角每一样单独开关（设置 → 外观与演出 → 调试信息，lib/config.js 的 CORNER_DEFAULTS）；一样都不显示时整块不出
+          const place = corner.place ? hud.scene.location || `第 ${hud.turn} 轮` : ''
+          const meta = [
+            corner.mode && hud.mode && <span key="mode" className="fg-hud-mode">{MODE_LABEL[hud.mode]}</span>,
+            corner.time && TIME_LABEL[hud.scene.time] && <span key="time">{TIME_LABEL[hud.scene.time]}</span>,
+            corner.weather && hud.scene.weather && hud.scene.weather !== 'clear' && <span key="weather">{WEATHER_LABEL[hud.scene.weather]}</span>,
+            corner.light && LIGHT_LABEL[hud.scene.light] && <span key="light">{LIGHT_LABEL[hud.scene.light]}</span>,
+            corner.fx && FX_LABEL[hud.scene.fx] && <span key="fx">{FX_LABEL[hud.scene.fx]}</span>,
+            corner.romance && ROMANCE_LABEL[hud.scene.romance] && <span key="romance" className="fg-hud-romance">♡ {ROMANCE_LABEL[hud.scene.romance]}</span>,
+            corner.sense && SENSE_LABEL[hud.scene.sense] && <span key="sense" className="fg-hud-sense">{SENSE_LABEL[hud.scene.sense]}</span>,
+            corner.mood && hud.scene.mood && <span key="mood">♪ {MOOD_LABEL[hud.scene.mood]}</span>,
+          ].filter(Boolean)
+          if (!place && !meta.length) return null
+          return (
+            <div className="fg-hud">
+              <div className="fg-hud-bar" />
+              <div>
+                {place && <div className="fg-hud-place">{place}</div>}
+                {meta.length > 0 && <div className={'fg-hud-meta' + (place ? '' : ' is-alone')}>{meta}</div>}
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
         {!title && (
           <div className="fg-topright" onClick={e => e.stopPropagation()}>
-            {/* 导演整理中、出图进度、曲名是调试用的（设置 → 外观与演出 → 调试信息）；通话中、连接中断、关闭按钮一直在 */}
-            {ui0.showStatus && directing && <button type="button" className="fg-pill is-busy is-link" title="看导演正在写什么" onClick={() => setPanel('director')}>导演整理中 ›</button>}
-            {ui0.showStatus && drawing > 0 && <span className="fg-pill is-busy">出图 {drawing}</span>}
-            {beat && beat.call && beat.call.state === 'live' && <CallChip key={beat.call.id} call={beat.call} sound={sfxOn} />}
-            {ui0.showStatus && track && <span className={'fg-pill' + (hushed ? ' is-hushed' : '')} title={hushed ? `${track.name}（留白，一会儿回来）` : track.name}>♪ {track.name}</span>}
-            {viewError && <span className="fg-pill fg-err" title={viewError}>连接中断，重连中</span>}
+            {/* 右上角每一样单独开关（同上）；关闭按钮一直在。通话中的小卡关掉时接通的声音照旧 */}
+            {corner.director && directing && <button type="button" className="fg-pill is-busy is-link" title="看导演正在写什么" onClick={() => setPanel('director')}>导演整理中 ›</button>}
+            {corner.drawing && drawing > 0 && <span className="fg-pill is-busy">出图 {drawing}</span>}
+            {beat && beat.call && beat.call.state === 'live' && <CallChip key={beat.call.id} call={beat.call} sound={sfxOn} hidden={!corner.call} />}
+            {corner.track && track && <span className={'fg-pill' + (hushed ? ' is-hushed' : '')} title={hushed ? `${track.name}（留白，一会儿回来）` : track.name}>♪ {track.name}</span>}
+            {corner.error && viewError && <span className="fg-pill fg-err" title={viewError}>连接中断，重连中</span>}
             <button type="button" className="fg-iconbtn" title="回到聊天（Esc）" onClick={close}>✕</button>
           </div>
         )}
