@@ -3,7 +3,7 @@
 // 打字音和音效照 lib/sounds.js 的配方用 WebAudio 现场合成，不需要音频文件；某种音效换成了玩家上传的文件、
 // 音效库里的声音，或者音色用的是音效库里的打字音时放那个文件，响度按内置的对齐（见「响度对齐」）。
 import { assetUrl, soundlibNow } from '../api.js'
-import { voiceById, soundFor, slotById, DEFAULT_SOUNDS, isLibRef, libIdOf } from '../../../lib/sounds.js'
+import { voiceById, findVoice, isCustomRef, soundFor, slotById, DEFAULT_SOUNDS, isLibRef, libIdOf } from '../../../lib/sounds.js'
 import { FOLEY } from '../../../lib/foley.js'
 import { EROS_FOLEY, EROS_LOOPS, TENTACLE_LOOPS, TENTACLE_SWAP, PEAK_FOLEY } from '../../../lib/eros.js'
 
@@ -523,10 +523,12 @@ function chainFor(ac, style) {
 
 const CLASSIC = voiceById('classic').parts
 /**
- * 一个音色怎么出声：内置的照配方合成（{ parts }）；音效库里的打字音放采样（{ sample, gain }，响度对齐经典哔哔，再乘库里给它调的音量）。
+ * 一个音色怎么出声：内置的、自己做的照配方合成（{ parts }，自己做的配方在设置的 customVoices 里，删掉了的退回经典哔哔）；
+ * 音效库里的打字音放采样（{ sample, gain }，响度对齐经典哔哔，再乘库里给它调的音量）。
  * 音效库还没读到、采样还没下载解码好时返回 null（这个字先不响，同时开始准备）；库里已经删掉的退回经典哔哔。
  */
 function voiceSource(ac, id) {
+  if (isCustomRef(id)) return { parts: findVoice(id, sounds)?.parts || CLASSIC }
   if (!isLibRef(id)) { const v = voiceById(id); return v ? { parts: v.parts } : null }
   if (!soundlibNow()) return null
   const lib = libSound(libIdOf(id))
@@ -592,7 +594,10 @@ export function blip(voice, { pitch = 1, gain = 1 } = {}) {
   if (style === 'radio') playParts(ac, [{ wave: 'noise', f: 3200, q: 0.8, gain: 0.05, dur: 0.06 }], { volume, out })
 }
 
-/** 试听一个音色：按打字音音量念一小段（三个字、一个停顿、再四个字）。ui 是当前设置。音效库的打字音等下载好再念。 */
+/**
+ * 试听一个音色：按打字音音量念一小段（三个字、一个停顿、再四个字）。ui 是当前设置。音效库的打字音等下载好再念。
+ * voice 带着 parts 时直接照这份配方念（编辑自己的音色时还没保存的那份）。
+ */
 export async function previewVoice(voice, ui = sounds) {
   const ac = voice && audioCtx()
   if (!ac) return
@@ -600,11 +605,18 @@ export async function previewVoice(voice, ui = sounds) {
     const lib = libSound(libIdOf(voice.id))
     if (lib) { await sampleReady(ac, lib.assetId); await recipeLevelDone(CLASSIC) }
   }
-  const v = voiceSource(ac, voice.id)
+  const v = voice.parts ? { parts: voice.parts } : isCustomRef(voice.id) ? { parts: findVoice(voice.id, ui)?.parts || CLASSIC } : voiceSource(ac, voice.id)
   if (!v) return
   const base = 2 ** ((voice.pitch || 0) / 12)
   const t0 = ac.currentTime + 0.02
   for (const dt of [0, 0.09, 0.18, 0.42, 0.51, 0.6, 0.69]) emit(ac, v, { rate: base * (0.96 + Math.random() * 0.08), volume: ui.blipVolume ?? 1, at: t0 + dt })
+}
+/** 这份配方比经典哔哔响多少（A 计权响度之比），做自己的音色时「音量对齐经典哔哔」用。量不出来时是 1。 */
+export async function loudnessVsClassic(parts) {
+  await recipeLevelDone(CLASSIC)
+  await recipeLevelDone(parts)
+  const a = recipeLevel(parts).value, b = recipeLevel(CLASSIC).value
+  return a > 0 && b > 0 ? a / b : 1
 }
 /** 等配方的响度量好（最多等半秒）。 */
 async function recipeLevelDone(parts) {

@@ -165,6 +165,7 @@ export function loadConfig(force = false) {
   }
   return configPromise
 }
+export function configNow() { return configCache }
 export function setConfig(data) { configCache = data; for (const fn of [...configListeners]) fn() }
 export function useConfig() {
   const [, force] = React.useReducer(x => x + 1, 0)

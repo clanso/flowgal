@@ -1751,3 +1751,26 @@ button.fg-pm-name:hover { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */
 }
+
+/* 设置 → 声音：音色一览按男女分组；自己做音色的编辑器；自动分配的音色组 */
+.fg-voice-group { margin: .8cqw 0 .3cqw; color: var(--ink-dim); letter-spacing: .1em; }
+.fg-linkbtn { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.fg-linkbtn:hover { color: var(--accent); }
+.fg-vm-list { display: flex; flex-direction: column; gap: .5cqw; margin-top: .6cqw; }
+.fg-vm-item { padding: .6cqw .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }
+.fg-vm-item b { letter-spacing: .08em; }
+.fg-vm-editor { display: flex; flex-direction: column; gap: .6cqw; margin: .6cqw 0; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
+.fg-vm-parts { display: flex; flex-direction: column; gap: .4cqw; }
+.fg-vm-part { display: flex; flex-wrap: wrap; align-items: center; gap: .4cqw .6cqw; padding: .4cqw .6cqw; border-radius: .6cqw; background: rgba(0, 0, 0, .18); }
+.fg-vm-part label { display: inline-flex; align-items: center; gap: .3cqw; font-size: .85cqw; color: var(--ink-dim); white-space: nowrap; }
+.fg-vm-part .fg-input { padding: .2cqw .4cqw; }
+.fg-vm-idx { min-width: 1.4cqw; color: var(--accent); font-weight: 600; }
+.fg-vm-tools { flex-wrap: wrap; gap: .4cqw; }
+.fg-vm-pools { display: flex; flex-direction: column; gap: .3cqw; margin-top: .4cqw; }
+.fg-vm-pool { flex-wrap: wrap; gap: .2cqw; }
+.fg-vm-pool .fg-look-chip { margin: 0; align-items: center; }
+.fg-vm-pool-label { min-width: 5cqw; color: var(--ink-dim); }
+@media (max-width: 700px), (orientation: portrait) {
+  .fg-vm-part label, .fg-vm-pool-label { font-size: 2.8cqw; }
+  .fg-vm-part .fg-input { width: 12cqw !important; }
+}

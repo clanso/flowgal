@@ -1,6 +1,6 @@
 // 剧场里的四个面板：回想（Backlog）、鉴赏（CG / 背景 / 重画 / 改词 / 补图）、人物志（档案、衣橱、立绘差分、情绪库）、设置（含声音、「我的配乐」）。导演日志在 DirectorLog.jsx。
 import React from 'react'
-import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, soundlibNow, hostName } from '../api.js'
+import { api, assetUrl, toast, fillText, useConfig, loadConfig, patchConfig, setConfig, useUpdate, loadUpdate, setUpdate, updateAvailable, useMusic, loadMusic, useSoundlib, loadSoundlib, soundlibNow, configNow, hostName } from '../api.js'
 import { emotionLabel, shownLib, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, MODE_LABEL, RECALL_TONES, RECALL_TONE_LABEL, cgSrc } from './playback.js'
 import { playedUnits } from '../../../lib/staging.js'
 import { allEmotions, emotionEntry, personEmotions, nearestOf, emotionLevel } from '../../../lib/emotions.js'
@@ -22,7 +22,8 @@ import { CORNER_ITEMS, CORNER_DEFAULTS } from '../../../lib/corner.js'
 import { EFFECT_GROUPS, EFFECT_IDS } from './effects.js'
 import { previewTrack, stopPreview, previewVoice, previewSound, erosFoley, previewEros, erosPeak } from './audio.js'
 import { EROS_SFX, EROS_PACES, EROS_LABEL, TENTACLE, TENTACLE_LABEL, PEAKS, PEAK_LABEL } from '../../../lib/eros.js'
-import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, castVoices, libraryBlips, voiceLabel, isLibRef, libRef, libIdOf, LIBRARY_VOICES, AA_VOICES, libraryPreset, builtinPreset, aaPreset, narrationPatch } from '../../../lib/sounds.js'
+import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, castVoices, libraryBlips, voiceLabel, isLibRef, libRef, libIdOf, LIBRARY_VOICES, AA_VOICES, libraryPreset, builtinPreset, aaPreset, narrationPatch, customRef, isCustomRef } from '../../../lib/sounds.js'
+import { VoiceMaker, VoicePools, VOICE_GENDERS } from './VoiceMaker.jsx'
 import { cleanPack, packFiles } from '../../../lib/aa-sprite.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
 import { SOUND_SIDECAR, MAX_SOUND_VOLUME, readSoundSidecar, soundMatcher, writeSoundSidecar } from '../../../lib/soundlib-sidecar.js'
@@ -390,7 +391,12 @@ function lookGroups(person) {
 // 声音：音色按男女分组；音高上下各几个半音。
 const VOICE_GROUPS = [['female', '女声'], ['male', '男声'], ['', '不分男女']]
 const PITCHES = Array.from({ length: VOICE_PITCH_LIMIT * 2 + 1 }, (_, i) => i - VOICE_PITCH_LIMIT).map(n => [String(n), n > 0 ? `音高 +${n}` : n < 0 ? `音高 ${n}` : '音高 原调'])
-const voiceText = voice => (voice ? voiceLabel(voice.id, libraryBlips(soundlibNow())) : '不出声')
+const voiceText = voice => (voice ? voiceLabel(voice.id, libraryBlips(soundlibNow()), configNow()?.config?.ui) : '不出声')
+/** 自己做的音色，当下拉框里的一组：[[my:编号, 名字], …]；当前选着、但已经删了的也留一项。 */
+const customOptions = (ui, current) => [
+  ...(ui?.customVoices || []).map(v => [customRef(v.id), v.label]),
+  ...(isCustomRef(current) && !(ui?.customVoices || []).some(v => customRef(v.id) === current) ? [[current, '已删除的自己的音色（放经典哔哔）']] : []),
+]
 /** 音效库里的打字音，当下拉框里的一组：[[lib:编号, 名字], …]；当前选着、但库里已经删了的也留一项。 */
 const blipOptions = (blips, current) => [
   ...blips.map(b => [libRef(b.id), b.name]),
@@ -472,6 +478,7 @@ function ProfileEditor({ gameId, person, cast, group, turn }) {
             <option value="">自动（{voiceText(autoVoice)}）</option>
             <option value="off">不出声</option>
             {VOICE_GROUPS.map(([g, label]) => <optgroup key={g} label={label}>{VOICES.filter(v => v.gender === g).map(v => <option key={v.id} value={v.id}>{v.label}</option>)}</optgroup>)}
+            {customOptions(ui, form.voice).length > 0 && <optgroup label="自己的音色">{customOptions(ui, form.voice).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</optgroup>}
             {blipOptions(blips, form.voice).length > 0 && <optgroup label="音效库里的打字音">{blipOptions(blips, form.voice).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</optgroup>}
           </select>
           <select className="fg-select" style={{ width: 'auto' }} value={form.voicePitch} onChange={set('voicePitch')} aria-label="音高" title="升降几个半音">{PITCHES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
@@ -2310,7 +2317,9 @@ function SoundSection({ data }) {
   const aa = aaPreset(ui)
   const usable = library.filter(s => s.use).length
   const choose = (slot, value) => { p({ sounds: { [slot]: value } }); previewSound(slot, value, ui) }
-  const defaultOptions = [['auto', '自动（按性别分）'], [AA_VOICES, '逆转式（女性都用逆转女声、男性都用逆转男声）'], ...(blips.length || ui.voiceDefault === LIBRARY_VOICES ? [[LIBRARY_VOICES, '音效库里的打字音（按性别分）']] : []), ...VOICES.map(v => [v.id, `都用「${v.label}」`]), { group: '都用音效库里的', options: blipOptions(blips, ui.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }]
+  const defaultOptions = [['auto', '自动（按性别分）'], [AA_VOICES, '逆转式（女性都用逆转女声、男性都用逆转男声）'], ...(blips.length || ui.voiceDefault === LIBRARY_VOICES ? [[LIBRARY_VOICES, '音效库里的打字音（按性别分）']] : []), ...VOICES.map(v => [v.id, `都用「${v.label}」`]), { group: '都用自己的', options: customOptions(ui, ui.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }, { group: '都用音效库里的', options: blipOptions(blips, ui.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }]
+  // 自动分配能用的所有音色（内置的、自己的、音效库的打字音）
+  const allVoices = [...VOICES.map(v => [v.id, v.label]), ...customOptions(ui), ...blipOptions(blips)]
   return (
     <>
       {(aa || preset || builtin) && (
@@ -2327,20 +2336,33 @@ function SoundSection({ data }) {
       <Field label="没指定的角色" hint="每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。">
         <Select value={ui.voiceDefault} options={defaultOptions} onChange={v => p({ voiceDefault: v })} />
       </Field>
+      {ui.voiceDefault === 'auto' && (
+        <Field label="自动分配的音色" hint="选「自动」时每种性别从这一组里按名字挑一个（同一局里尽量不撞）。可以加减，内置的、自己做的、音效库里的打字音都能放进来；改了只影响还没指定声音的角色。">
+          <VoicePools ui={ui} p={p} options={allVoices} />
+        </Field>
+      )}
       <Field label="旁白">
         <div className="fg-row">
-          <Select value={ui.narrationVoice} options={[...VOICES.map(v => [v.id, v.label]), { group: '音效库里的打字音', options: blipOptions(blips, ui.narrationVoice) }, ['off', '不出声']]} style={INLINE} onChange={v => p(narrationPatch(ui, v))} />
+          <Select value={ui.narrationVoice} options={[...VOICES.map(v => [v.id, v.label]), { group: '自己的音色', options: customOptions(ui, ui.narrationVoice) }, { group: '音效库里的打字音', options: blipOptions(blips, ui.narrationVoice) }, ['off', '不出声']]} style={INLINE} onChange={v => p(narrationPatch(ui, v))} />
           <Select value={String(ui.narrationPitch)} options={PITCHES} style={INLINE} onChange={v => p({ narrationPitch: Number(v) })} />
           <button type="button" className="fg-btn" disabled={!narration} onClick={() => previewVoice(narration, ui)}>▶ 试听</button>
         </div>
       </Field>
-      <div className="fg-section">音色一览 · {VOICES.length + blips.length} 个（点一下试听）</div>
+      <div className="fg-section">音色一览 · {VOICES.length + (ui.customVoices || []).length + blips.length} 个（点一下试听）</div>
+      {VOICE_GENDERS.filter(([g]) => g !== 'other').map(([g, label]) => (
+        <React.Fragment key={g}>
+          <div className="fg-note fg-voice-group">{label} · {VOICES.filter(v => v.gender === g).length} 个</div>
+          <div className="fg-skins fg-voices">
+            {VOICES.filter(v => v.gender === g).map(v => (
+              <button key={v.id} type="button" className="fg-skin" onClick={() => previewVoice({ id: v.id, pitch: 0 }, ui)}>
+                <b>▶ {v.label}</b><span>{v.desc}</span>
+              </button>
+            ))}
+          </div>
+        </React.Fragment>
+      ))}
+      {blips.length > 0 && <div className="fg-note fg-voice-group">音效库里的打字音 · {blips.length} 个</div>}
       <div className="fg-skins fg-voices">
-        {VOICES.map(v => (
-          <button key={v.id} type="button" className="fg-skin" onClick={() => previewVoice({ id: v.id, pitch: 0 }, ui)}>
-            <b>▶ {v.label}</b><span>{VOICE_GENDER[v.gender]} · {v.desc}</span>
-          </button>
-        ))}
         {blips.map(b => (
           <button key={b.id} type="button" className="fg-skin" onClick={() => previewVoice({ id: libRef(b.id), pitch: 0 }, ui)}>
             <b>▶ {b.name}</b><span>音效库 · {VOICE_GENDER[b.gender || '']}{b.use === 'narration' ? ' · 旁白用' : ''}{b.description ? ' · ' + b.description : ''}</span>
@@ -2348,6 +2370,7 @@ function SoundSection({ data }) {
         ))}
       </div>
       {!blips.length && <div className="fg-note">逆转女声、逆转男声、逆转打字机是照逆转裁判的声音合成的，不用导入。想用原版录音：把逆转裁判音效包（或别的打字音）导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。</div>}
+      <VoiceMaker ui={ui} p={p} />
       <div className="fg-section">音效</div>
       <Field label="音效"><div className="fg-row"><Toggle value={ui.sfx} onChange={v => p({ sfx: v })} /><input type="range" min="0" max="2" step="0.1" value={ui.sfxVolume} aria-label="音效音量" onChange={e => p({ sfxVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
       {SOUND_GROUPS.map(([group, title, note]) => (

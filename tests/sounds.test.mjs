@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { VOICES, SOUND_SLOTS, DEFAULT_SOUNDS, resolveVoice, castVoices, lineVoice, soundFor, cleanVoice, voiceLabel, libraryPreset, builtinPreset, LIBRARY_VOICES, AA_VOICES, aaPreset, narrationPatch, isFixedVoice } from '../lib/sounds.js'
+import { VOICES, SOUND_SLOTS, DEFAULT_SOUNDS, resolveVoice, castVoices, lineVoice, soundFor, cleanVoice, voiceLabel, libraryPreset, builtinPreset, LIBRARY_VOICES, AA_VOICES, aaPreset, narrationPatch, isFixedVoice, findVoice, CUSTOM_VOICE_LIMIT, CUSTOM_PART_LIMIT } from '../lib/sounds.js'
 import { resolveConfig, applyPatch } from '../lib/config.js'
 import { editPerson, effectivePerson } from '../lib/cast.js'
 import { createStore } from '../lib/dsh/store.js'
@@ -273,4 +273,81 @@ test('gate: 逆转式音色：内置的逆转男声 / 女声 / 打字机随时�
   assert.deepEqual(narrationPatch({ narrationVoice: 'bell', narrationPitch: 0 }, 'classic'), { narrationVoice: 'classic' })
   assert.deepEqual(narrationPatch({ narrationVoice: 'aa-typewriter', narrationPitch: 0 }, 'off'), { narrationVoice: 'off' })
   assert.deepEqual(lineVoice('narration', '', new Map(), resolveConfig({ ui: patch }).ui), { id: 'aa-typewriter', pitch: 0, auto: false })
+})
+
+test('gate: 自己做的音色：配方夹在范围里、认不出的丢掉；档案和设置能选 my:编号；删掉后设置退回默认、剧场退回经典哔哔', () => {
+  const saved = resolveConfig({ ui: {
+    customVoices: [
+      { id: 'v1', label: '  我的少女音  ', desc: '甜', gender: 'female', fixed: true, from: 'bell', parts: [
+        { wave: 'sine', f: 99999, dur: 9, gain: 3, attack: 1, hold: 5, q: 3, lp: 900 },
+        { wave: 'noise', f: 2000, dur: 0.04, gain: 0.02, q: 99, lp: 900 },
+        { wave: 'organ', f: 440, dur: 0.05, gain: 0.03 },
+      ] },
+      { id: 'v1', label: '重复的编号', parts: [{ wave: 'sine', f: 440, dur: 0.05, gain: 0.03 }] },
+      { id: '../bad', label: '坏编号', parts: [{ wave: 'sine', f: 440, dur: 0.05, gain: 0.03 }] },
+      { id: 'v2', label: '', gender: 'robot', from: 'nope', parts: [{ wave: 'kazoo' }] },
+      { id: 'v3', label: '', gender: 'robot', from: 'nope', parts: [{ wave: 'square', f: 300, dur: 0.05, gain: 0.02, to: 300 }] },
+    ],
+    voiceDefault: 'my:v3', narrationVoice: 'my:gone',
+  } }).ui
+  assert.deepEqual(saved.customVoices.map(v => v.id), ['v1', 'v3'])
+  const [mine, plain] = saved.customVoices
+  assert.equal(mine.label, '我的少女音')
+  assert.equal(mine.fixed, true)
+  assert.equal(mine.from, 'bell')
+  assert.deepEqual(mine.parts, [
+    { wave: 'sine', f: 16000, dur: 2, gain: 0.4, attack: 0.5, hold: 1.499, lp: 900 },
+    { wave: 'noise', f: 2000, dur: 0.04, gain: 0.02, q: 40 },
+  ])
+  assert.deepEqual(plain, { id: 'v3', label: '我的音色', desc: '', gender: '', parts: [{ wave: 'square', f: 300, dur: 0.05, gain: 0.02 }] })
+  // 设置里用着删掉了的自己的音色：退回默认；还在的照用
+  assert.equal(saved.voiceDefault, 'my:v3')
+  assert.equal(saved.narrationVoice, 'classic')
+  // 档案能选 my:编号（写法对就收，删没删由剧场管）
+  assert.equal(cleanVoice('my:v1'), 'my:v1')
+  assert.equal(cleanVoice('my:../x'), '')
+  assert.equal(findVoice('my:v1', saved).label, '我的少女音')
+  assert.equal(findVoice('my:v1', saved).id, 'my:v1')
+  assert.equal(findVoice('my:gone', saved), null)
+  assert.equal(voiceLabel('my:v1', [], saved), '我的少女音')
+  assert.equal(voiceLabel('my:gone', [], saved), '已删除的自己的音色')
+  // 照原样放的自己的音色：自动分配不错开音高，当旁白放原调
+  const ui = { ...saved, voiceDefault: 'auto', voicePools: { ...saved.voicePools, female: ['my:v1'] } }
+  assert.deepEqual(resolveVoice({ gender: 'female' }, '真宵', ui), { id: 'my:v1', pitch: 0, auto: true })
+  assert.ok(isFixedVoice('my:v1', saved) && !isFixedVoice('my:v3', saved))
+  assert.deepEqual(narrationPatch(saved, 'my:v1'), { narrationVoice: 'my:v1', narrationPitch: 0 })
+  // 一个人最多 CUSTOM_PART_LIMIT 段、一共最多 CUSTOM_VOICE_LIMIT 个
+  const many = resolveConfig({ ui: { customVoices: Array.from({ length: CUSTOM_VOICE_LIMIT + 5 }, (_, i) => ({ id: 'm' + i, parts: Array.from({ length: CUSTOM_PART_LIMIT + 3 }, () => ({ wave: 'sine', f: 440, dur: 0.05, gain: 0.03 })) })) } }).ui
+  assert.equal(many.customVoices.length, CUSTOM_VOICE_LIMIT)
+  assert.equal(many.customVoices[0].parts.length, CUSTOM_PART_LIMIT)
+  // 改设置时整份 customVoices 换掉（不是按下标合并）
+  const after = resolveConfig(applyPatch({ ui: { customVoices: saved.customVoices } }, { ui: { customVoices: [plain] } })).ui
+  assert.deepEqual(after.customVoices.map(v => v.id), ['v3'])
+})
+
+test('gate: 自动分配的音色组能改：每组只留认得的、不重复，改空了或没改过用默认；只影响没指定声音的角色', () => {
+  const def = resolveConfig({}).ui
+  assert.deepEqual(def.voicePools, { female: ['bell', 'chirp', 'soft', 'cool', 'bubble'], male: ['boy', 'deep', 'gruff', 'elder'], other: ['classic', 'kid', 'wood', 'robot'], '': ['classic'] })
+  const ui = resolveConfig({ ui: {
+    customVoices: [{ id: 'v1', label: '我的', parts: [{ wave: 'sine', f: 440, dur: 0.05, gain: 0.03 }] }],
+    voicePools: { female: ['sweet', 'sweet', 'nope', 'my:v1', 'my:gone', 'lib:abc'], male: [], other: 'x', '': ['idol'] },
+  } }).ui
+  assert.deepEqual(ui.voicePools.female, ['sweet', 'my:v1', 'lib:abc'])
+  assert.deepEqual(ui.voicePools.male, ['boy', 'deep', 'gruff', 'elder'])
+  assert.deepEqual(ui.voicePools.other, ['classic', 'kid', 'wood', 'robot'])
+  assert.deepEqual(ui.voicePools[''], ['idol'])
+  // 改的是哪一组就只换那一组
+  const patched = resolveConfig(applyPatch({ ui: { voicePools: { male: ['calm'] } } }, { ui: { voicePools: { female: ['tsun'] } } })).ui
+  assert.deepEqual(patched.voicePools.female, ['tsun'])
+  assert.deepEqual(patched.voicePools.male, ['calm'])
+  // 分配照新的组：女性从 sweet / my:v1 / lib:abc 里挑，没标性别的都用 idol；档案指定的不受影响
+  const people = [{ name: '甲', gender: 'female', createdTurn: 0 }, { name: '乙', gender: 'female', createdTurn: 1 }, { name: '丙', gender: 'female', createdTurn: 2 }, { name: '丁', createdTurn: 3 }, { name: '戊', gender: 'female', voice: 'bell', createdTurn: 4 }]
+  const voices = castVoices(people, ui, [{ id: 'abc', kind: 'blip', name: '库里的' }])
+  assert.deepEqual(['甲', '乙', '丙'].map(n => voices.get(n).id).sort(), ['lib:abc', 'my:v1', 'sweet'])
+  assert.equal(voices.get('丁').id, 'idol')
+  assert.equal(voices.get('戊').id, 'bell')
+  // 新加的内置音色不进默认的自动分配：没改过设置的老角色声音不变
+  assert.ok(!Object.values(def.voicePools).flat().some(id => ['sweet', 'tsun', 'idol', 'calm', 'boss', 'piano'].includes(id)))
+  assert.ok(VOICES.length >= 45)
+  assert.ok(VOICES.filter(v => v.gender === 'female').length >= 12 && VOICES.filter(v => v.gender === 'male').length >= 11)
 })
