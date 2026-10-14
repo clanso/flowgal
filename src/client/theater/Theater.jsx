@@ -13,7 +13,7 @@ import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx,
 import { ErosPeak, useErosPulse } from './Eros.jsx'
 import { EROS_SFX } from '../../../lib/eros.js'
 import { ONOMATOPOEIA } from '../../../lib/foley.js'
-import { loadSkinFonts, loadGlyphs } from './skins.js'
+import { loadSkinFonts, loadGlyphs, dialogVars } from './skins.js'
 import { preloadImage, whenImageReady } from './preload.js'
 import { castVoices, lineVoice, libraryBlips } from '../../../lib/sounds.js'
 import { ROMANCE_LABEL, SENSE_LABEL } from '../../../lib/vocab.js'
@@ -275,21 +275,24 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   useParallax(stageRef, cameraRef, !off.has('look.parallax'))
   const atEnd = beat && index === beats.length - 1
 
-  React.useEffect(() => { loadSkinFonts(ui0.skin, ui0.fontBase) }, [ui0.skin, ui0.fontBase])
+  // 设置里给对话、名牌选的字体（ui0.textFont / nameFont）跟皮肤的字体一起加载
+  const fontKey = [ui0.skin, ui0.fontBase, ui0.textFont || '', ui0.nameFont || ''].join('|')
+  const fontUi = React.useMemo(() => ({ textFont: ui0.textFont, nameFont: ui0.nameFont }), [ui0.textFont, ui0.nameFont])
+  React.useEffect(() => { loadSkinFonts(ui0.skin, ui0.fontBase, fontUi) }, [fontKey])
   // 字体是按字切片的：这句用到的分片下载完再开始逐字显示，不然先用系统字体画、到了再换，整句会闪一下。
   React.useEffect(() => {
     if (!beat) return undefined
     let live = true
-    loadSkinFonts(ui0.skin, ui0.fontBase)
+    loadSkinFonts(ui0.skin, ui0.fontBase, fontUi)
       .then(() => loadGlyphs(rootRef.current, glyphsOf([beat]), GLYPH_WAIT))
       .then(() => { if (live) setGlyphKey(beat.key) })
     return () => { live = false }
-  }, [beat && beat.key, ui0.skin, ui0.fontBase])
+  }, [beat && beat.key, fontKey])
   // 读这句的时候顺手把后面几句的分片下好。
   React.useEffect(() => {
     if (index < 0) return
-    loadSkinFonts(ui0.skin, ui0.fontBase).then(() => loadGlyphs(rootRef.current, glyphsOf(beats.slice(index + 1, index + 1 + GLYPH_AHEAD))))
-  }, [index, beats, ui0.skin, ui0.fontBase])
+    loadSkinFonts(ui0.skin, ui0.fontBase, fontUi).then(() => loadGlyphs(rootRef.current, glyphsOf(beats.slice(index + 1, index + 1 + GLYPH_AHEAD))))
+  }, [index, beats, fontKey])
   // 后面几处换场要用的背景：提前下载、解码好，换场揭开时不用等
   React.useEffect(() => {
     if (index < 0 || !view) return
@@ -473,7 +476,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   ].filter(Boolean)
 
   return (
-    <div ref={rootRef} className={`fg-theater${closing ? ' is-closing' : ''}${hidden ? ' fg-ui-hidden' : ''}`} data-skin={ui0.skin} data-off={cssOff(off) || undefined} style={{ '--stage-ar': stageRatio(cfg) }} role="dialog" aria-label="FlowGal 剧场">
+    <div ref={rootRef} className={`fg-theater${closing ? ' is-closing' : ''}${hidden ? ' fg-ui-hidden' : ''}`} data-skin={ui0.skin} data-off={cssOff(off) || undefined} style={{ '--stage-ar': stageRatio(cfg), ...dialogVars(cfg && cfg.ui) }} role="dialog" aria-label="FlowGal 剧场">
       <StageFlags.Provider value={stageFlags}>
       <div className="fg-stage" ref={stageRef} data-change={phase || undefined} data-clearing={clearing ? '' : undefined} onClick={() => { if (hidden) { setHidden(false); return } if (!title && !panel && !choosing) advance() }}
         onWheel={e => { if (!title && !panel && e.deltaY < -30) setPanel('log') }}>

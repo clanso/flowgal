@@ -16,7 +16,8 @@ import { SpriteArt, SpriteViewer } from './AaPreview.jsx'
 import { lookAt, lookKey, lookLabel, pickSprite, findLookTurn, LOOK_FIELDS, LOOK_FIELD_LABELS, lookTags, keyEmotion } from '../../../lib/look.js'
 import { Silhouette } from './Stage.jsx'
 import { stateSpans } from '../../../lib/cast.js'
-import { SKINS } from './skins.js'
+import { SKINS, loadFontFile } from './skins.js'
+import { FONT_PACKS, FONT_GROUPS, LOCAL_FONTS, DIALOG_LIMITS, cleanFontName, fontFamilyOf, skinDialogHeight } from '../../../lib/fonts.js'
 import { EFFECT_GROUPS, EFFECT_IDS } from './effects.js'
 import { previewTrack, stopPreview, previewVoice, previewSound, erosFoley, previewEros, erosPeak } from './audio.js'
 import { EROS_SFX, EROS_PACES, EROS_LABEL, TENTACLE, TENTACLE_LABEL, PEAKS, PEAK_LABEL } from '../../../lib/eros.js'
@@ -114,7 +115,7 @@ export function Backlog({ beats, index, onJump, onClose, gameId }) {
               )}
               <div className={`fg-log-item${i === index ? ' is-current' : ''}`} onClick={() => onJump(i)} style={i === index ? { background: 'rgba(255,255,255,.06)' } : null}>
                 <div className="fg-log-name">{b.type === 'narration' ? '' : b.alias || b.speaker}</div>
-                <div style={b.type === 'thought' ? { fontStyle: 'italic', opacity: 0.8 } : null}>
+                <div className="fg-log-text" style={b.type === 'thought' ? { fontStyle: 'italic', opacity: 0.8 } : null}>
                   {b.orig && <div className="fg-orig">{b.orig}</div>}
                   {b.type === 'dialogue' ? `「${b.text}」` : b.type === 'thought' ? `（${b.text}）` : b.text}
                 </div>
@@ -1624,7 +1625,8 @@ function DirectorSection({ data, onDirectorLog, onTab = null }) {
       <Field label="最大输出" hint="自动：模型报了输出上限就用它报的，没报按 128000（当前主流大模型的输出上限）。模型窗口装不下时自动往下收；模型拒绝这个值时按它报的上限重试一次。导演日志里能看到实际用了多少。导演、立绘设计师、插画分镜师都用这一个。"><Limit value={cfg.director.maxTokens} fallback={128000} min={1000} width="9cqw" free="自动" onCommit={v => p({ maxTokens: v })} /></Field>
       <Field label="温度"><Text type="number" style={{ width: '7cqw' }} value={cfg.director.temperature} onCommit={v => p({ temperature: v })} /></Field>
       <Field label="资料长度" hint="给导演看多少人物卡 / 世界书（字），用来判断人物外貌。默认不限，整份给；超出模型窗口时自动缩短。"><Limit value={cfg.director.contextChars} fallback={1000000} width="9cqw" unit="字" onCommit={v => p({ contextChars: v })} /></Field>
-      <CgModelFields data={data} providers={llm.providers} />
+      <OwnModelFields data={data} providers={llm.providers} which="cg" />
+      <OwnModelFields data={data} providers={llm.providers} which="listen" />
       <div className="fg-section">每轮上限</div>
       <div className="fg-note">导演一轮里最多写几次。默认都不限：提示词里「只给真正需要的地方」「平常的句子不写」那几句一直在，靠它让导演自己收着用。限了数的，提示词里会写上这个数，导演写多了也只按正文顺序留前面那么多。</div>
       <div className="fg-limits">
@@ -1633,7 +1635,7 @@ function DirectorSection({ data, onDirectorLog, onTab = null }) {
         ))}
       </div>
       <div className="fg-section">提示词{onTab && <button type="button" className="fg-btn" onClick={() => onTab('prompts')}>打开提示词页</button>}</div>
-      <div className="fg-note">导演、表演设计师、立绘设计师、插画分镜师的每一段提示词，连出图固定词和过滤规则，都在「提示词」页全文显示、能改、能单段恢复默认，还能照这一局预览完整的提示词。</div>
+      <div className="fg-note">导演、听音师、表演设计师、立绘设计师、插画分镜师的每一段提示词，连出图固定词和过滤规则，都在「提示词」页全文显示、能改、能单段恢复默认，还能照这一局预览完整的提示词。</div>
       <Field label="共用开头" hint="导演和几位设计师的系统提示词都换成同一句，各自的规矩放进用户消息的【你的工作】一节，资料和剧情放在最前面一字不差：会自动缓存的模型接口（DeepSeek 等）第二次读就便宜、快。关掉就照以前，规矩放在系统提示词里。"><Toggle value={cfg.director.sharedPrefix} onChange={v => p({ sharedPrefix: v })} /></Field>
       <Field label="补设计合进写词" hint="已经设计过的人要画还没设计的情绪（或重新设计表情）时，补设计和写立绘提示词一次请求做完，资料和剧情只读一遍。关掉就先单独补设计、再写词。第一次整套设计一直是单独一次。"><Toggle value={cfg.director.combineDesign} onChange={v => p({ combineDesign: v })} /></Field>
       <div className="fg-section">动作跟着剧情和世界线变</div>
@@ -1648,24 +1650,29 @@ function DirectorSection({ data, onDirectorLog, onTab = null }) {
   )
 }
 
-/** 插画分镜师单独用的模型：跟导演一样 / 宿主里另选一个 / 自己接一个 OpenAI 兼容接口（Key 存在宿主）。 */
-function CgModelFields({ data, providers }) {
-  const own = data.config.director.cgLlm
+/** 插画分镜师（cg）、听音师（listen）各自能单独用的模型：跟导演一样 / 宿主里另选一个 / 自己接一个 OpenAI 兼容接口（Key 存在宿主）。 */
+const OWN_MODEL = {
+  cg: { field: 'cgLlm', secret: 'cgllm', window: '这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收；最大输出、温度、资料长度跟导演用同一套设置。接口报出更小的输出上限时自动按它重试。', label: '插画分镜师的模型', hint: '写 CG 提示词的模型可以和导演分开。有的模型不肯把露骨的画面写具体，就给分镜师单独换一个；自定义接口填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行。' },
+  listen: { field: 'listenLlm', secret: 'listenllm', window: '这个模型一次能读多少 token，最大输出按它往下收（听音师最多要 16000）；温度跟导演用同一个。接口报出更小的输出上限时自动按它重试。', label: '听音师的模型', hint: '音效库比每轮给导演看的候选多时（设置 → 音效库 →「先听一遍」），导演之前先让听音师读一遍正文、列出听得见的声音，候选照它列的找。活很简单，可以换个便宜、快的模型，省钱也少等一会儿；自定义接口同上。' },
+}
+function OwnModelFields({ data, providers, which }) {
+  const meta = OWN_MODEL[which]
+  const own = data.config.director[meta.field]
   const [busy, run] = useBusy()
   const [hostModels, setHostModels] = React.useState([])
   const [list, setList] = React.useState(null)
-  const p = patch => patchConfig({ director: { cgLlm: patch } }).catch(e => toast(e.message, 'error'))
+  const p = patch => patchConfig({ director: { [meta.field]: patch } }).catch(e => toast(e.message, 'error'))
   React.useEffect(() => {
     if (own.source !== 'host' || !own.provider) return setHostModels([])
     api.llm(own.provider).then(r => setHostModels(r.models || [])).catch(() => setHostModels([]))
   }, [own.source, own.provider])
-  const loadList = () => run('m', async () => setList(await api.cgModels()))
+  const loadList = () => run('m', async () => setList(await api.ownModels(which)))
   // 地址或 Key 换了就重新读模型列表
-  React.useEffect(() => { setList(null); if (own.source === 'custom' && own.baseURL) loadList() }, [own.source, own.baseURL, data.keys.cgllm])
+  React.useEffect(() => { setList(null); if (own.source === 'custom' && own.baseURL) loadList() }, [own.source, own.baseURL, data.keys[meta.secret]])
   const sources = [['', '跟导演一样'], ['host', hostName() === 'st' ? '另选一套酒馆连接配置' : '另选一个 Tavern 里的模型'], ['custom', '自定义接口（OpenAI 兼容）']]
   return (
     <>
-      <Field label="插画分镜师的模型" hint="写 CG 提示词的模型可以和导演分开。有的模型不肯把露骨的画面写具体，就给分镜师单独换一个；自定义接口填 /chat/completions 前面那段地址，DeepSeek、OpenRouter、各家中转、本机的 LM Studio / Ollama 都行。">
+      <Field label={meta.label} hint={meta.hint}>
         <div className="fg-row">
           <Select value={own.source} style={INLINE} onChange={v => p({ source: v, provider: '', model: '' })} options={sources} />
           {own.source === 'host' && <Select value={own.provider} style={INLINE} onChange={v => p({ provider: v, model: '' })} options={[['', '（选一个）'], ...providers.map(x => [x.id, x.name])]} />}
@@ -1677,14 +1684,14 @@ function CgModelFields({ data, providers }) {
       {own.source === 'custom' && (
         <>
           <Field label="接口地址"><Text value={own.baseURL} placeholder="https://api.deepseek.com/v1" style={{ flex: 1, width: '100%' }} onCommit={v => p({ baseURL: String(v).trim() })} /></Field>
-          <Field label="Key" hint={`存在宿主（${data.secretStorage || '插件目录'}），不会发到浏览器。本机的接口不要 Key 就空着。`}><KeyInput backend="cgllm" has={data.keys.cgllm} /></Field>
+          <Field label="Key" hint={`存在宿主（${data.secretStorage || '插件目录'}），不会发到浏览器。本机的接口不要 Key 就空着。`}><KeyInput backend={meta.secret} has={data.keys[meta.secret]} /></Field>
           <Field label="模型" hint={list ? list.note : own.baseURL ? '正在读取模型列表…' : '先填接口地址'}>
             <div className="fg-row">
               <ModelField value={own.model} options={(list && list.models) || []} placeholder="模型 ID" onCommit={v => p({ model: v, ...((list?.models || []).find(m => m.id === v)?.window ? { contextWindow: list.models.find(m => m.id === v).window } : {}) })} />
               <button type="button" className="fg-btn" disabled={busy === 'm' || !own.baseURL} onClick={loadList}>{busy === 'm' ? '读取中…' : '刷新列表'}</button>
             </div>
           </Field>
-          <Field label="上下文窗口" hint="这个模型一次能读多少 token。剧情太长时按它从最早的删起，最大输出也按它往下收；最大输出、温度、资料长度跟导演用同一套设置。接口报出更小的输出上限时自动按它重试。"><Text type="number" style={{ width: '9cqw' }} value={own.contextWindow} onCommit={v => p({ contextWindow: v })} /></Field>
+          <Field label="上下文窗口" hint={meta.window}><Text type="number" style={{ width: '9cqw' }} value={own.contextWindow} onCommit={v => p({ contextWindow: v })} /></Field>
         </>
       )}
     </>
@@ -1841,6 +1848,148 @@ function ImagesSection({ data }) {
 
 const landscapeSize = cfg => { const { width, height } = sizeFor(cfg, 'landscape'); return `${width}×${height}` }
 
+// ───────────────────────── 对话框：字体、字号、高度 ─────────────────────────
+let localFamilies = null // 「读取电脑里的字体」读到的字体名（这次打开网页期间记着）
+const OTHER_FONT = '__other__'
+const PREVIEW_LINE = '好巧啊。今天的月色真美，要不要一起走一段？'
+
+/** 一个百分比：滑块 + 数字框，松手 / 回车才存；改过了显示「恢复默认」。value 为 null 时显示 empty（跟皮肤）。 */
+function Percent({ value, fallback, min, max, step = 1, onCommit, onReset, changed, label, empty = '' }) {
+  const shown = value ?? fallback
+  const [v, setV] = React.useState(shown)
+  React.useEffect(() => { setV(shown) }, [shown])
+  const commit = next => { const n = Math.min(max, Math.max(min, Number(next))); if (Number.isFinite(n) && n !== value) onCommit(n); else setV(shown) }
+  return (
+    <span className="fg-row fg-pct">
+      <input type="range" min={min} max={max} step={step} value={v} aria-label={label} onChange={e => setV(Number(e.target.value))} onPointerUp={e => commit(e.target.value)} onKeyUp={e => commit(e.target.value)} />
+      <input className="fg-input" type="number" min={min} max={max} step={1} value={v} aria-label={label} onChange={e => setV(e.target.value)} onBlur={e => commit(e.target.value)} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commit(e.target.value) }} />
+      <span className="fg-note">%{value == null && empty ? ` · ${empty}` : ''}</span>
+      {changed && <button type="button" className="fg-btn is-mini" onClick={onReset}>恢复默认</button>}
+    </span>
+  )
+}
+
+/** 选字体：跟皮肤 / 网页字体 / 电脑里的 / 上传的 / 自己填名字；旁边能直接上传一个字体用在这里。 */
+function FontField({ label, hint, value, skinFont, fonts, families, onPick, onUpload, busy }) {
+  const [typing, setTyping] = React.useState(false)
+  const fileRef = React.useRef(null)
+  const local = value.startsWith('local:') ? value.slice(6) : ''
+  const known = new Set([...LOCAL_FONTS.map(([f]) => f), ...(families || [])])
+  const options = [
+    ['', `跟皮肤（${skinFont}）`],
+    ...FONT_GROUPS.map(([g, name]) => ({ group: name, options: Object.entries(FONT_PACKS).filter(([, f]) => f.group === g).map(([key, f]) => ['pack:' + key, f.name]) })),
+    { group: '上传的字体', options: fonts.map(f => ['file:' + f.assetId, f.name]) },
+    { group: '电脑里常见的（装了才有）', options: LOCAL_FONTS.map(([f, name]) => ['local:' + f, `${name}（${f}）`]) },
+    { group: `这台电脑里的字体（${(families || []).length} 个）`, options: (families || []).map(f => ['local:' + f, f]) },
+    ...(local && !known.has(local) ? [['local:' + local, `${local}（自己填的）`]] : []),
+    [OTHER_FONT, '其他字体：自己填名字…'],
+  ]
+  return (
+    <Field label={label} hint={hint}>
+      <div className="fg-row">
+        <Select value={typing ? OTHER_FONT : value} options={options} style={INLINE} onChange={v => { if (v === OTHER_FONT) setTyping(true); else { setTyping(false); onPick(v) } }} />
+        {typing && <Text value={local} placeholder="字体名，比如 方正兰亭黑_GBK" style={{ width: '16cqw' }} onCommit={v => { const name = cleanFontName(v); if (name) { onPick('local:' + name); setTyping(false) } }} />}
+        <button type="button" className="fg-btn is-mini" disabled={busy} onClick={() => fileRef.current && fileRef.current.click()}>{busy ? '上传中…' : '上传字体用在这里'}</button>
+        {value && <button type="button" className="fg-btn is-mini" onClick={() => { setTyping(false); onPick('') }}>恢复默认</button>}
+        <input ref={fileRef} type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden onChange={e => { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) onUpload(file) }} />
+      </div>
+    </Field>
+  )
+}
+
+/** 对话框的样子在设置里的缩小版：跟剧场同一套样式（舞台的 cqw 换成这个小框的宽），字体、字号、高度改了马上看到。 */
+function DialogPreview() {
+  return (
+    <div className="fg-dlg-preview" aria-hidden="true">
+      <div className="fg-dialog">
+        <div className="fg-box" />
+        <div className="fg-name"><div className="fg-name-plate">苏晴</div><div className="fg-name-sub">调侃</div></div>
+        <div className="fg-text is-dialogue is-done"><span className="fg-line">{PREVIEW_LINE}</span></div>
+        <div className="fg-wait" />
+        <div className="fg-progress"><i style={{ width: '40%' }} /></div>
+        <div className="fg-quick">{['AUTO', 'SKIP', 'LOG', 'CONFIG'].map(t => <button key={t} type="button" tabIndex={-1}>{t}</button>)}</div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 设置 → 外观与演出 → 对话框：对话字体、名牌字体（网页字体、电脑里装的、上传的、自己填名字）、对话字号、名牌字号、对话框高度（横屏、竖屏）。
+ * 每一项都能恢复默认；默认就是皮肤原来的样子。上传的字体存在素材目录，在这里能删。
+ */
+function DialogSection({ data }) {
+  const ui = data.config.ui
+  const p = patch => patchConfig({ ui: patch }).catch(e => toast(e.message, 'error'))
+  const [busy, run] = useBusy()
+  const [families, setFamilies] = React.useState(localFamilies)
+  const fonts = ui.customFonts || []
+  const skin = SKINS.find(s => s.id === ui.skin) || SKINS[0]
+  // 上传的字体都装上，下面的清单里每个名字用它自己的字体显示
+  React.useEffect(() => { for (const f of fonts) loadFontFile(f.assetId) }, [fonts.map(f => f.assetId).join()])
+  const upload = (file, slot) => run('font' + slot, async () => {
+    const res = await api.uploadFont(file)
+    setConfig(res)
+    if (slot && res.font) await patchConfig({ ui: { [slot]: 'file:' + res.font.assetId } })
+  }, slot ? '已上传，正在用这个字体' : '已上传')
+  const readLocal = () => run('local', async () => {
+    if (typeof window === 'undefined' || typeof window.queryLocalFonts !== 'function') throw new Error('这个浏览器不让网页读字体清单（Chrome / Edge 103 以上可以）。可以在下拉框里选「其他字体」直接填名字')
+    const list = await window.queryLocalFonts()
+    localFamilies = [...new Set(list.map(f => cleanFontName(f.family)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh'))
+    setFamilies(localFamilies)
+    if (!localFamilies.length) throw new Error('没读到字体：浏览器问要不要让网页看字体时要点「允许」')
+    return localFamilies.length
+  }, '已读取这台电脑里的字体，在下拉框最后一组')
+  const land = skinDialogHeight(skin.id, 'landscape')
+  const port = skinDialogHeight(skin.id, 'portrait')
+  const allDefault = !ui.textFont && !ui.nameFont && ui.textScale === 1 && ui.nameScale === 1 && ui.dialogHeight == null && ui.dialogHeightPortrait == null
+  return (
+    <>
+      <div className="fg-section">对话框</div>
+      <DialogPreview />
+      <div className="fg-row" style={{ justifyContent: 'flex-end', marginTop: '.6cqw' }}>
+        <span className="fg-note" style={{ flex: 1 }}>上面是现在的样子（皮肤「{skin.name}」）。改完马上生效，剧场里正在读的那句也会跟着变。</span>
+        <button type="button" className="fg-btn is-mini" disabled={busy === 'local'} onClick={readLocal}>{busy === 'local' ? '读取中…' : families ? `重新读取电脑里的字体（${families.length} 个）` : '读取电脑里的字体'}</button>
+        <button type="button" className="fg-btn is-mini" disabled={allDefault} onClick={() => p({ textFont: '', nameFont: '', textScale: 1, nameScale: 1, dialogHeight: null, dialogHeightPortrait: null })}>对话框全部恢复默认</button>
+      </div>
+      <FontField label="对话字体" hint="对话框里的台词和旁白，也用在选项和回想里。选的字体缺字时（比如日文字体里没有的简体字）用皮肤的字体补上。电脑里的字体只在装了它的电脑上生效；上传的字体每台设备都能用。"
+        value={ui.textFont || ''} skinFont={skin.textFont} fonts={fonts} families={families} busy={busy === 'fonttextFont'} onPick={v => p({ textFont: v })} onUpload={file => upload(file, 'textFont')} />
+      <FontField label="名牌字体" hint="说话人的名字，也用在回想里的名字上。"
+        value={ui.nameFont || ''} skinFont={skin.nameFont} fonts={fonts} families={families} busy={busy === 'fontnameFont'} onPick={v => p({ nameFont: v })} onUpload={file => upload(file, 'nameFont')} />
+      <Field label="对话字号" hint={`皮肤原来的大小是 100%。调大以后一屏放不下的话，把下面的对话框高度也调高。`}>
+        <Percent value={Math.round(ui.textScale * 100)} fallback={100} min={DIALOG_LIMITS.textScale.min * 100} max={DIALOG_LIMITS.textScale.max * 100} step={DIALOG_LIMITS.textScale.step * 100} label="对话字号"
+          changed={ui.textScale !== 1} onCommit={n => p({ textScale: Math.round(n) / 100 })} onReset={() => p({ textScale: 1 })} />
+      </Field>
+      <Field label="名牌字号" hint="名牌整块跟着放大缩小，往上长，不压到台词。">
+        <Percent value={Math.round(ui.nameScale * 100)} fallback={100} min={DIALOG_LIMITS.nameScale.min * 100} max={DIALOG_LIMITS.nameScale.max * 100} step={DIALOG_LIMITS.nameScale.step * 100} label="名牌字号"
+          changed={ui.nameScale !== 1} onCommit={n => p({ nameScale: Math.round(n) / 100 })} onReset={() => p({ nameScale: 1 })} />
+      </Field>
+      <Field label="对话框高度" hint={`占画面高度的百分比；「${skin.name}」原来是 ${land}%。调高时名牌、台词离上边的距离不变，多出来的地方都给台词。`}>
+        <Percent value={ui.dialogHeight} fallback={land} min={DIALOG_LIMITS.dialogHeight.min} max={DIALOG_LIMITS.dialogHeight.max} step={DIALOG_LIMITS.dialogHeight.step} label="对话框高度" empty="跟皮肤"
+          changed={ui.dialogHeight != null} onCommit={n => p({ dialogHeight: n })} onReset={() => p({ dialogHeight: null })} />
+      </Field>
+      <Field label="竖屏时的高度" hint={`手机竖着拿时单独算（画面是竖的，同样的百分比看起来不一样）；「${skin.name}」原来是 ${port}%。`}>
+        <Percent value={ui.dialogHeightPortrait} fallback={port} min={DIALOG_LIMITS.dialogHeight.min} max={DIALOG_LIMITS.dialogHeight.max} step={DIALOG_LIMITS.dialogHeight.step} label="竖屏时的对话框高度" empty="跟皮肤"
+          changed={ui.dialogHeightPortrait != null} onCommit={n => p({ dialogHeightPortrait: n })} onReset={() => p({ dialogHeightPortrait: null })} />
+      </Field>
+      {fonts.length > 0 && (
+        <Field label="上传的字体" hint="存在数据目录的素材里，删掉后正用着它的地方回到皮肤的字体。">
+          <div className="fg-fontlist">
+            {fonts.map(f => (
+              <div key={f.assetId} className="fg-row fg-fontitem">
+                <span className="fg-fontname" style={{ fontFamily: `${fontFamilyOf('file:' + f.assetId)}, var(--font-body)` }}>{f.name} · {PREVIEW_LINE.slice(0, 8)}</span>
+                <span className="fg-spacer" />
+                <button type="button" className="fg-btn is-mini" disabled={ui.textFont === 'file:' + f.assetId} onClick={() => p({ textFont: 'file:' + f.assetId })}>用作对话</button>
+                <button type="button" className="fg-btn is-mini" disabled={ui.nameFont === 'file:' + f.assetId} onClick={() => p({ nameFont: 'file:' + f.assetId })}>用作名牌</button>
+                <button type="button" className="fg-btn is-mini" disabled={busy === 'rm' + f.assetId} onClick={() => run('rm' + f.assetId, async () => setConfig(await api.removeFont(f.assetId)), '已删掉')}>删除</button>
+              </div>
+            ))}
+          </div>
+        </Field>
+      )}
+    </>
+  )
+}
+
 export function LookSection({ data }) {
   const cfg = data.config
   const p = patch => patchConfig({ ui: patch }).catch(e => toast(e.message, 'error'))
@@ -1855,6 +2004,7 @@ export function LookSection({ data }) {
           </button>
         ))}
       </div>
+      <DialogSection data={data} />
       <div className="fg-section">画面</div>
       <Field label="画面比例" hint="跟横版插画一样时，插画正好铺满舞台（默认就是 NovelAI 常用的 1216×832；横版尺寸在「画风与配图 → 尺寸」里改）。">
         <select className="fg-select" style={{ width: 'auto' }} value={cfg.ui.ratio} onChange={e => p({ ratio: e.target.value })}>
@@ -2277,8 +2427,36 @@ function ErosField({ cfg, p }) {
 // 音效库页列音效和打字音，环境音库页列环境音；导演挑候选时本来就分开挑。清空只清这一页的音效或环境音，
 // 打字音和「声音」页正在用的（落字音效、界面音的槽，旁白、默认音色）留着。
 const LIB_PAGE = {
-  sfx: { kinds: ['sfx', 'blip'], title: '音效库', unit: '个音效', other: '环境音库', empty: '音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。', note: '推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时，只会看到按这一轮正文挑出来的几十个候选（标签、名字、分类在正文里出现得越多越靠前），再决定哪句配什么音效。所以标签要写正文里会出现的词。' },
-  ambience: { kinds: ['ambience'], title: '环境音库', unit: '个环境音', other: '音效库', empty: '环境音库还是空的。没有环境音时剧场不放环境音。', note: '雨声、蝉鸣、车站广播这类循环的底。后台导演整理每一轮时按地点、天气和正文挑一批候选，决定每一幕放哪个，跨轮沿用。标签写地点、天气、时段这类词最管用。' },
+  sfx: { kinds: ['sfx', 'blip'], title: '音效库', unit: '个音效', other: '环境音库', empty: '音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。', note: '推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时只看几十个候选，再决定哪句配什么音效。候选怎么挑见下面「导演怎么挑」；标签写正文里会出现的说法最稳。' },
+  ambience: { kinds: ['ambience'], title: '环境音库', unit: '个环境音', other: '音效库', empty: '环境音库还是空的。没有环境音时剧场不放环境音。', note: '雨声、蝉鸣、车站广播这类循环的底。后台导演整理每一轮时从一批候选里给每一幕挑一个，跨轮沿用。候选怎么挑见下面「导演怎么挑」；标签写地点、天气、时段这类词最管用。' },
+}
+
+/**
+ * 导演怎么挑候选：每轮给导演看几个（这一页的种类），和「先听一遍」（音效库、环境音库两页是同一个开关）。
+ * 库没超过名额时全给导演看，用不着找；超过了，开着先听一遍就先让听音师列出听得见的声音、照它找，关着只按正文对词。
+ */
+function PickingFields({ cfg, kind, count }) {
+  const quota = cfg.director.soundCandidates[kind]
+  const listen = cfg.director.listen
+  const pd = patch => patchConfig({ director: patch }).catch(e => toast(e.message, 'error'))
+  const word = KIND_LABEL[kind]
+  const state = count <= quota
+    ? `现在${word}有 ${count} 个，没超过 ${quota}：每轮全给导演看，不用找。`
+    : listen
+      ? `现在${word}有 ${count} 个，比 ${quota} 多：每轮导演之前先听一遍，照听到的声音找，剩下的名额按正文对词补。`
+      : `现在${word}有 ${count} 个，比 ${quota} 多：每轮按正文对词挑 ${quota} 个（标签、名字、分类要在正文里原样出现）。`
+  return (
+    <>
+      <div className="fg-section">导演怎么挑</div>
+      <div className="fg-note">{state}</div>
+      <Field label="每轮候选" hint={`后台导演每一轮能看到几个${word}（编号、名字、分类和描述各一行，越多提示词越长）。库没超过这个数时全给它看。`}>
+        <div className="fg-row"><Text type="number" style={{ width: '7cqw' }} value={quota} onCommit={v => { const n = Math.trunc(Number(v)); if (n >= 1) pd({ soundCandidates: { [kind]: n } }) }} /><span className="fg-note">个，最多 300</span></div>
+      </Field>
+      <Field label="先听一遍" hint={'库比候选多时，导演之前先让听音师读一遍这一轮正文，列出听得见的声音和找它们的近义词（「砸了杯子」会去找摔碎、打碎、玻璃……），候选照它列的找，正文里没有原词的声音也找得到。每轮多一次模型调用，会慢一点；听音师可以在「导演」页单独换个便宜、快的模型，提示词在「提示词 → 听音师」里改。它出错时退回按正文对词，导演照常整理。音效库和环境音库共用这一个开关。'}>
+        <Toggle value={listen} onChange={v => pd({ listen: v })} />
+      </Field>
+    </>
+  )
 }
 
 function SoundLibSection({ data, kind = 'sfx' }) {
@@ -2379,6 +2557,7 @@ function SoundLibSection({ data, kind = 'sfx' }) {
       {kind === 'ambience' && <Field label="环境音" hint="雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。"><div className="fg-row"><Toggle value={cfg.ui.amb} onChange={v => p({ amb: v })} /><input type="range" min="0" max="1" step="0.05" value={cfg.ui.ambVolume} onChange={e => p({ ambVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>}
       {kind === 'sfx' && <Field label="剧情音效" hint="推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。"><div className="fg-row"><Toggle value={cfg.ui.storySfx} onChange={v => p({ storySfx: v })} /><input type="range" min="0" max="2" step="0.05" value={cfg.ui.storySfxVolume} onChange={e => p({ storySfxVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>}
       {kind === 'sfx' && <ErosField cfg={cfg} p={p} />}
+      <PickingFields cfg={cfg} kind={kind} count={(sounds || []).filter(s => s.kind === kind).length} />
       <div className="fg-section">我的{page.title}{sounds ? ` · ${sounds.length} 个` : ''}</div>
       <div className="fg-note">{page.note}</div>
       <div className="fg-row" style={{ margin: '1cqw 0' }}>

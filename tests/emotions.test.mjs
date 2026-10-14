@@ -6,8 +6,11 @@ import {
   emotionTags, emotionFace, emotionAct, cleanEmotionLib, mergeEmotions, personEmotions,
   editEmotion, resetEmotion, addEmotion, deleteEmotions, restoreBuiltins, mergeInto, renameEmotion,
   saveCategory, deleteCategory, orderCategories, resetCategories, followMerge, DEFAULT_CATEGORIES,
+  emotionReact, emotionRecall, emotionLevel, categoryOf,
 } from '../lib/emotions.js'
-import { EMOTION_TAGS } from '../lib/vocab.js'
+import { EMOTION_TAGS, EMOTION_LEVEL, EMOTIONS } from '../lib/vocab.js'
+import { reactKind } from '../lib/blocking.js'
+import { autoRecallTone } from '../lib/scenes.js'
 import { normalizeScript } from '../lib/director.js'
 import { pickSprite, variantKey } from '../lib/look.js'
 
@@ -147,6 +150,8 @@ test('emotions: 导演新造的情绪：替身可以是库里的新情绪，类�
 test('emotions: 类别能加、改名、换代表情绪、排顺序、删、恢复默认；导演看的情绪库按类别列', () => {
   const lib = fresh()
   const id = saveCategory(lib, { label: '欲' })
+  assert.equal(emotionEntry('欲', lib).category, id, '加一类顺手加上同名的情绪')
+  assert.equal(lib.categories.find(c => c.id === id).rep, '欲', '它就是这一类的代表')
   addEmotion(lib, { name: '情欲难耐', category: id })
   saveCategory(lib, { id, rep: '情欲难耐' })
   assert.throws(() => saveCategory(lib, { label: '喜' }), /已经有/)
@@ -155,12 +160,12 @@ test('emotions: 类别能加、改名、换代表情绪、排顺序、删、恢�
   assert.deepEqual(lib.categories.slice(0, 2).map(c => c.label), ['欲', '乐'])
   editEmotion(lib, 'smile', { label: '浅笑' })
   const brief = emotionBrief(lib)
-  assert.ok(brief.indexOf('【欲】情欲难耐') < brief.indexOf('【乐】smile 浅笑'), brief)
+  assert.ok(brief.indexOf('【欲】欲，情欲难耐') < brief.indexOf('【乐】smile 浅笑'), brief)
   addEmotion(lib, { name: '想入非非', category: id })
   assert.deepEqual(standIns('想入非非', lib), ['情欲难耐', 'neutral'])
   deleteCategory(lib, id)
   assert.equal(emotionEntry('情欲难耐', lib).category, '')
-  assert.match(emotionBrief(lib), /【未分类】情欲难耐，想入非非/)
+  assert.match(emotionBrief(lib), /【未分类】欲，情欲难耐，想入非非/)
   deleteCategory(lib, 'joy')
   assert.equal(emotionEntry('smile', lib).category, '')
   assert.deepEqual(groupEmotions(allEmotions(lib), lib).at(-1).list.map(e => e.id).slice(0, 3), ['smile', 'happy', 'laugh'])
@@ -255,4 +260,102 @@ test('emotions: 给导演看的情绪库不带描述，按类别列，改过的�
   const brief = emotionBrief(lib)
   assert.match(brief, /【思】serious 认真，thinking 琢磨，determined 坚定，带着烦躁思考/)
   assert.doesNotMatch(brief, /皱眉撇嘴/)
+})
+
+test('emotions: 加一类「恨」顺手加上「恨」当代表；库里已有同名的就挪进来当代表，删掉的内置情绪拿回来', () => {
+  const lib = fresh()
+  const hate = saveCategory(lib, { label: '恨' })
+  const e = emotionEntry('恨', lib)
+  assert.deepEqual([e.category, e.source, e.builtin], [hate, 'user', false])
+  assert.equal(lib.categories.at(-1).rep, '恨')
+  addEmotion(lib, { name: '怨恨', category: hate })
+  assert.deepEqual(standIns('怨恨', lib), ['恨', 'neutral'], '这一类的新情绪没写替身先用「恨」的立绘')
+  // 已有的情绪：挪进来当代表，不另加
+  const before = lib.list.length
+  const grin = saveCategory(lib, { label: '冷笑' })
+  addEmotion(lib, { name: '假笑', category: grin })
+  const big = saveCategory(lib, { label: '大笑' })
+  assert.equal(emotionEntry('laugh', lib).category, big)
+  assert.equal(lib.categories.find(c => c.id === big).rep, 'laugh')
+  assert.equal(lib.list.filter(x => x.id === '大笑').length, 0)
+  deleteEmotions(lib, ['pout'])
+  const sulk = saveCategory(lib, { label: '赌气' })
+  assert.equal(emotionEntry('pout', lib).deleted, false, '删掉的内置情绪拿回来当代表')
+  assert.equal(emotionEntry('pout', lib).category, sulk)
+  // 给了 rep 就用给的，不另加
+  const other = saveCategory(lib, { label: '妒', rep: 'pout' })
+  assert.equal(lib.categories.find(c => c.id === other).rep, 'pout')
+  assert.equal(emotionEntry('妒', lib).category, '')
+  assert.ok(lib.list.length > before)
+})
+
+test('emotions: 反应动作、闪回基调、强弱每种情绪都能改：内置的默认照以前那几张表；新情绪跟替身、再跟这一类的代表', () => {
+  const lib = fresh()
+  // 内置的默认：跟以前写死的表一样
+  assert.equal(emotionReact('surprised', lib), 'jolt')
+  assert.equal(emotionReact('serious', lib), 'nod')
+  assert.equal(emotionRecall('scared', lib), 'dread')
+  assert.equal(emotionRecall('smile', lib), '', '没列的不影响基调')
+  for (const id of Object.keys(EMOTIONS)) assert.equal(emotionLevel(id, lib), EMOTION_LEVEL[id])
+  assert.equal(reactKind('angry'), 'shake')
+  assert.equal(autoRecallTone(['smile', 'cry', 'blush'], 'sweet'), 'sad')
+  // 新的一类「恨」：给代表设一次，这一类里没写替身的都跟着
+  const hate = saveCategory(lib, { label: '恨' })
+  addEmotion(lib, { name: '怨恨', category: hate })
+  assert.equal(emotionReact('怨恨', lib), 'nod', '都没设：轻轻点头')
+  assert.equal(emotionLevel('怨恨', lib), 2)
+  editEmotion(lib, '恨', { react: 'shake', recall: 'dread', level: 3 })
+  assert.deepEqual([emotionReact('怨恨', lib), emotionRecall('怨恨', lib), emotionLevel('怨恨', lib)], ['shake', 'dread', 3])
+  assert.equal(reactKind('怨恨', lib), 'shake', '剧场按情绪库挑怎么动')
+  assert.equal(autoRecallTone(['smile', '怨恨'], 'sweet', lib), 'dread', '闪回按情绪库挑基调')
+  // 自己设了用自己的；改回 '' / 0 跟替身
+  editEmotion(lib, '怨恨', { react: 'still', recall: 'none', level: 4 })
+  assert.deepEqual([emotionReact('怨恨', lib), emotionRecall('怨恨', lib), emotionLevel('怨恨', lib)], ['still', '', 4])
+  assert.ok(emotionEntry('怨恨', lib).edited)
+  editEmotion(lib, '怨恨', { react: '', recall: '', level: 0 })
+  assert.deepEqual([emotionReact('怨恨', lib), emotionLevel('怨恨', lib)], ['shake', 3])
+  // 有替身的先跟替身
+  editEmotion(lib, '怨恨', { base: 'sad' })
+  assert.deepEqual([emotionReact('怨恨', lib), emotionRecall('怨恨', lib), emotionLevel('怨恨', lib)], ['droop', 'sad', 2])
+  // 内置的也能改，改回默认就不留条目；恢复默认清掉
+  editEmotion(lib, 'smile', { react: 'bounce', level: 2, recall: 'warm' })
+  assert.deepEqual([emotionReact('smile', lib), emotionLevel('smile', lib), emotionRecall('smile', lib)], ['bounce', 2, 'warm'])
+  assert.equal(autoRecallTone(['smile'], 'eerie', lib), 'warm', '情绪定了基调就不看场景')
+  editEmotion(lib, 'smile', { react: 'nod', level: 0, recall: 'none' })
+  assert.equal(lib.list.some(x => x.id === 'smile'), false)
+  editEmotion(lib, 'smile', { react: 'tilt' })
+  resetEmotion(lib, 'smile')
+  assert.equal(emotionReact('smile', lib), 'nod')
+  editEmotion(lib, '恨', { react: 'jolt' })
+  resetEmotion(lib, '恨')
+  assert.equal(emotionReact('恨', lib), 'nod', '新情绪恢复默认也清掉这几样')
+  assert.throws(() => editEmotion(lib, 'smile', { react: 'spin' }), /没有这种反应/)
+  assert.throws(() => editEmotion(lib, 'smile', { recall: 'happy' }), /没有这种闪回基调/)
+  assert.throws(() => editEmotion(lib, 'smile', { level: 7 }), /强弱/)
+})
+
+test('emotions: 导演看的情绪库列出空的类别；导演造新词时能写归哪一类，只能归进已有的类', () => {
+  const lib = fresh()
+  const hate = saveCategory(lib, { label: '恨' })
+  editEmotion(lib, '恨', { category: '' })
+  const brief = emotionBrief(lib)
+  assert.match(brief, /【恨】（这一类还没有情绪：新造的可以归进来）/)
+  assert.match(brief, /【未分类】恨$/)
+  assert.match(emotionBrief(lib, '{{list}}', '（空）'), /【恨】（空）/, '空的那句在提示词页能改')
+  assert.equal(categoryOf('恨', lib), hate)
+  assert.equal(categoryOf('【恨】', lib), hate)
+  assert.equal(categoryOf('joy', lib), 'joy')
+  assert.equal(categoryOf('嫉妒', lib), '', '导演不能自己开新类')
+  const units = ['甲', '乙', '丙'].map((text, i) => ({ id: 'U' + (i + 1), type: 'dialogue', speaker: '林岚', text }))
+  const script = normalizeScript({
+    scene: {}, cast: [{ name: '林岚' }],
+    lines: [{ u: 'U1', sp: '林岚', emo: '咬牙切齿的恨' }, { u: 'U2', sp: '林岚', emo: '嫉妒' }, { u: 'U3', sp: '林岚', emo: '酸溜溜' }],
+    emotions: [{ name: '咬牙切齿的恨', base: 'angry', category: '恨' }, { name: '嫉妒', base: 'pout', category: '妒' }, { name: '酸溜溜', base: 'pout' }],
+  }, units, { emotions: lib })
+  assert.deepEqual(script.emotions, [{ name: '咬牙切齿的恨', base: 'angry', category: hate }, { name: '嫉妒', base: 'pout' }, { name: '酸溜溜', base: 'pout' }])
+  mergeEmotions(lib, script.emotions, { source: 'director' })
+  assert.equal(emotionEntry('咬牙切齿的恨', lib).category, hate, '归进导演写的那一类（替身照样是生气）')
+  assert.equal(emotionEntry('咬牙切齿的恨', lib).base, 'angry')
+  assert.equal(emotionEntry('嫉妒', lib).category, 'anger', '认不出的类别：跟着替身归类')
+  assert.match(emotionBrief(lib), /【恨】咬牙切齿的恨/)
 })

@@ -11,7 +11,7 @@ import { shiftsAhead } from '../../../lib/look.js'
 import { reactsOf, poseTracker, blockLayout } from '../../../lib/blocking.js'
 
 export { placeKey, blockLayout, hintedSpeaker }
-import { emotionLabel as labelIn, resolveEmotion, standIns, isBuiltinEmotion } from '../../../lib/emotions.js'
+import { emotionLabel as labelIn, resolveEmotion } from '../../../lib/emotions.js'
 import { sheetOf, poseWalker, lineSteps, homePose, fullSheet } from '../../../lib/poses.js'
 import { liveSheet, lineCtx, unitOrder, offPoses } from '../../../lib/pose-life.js'
 
@@ -22,8 +22,6 @@ export function showEmotions(lib) { if (lib) shownEmotions = lib }
 export const shownLib = () => shownEmotions
 /** 情绪显示的名字；不给情绪库就用剧场最近拿到的那份。 */
 export const emotionLabel = (id, custom) => labelIn(id, custom || shownEmotions)
-/** 一种情绪对应的内置情绪（内置的就是它自己；新情绪按替身那一串找第一个内置的）。 */
-export const builtinOf = (emo, custom = []) => [resolveEmotion(emo, custom || []), ...standIns(emo, custom || [])].find(isBuiltinEmotion) || emo
 
 export const TIME_LABEL = { dawn: '黎明', morning: '清晨', noon: '正午', afternoon: '午后', dusk: '黄昏', evening: '傍晚', night: '夜', midnight: '深夜' }
 export const WEATHER_LABEL = { clear: '晴', rain: '雨', storm: '暴雨', snow: '雪', blizzard: '暴风雪', wind: '狂风', sakura: '樱吹雪', leaves: '落叶', fireflies: '萤火', fog: '雾', embers: '余烬', dust: '浮尘', bokeh: '光斑', stars: '星空', sparkles: '光点', bubbles: '气泡' }
@@ -185,7 +183,7 @@ export function buildBeats(view) {
       const front = onStageNames.filter(name => spoke.has(name)).sort((a, b) => spoke.get(b) - spoke.get(a))
       const recall = recalls[ui]
       // 导演没写基调的闪回：进闪回那一句按闪回里的情绪（新情绪看它替身那一串里第一个内置情绪）和这一刻的场景基调挑
-      if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos.map(e => builtinOf(e, view.emotions)), at.scene.mood)
+      if (recall && !recall.tone) recall.tone = autoRecallTone(recall.emos, at.scene.mood, view.emotions)
       // 手机：打来、拨出的那一句响起；这一轮里接下来写的是没接通、被拒接，就一直响到那一句，不然下一句起就接通了，右上角挂着「通话中」
       const phone = line.phone || null
       if (call && call.who && steps[ui].entered.includes(call.who)) call = null // 电话那头的人走进了画面：不用再打了

@@ -82,17 +82,25 @@
   --font-display: "Noto Serif SC", "Songti SC", "SimSun", serif;
   --wait-glyph: "▼";
 }
-.fg-theater[data-skin="noir"] .fg-dialog { left: 0; right: 0; bottom: 0; height: 31%; }
-.fg-theater[data-skin="noir"] .fg-box { box-shadow: none; }
-.fg-theater[data-skin="noir"] .fg-box::before { top: 26%; left: 20%; right: 20%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: none; }
+/* 名字、金线、正文的位置按对话框高度的比例；对话框调高时停在原来的位置（min 封顶，见 theater.css 的 --fg-dlg-ref），多出来的地方给正文 */
+.fg-theater[data-skin="noir"] .fg-dialog { left: 0; right: 0; bottom: 0; height: var(--fg-dlg-h, 31%); --fg-dlg-ref: 31cqh; }
+/* 不要边框：透明边框底下会露出对话框底色从下往上重复的那一行（最黑的那行），成了名字上方横贯整个画面的一条黑线 */
+.fg-theater[data-skin="noir"] .fg-box { box-shadow: none; border: 0; }
+.fg-theater[data-skin="noir"] .fg-box::before { top: min(26%, calc(.26 * var(--fg-dlg-ref))); left: 20%; right: 20%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: none; }
 .fg-theater[data-skin="noir"] .fg-box::after { display: none; }
-.fg-theater[data-skin="noir"] .fg-name { left: 0; right: 0; top: 10%; justify-content: center; }
+.fg-theater[data-skin="noir"] .fg-name { left: 0; right: 0; top: min(10%, calc(.1 * var(--fg-dlg-ref))); justify-content: center; transform-origin: 50% 100%; }
 .fg-theater[data-skin="noir"] .fg-name-plate { background: none; clip-path: none; box-shadow: none; color: var(--accent); font-size: 1.5cqw; letter-spacing: .6em; padding: 0; }
 .fg-theater[data-skin="noir"] .fg-name-plate::after { display: none; }
-.fg-theater[data-skin="noir"] .fg-text { left: 14%; right: 14%; top: 36%; text-align: center; font-size: 2.05cqw; }
+.fg-theater[data-skin="noir"] .fg-text { left: 14%; right: 14%; top: min(36%, calc(.36 * var(--fg-dlg-ref))); text-align: center; font-size: calc(2.05cqw * var(--fg-text-scale, 1)); }
 .fg-theater[data-skin="noir"] .fg-progress { left: 30%; right: 30%; }
 .fg-theater[data-skin="noir"] .fg-stage::after { content: ""; position: absolute; inset: 0; z-index: 45; pointer-events: none; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.06'/></svg>"); mix-blend-mode: overlay; }
 .fg-theater[data-skin="noir"] .fg-camera { filter: saturate(.75) contrast(1.06); }
+/* 竖屏（手机）：字跟别的皮肤一样大（以前沿用横屏的字号，只有 8px 左右） */
+@container stage (max-aspect-ratio: 4/5) {
+  .fg-theater[data-skin="noir"] .fg-dialog { height: var(--fg-dlg-h-p, 31%); }
+  .fg-theater[data-skin="noir"] .fg-name-plate { font-size: 3.4cqw; }
+  .fg-theater[data-skin="noir"] .fg-text { left: 8%; right: 8%; font-size: calc(4.6cqw * var(--fg-text-scale, 1)); }
+}
 
 /* 赛博：扫描线、等宽、青品红。 */
 .fg-theater[data-skin="cyber"] {

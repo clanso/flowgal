@@ -109,7 +109,10 @@ test('gate: 导演配环境音和音效：编号 / none / keep 规整，中途�
     { id: 'door', kind: 'sfx', category: '门窗/开门', name: '推开门', tags: ['推开门', '门'], description: '木门被推开，吱呀一声' },
     ...Array.from({ length: 60 }, (_, i) => ({ id: 'x' + i, kind: 'sfx', category: '无关/' + i, name: '无关' + i, tags: ['不会出现的词' + i] })),
   ]
-  const out = await direct({ llm, provider: 'fake', model: 'fake-1', units, previous: s, castList: [], context: {}, config: DEFAULT_CONFIG, backend: 'novelai', sounds: many })
+  // 只按正文对词（先听一遍关掉；开着时见 tests/listen.test.mjs）
+  const literal = { ...DEFAULT_CONFIG, director: { ...DEFAULT_CONFIG.director, listen: false } }
+  const out = await direct({ llm, provider: 'fake', model: 'fake-1', units, previous: s, castList: [], context: {}, config: literal, backend: 'novelai', sounds: many })
+  assert.equal(prompts.length, 1, '关着先听一遍：只有导演一次')
   const user = prompts[0].messages.map(m => JSON.stringify(m)).join('')
   assert.match(user, /【音效库候选】/)
   assert.match(user, /door｜推开门｜门窗\/开门｜木门被推开，吱呀一声/)

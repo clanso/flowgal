@@ -920,7 +920,10 @@
 .fg-iconbtn:hover { transform: rotate(90deg); background: rgba(255, 255, 255, .14); }
 
 /* ── 对话框 ── */
-.fg-dialog { position: absolute; left: 4%; right: 4%; bottom: 3.6%; height: 27%; z-index: 20; transition: opacity .3s, transform .3s; }
+/* 高度、字号、字体可以在设置里改（Theater.jsx 的 dialogVars）：--fg-dlg-h 横屏高度、--fg-dlg-h-p 竖屏高度、--fg-text-scale / --fg-name-scale 字号倍数、--fg-text-font / --fg-name-font 字体。
+   --fg-dlg-ref 是皮肤原来的高度（cqh：舞台高的百分之几）。对话框比它高时，正文、底下那排按钮离框边的距离停在原来的样子（min / clamp 封顶），多出来的地方都给正文；
+   比它矮时照旧按比例缩。默认高度下和以前一模一样 */
+.fg-dialog { position: absolute; left: 4%; right: 4%; bottom: 3.6%; height: var(--fg-dlg-h, 27%); --fg-dlg-ref: 27cqh; z-index: 20; transition: opacity .3s, transform .3s; }
 .fg-ui-hidden .fg-dialog, .fg-ui-hidden .fg-hud, .fg-ui-hidden .fg-topright, .fg-ui-hidden .fg-quick { opacity: 0; pointer-events: none; }
 /* 插画出现时对话框先让开（淡出、往下沉一点），画面出来后再回来 */
 .fg-dialog.is-away { opacity: 0; transform: translateY(1.2cqw); pointer-events: none; }
@@ -928,8 +931,9 @@
 .fg-box::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), var(--accent3), transparent); background-size: 200% 100%; animation: fg-shimmer 6s linear infinite; opacity: .9; }
 .fg-box::after { content: ""; position: absolute; right: -6cqw; bottom: -10cqw; width: 26cqw; height: 26cqw; border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--speaker, var(--accent)) 28%, transparent), transparent 65%); pointer-events: none; transition: background .6s; }
 @keyframes fg-shimmer { from { background-position: 200% 0; } to { background-position: 0 0; } }
-.fg-name { position: absolute; left: 3.2%; top: -2.3cqw; z-index: 2; display: flex; align-items: flex-end; gap: .8cqw; animation: fg-name-in .35s cubic-bezier(.2, .8, .2, 1) both; }
-.fg-name-plate { position: relative; padding: .5cqw 2.4cqw .55cqw 1.6cqw; font-family: var(--font-display); font-weight: 700; font-size: 1.75cqw; letter-spacing: .2em; color: var(--name-ink);
+/* 名牌字号是整块按底边缩放（scale 不占位置）：调大时往上长，不压到正文 */
+.fg-name { position: absolute; left: 3.2%; top: -2.3cqw; z-index: 2; display: flex; align-items: flex-end; gap: .8cqw; transform-origin: 0 100%; scale: var(--fg-name-scale, 1); animation: fg-name-in .35s cubic-bezier(.2, .8, .2, 1) both; }
+.fg-name-plate { position: relative; padding: .5cqw 2.4cqw .55cqw 1.6cqw; font-family: var(--fg-name-font, var(--font-display)); font-weight: 700; font-size: 1.75cqw; letter-spacing: .2em; color: var(--name-ink);
   background: linear-gradient(100deg, var(--speaker, var(--accent)), color-mix(in oklab, var(--speaker, var(--accent)) 55%, var(--accent2)));
   clip-path: polygon(0 0, 100% 0, calc(100% - 1.2cqw) 100%, 0 100%); box-shadow: 0 .4cqw 1.6cqw rgba(0, 0, 0, .35); text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
 .fg-name-plate::after { content: ""; position: absolute; left: 1.6cqw; right: 2.4cqw; bottom: .3cqw; height: 1px; background: rgba(255, 255, 255, .55); }
@@ -1032,10 +1036,10 @@
 .fg-dialog[data-recall="haze"] .fg-char { animation-name: fg-char-mist; animation-duration: 1.1s; }
 @keyframes fg-line-haze { 0%, 100% { filter: none; } 50% { filter: blur(.5px); } }
 @keyframes fg-char-mist { from { opacity: 0; filter: blur(7px); } to { opacity: 1; filter: none; } }
-.fg-text { position: absolute; left: 4.2%; right: 5%; top: 23%; bottom: 20%; font-size: 1.95cqw; line-height: 1.78; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0, 0, 0, .45); overflow: hidden; }
+.fg-text { position: absolute; left: 4.2%; right: 5%; top: clamp(1.6cqw, 23%, calc(.23 * var(--fg-dlg-ref))); bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-family: var(--fg-text-font, var(--font-body)); font-size: calc(1.95cqw * var(--fg-text-scale, 1)); line-height: 1.78; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0, 0, 0, .45); overflow: hidden; }
 .fg-text.is-narration { color: color-mix(in oklab, var(--ink) 92%, var(--accent3)); }
 .fg-text.is-thought { font-style: italic; color: color-mix(in oklab, var(--ink) 70%, var(--accent2)); }
-.fg-text.is-cardhint { color: var(--ink-dim); font-size: 1.3cqw; letter-spacing: .4em; text-align: center; }
+.fg-text.is-cardhint { color: var(--ink-dim); font-size: calc(1.3cqw * var(--fg-text-scale, 1)); letter-spacing: .4em; text-align: center; }
 .fg-text.is-thought .fg-line::before { content: "（"; } .fg-text.is-thought .fg-line::after { content: "）"; }
 /* 双语对照：像注音一样，上方小字原文，下方是打出来的翻译；原文的字跟着翻译的进度一起出（Dialog.jsx 的 origChars） */
 .fg-orig { font-size: .62em; line-height: 1.45; letter-spacing: .02em; opacity: .72; margin-bottom: .2em; font-style: normal; font-weight: normal; }
@@ -1083,16 +1087,16 @@
 @keyframes fg-tx-wave { 0%, 100% { transform: translateY(.1em); } 50% { transform: translateY(-.16em); } }
 @keyframes fg-tx-slam { from { opacity: 0; transform: scale(2.6) rotate(-4deg); } 50% { opacity: 1; transform: scale(.88); } 75% { opacity: 1; transform: scale(1.06); } to { opacity: 1; transform: none; } }
 @keyframes fg-tx-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
-.fg-wait { position: absolute; right: 2.6%; bottom: 20%; font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }
+.fg-wait { position: absolute; right: 2.6%; bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }
 .fg-wait::before { content: var(--wait-glyph); }
 @keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }
-.fg-quick { position: absolute; right: 2.4%; bottom: 7%; display: flex; gap: 1.5cqw; font-family: var(--font-latin); font-size: .98cqw; font-weight: 600; letter-spacing: .2em; z-index: 3; }
+.fg-quick { position: absolute; right: 2.4%; bottom: min(7%, calc(.07 * var(--fg-dlg-ref))); display: flex; gap: 1.5cqw; font-family: var(--font-latin); font-size: .98cqw; font-weight: 600; letter-spacing: .2em; z-index: 3; }
 .fg-quick button { color: var(--ink-dim); transition: color .2s, text-shadow .2s; position: relative; }
 .fg-quick button:hover, .fg-quick button.is-on { color: var(--ink); text-shadow: 0 0 .8cqw var(--accent); }
 .fg-quick button.is-on::after { content: ""; position: absolute; left: 0; right: .2em; bottom: -.3cqw; height: 1px; background: var(--accent); }
-.fg-progress { position: absolute; left: 4.2%; right: 30%; bottom: 8.6%; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.fg-progress { position: absolute; left: 4.2%; right: 30%; bottom: min(8.6%, calc(.086 * var(--fg-dlg-ref))); height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; }
 .fg-progress i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); box-shadow: 0 0 6px var(--accent); transition: width .4s ease; }
-.fg-status { position: absolute; left: 4.2%; bottom: 7%; font-size: .9cqw; letter-spacing: .1em; color: var(--ink-dim); display: flex; align-items: center; gap: .5cqw; }
+.fg-status { position: absolute; left: 4.2%; bottom: min(7%, calc(.07 * var(--fg-dlg-ref))); font-size: .9cqw; letter-spacing: .1em; color: var(--ink-dim); display: flex; align-items: center; gap: .5cqw; }
 .fg-status::before { content: ""; width: .6cqw; height: .6cqw; border-radius: 50%; background: var(--accent3); box-shadow: 0 0 .6cqw var(--accent3); animation: fg-pulse 1.4s ease-in-out infinite; }
 
 /* ── 情境卡片（短信、信件……） ── */
@@ -1115,14 +1119,14 @@
 /* ── 选项 ── */
 .fg-choices { position: absolute; inset: 0; z-index: 26; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.3cqw; background: radial-gradient(70% 60% at 50% 45%, rgba(0, 0, 0, .25), rgba(0, 0, 0, .6)); animation: fg-fade-in .4s ease both; }
 .fg-choices-title { font-family: var(--font-latin); letter-spacing: .6em; font-size: 1.05cqw; color: var(--ink-dim); margin-bottom: .6cqw; }
-.fg-choice { position: relative; width: 46cqw; padding: 1.25cqw 2.4cqw 1.25cqw 6cqw; text-align: left; font-size: 1.7cqw; letter-spacing: .08em; border-radius: 99px; background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .35); transition: transform .25s cubic-bezier(.2, .8, .2, 1), border-color .25s, box-shadow .25s; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); overflow: hidden; }
+.fg-choice { position: relative; width: 46cqw; padding: 1.25cqw 2.4cqw 1.25cqw 6cqw; text-align: left; font-family: var(--fg-text-font, var(--font-body)); font-size: 1.7cqw; letter-spacing: .08em; border-radius: 99px; background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .35); transition: transform .25s cubic-bezier(.2, .8, .2, 1), border-color .25s, box-shadow .25s; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); overflow: hidden; }
 .fg-choice::before { content: attr(data-n); position: absolute; left: 2.2cqw; top: 50%; transform: translateY(-50%); font-family: var(--font-latin); font-size: 1.5cqw; font-weight: 700; color: var(--accent); letter-spacing: .1em; }
 .fg-choice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .16) 50%, transparent 70%); transform: translateX(-100%); transition: transform .6s ease; }
 .fg-choice:hover { transform: translateX(1.2cqw) scale(1.02); border-color: var(--accent); box-shadow: 0 0 2.4cqw color-mix(in oklab, var(--accent) 45%, transparent); }
 .fg-choice:hover::after { transform: translateX(100%); }
 @keyframes fg-choice-in { from { opacity: 0; transform: translateY(1.4cqw); } }
 .fg-free { display: flex; gap: .8cqw; width: 46cqw; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); }
-.fg-free input { flex: 1; min-width: 0; padding: 1cqw 1.8cqw; font: inherit; font-size: 1.45cqw; color: var(--ink); border-radius: 99px; border: 1px dashed var(--box-border); background: rgba(0, 0, 0, .35); outline: none; user-select: text; }
+.fg-free input { flex: 1; min-width: 0; padding: 1cqw 1.8cqw; font: inherit; font-family: var(--fg-text-font, var(--font-body)); font-size: 1.45cqw; color: var(--ink); border-radius: 99px; border: 1px dashed var(--box-border); background: rgba(0, 0, 0, .35); outline: none; user-select: text; }
 .fg-free input:focus { border-color: var(--accent); border-style: solid; }
 .fg-free button { padding: 0 2cqw; border-radius: 99px; background: linear-gradient(100deg, var(--accent), var(--accent2)); font-size: 1.4cqw; font-weight: 700; letter-spacing: .2em; color: #fff; }
 
@@ -1156,7 +1160,8 @@
 
 .fg-log-item { display: grid; grid-template-columns: 9cqw 1fr; gap: 1.4cqw; padding: 1cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .06); cursor: pointer; font-size: 1.35cqw; line-height: 1.7; }
 .fg-log-item:hover { background: linear-gradient(90deg, rgba(255, 255, 255, .04), transparent); }
-.fg-log-name { font-family: var(--font-display); font-weight: 700; text-align: right; letter-spacing: .1em; }
+.fg-log-text { font-family: var(--fg-text-font, var(--font-body)); }
+.fg-log-name { font-family: var(--fg-name-font, var(--font-display)); font-weight: 700; text-align: right; letter-spacing: .1em; }
 .fg-log-turn { grid-column: 1 / -1; font-family: var(--font-latin); font-size: .95cqw; letter-spacing: .5em; color: var(--accent); padding-top: 1.4cqw; }
 .fg-log-scene { grid-column: 1 / -1; display: flex; align-items: center; gap: 1cqw; font-size: .9cqw; letter-spacing: .3em; color: var(--ink-dim); padding: .6cqw 0 .2cqw; }
 .fg-log-scene::before, .fg-log-scene::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .18), transparent); }
@@ -1506,6 +1511,14 @@ button.fg-pm-name:hover { color: var(--accent); }
 .fg-switch.is-on::after { transform: translateX(1.5cqw); }
 .fg-note { font-size: .95cqw; color: var(--ink-dim); line-height: 1.6; }
 .fg-ok { color: #6ef0a8; } .fg-err { color: #ff8a8a; }
+/* 设置 → 对话框：缩小版的舞台（自己是 stage 容器，里面的 cqw 按它的宽算），对话框跟剧场里一模一样；百分比滑块；上传的字体清单 */
+.fg-dlg-preview { position: relative; container-type: size; container-name: stage; width: min(100%, 44cqw); aspect-ratio: var(--stage-ar, 1.4615); margin: .4cqw auto 0; border-radius: .8cqw; overflow: hidden; border: 1px solid var(--box-border); pointer-events: none;
+  background: radial-gradient(60% 50% at 30% 30%, rgba(255, 190, 170, .45), transparent 70%), radial-gradient(50% 60% at 78% 40%, rgba(150, 120, 255, .35), transparent 70%), linear-gradient(180deg, #2b2140, #8a4058 62%, #2a1830); }
+.fg-pct input[type=range] { width: 18cqw; }
+.fg-pct .fg-input { width: 6.4cqw; }
+.fg-fontlist { display: grid; gap: .3cqw; }
+.fg-fontitem { padding: .4cqw .2cqw; border-bottom: 1px solid rgba(255, 255, 255, .06); flex-wrap: nowrap; }
+.fg-fontname { font-size: 1.3cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .fg-section { margin: 1.6cqw 0 .6cqw; font-family: var(--font-display); font-size: 1.4cqw; letter-spacing: .2em; display: flex; align-items: center; gap: .8cqw; }
 .fg-section::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--box-border), transparent); }
 /* 设置 → 特效：每组一个标题行（名字、开着几个、总开关），下面一排排小开关 */
@@ -1590,10 +1603,11 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
 @container stage (max-aspect-ratio: 4/5) {
-  .fg-face-levels { grid-template-columns: minmax(0, 1fr); } .fg-dial input[type=range] { width: 30cqw; }
+  .fg-face-levels { grid-template-columns: minmax(0, 1fr); } .fg-dial input[type=range], .fg-pct input[type=range] { width: 30cqw; }
+  .fg-pct .fg-input { width: 14cqw; } .fg-dlg-preview { width: 100%; } .fg-fontname { font-size: 3.2cqw; }
   .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }
   .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
-  .fg-dialog { left: 3%; right: 3%; height: 22%; }
+  .fg-dialog { left: 3%; right: 3%; height: var(--fg-dlg-h-p, 22%); --fg-dlg-ref: 22cqh; }
   .fg-recall-face { width: 17cqw; }
   .fg-phone { top: 16%; } .fg-phone-card { width: 34cqw; padding: 3cqw 2.6cqw; border-radius: 4cqw; }
   .fg-phone-label { font-size: 2.4cqw; } .fg-phone-label svg { width: 2.6cqw; height: 2.6cqw; }
@@ -1606,12 +1620,12 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-notify-icon { width: 8cqw; height: 8cqw; border-radius: 2cqw; font-size: 4cqw; }
   .fg-notify-head { font-size: 2.8cqw; } .fg-notify-head span { font-size: 2.4cqw; } .fg-notify-text { font-size: 3.2cqw; }
   .fg-notify-wave { height: 4.4cqw; gap: .5cqw; } .fg-notify-wave i { width: .5cqw; }
-  .fg-text { font-size: 4.6cqw; top: 18%; bottom: 26%; }
-  .fg-progress { bottom: 12%; right: 4.2%; }
-  .fg-quick { bottom: 5%; left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }
-  .fg-wait { bottom: 28%; }
+  .fg-text { font-size: calc(4.6cqw * var(--fg-text-scale, 1)); top: clamp(3cqw, 18%, calc(.18 * var(--fg-dlg-ref))); bottom: min(26%, calc(.26 * var(--fg-dlg-ref))); }
+  .fg-progress { bottom: min(12%, calc(.12 * var(--fg-dlg-ref))); right: 4.2%; }
+  .fg-quick { bottom: min(5%, calc(.05 * var(--fg-dlg-ref))); left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }
+  .fg-wait { bottom: min(28%, calc(.28 * var(--fg-dlg-ref))); }
   .fg-status { display: none; }
-  .fg-name-plate { font-size: 4cqw; } .fg-name { top: -5cqw; }
+  .fg-name-plate { font-size: 4cqw; } .fg-name { top: -5cqw; } .fg-name-sub { font-size: 2.4cqw; } /* 情绪小字：以前沿用横屏的 1cqw，手机上只有 4px */
   .fg-iconbtn { width: 9cqw; height: 9cqw; font-size: 4cqw; }
   .fg-hud-place { font-size: 4cqw; } .fg-hud-meta { font-size: 2.6cqw; }
   .fg-choice, .fg-free { width: 88cqw; font-size: 4cqw; }
