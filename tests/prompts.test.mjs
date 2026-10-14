@@ -1,5 +1,5 @@
 // 提示词页（第五批）：每一段提示词都在注册表里有默认、有说明；改了存成 { text, base }，内置更新了提示「有新版」；
-// 共用开头把几位的规矩挪进用户消息、开头一字不差；导演日志里每张立绘的去掉 / 换掉；预览不发给模型。
+// 共用开头把几位的规矩挪进用户消息、开头一字不差；补设计合进写词；导演日志里每张立绘的去掉 / 换掉；预览不发给模型。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm, readFile } from 'node:fs/promises'
@@ -11,7 +11,7 @@ import { PROMPTS, PROMPT_GROUPS, promptItem, promptView, editPrompt, fingerprint
 import { resolveConfig } from '../lib/config.js'
 import { softenSprite, composePrompt } from '../lib/image/style.js'
 import { isFaceTag, faceTags } from '../lib/face.js'
-import { writeSpritePrompts, tagReport } from '../lib/sprites.js'
+import { writeSpritePrompts, writeSpritesAndDesign, writeActing, tagReport, designedTags } from '../lib/sprites.js'
 import { direct } from '../lib/director.js'
 import { segmentTurn } from '../lib/segment.js'
 import { createStore } from '../lib/dsh/store.js'
@@ -49,12 +49,12 @@ test('gate: 注册表：每一段都有默认、分组、说明；默认里用�
     assert.deepEqual(item.vars.filter(v => v.unknown).map(v => v.name), [], '默认里的变量都有说明：' + id)
     assert.equal(item.edited, false)
     assert.equal(item.text, item.def)
-    if (/\.(system|user)$/.test(id) || /^director\.(music|sounds|eros)/.test(id)) assert.ok(!defaultOf(id).includes('[['), '大段默认没有可省的一截：' + id)
+    if (/\.(system|user)$/.test(id) || /^(director\.(music|sounds|eros)|acting\.task\.)/.test(id)) assert.ok(!defaultOf(id).includes('[['), '大段默认没有可省的一截：' + id)
   }
   const view = promptView(config)
   assert.equal(view.items.length, PROMPTS.size)
   assert.equal(view.shared, true, '共用开头默认开')
-  assert.deepEqual(view.groups.map(g => g.id), ['director', 'judge', 'listen', 'sprite', 'cg', 'shared', 'image', 'filter'])
+  assert.deepEqual(view.groups.map(g => g.id), ['director', 'judge', 'listen', 'acting', 'sprite', 'cg', 'shared', 'image', 'filter'])
 })
 
 test('gate: 改提示词：存成 { text, base }，跟默认一样的不存；内置更新了标「有新版」，保留我的不再提示；恢复默认；老设置的四个大框搬进来', () => {
@@ -142,27 +142,53 @@ test('gate: 设计师写的 → 实际发出的：去掉哪些（为什么）、
   const face = tagReport('school uniform, smile, blush, arms crossed', { key: 'k', emotion: 'smile', face: { from: 'b' } }, person)
   assert.deepEqual(face.removed.map(r => [r.tag, r.why]), [['school uniform', '不是脸上的（只换脸只留表情）'], ['arms crossed', '不是脸上的（只换脸只留表情）']])
   assert.equal(face.sent.includes('smile') && face.sent.includes('blush'), true)
+  assert.equal(designedTags('1girl, school uniform, smile, blush', { face: { from: 'b' } }), 'smile, blush')
+  assert.equal(designedTags('smile, blush', {}), '', '整张画的只写了表情：不算写了')
+  assert.equal(designedTags('1girl, school uniform, smile', {}), '1girl, school uniform, smile')
 })
 
-test('gate: 共用开头：系统提示词是同一句，规矩挪进【你的工作】；立绘设计师和导演的资料那一截一字不差；关掉照以前', async () => {
+test('gate: 共用开头：系统提示词是同一句，规矩挪进【你的工作】；表演设计师和立绘设计师的开头（资料、剧情、档案）一字不差；关掉照以前', async () => {
   const config = resolveConfig({})
+  const acting = fakeLlm(() => '{}')
+  await writeActing({ llm: acting, provider: 'p', model: 'm', config, backend: 'novelai', context, story, turn: 1, person, emotions: ['neutral'] })
   const sprite = fakeLlm(() => '{}')
   await writeSpritePrompts({ llm: sprite, provider: 'p', model: 'm', config, backend: 'novelai', context, story, turn: 1, person, targets: [{ key: 'k', emotion: 'smile', outfit: '校服', states: [] }] })
   const director = fakeLlm(() => '{}')
   await direct({ llm: director, provider: 'p', model: 'm', units: segmentTurn('“你来了。”'), previous: null, castList: [], context, config, backend: 'novelai' }).catch(() => {})
   const shared = defaultOf('shared.system')
-  for (const c of [sprite.calls[0], director.calls[0]]) assert.equal(c.system, shared)
-  const s = userOf(sprite.calls[0]), d = userOf(director.calls[0])
+  for (const c of [acting.calls[0], sprite.calls[0], director.calls[0]]) assert.equal(c.system, shared)
+  const a = userOf(acting.calls[0]), s = userOf(sprite.calls[0]), d = userOf(director.calls[0])
+  assert.match(a, /【你的工作】\n你是视觉小说的角色表演设计师/)
   assert.match(s, /【角色档案】[\s\S]*【你的工作】\n你是视觉小说的立绘设计师[\s\S]*【要画的差分】/)
   assert.match(d, /^【资料[\s\S]*钢琴社社长[\s\S]*【你的工作】\n你是视觉小说（Galgame）的后台导演/)
-  const head = s.slice(0, s.indexOf('【你的工作】'))
+  const head = a.slice(0, a.indexOf('【你的工作】'))
   assert.ok(head.includes('【剧情') && head.includes('【角色档案】') && head.includes('固定外貌：1girl, long black hair, blue eyes'))
+  assert.equal(s.slice(0, head.length), head, '资料、剧情、档案一字不差：模型接口能缓存')
   assert.equal(d.slice(0, d.indexOf('【你的工作】')), head.slice(0, d.indexOf('【你的工作】')), '导演和设计师的资料那一截也一样')
 
   const off = fakeLlm(() => '{}')
   await writeSpritePrompts({ llm: off, provider: 'p', model: 'm', config: resolveConfig({ director: { sharedPrefix: false } }), backend: 'novelai', context, story, turn: 1, person, targets: [{ key: 'k', emotion: 'smile', outfit: '校服', states: [] }] })
   assert.match(off.calls[0].system, /^你是视觉小说的立绘设计师/)
   assert.doesNotMatch(userOf(off.calls[0]), /【你的工作】/)
+})
+
+test('gate: 补设计合进写词：一次请求带着表演设计师的规矩和已有设计，回的设计并进去，先设计再写的收原样', async () => {
+  const current = { read: '安静', poses: [{ id: 'p1', label: '站着', desc: '', tags: 'hands at sides', emotions: ['neutral', 'smile'] }], faces: { neutral: { desc: '', tags: 'closed mouth' } } }
+  const llm = fakeLlm(() => JSON.stringify({
+    acting: { poses: [{ id: 'p1', emotions: ['sad'] }], faces: [{ emotion: 'sad', desc: '低着眼', tags: 'downcast eyes, frown' }] },
+    sprites: [{ key: 's1', tags: '1girl, smile' }, { key: 's2', tags: '1girl, school uniform, downcast eyes, frown' }],
+  }))
+  const targets = [{ key: 'k1', emotion: 'smile', outfit: '校服', states: [] }, { key: 'design:sad', emotion: 'sad', design: true, outfit: '校服', states: [] }]
+  const { results, sheet } = await writeSpritesAndDesign({ llm, provider: 'p', model: 'm', config: resolveConfig({}), backend: 'novelai', context, story, turn: 1, person: { ...person, acting: current }, targets, design: { emotions: ['sad'], current } })
+  assert.equal(llm.calls.length, 1)
+  const user = userOf(llm.calls[0])
+  assert.match(user, /【先补设计】[\s\S]*你是视觉小说的角色表演设计师[\s\S]*【已有的动作与表情设计】[\s\S]*【要先设计的情绪】\n- sad（难过）/)
+  assert.match(user, /- s2：先设计再写——情绪「难过」/)
+  assert.match(user, /\{"acting":\{表演设计师要输出的那个对象/)
+  assert.ok(sheet.poses[0].emotions.includes('sad'))
+  assert.equal(sheet.faces.sad.tags, 'downcast eyes, frown')
+  assert.equal(results.get('design:sad').raw, '1girl, school uniform, downcast eyes, frown')
+  assert.equal(results.get('k1').tags, '1girl, smile')
 })
 
 test('gate: 宿主：提示词页的接口（看、改、恢复、上次填的、预览）；设置那边不带 prompts、不收老字段；预览不发给模型', async () => {
@@ -200,7 +226,8 @@ test('gate: 宿主：提示词页的接口（看、改、恢复、上次填的�
     assert.equal(llm.calls.length, before, '预览不发给模型')
     assert.equal(preview.system, defaultOf('shared.system'))
     assert.match(preview.user, /林岚是钢琴社社长[\s\S]*名字：林岚（女）[\s\S]*【你的工作】\n你是视觉小说的立绘设计师[\s\S]*- s1：.*情绪「平静」/)
-    await assert.rejects(engine.previewPrompt('g', 'acting', { name: '林岚' }), /没有这个角色/, '动作与表情设计删掉了')
+    const acting = await engine.previewPrompt('g', 'acting', { name: '林岚' })
+    assert.match(acting.user, /你是视觉小说的角色表演设计师[\s\S]*【要设计的情绪】\n- neutral（平静）/)
     await assert.rejects(engine.previewPrompt('g', 'sprite', { name: '没这个人' }), /没有 没这个人/)
     const last = await route('GET', '/prompts/last')({ method: 'GET', query: { id: 'shared.person' }, body: {} })
     assert.equal(last.last.values.name, '林岚')

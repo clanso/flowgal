@@ -148,7 +148,17 @@ async function settle(t) {
   turns.set(t.turn, { ...t, textVersion })
   return engine.onTurnSettled({ gameId: GAME, turn: t.turn, textVersion, text: t.text, rawText: t.raw || t.text, card: CARD })
 }
-for (const t of TURNS) await settle(t)
+// 真玩的时候两轮之间隔着读和写：第 2 轮出场的人设计好动作再进第 3 轮（第 3 轮导演会收起苏晴的处境动作，设计师跟着复盘）
+async function designed(names) {
+  for (const end = Date.now() + 30000; Date.now() < end; await sleep(200)) {
+    const view = await engine.gameView(GAME)
+    if (names.every(name => view.cast.find(p => p.name === name)?.acting?.poses?.length)) return
+  }
+}
+for (const t of TURNS) {
+  await settle(t)
+  if (t.turn === 2) await designed(['林岚', '苏晴'])
+}
 // 画风：内置几套之外加一套自己调过的，几套都试画一张样图（排在剧情的图后面）。
 const MY_STYLE = { id: 'mynight', name: '夜景厚涂（自己调的）', artist: 'cinematic lighting, 1.2::dramatic lighting::, depth of field, thick painting, painterly', positive: 'masterpiece, best quality, very aesthetic', negative: 'lowres, bad anatomy, bad hands, blurry, watermark, text', cfg: 6, cfgRescale: 0.2 }
 await engine.patchConfig({ style: { presets: [...(await engine.publicConfig()).config.style.presets, MY_STYLE] } })

@@ -1,11 +1,11 @@
-// 立绘在剧场里的大小和高低：按脸框把大家的头缩放到一样大，按身高抬高或压低；身高从档案来，没写按性别外貌估。
+// 立绘在剧场里的大小和高低：按脸框把大家的头缩放到一样大，按身高抬高或压低；身高从档案、动作与表情设计、性别外貌来。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { guessHeight, heightOf, cleanHeight, placeSprite, usualFace, faceHeight, genderOf, faceCrop, FACE_RATIO, FACE_SPREAD } from '../lib/stature.js'
-import { poseTags } from '../lib/poses.js'
+import { cleanActing, mergeActing, poseTags } from '../lib/acting.js'
 import { composePrompt } from '../lib/image/style.js'
 import { resolveConfig } from '../lib/config.js'
 import { encodePng } from '../lib/image/png.js'
@@ -15,7 +15,7 @@ import { createEngine } from '../lib/engine.js'
 const H = [832, 1216]
 const faceAt = (ratio, center) => [300, (center - ratio / 2) * H[1], 520, (center + ratio / 2) * H[1]]
 
-test('gate: 身高：档案写的优先，没写按性别和外貌 tag 估（矮人、孩子、矮小、高挑）', () => {
+test('gate: 身高：档案写的优先，其次设计师估的，都没有按性别和外貌 tag 估（矮人、孩子、矮小、高挑）', () => {
   assert.equal(guessHeight({ gender: 'female', appearance: '1girl, long hair' }), 160)
   assert.equal(guessHeight({ gender: 'male', appearance: '1boy, short hair' }), 172, 'short hair 不算矮')
   assert.equal(guessHeight({ appearance: '1girl, orange hair, dwarf, short, stocky' }), 125)
@@ -24,8 +24,8 @@ test('gate: 身高：档案写的优先，没写按性别和外貌 tag 估（矮
   assert.equal(guessHeight({ appearance: 'little girl, twintails' }), 128)
   assert.equal(genderOf({ appearance: '1boy, white hair' }), 'male', '档案没写性别按 1boy / 1girl 猜')
   assert.equal(genderOf({ appearance: 'silver hair' }), 'other')
-  assert.deepEqual(heightOf({ gender: 'female', appearance: '1girl', acting: { height: 150 } }), { cm: 160, from: 'guess' }, '老存档里设计师估的不再读')
-  assert.deepEqual(heightOf({ gender: 'female', appearance: '1girl', height: 171 }), { cm: 171, from: 'user' })
+  assert.deepEqual(heightOf({ gender: 'female', appearance: '1girl', acting: { height: 150 } }), { cm: 150, from: 'acting' })
+  assert.deepEqual(heightOf({ gender: 'female', appearance: '1girl', height: 171, acting: { height: 150 } }), { cm: 171, from: 'user' })
   assert.deepEqual(heightOf({ gender: 'male', appearance: '1boy', height: 'abc' }), { cm: 172, from: 'guess' })
   assert.equal(cleanHeight('158.6'), 159)
   assert.equal(cleanHeight(9999), null)
@@ -82,8 +82,13 @@ test('gate: 同一个人换动作：侧身、低头那张脸框认小了，按�
   assert.deepEqual(placeSprite({ box: aside, size: H, cm: 162, usual: 0 }), raw(aside), '没有参照就照旧')
 })
 
-test('gate: 演出型立绘可以前倾、弯腰（设计师决定，插件不拦）', () => {
-  assert.equal(poseTags('clenched fist on own chest, leaning forward slightly, shoulders squared, cowboy shot'), 'clenched fist on own chest, leaning forward slightly, shoulders squared', '构图还是归插件管')
+test('gate: 设计师估的身高跟着动作与表情设计存；演出型立绘可以前倾、弯腰（设计师决定，插件不拦）', () => {
+  const sheet = cleanActing({ read: '矮人战士', height: '128', poses: [{ label: '握拳捶胸', tags: 'clenched fist on own chest, leaning forward slightly, shoulders squared, cowboy shot', emotions: ['neutral'] }] })
+  assert.equal(sheet.height, 128)
+  assert.equal(sheet.poses[0].tags, 'clenched fist on own chest, leaning forward slightly, shoulders squared', '构图还是归插件管')
+  assert.equal(cleanActing({ height: 9000, poses: [{ label: 'A', emotions: ['neutral'] }] }).height, undefined)
+  assert.equal(mergeActing(sheet, { height: 150, poses: [] }).sheet.height, 128, '补设计不改已经估好的身高')
+  assert.equal(mergeActing({ ...sheet, height: undefined }, { height: 150 }).sheet.height, 150)
   assert.equal(poseTags('bent over, hands on knees, bending forward'), 'bent over, hands on knees, bending forward')
   const cfg = resolveConfig({ images: { backend: 'novelai' } })
   const p = composePrompt({ kind: 'sprite', tags: 'girl, smile, leaning forward, hands behind back', person: { appearance: '1girl', gender: 'female' }, emotion: 'smile', backend: 'novelai', config: cfg })

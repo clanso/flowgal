@@ -1356,6 +1356,9 @@
 .fg-face-try.is-flat:not(.is-on), .fg-face-try.is-drift:not(.is-on) { opacity: .78; }
 .fg-lightbox.is-face img { width: min(88vw, 104dvh); height: auto; max-height: 78%; image-rendering: auto; }
 .fg-face-editor .fg-aa-frame { height: 28cqw; }
+/* 动作与表情设计：一个动作一块，块里每个情绪一行（名字、归哪个动作、他的这种表情） */
+.fg-acting { display: grid; gap: .7cqw; }
+.fg-acting .fg-field { grid-template-columns: 9cqw 1fr; }
 /* 「动作 × 情绪」的表（PoseMatrix.jsx）：上面一排动作卡片，下面一列一个动作、一行一个情绪；横着放不下时表自己左右滑，情绪名那一列钉在左边 */
 .fg-pm { display: grid; gap: .8cqw; min-width: 0; }
 .fg-pm .fg-input { padding: .45cqw .8cqw; font-size: 1cqw; }
@@ -1375,9 +1378,11 @@
 .fg-pm-head b { max-width: 9cqw; overflow: hidden; text-overflow: ellipsis; letter-spacing: .04em; }
 .fg-pm-emo { position: sticky; left: 0; z-index: 1; background: rgb(15, 12, 33); text-align: left !important; white-space: nowrap; }
 .fg-pm-emo > * + * { margin-left: .4cqw; }
-.fg-pm-name { font-weight: 600; letter-spacing: .04em; }
+.fg-pm-name { padding: 0; font: inherit; font-weight: 600; letter-spacing: .04em; color: inherit; background: none; border: 0; cursor: pointer; }
+button.fg-pm-name:hover { color: var(--accent); }
 .fg-pm-emo small { font-size: .8cqw; opacity: .55; }
 .fg-pm-row.is-loose .fg-pm-name { opacity: .6; }
+.fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 10%, rgb(15, 12, 33)); }
 .fg-pm-cat td { position: sticky; left: 0; text-align: left !important; background: rgba(0, 0, 0, .25); }
 .fg-pm-cat button { display: inline-flex; align-items: baseline; gap: .8cqw; padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 .fg-pm-cat b { font-family: var(--font-display); font-size: 1.15cqw; letter-spacing: .16em; color: var(--accent); }
@@ -1389,10 +1394,33 @@
 .fg-pm-star { padding: 0 .2cqw; font-size: 1.15cqw; line-height: 1; color: var(--accent); background: none; border: 0; cursor: pointer; }
 .fg-pm-star[disabled] { cursor: default; opacity: 1; }
 .fg-pm-cell:not(.is-anchor) .fg-pm-star { opacity: .45; } .fg-pm-cell:not(.is-anchor) .fg-pm-star:hover:not([disabled]) { opacity: 1; }
+.fg-pm-thumb { display: inline-grid; place-items: center; width: 2.8cqw; height: 3.6cqw; margin-left: .3cqw; padding: 0; overflow: hidden; border-radius: .4cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink-dim); font-size: .9cqw; cursor: pointer; }
+.fg-pm-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
+.fg-pm-thumb:hover { border-color: var(--accent); }
+/* 本性 / 处境、前提、靠的长期状态、收起放回（lib/pose-life.js）；此刻收起了的动作那一列和卡片暗下来 */
+.fg-pm-pose.is-off { border-style: dashed; background: rgba(255, 255, 255, .02); }
+.fg-pm-pose.is-off .fg-pm-label { opacity: .6; }
+.fg-pm-table th.is-off, .fg-pm-cell.is-off { opacity: .45; }
+.fg-pm-offtag { padding: 0 .4cqw; border-radius: .3cqw; font-size: .8cqw; font-weight: 400; color: var(--ink-dim); border: 1px solid var(--box-border); }
+.fg-pm-situ { display: grid; gap: .35cqw; padding-top: .4cqw; border-top: 1px dashed rgba(255, 255, 255, .08); }
+.fg-pm-situ > .fg-row { flex-wrap: wrap; gap: .4cqw; }
+.fg-pm-kind { display: inline-flex; gap: .3cqw; }
+.fg-pm-status { font-size: .9cqw; color: var(--ink-dim); }
+.fg-pm-status.is-off { color: var(--accent); }
+.fg-pm-needs { display: flex; flex-wrap: wrap; gap: .3cqw; align-items: center; }
+.fg-pm-life { display: grid; gap: .2cqw; margin: 0; padding: 0; list-style: none; font-size: .85cqw; color: var(--ink-dim); }
+.fg-pm-life li { display: flex; gap: .4cqw; align-items: baseline; }
+.fg-pm-life li.is-dropped > span { text-decoration: line-through; opacity: .6; }
+.fg-acting-situ { display: flex; flex-wrap: wrap; gap: .5cqw; align-items: center; }
+.fg-pm-thumb.is-busy { border-color: var(--accent2); animation: fg-pulse 1.4s ease-in-out infinite; }
+.fg-pm-thumb.is-failed { border-color: #ff6b6b; color: #ff9b9b; }
+.fg-pm-open td { text-align: left !important; background: color-mix(in oklab, var(--accent) 6%, transparent); }
+.fg-pm-face { position: sticky; left: .6cqw; display: grid; grid-template-columns: auto 1fr 1fr; gap: .6cqw; align-items: center; max-width: 70cqw; }
 .fg-pose-groups { display: grid; gap: .6cqw; min-width: 0; }
 .fg-face-levels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4cqw 2cqw; }
 .fg-face-levels > label { gap: .8em; } .fg-face-levels b { min-width: 1.6em; }
 .fg-dial input[type=range] { width: 14cqw; }
+.fg-pm-level { display: flex; align-items: center; gap: .6em; flex-wrap: wrap; }
 .fg-field:has(.fg-pose-groups) { align-items: start; } .fg-field:has(.fg-pose-groups) > div { min-width: 0; }
 .fg-aa-box text { fill: currentColor; paint-order: stroke; stroke: rgba(0, 0, 0, .75); stroke-width: 3px; pointer-events: none; }
 .fg-aa-play > canvas, .fg-aa-play > img { position: absolute; left: 50%; top: 0; height: 100%; width: auto; transform: translateX(-50%); }
@@ -1692,13 +1720,17 @@
   .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }
   .fg-aa-grid { grid-template-columns: 1fr; } .fg-aa-list { max-height: 50cqw; }
   .fg-aa-vision { font-size: 2.6cqw; } .fg-aa-badge { font-size: 2.2cqw; } .fg-aa-vision progress { height: 1.6cqw; }
+  .fg-acting .fg-field { grid-template-columns: 1fr; }
   .fg-pm .fg-input { font-size: 3cqw; padding: 1cqw 1.6cqw; }
   .fg-pm-poses { grid-template-columns: 1fr; gap: 1.6cqw; } .fg-pm-pose { padding: 1.8cqw; gap: 1cqw; border-radius: 2cqw; }
   .fg-pm-id { font-size: 2.4cqw; min-width: 5cqw; } .fg-pm-add { min-height: 10cqw; font-size: 3cqw; border-radius: 2cqw; }
   .fg-pm-scroll { max-height: 120cqw; border-radius: 2cqw; }
   .fg-pm-table { font-size: 3cqw; } .fg-pm-table th, .fg-pm-table td { padding: 1cqw 1.4cqw; }
   .fg-pm-head b { max-width: 22cqw; } .fg-pm-emo small { font-size: 2.4cqw; } .fg-pm-cat b { font-size: 3.2cqw; }
+  .fg-pm-offtag { font-size: 2.2cqw; } .fg-pm-status { font-size: 2.6cqw; } .fg-pm-life { font-size: 2.4cqw; } .fg-pm-situ { gap: 1cqw; padding-top: 1cqw; }
   .fg-pm-cell input { width: 3.6cqw; height: 3.6cqw; } .fg-pm-star { font-size: 3.6cqw; padding: 0 .6cqw; }
+  .fg-pm-thumb { width: 7cqw; height: 9cqw; font-size: 2.6cqw; border-radius: 1cqw; }
+  .fg-pm-face { grid-template-columns: 1fr; max-width: 80cqw; }
   .fg-face-editor .fg-aa-frame { height: 80cqw; }
   .fg-aa-frame, .fg-aa-play { height: 90cqw; } .fg-aa-play.is-close { width: 90cqw; }
   .fg-aa-item img { width: 9cqw; height: 11cqw; } .fg-aa-item { grid-template-columns: auto 9cqw 1fr; }
