@@ -4081,6 +4081,7 @@ function posOf(turn, at2, ctx2) {
   if (!ctx2.order) return 0;
   return ctx2.order.has(at2) ? ctx2.order.get(at2) : -1;
 }
+var pastIndex = (pos, index) => pos === Infinity || pos > index;
 function later(a, b) {
   for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k] > b[k];
   return false;
@@ -4099,13 +4100,13 @@ function missingNeeds(pose, states) {
 }
 function poseLife(pose, ctx2 = {}) {
   const at2 = { turn: Number.isFinite(ctx2.turn) ? ctx2.turn : Infinity, index: ctx2.index ?? Infinity, order: ctx2.order || null };
-  if (pose?.from && posOf(pose.from.turn, pose.from.at, at2) > at2.index) return { live: false, why: "later" };
+  if (pose?.from && pastIndex(posOf(pose.from.turn, pose.from.at, at2), at2.index)) return { live: false, why: "later" };
   if (!ctx2.segment && pose?.life?.length) {
     let last = null, lastKey = null;
     pose.life.forEach((e, i) => {
       if (e.dropped || ctx2.before && e.by === "ai" && e.turn >= at2.turn) return;
       const pos = posOf(e.turn, e.at, at2);
-      if (pos > at2.index) return;
+      if (pastIndex(pos, at2.index)) return;
       const key = [e.turn, pos, e.by === "user" ? 1 : 0, i];
       if (!lastKey || later(key, lastKey)) {
         last = e;
@@ -4122,7 +4123,7 @@ function lateEmotions(pose, ctx2) {
   if (!pose?.joins) return [];
   const at2 = { turn: Number.isFinite(ctx2.turn) ? ctx2.turn : Infinity, order: ctx2.order || null };
   const index = ctx2.index ?? Infinity;
-  return Object.entries(pose.joins).filter(([, f]) => f && posOf(f.turn, f.at, at2) > index).map(([e]) => e);
+  return Object.entries(pose.joins).filter(([, f]) => f && pastIndex(posOf(f.turn, f.at, at2), index)).map(([e]) => e);
 }
 function liveSheet(sheet, ctx2 = {}) {
   if (!sheet?.designed || !sheet.poses?.length) return sheet;
