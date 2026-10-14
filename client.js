@@ -155,7 +155,7 @@ var api = {
   updateLibSound: (id, patch) => call("/soundlib", { action: "update", id, patch }),
   removeLibSounds: (ids) => call("/soundlib", { action: "remove", ids }),
   clearLibSounds: (kind) => call("/soundlib", { action: "clear", kind }),
-  /** 往音效库导入一个（最大 20 MB）：path 是相对导入文件夹的路径，meta 是描述文件里这一条。 */
+  /** 往音效库导入一个（最大 100 MB）：path 是相对导入文件夹的路径，meta 是描述文件里这一条。 */
   async uploadLibSound(file2, path, meta) {
     const query = `name=${encodeURIComponent(path || file2.name || "")}${meta ? `&meta=${encodeURIComponent(JSON.stringify(meta))}` : ""}`;
     return (await uploadFile(`/soundlib/upload?${query}`, file2)).sound;
@@ -6744,9 +6744,24 @@ function fade(el, to, ms, done) {
   requestAnimationFrame(tick);
   setTimeout(end, ms + 150);
 }
+function boost(el, gain) {
+  if (!(gain > 1) && !el._fgGain) return;
+  const ac = audioCtx();
+  if (!ac) return;
+  if (!el._fgGain) {
+    try {
+      const g = ac.createGain();
+      ac.createMediaElementSource(el).connect(g).connect(ac.destination);
+      el._fgGain = g;
+    } catch {
+      return;
+    }
+  }
+  el._fgGain.gain.value = Math.max(1, gain);
+}
 var HUSH_OUT_MS = 600;
 var HUSH_BACK_MS = 2600;
-function loopPlayer() {
+function loopPlayer({ loud = false } = {}) {
   let cur = null;
   let hushed = false;
   let ducked = 1;
@@ -6756,7 +6771,7 @@ function loopPlayer() {
     el.pause();
     el.src = "";
   };
-  const audible = (volume) => preview || hushed ? 0 : volume * ducked;
+  const audible = (volume) => preview || hushed ? 0 : Math.min(1, volume) * ducked;
   return {
     get current() {
       return cur;
@@ -6770,9 +6785,10 @@ function loopPlayer() {
         this.stop();
         return;
       }
-      volume = Math.max(0, Math.min(1, volume));
+      volume = Math.max(0, loud ? volume : Math.min(1, volume));
       if (cur && cur.id === item.id) {
         cur.volume = volume;
+        boost(cur.el, volume);
         cur.el.volume = Math.min(cur.el.volume, audible(volume));
         fade(cur.el, audible(volume), 400);
         return;
@@ -6783,6 +6799,7 @@ function loopPlayer() {
       el.src = item.url;
       el.loop = true;
       el.volume = 0;
+      boost(el, volume);
       el.play().then(() => {
         if (el._fgStopped) halt(el);
         else if (!el._fgFading) fade(el, audible(volume), 1800);
@@ -6832,7 +6849,7 @@ function loopPlayer() {
   };
 }
 var music = loopPlayer();
-var ambience = loopPlayer();
+var ambience = loopPlayer({ loud: true });
 var players = [music, ambience];
 var loops = () => [music.current, ambience.current].filter(Boolean);
 function playBgm(track, volume = 0.45) {
@@ -6862,7 +6879,9 @@ function previewTrack(track, onEnd) {
   stopPreview();
   if (!track) return;
   const el = new Audio(track.url);
-  el.volume = Math.max(0, Math.min(1, track.volume ?? (music.current ? music.current.volume : 0.6)));
+  const volume = track.volume ?? (music.current ? music.current.volume : 0.6);
+  el.volume = Math.max(0, Math.min(1, volume));
+  boost(el, volume);
   preview = { el, id: track.id, onEnd };
   el.onended = () => {
     if (preview && preview.el === el) stopPreview();
@@ -7102,11 +7121,12 @@ function playLibSound(assetId, volume = 1) {
   }).catch(() => {
   });
 }
+var slotVolume = (lib) => Math.min(2, lib.volume ?? 1);
 function playSound(sound, volume) {
   const ac = sound && audioCtx();
   if (!ac) return;
   const lib = sound.libId ? libSound(sound.libId) : null;
-  if (lib) playFile(ac, lib.assetId, volume * (lib.volume ?? 1), sound.parts);
+  if (lib) playFile(ac, lib.assetId, volume * slotVolume(lib), sound.parts);
   else if (sound.assetId) playFile(ac, sound.assetId, volume, sound.parts);
   else playParts(ac, sound.parts, { volume });
 }
@@ -7242,7 +7262,7 @@ function voiceSource(ac, id) {
   if (!lib) return { parts: CLASSIC };
   const sample2 = loadSample(ac, lib.assetId);
   recipeLevel(CLASSIC);
-  return sample2 ? { sample: sample2, gain: (lib.volume ?? 1) * matchGain(CLASSIC, sample2) } : null;
+  return sample2 ? { sample: sample2, gain: slotVolume(lib) * matchGain(CLASSIC, sample2) } : null;
 }
 function emit(ac, source, { rate = 1, volume = 1, at: at2 = ac.currentTime, out = ac.destination, memory = false } = {}) {
   if (source.sample) playSample(ac, source.sample, { rate, volume: volume * source.gain, at: at2, out });
@@ -10859,6 +10879,7 @@ function writeSidecar(tracks, note = "") {
 var SOUND_SIDECAR = "flowgal-sounds.json";
 var FORMAT2 = "flowgal-sounds";
 var FIELDS2 = ["name", "kind", "category", "description", "tags", "volume", "gender", "use"];
+var MAX_SOUND_VOLUME = 16;
 var slash = (path) => String(path || "").replace(/\\/g, "/").replace(/^\/+/, "");
 var dirOf = (path) => {
   const p4 = slash(path);
@@ -10949,7 +10970,7 @@ var VISION_FILES = [
 var VISION_PATHS = { ort: `${ORT}/ort.wasm.min.mjs`, ortDir: `${ORT}/`, tjs: `${TJS}/transformers.min.js`, tjsDir: `${TJS}/`, florence: FLORENCE };
 
 // lib/soundlib.js
-var MAX_SOUNDLIB_BYTES = 20 * 1024 * 1024;
+var MAX_SOUNDLIB_BYTES = 100 * 1024 * 1024;
 var SFX_CANDIDATES = 36;
 var AMBIENCE_CANDIDATES = 12;
 
@@ -12576,6 +12597,10 @@ function saveText(text, name2) {
 var KIND_LABEL2 = { ambience: "环境音", blip: "打字音", sfx: "音效" };
 var USE_OPTIONS = [["", "没有"], ...SOUND_SLOTS.map((s) => [s.id, `${s.group === "ui" ? "界面音" : "落字音效"} · ${s.label}`]), ["narration", "旁白的打字音"]];
 var LIB_SHOWN = 200;
+var VOLUME_DB = [-30, 20 * Math.log10(MAX_SOUND_VOLUME)];
+var volumeDb = (v) => v > 0 ? Math.min(VOLUME_DB[1], Math.max(VOLUME_DB[0], 20 * Math.log10(v))) : VOLUME_DB[0];
+var dbVolume = (db) => db <= VOLUME_DB[0] ? 0 : Math.min(MAX_SOUND_VOLUME, Math.round(10 ** (db / 20) * 100) / 100);
+var volumeText = (v) => v > 0 ? `${Number(v.toFixed(2))} 倍` : "静音";
 function LibSoundCard({ sound, playing, onPlay }) {
   const [busy, run] = useBusy3();
   const [open, setOpen] = import_react12.default.useState(false);
@@ -12588,7 +12613,7 @@ function LibSoundCard({ sound, playing, onPlay }) {
       await api.removeLibSounds([sound.id]);
       await loadSoundlib();
     }, "已删除");
-  } }, "删除")), !open && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note fg-libsound-tags" }, sound.kind === "blip" ? `打字音 · ${VOICE_GENDER[sound.gender || ""]}` : (sound.tags || []).join("、") || "（没有标签）", sound.use ? ` · 推荐用途：${(USE_OPTIONS.find(([v]) => v === sound.use) || [])[1] || sound.use}` : "", sound.description ? " · " + sound.description : ""), open && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: sound.kind, onChange: (e) => save({ kind: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "sfx" }, "音效（响一次）"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "ambience" }, "环境音（循环）"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "blip" }, "打字音（一个字一下）")), sound.kind === "blip" && /* @__PURE__ */ import_react12.default.createElement(Select, { value: sound.gender || "", options: [["", "不分男女"], ["female", "女声"], ["male", "男声"]], style: INLINE, onChange: (v) => save({ gender: v }) }), /* @__PURE__ */ import_react12.default.createElement(Text, { value: sound.category, placeholder: "分类，两层用 / 隔开：门窗/敲门", style: { flex: 1, width: "auto" }, onCommit: (v) => save({ category: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "音量"), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.05", value: sound.volume ?? 1, onChange: (e) => save({ volume: Number(e.target.value) }), style: { width: "8cqw" } })), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "推荐用途"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: sound.use || "", options: USE_OPTIONS, style: INLINE, onChange: (v) => save({ use: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "「声音」页一键套用时用")), sound.kind !== "blip" && /* @__PURE__ */ import_react12.default.createElement(Text, { value: (sound.tags || []).join("、"), placeholder: "标签：正文里会出现的词，用顿号隔开。导演按它们挑候选，例如：敲门、咚咚、门", style: { width: "100%" }, onCommit: (v) => save({ tags: v }) }), /* @__PURE__ */ import_react12.default.createElement(TextArea, { value: sound.description, placeholder: "听起来什么样、什么时候用。例如：木门被轻轻敲了两下，礼貌、迟疑", onCommit: (v) => save({ description: v }) }))));
+  } }, "删除")), !open && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note fg-libsound-tags" }, sound.kind === "blip" ? `打字音 · ${VOICE_GENDER[sound.gender || ""]}` : (sound.tags || []).join("、") || "（没有标签）", sound.use ? ` · 推荐用途：${(USE_OPTIONS.find(([v]) => v === sound.use) || [])[1] || sound.use}` : "", sound.description ? " · " + sound.description : ""), open && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: sound.kind, onChange: (e) => save({ kind: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "sfx" }, "音效（响一次）"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "ambience" }, "环境音（循环）"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "blip" }, "打字音（一个字一下）")), sound.kind === "blip" && /* @__PURE__ */ import_react12.default.createElement(Select, { value: sound.gender || "", options: [["", "不分男女"], ["female", "女声"], ["male", "男声"]], style: INLINE, onChange: (v) => save({ gender: v }) }), /* @__PURE__ */ import_react12.default.createElement(Text, { value: sound.category, placeholder: "分类，两层用 / 隔开：门窗/敲门", style: { flex: 1, width: "auto" }, onCommit: (v) => save({ category: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "音量"), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: VOLUME_DB[0], max: VOLUME_DB[1], step: "any", value: volumeDb(sound.volume ?? 1), onChange: (e) => save({ volume: dbVolume(Number(e.target.value)) }), style: { width: "8cqw" } }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, volumeText(sound.volume ?? 1))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "推荐用途"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: sound.use || "", options: USE_OPTIONS, style: INLINE, onChange: (v) => save({ use: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "「声音」页一键套用时用")), sound.kind !== "blip" && /* @__PURE__ */ import_react12.default.createElement(Text, { value: (sound.tags || []).join("、"), placeholder: "标签：正文里会出现的词，用顿号隔开。导演按它们挑候选，例如：敲门、咚咚、门", style: { width: "100%" }, onCommit: (v) => save({ tags: v }) }), /* @__PURE__ */ import_react12.default.createElement(TextArea, { value: sound.description, placeholder: "听起来什么样、什么时候用。例如：木门被轻轻敲了两下，礼貌、迟疑", onCommit: (v) => save({ description: v }) }))));
 }
 function ErosField({ cfg, p: p4 }) {
   const [open, setOpen] = import_react12.default.useState(false);
@@ -12636,7 +12661,7 @@ function SoundLibSection({ data, kind = "sfx" }) {
       stopPreview();
       return;
     }
-    previewTrack({ id: s.id, url: assetUrl(s.assetId), volume: Math.min(1, 0.7 * (s.volume ?? 1)) }, () => setPlaying((id) => id === s.id ? "" : id));
+    previewTrack({ id: s.id, url: assetUrl(s.assetId), volume: 0.7 * (s.volume ?? 1) }, () => setPlaying((id) => id === s.id ? "" : id));
     setPlaying(s.id);
   };
   const importFiles = async (list3) => {

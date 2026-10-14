@@ -24,8 +24,8 @@ test('gate: 音效库：导入带上描述，没描述时名字取文件名、�
     await assert.rejects(lib.add(Buffer.from('not audio at all'), 'x.ogg'), /认不出/)
     const plain = await lib.add(OGG, '门窗/敲门 木门 01.ogg')
     assert.deepEqual([plain.name, plain.kind, plain.category, plain.volume], ['敲门 木门 01', 'sfx', '门窗', 1])
-    const rain = await lib.add(OGG2, '环境音/天气/小雨.ogg', { name: '小雨（打在窗上）', kind: 'ambience', category: ' 天气 / 雨 / 多余的一层', tags: '雨，下雨、窗', volume: 5, description: '细雨\u0007敲窗' })
-    assert.deepEqual([rain.kind, rain.category, rain.tags, rain.volume, rain.description], ['ambience', '天气/雨', ['雨', '下雨', '窗'], 2, '细雨敲窗'])
+    const rain = await lib.add(OGG2, '环境音/天气/小雨.ogg', { name: '小雨（打在窗上）', kind: 'ambience', category: ' 天气 / 雨 / 多余的一层', tags: '雨，下雨、窗', volume: 40, description: '细雨\u0007敲窗' })
+    assert.deepEqual([rain.kind, rain.category, rain.tags, rain.volume, rain.description], ['ambience', '天气/雨', ['雨', '下雨', '窗'], 16, '细雨敲窗'])
     // 同路径同大小：不重复存，按新描述更新
     const again = await lib.add(OGG2, '环境音/天气/小雨.ogg', { tags: ['雨', '雨夜'] })
     assert.equal(again.id, rain.id)

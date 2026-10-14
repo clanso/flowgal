@@ -25,7 +25,7 @@ import { EROS_SFX, EROS_PACES, EROS_LABEL, TENTACLE, TENTACLE_LABEL, PEAKS, PEAK
 import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, castVoices, libraryBlips, voiceLabel, isLibRef, libRef, libIdOf, LIBRARY_VOICES, libraryPreset, builtinPreset } from '../../../lib/sounds.js'
 import { cleanPack, packFiles } from '../../../lib/aa-sprite.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
-import { SOUND_SIDECAR, readSoundSidecar, soundMatcher, writeSoundSidecar } from '../../../lib/soundlib-sidecar.js'
+import { SOUND_SIDECAR, MAX_SOUND_VOLUME, readSoundSidecar, soundMatcher, writeSoundSidecar } from '../../../lib/soundlib-sidecar.js'
 import { modelKey, qualityFor, negativeFor, sizeFor, MAX_STYLES } from '../../../lib/image/style.js'
 import { naiModelInfo } from '../../../lib/image/nai-models.js'
 import { naiReferenceOk } from '../../../lib/image/novelai.js'
@@ -2491,6 +2491,11 @@ const KIND_LABEL = { ambience: '环境音', blip: '打字音', sfx: '音效' }
 /** 推荐用途：「声音」页一键套用时，标了哪个槽就放进哪个槽，标了旁白的打字音给旁白。 */
 const USE_OPTIONS = [['', '没有'], ...SOUND_SLOTS.map(s => [s.id, `${s.group === 'ui' ? '界面音' : '落字音效'} · ${s.label}`]), ['narration', '旁白的打字音']]
 const LIB_SHOWN = 200 // 搜索结果、一个分组里最多列出多少个
+// 单个声音的音量按分贝拖（-30 dB 到 +24 dB，最左是静音）：能放大到 16 倍，按倍数拖的话 1 倍以下挤在最左边一小段。
+const VOLUME_DB = [-30, 20 * Math.log10(MAX_SOUND_VOLUME)]
+const volumeDb = v => (v > 0 ? Math.min(VOLUME_DB[1], Math.max(VOLUME_DB[0], 20 * Math.log10(v))) : VOLUME_DB[0])
+const dbVolume = db => (db <= VOLUME_DB[0] ? 0 : Math.min(MAX_SOUND_VOLUME, Math.round(10 ** (db / 20) * 100) / 100))
+const volumeText = v => (v > 0 ? `${Number(v.toFixed(2))} 倍` : '静音')
 
 /** 音效库里的一个声音：试听、改名字 / 种类 / 分类 / 音量 / 标签 / 描述、删除。 */
 function LibSoundCard({ sound, playing, onPlay }) {
@@ -2519,7 +2524,8 @@ function LibSoundCard({ sound, playing, onPlay }) {
               {sound.kind === 'blip' && <Select value={sound.gender || ''} options={[['', '不分男女'], ['female', '女声'], ['male', '男声']]} style={INLINE} onChange={v => save({ gender: v })} />}
               <Text value={sound.category} placeholder="分类，两层用 / 隔开：门窗/敲门" style={{ flex: 1, width: 'auto' }} onCommit={v => save({ category: v })} />
               <span className="fg-note">音量</span>
-              <input type="range" min="0" max="2" step="0.05" value={sound.volume ?? 1} onChange={e => save({ volume: Number(e.target.value) })} style={{ width: '8cqw' }} />
+              <input type="range" min={VOLUME_DB[0]} max={VOLUME_DB[1]} step="any" value={volumeDb(sound.volume ?? 1)} onChange={e => save({ volume: dbVolume(Number(e.target.value)) })} style={{ width: '8cqw' }} />
+              <span className="fg-note">{volumeText(sound.volume ?? 1)}</span>
             </div>
             <div className="fg-row">
               <span className="fg-note">推荐用途</span>
@@ -2614,7 +2620,7 @@ function SoundLibSection({ data, kind = 'sfx' }) {
 
   const play = s => {
     if (playing === s.id) { stopPreview(); return }
-    previewTrack({ id: s.id, url: assetUrl(s.assetId), volume: Math.min(1, 0.7 * (s.volume ?? 1)) }, () => setPlaying(id => (id === s.id ? '' : id)))
+    previewTrack({ id: s.id, url: assetUrl(s.assetId), volume: 0.7 * (s.volume ?? 1) }, () => setPlaying(id => (id === s.id ? '' : id)))
     setPlaying(s.id)
   }
 

@@ -40,32 +40,54 @@ function fade(el, to, ms, done) {
   setTimeout(end, ms + 150)
 }
 
+/**
+ * HTMLAudio 的音量最大是 1；音效库里录得很轻的环境音、试听要放大到 1 倍以上时，再接一级 WebAudio 增益（第一次要放大时才接，
+ * 接上以后这条声音一直走 WebAudio）。素材都是同源地址，接上不会变哑。
+ */
+function boost(el, gain) {
+  if (!(gain > 1) && !el._fgGain) return
+  const ac = audioCtx()
+  if (!ac) return
+  if (!el._fgGain) {
+    try {
+      const g = ac.createGain()
+      ac.createMediaElementSource(el).connect(g).connect(ac.destination)
+      el._fgGain = g
+    } catch { return }
+  }
+  el._fgGain.gain.value = Math.max(1, gain)
+}
+
 /** 配乐留白：停下时淡出得快（字出来之前就静了），回来时慢慢淡回来。 */
 const HUSH_OUT_MS = 600
 const HUSH_BACK_MS = 2600
 
-/** 一条循环播放的声音（配乐、环境音各一条）：换的时候交叉淡入淡出，试听时压到 0；留白时停在原处，回来时接着放。 */
-function loopPlayer() {
+/**
+ * 一条循环播放的声音（配乐、环境音各一条）：换的时候交叉淡入淡出，试听时压到 0；留白时停在原处，回来时接着放。
+ * loud：音量能超过 1（环境音：库里给录得轻的调了好几倍），淡入淡出照旧在 0～1 里走，超出的部分放在增益上。
+ */
+function loopPlayer({ loud = false } = {}) {
   let cur = null // { el, id, volume }
   let hushed = false
   let ducked = 1 // 高潮那一下压低到几成（见 duck）
   let duckTurn = 0
   const halt = el => { el._fgStopped = true; el.pause(); el.src = '' }
-  const audible = volume => (preview || hushed ? 0 : volume * ducked)
+  const audible = volume => (preview || hushed ? 0 : Math.min(1, volume) * ducked)
   return {
     get current() { return cur },
     /** 现在该有的音量：试听、留白时是 0。 */
     get level() { return cur ? audible(cur.volume) : 0 },
     play(item, volume) {
       if (!item) { this.stop(); return }
-      volume = Math.max(0, Math.min(1, volume))
-      if (cur && cur.id === item.id) { cur.volume = volume; cur.el.volume = Math.min(cur.el.volume, audible(volume)); fade(cur.el, audible(volume), 400); return }
+      volume = Math.max(0, loud ? volume : Math.min(1, volume))
+      if (cur && cur.id === item.id) { cur.volume = volume; boost(cur.el, volume); cur.el.volume = Math.min(cur.el.volume, audible(volume)); fade(cur.el, audible(volume), 400); return }
       hushed = false // 换了一首：留白自然结束
       const old = cur
       const el = new Audio()
       el.src = item.url
       el.loop = true
       el.volume = 0
+      boost(el, volume)
       // 曲子加载得慢、开始播放前已经被停掉（关了剧场、换了歌）：别再响起来
       el.play().then(() => { if (el._fgStopped) halt(el); else if (!el._fgFading) fade(el, audible(volume), 1800) }).catch(() => {})
       cur = { el, id: item.id, volume }
@@ -100,7 +122,7 @@ function loopPlayer() {
   }
 }
 const music = loopPlayer()
-const ambience = loopPlayer()
+const ambience = loopPlayer({ loud: true })
 const players = [music, ambience]
 const loops = () => [music.current, ambience.current].filter(Boolean)
 
@@ -123,12 +145,14 @@ export function stopAll() {
   stopEros()
 }
 
-/** 试听一首（设置里的配乐页）：剧场配乐先淡出，试听停了再淡回来。onEnd 在停下时调用（播完、换一首或手动停）。 */
+/** 试听一首（设置里的配乐页、音效库）：剧场配乐先淡出，试听停了再淡回来。onEnd 在停下时调用（播完、换一首或手动停）。volume 能超过 1。 */
 export function previewTrack(track, onEnd) {
   stopPreview()
   if (!track) return
   const el = new Audio(track.url)
-  el.volume = Math.max(0, Math.min(1, track.volume ?? (music.current ? music.current.volume : 0.6)))
+  const volume = track.volume ?? (music.current ? music.current.volume : 0.6)
+  el.volume = Math.max(0, Math.min(1, volume))
+  boost(el, volume)
   preview = { el, id: track.id, onEnd }
   el.onended = () => { if (preview && preview.el === el) stopPreview() }
   for (const loop of loops()) fade(loop.el, 0, 500)
@@ -364,12 +388,18 @@ export function playLibSound(assetId, volume = 1) {
   }).catch(() => {})
 }
 
+/**
+ * 音效库的声音顶替内置配方（打字音、落字音效、界面音）时已经按配方对齐了响度；库里的音量是给剧情音效、环境音拉平响度调的
+ * （录得轻的可能调到好几倍），这里只当微调，最多 2 倍。
+ */
+const slotVolume = lib => Math.min(2, lib.volume ?? 1)
+
 /** 落字音效、界面音：内置配方现场合成；上传的文件、音效库的声音（库里删了的退回默认版本）按默认版本的响度放。 */
 function playSound(sound, volume) {
   const ac = sound && audioCtx()
   if (!ac) return
   const lib = sound.libId ? libSound(sound.libId) : null
-  if (lib) playFile(ac, lib.assetId, volume * (lib.volume ?? 1), sound.parts)
+  if (lib) playFile(ac, lib.assetId, volume * slotVolume(lib), sound.parts)
   else if (sound.assetId) playFile(ac, sound.assetId, volume, sound.parts)
   else playParts(ac, sound.parts, { volume })
 }
@@ -503,7 +533,7 @@ function voiceSource(ac, id) {
   if (!lib) return { parts: CLASSIC }
   const sample = loadSample(ac, lib.assetId)
   recipeLevel(CLASSIC)
-  return sample ? { sample, gain: (lib.volume ?? 1) * matchGain(CLASSIC, sample) } : null
+  return sample ? { sample, gain: slotVolume(lib) * matchGain(CLASSIC, sample) } : null
 }
 /** 响一下：配方合成，或者放采样（变速当移调）。memory 时配方的起音软下来、尾巴拖长（采样照原样，只靠效果链闷住）。 */
 function emit(ac, source, { rate = 1, volume = 1, at = ac.currentTime, out = ac.destination, memory = false } = {}) {
