@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FONT_PACKS, FONT_GROUPS, sniffFont, cleanFontChoice, cleanCustomFonts, fontFamilyOf, fontPackOf, fileFamily, DIALOG_LIMITS, skinDialogHeight } from '../lib/fonts.js'
 import { resolveConfig, applyPatch, DEFAULT_CONFIG } from '../lib/config.js'
+import { CORNER_ITEMS, CORNER_DEFAULTS, cleanCorner } from '../lib/corner.js'
 import { createStore } from '../lib/dsh/store.js'
 import { createEngine } from '../lib/engine.js'
 
@@ -76,12 +77,24 @@ test('设置：默认都跟皮肤；字号、高度放在范围里，填坏了�
   assert.equal('customFonts' in (applyPatch({}, { ui: { customFonts: [{ assetId: ID }], textScale: 2 } }).ui), false)
 })
 
-test('调试信息（情绪小字、左上角、右上角）默认不显示；只有真的打开才显示', () => {
-  const keys = ['showEmotion', 'showHud', 'showStatus']
-  assert.deepEqual(keys.map(k => resolveConfig({}).ui[k]), [false, false, false])
-  assert.deepEqual(keys.map(k => resolveConfig({ ui: { showEmotion: true, showHud: true, showStatus: true } }).ui[k]), [true, true, true])
-  assert.deepEqual(keys.map(k => resolveConfig({ ui: { showEmotion: 'yes', showHud: 1, showStatus: null } }).ui[k]), [false, false, false])
-  assert.equal(applyPatch({}, { ui: { showHud: true } }).ui.showHud, true)
+test('调试信息：情绪小字默认不显示；角落每一样单独开关，默认只显示通话中和连接中断', () => {
+  const ui = resolveConfig({}).ui
+  assert.equal(ui.showEmotion, false)
+  assert.deepEqual(ui.corner, CORNER_DEFAULTS)
+  assert.deepEqual(Object.keys(ui.corner).filter(k => ui.corner[k]), ['call', 'error'])
+  assert.equal(resolveConfig({ ui: { showEmotion: true } }).ui.showEmotion, true)
+  assert.equal(resolveConfig({ ui: { showEmotion: 'yes' } }).ui.showEmotion, false)
+  // 改一样不动别的；填坏的、不认得的回默认
+  const saved = applyPatch(applyPatch({}, { ui: { corner: { place: true } } }), { ui: { corner: { error: false, nope: true, time: 'x' } } })
+  const corner = resolveConfig(saved).ui.corner
+  assert.deepEqual([corner.place, corner.error, corner.time, corner.call], [true, false, false, true])
+  assert.equal('nope' in corner, false)
+  // 早先一版的整块开关打开过的，换成那几样都开；后来单独关掉的照关
+  const old = resolveConfig({ ui: { showHud: true, showStatus: true, corner: { mood: false } } }).ui
+  assert.deepEqual(CORNER_ITEMS.filter(i => old.corner[i.id]).map(i => i.id), ['place', 'mode', 'time', 'weather', 'light', 'fx', 'romance', 'sense', 'director', 'drawing', 'track', 'call', 'error'])
+  assert.equal('showHud' in old || 'showStatus' in old, false)
+  assert.deepEqual(cleanCorner(null), CORNER_DEFAULTS)
+  assert.ok(CORNER_ITEMS.every(i => ['left', 'right'].includes(i.side) && i.label))
 })
 
 test('上传自己的字体：认格式、存素材、能选来用；删掉时正用着的回到跟皮肤，文件也删', async () => {
