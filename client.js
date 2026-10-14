@@ -141,6 +141,10 @@ var api = {
   updateTrack: (id, patch) => call("/music", { action: "update", id, patch }),
   removeTrack: (id) => call("/music", { action: "remove", id }),
   clearMusic: () => call("/music", { action: "clear" }),
+  /** 整理界面的批量操作：一批一起改（分类、描述、addTags / removeTags）、一起删、分类改名（子分类跟着走）。 */
+  updateTracks: (ids, patch) => call("/music", { action: "update-many", ids, patch }),
+  removeTracks: (ids) => call("/music", { action: "remove-many", ids }),
+  renameMusicCategory: (from, to) => call("/music", { action: "rename-category", from, to }),
   /** 上传一首配乐：请求体直接是文件字节（最大 50 MB），不走 JSON。 */
   async uploadTrack(file2) {
     return (await uploadFile(`/music/upload?name=${encodeURIComponent(file2.name || "")}`, file2)).track;
@@ -155,6 +159,8 @@ var api = {
   updateLibSound: (id, patch) => call("/soundlib", { action: "update", id, patch }),
   removeLibSounds: (ids) => call("/soundlib", { action: "remove", ids }),
   clearLibSounds: (kind) => call("/soundlib", { action: "clear", kind }),
+  updateLibSounds: (ids, patch) => call("/soundlib", { action: "update-many", ids, patch }),
+  renameLibCategory: (from, to, kinds) => call("/soundlib", { action: "rename-category", from, to, kinds }),
   /** 往音效库导入一个（最大 100 MB）：path 是相对导入文件夹的路径，meta 是描述文件里这一条。 */
   async uploadLibSound(file2, path, meta) {
     const query = `name=${encodeURIComponent(path || file2.name || "")}${meta ? `&meta=${encodeURIComponent(JSON.stringify(meta))}` : ""}`;
@@ -1592,17 +1598,43 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-thumb.is-locked { cursor: default; display: grid; place-items: center; color: var(--ink-dim); font-size: 1cqw; background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .03) 0 1cqw, transparent 1cqw 2cqw); }
 
 .fg-person { display: grid; grid-template-columns: 13cqw 1fr; gap: 2cqw; padding: 1.6cqw; margin-bottom: 1.4cqw; border-radius: 1.2cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }
-.fg-track { display: grid; grid-template-columns: 4.2cqw 1fr; gap: 1.4cqw; padding: 1.2cqw 1.4cqw; margin-bottom: 1cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }
-.fg-track-body { display: grid; gap: .6cqw; min-width: 0; }
-.fg-track-play { width: 4.2cqw; height: 4.2cqw; border-radius: 50%; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink); font-size: 1.3cqw; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s; }
-.fg-track-play:hover { border-color: var(--accent); }
-.fg-track-play.is-on { background: var(--accent); border-color: var(--accent); color: #111; box-shadow: 0 0 1.4cqw color-mix(in oklab, var(--accent) 55%, transparent); }
 .fg-track-desc { min-height: 4.6cqw; font-family: var(--font-body); font-size: 1.05cqw; }
-.fg-libgroup { margin-bottom: .6cqw; }
-.fg-libgroup-head { padding: .5cqw .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }
-.fg-libgroup-head + .fg-track, .fg-libgroup-head + .fg-note { margin-top: .8cqw; }
-.fg-libsound { padding: .8cqw 1.2cqw; margin-bottom: .6cqw; }
-.fg-libsound-tags { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* 曲库、音效库、环境音库的整理界面（LibBrowser）：左边分类树，右边一行一条（点名字展开编辑），勾选后底部浮着一条批量操作。 */
+.fg-lib { display: grid; grid-template-columns: 15cqw minmax(0, 1fr); gap: 1.4cqw; align-items: start; margin-top: 1cqw; }
+.fg-lib-tree { position: sticky; top: .6cqw; display: flex; flex-direction: column; gap: .15cqw; max-height: 44cqw; overflow-y: auto; padding: .6cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); scrollbar-width: thin; }
+.fg-libcat { display: flex; align-items: center; gap: .6cqw; width: 100%; padding: .35cqw .8cqw; border: 0; border-radius: .6cqw; background: none; color: inherit; font: inherit; font-size: 1cqw; text-align: left; cursor: pointer; }
+.fg-libcat span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fg-libcat i { font-style: normal; font-size: .85cqw; opacity: .55; }
+.fg-libcat:hover { background: rgba(255, 255, 255, .06); }
+.fg-libcat.is-sub { padding-left: 2cqw; font-size: .95cqw; }
+.fg-libcat.is-on { background: color-mix(in oklab, var(--accent) 22%, transparent); color: var(--accent); }
+.fg-lib-main { min-width: 0; }
+.fg-lib-tools { margin-bottom: .6cqw; }
+.fg-lib-search { flex: 1; width: auto; min-width: 14cqw; }
+.fg-lib-cathead { padding: .5cqw .9cqw; margin-bottom: .6cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
+.fg-lib-count { gap: .6cqw; padding: .2cqw .9cqw .4cqw; }
+.fg-lib-count label { gap: .5cqw; cursor: pointer; }
+.fg-lib-count input, .fg-librow input[type="checkbox"] { width: 1.2cqw; height: 1.2cqw; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.fg-lib-empty { margin: 1cqw 0; }
+.fg-librow { display: grid; grid-template-columns: auto 2.6cqw minmax(0, 1fr) auto 5cqw; align-items: center; gap: .8cqw; padding: .45cqw .9cqw; border-radius: .7cqw; border: 1px solid transparent; }
+.fg-librow:hover { background: rgba(255, 255, 255, .04); }
+.fg-librow.is-picked { background: color-mix(in oklab, var(--accent) 10%, transparent); border-color: color-mix(in oklab, var(--accent) 35%, transparent); }
+.fg-librow.is-open { background: rgba(255, 255, 255, .06); border-color: var(--box-border); border-radius: .7cqw .7cqw 0 0; }
+.fg-librow-play { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink); font-size: .9cqw; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s; }
+.fg-librow-play:hover { border-color: var(--accent); }
+.fg-librow-play.is-on { background: var(--accent); border-color: var(--accent); color: #111; box-shadow: 0 0 1.2cqw color-mix(in oklab, var(--accent) 55%, transparent); }
+.fg-librow-main { display: grid; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.fg-librow-main b, .fg-librow-main span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fg-librow-main b { font-size: 1.05cqw; font-weight: 600; }
+.fg-librow-main span { font-size: .85cqw; color: var(--ink-dim); }
+.fg-librow-main:hover b { color: var(--accent); }
+.fg-libchip { max-width: 14cqw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: .15cqw .8cqw; border-radius: 99px; border: 1px solid color-mix(in oklab, var(--accent2) 50%, transparent); background: color-mix(in oklab, var(--accent2) 14%, transparent); color: inherit; font: inherit; font-size: .85cqw; cursor: pointer; }
+.fg-libchip.is-none { border-style: dashed; border-color: var(--box-border); background: none; opacity: .6; }
+.fg-librow-size { font-size: .85cqw; color: var(--ink-dim); text-align: right; }
+.fg-libedit { display: grid; gap: .6cqw; padding: .8cqw 1.2cqw 1cqw; margin-bottom: .6cqw; border: 1px solid var(--box-border); border-top: 0; border-radius: 0 0 .8cqw .8cqw; background: rgba(255, 255, 255, .06); }
+.fg-lib-more { margin: .8cqw 0; }
+.fg-lib-bar { position: sticky; bottom: 0; z-index: 3; display: grid; gap: .5cqw; margin-top: 1cqw; padding: .9cqw 1.2cqw; border-radius: 1cqw; background: rgb(20, 14, 40); border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent); box-shadow: 0 -.6cqw 1.4cqw rgba(0, 0, 0, .45); }
+.fg-lib-bar .fg-row { flex-wrap: nowrap; }
 /* 声音页：一键套用音效库里标了用途的声音；给落字音效 / 界面音从音效库挑一个 */
 .fg-libpreset { display: flex; flex-wrap: wrap; align-items: center; gap: .6cqw; padding: .8cqw 1.2cqw; margin-bottom: 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
 .fg-libpicker { margin-top: .6cqw; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }
@@ -2068,9 +2100,24 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-face-editor .fg-aa-frame { height: 80cqw; }
   .fg-aa-frame, .fg-aa-play { height: 90cqw; } .fg-aa-play.is-close { width: 90cqw; }
   .fg-aa-item img { width: 9cqw; height: 11cqw; } .fg-aa-item { grid-template-columns: auto 9cqw 1fr; }
-  .fg-track { grid-template-columns: 9cqw 1fr; gap: 2cqw; padding: 2cqw; }
-  .fg-track-play { width: 9cqw; height: 9cqw; font-size: 3cqw; }
   .fg-track-desc { min-height: 12cqw; font-size: 3cqw; }
+  .fg-lib { grid-template-columns: 1fr; }
+  .fg-lib-tree { position: static; flex-direction: row; flex-wrap: wrap; gap: 1cqw; max-height: 40cqw; padding: 1.2cqw; border-radius: 2cqw; }
+  .fg-libcat { width: auto; max-width: 100%; gap: 1cqw; padding: .8cqw 1.8cqw; border: 1px solid var(--box-border); border-radius: 99px; font-size: 2.6cqw; }
+  .fg-libcat.is-sub { padding-left: 1.8cqw; font-size: 2.4cqw; border-style: dashed; }
+  .fg-libcat i { font-size: 2.2cqw; }
+  .fg-lib-search { flex-basis: 100%; }
+  .fg-lib-cathead, .fg-lib-count { padding: 1cqw 1.6cqw; border-radius: 1.6cqw; }
+  .fg-lib-count input, .fg-librow input[type="checkbox"] { width: 3.6cqw; height: 3.6cqw; }
+  .fg-librow { grid-template-columns: auto 7cqw minmax(0, 1fr) auto; gap: 1.6cqw; padding: 1.2cqw 1.6cqw; border-radius: 1.6cqw; }
+  .fg-librow.is-open { border-radius: 1.6cqw 1.6cqw 0 0; }
+  .fg-librow-size { display: none; }
+  .fg-librow-play { width: 7cqw; height: 7cqw; font-size: 2.4cqw; }
+  .fg-librow-main b { font-size: 3cqw; } .fg-librow-main span { font-size: 2.4cqw; }
+  .fg-libchip { max-width: 22cqw; padding: .4cqw 1.4cqw; font-size: 2.4cqw; }
+  .fg-libedit { gap: 1.2cqw; padding: 1.6cqw 2cqw; border-radius: 0 0 1.6cqw 1.6cqw; }
+  .fg-lib-bar { gap: 1.2cqw; padding: 1.6cqw 2cqw; border-radius: 2cqw; }
+  .fg-lib-bar .fg-row { flex-wrap: wrap; }
 }
 
 /* 亲密场面（lib/eros.js、Eros.jsx）：潮红 .fg-eros（scene.eros，节奏越快越深，余韵时转成一层暖雾）、触手的影子 .fg-tentacle（scene.tentacle）、
@@ -2148,6 +2195,7 @@ var skins_default = `/* ───────────── 皮肤 ───
 .fg-theater[data-skin="sakura"] .fg-box::before { height: .5cqw; background: repeating-linear-gradient(90deg, #ffc2da 0 1.2cqw, #fff 1.2cqw 2.4cqw); opacity: .8; animation: none; }
 .fg-theater[data-skin="sakura"] .fg-hud-place, .fg-theater[data-skin="sakura"] .fg-hud-meta { color: #fff; }
 .fg-theater[data-skin="sakura"] .fg-panel { background: linear-gradient(135deg, rgba(255, 246, 250, .96), rgba(245, 236, 255, .95)); color: var(--ink); }
+.fg-theater[data-skin="sakura"] .fg-lib-bar { background: rgb(252, 242, 250); box-shadow: 0 -.6cqw 1.4cqw rgba(120, 60, 100, .18); }
 .fg-theater[data-skin="sakura"] .fg-emo-sticky { background: rgb(252, 242, 250); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(120, 60, 100, .18); }
 .fg-theater[data-skin="sakura"] .fg-pm-table thead th { background: rgb(250, 236, 246); } .fg-theater[data-skin="sakura"] .fg-pm-emo { background: rgb(252, 242, 250); } .fg-theater[data-skin="sakura"] .fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 12%, rgb(252, 242, 250)); }
 .fg-theater[data-skin="sakura"] .fg-input, .fg-theater[data-skin="sakura"] .fg-select, .fg-theater[data-skin="sakura"] .fg-textarea { background: rgba(255, 255, 255, .7); }
@@ -2179,6 +2227,7 @@ var skins_default = `/* ───────────── 皮肤 ───
 .fg-theater[data-skin="ink"] .fg-hud-place, .fg-theater[data-skin="ink"] .fg-hud-meta { color: #f6efde; }
 .fg-theater[data-skin="ink"] .fg-hud-bar { background: #b3261e; box-shadow: none; }
 .fg-theater[data-skin="ink"] .fg-panel { background: linear-gradient(135deg, rgba(242, 234, 214, .97), rgba(232, 220, 196, .97)); color: var(--ink); }
+.fg-theater[data-skin="ink"] .fg-lib-bar { background: rgb(238, 229, 207); box-shadow: 0 -.6cqw 1.4cqw rgba(60, 40, 20, .2); }
 .fg-theater[data-skin="ink"] .fg-emo-sticky { background: rgb(238, 229, 207); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(60, 40, 20, .2); }
 .fg-theater[data-skin="ink"] .fg-pm-table thead th { background: rgb(232, 221, 196); } .fg-theater[data-skin="ink"] .fg-pm-emo { background: rgb(238, 229, 207); } .fg-theater[data-skin="ink"] .fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 12%, rgb(238, 229, 207)); }
 .fg-theater[data-skin="ink"] .fg-input, .fg-theater[data-skin="ink"] .fg-select, .fg-theater[data-skin="ink"] .fg-textarea { background: rgba(255, 252, 244, .7); }
@@ -3632,8 +3681,25 @@ function findLookTurn(timeline, key) {
 
 // lib/sounds.js
 var p = (wave, f, dur, gain, more = {}) => ({ wave, f, dur, gain, ...more });
+var aaBlip = (f1, f2, f3, lp) => [
+  p("square", f1, 0.0165, 72e-4, { attack: 8e-4, hold: 0.0142, lp }),
+  p("square", f2, 0.0165, 72e-4, { at: 0.0163, attack: 5e-4, hold: 0.0145, lp: 6e3 }),
+  p("square", f3, 0.0175, 72e-4, { at: 0.0326, attack: 5e-4, hold: 0.015, lp: 6e3 })
+];
+var aaClick = (at2, g, hold, fall) => [
+  p("noise", 1300, hold + fall, g * 1.3, { at: at2, q: 2, hold }),
+  p("noise", 2300, hold + fall * 0.9, g * 0.9, { at: at2, q: 3, hold }),
+  p("noise", 3800, hold + fall * 0.7, g * 0.6, { at: at2, q: 1.2, hold: hold * 0.7 }),
+  p("noise", 5600, hold + fall * 0.6, g * 0.55, { at: at2, q: 1.2, hold: hold * 0.6 }),
+  p("noise", 1700, 0.16, g * 0.3, { at: at2 + hold, q: 2.5, attack: 4e-3 })
+];
 var VOICES2 = Object.freeze([
   { id: "classic", label: "经典哔哔", desc: "逆转裁判式的三角波哔哔声", gender: "", parts: [p("triangle", 420, 0.05, 0.045, { attack: 4e-3 })] },
+  // 照逆转裁判（DS）的打字音量出来的：一声是一帧一个音的三连音，男声是同一串音整体低一点；打字机是「咔、嗒」两下。
+  // fixed：照原样放，自动分配时不按名字错开音高（逆转裁判里同性别的人都是同一个声音），当旁白也不压低。
+  { id: "aa-female", label: "逆转女声", desc: "照逆转裁判女性角色的哔哔声合成：方波三连音，又高又脆", gender: "female", fixed: true, parts: aaBlip(923, 3640, 2980, 1900) },
+  { id: "aa-male", label: "逆转男声", desc: "照逆转裁判男性角色的哔哔声合成：同一串音低一点", gender: "male", fixed: true, parts: aaBlip(780, 3120, 2521, 1600) },
+  { id: "aa-typewriter", label: "逆转打字机", desc: "照逆转裁判开场打日期、地点的打字机声合成：咔、嗒两下，适合旁白", gender: "", fixed: true, parts: [...aaClick(0, 0.05, 8e-3, 0.06), ...aaClick(0.045, 0.045, 5e-3, 0.03)] },
   { id: "bell", label: "清亮铃音", desc: "干净透亮，带一点泛音", gender: "female", parts: [p("sine", 660, 0.07, 0.05, { attack: 3e-3 }), p("sine", 1320, 0.04, 0.015, { attack: 3e-3 })] },
   { id: "chirp", label: "少女啾啾", desc: "每个字往上一挑，活泼", gender: "female", parts: [p("triangle", 520, 0.05, 0.045, { to: 640, attack: 4e-3 })] },
   { id: "soft", label: "温柔气声", desc: "软一点、带气息", gender: "female", parts: [p("sine", 480, 0.07, 0.04, { attack: 0.012 }), p("noise", 2400, 0.05, 0.025, { q: 1.5, attack: 0.01 })] },
@@ -3660,6 +3726,9 @@ var libRef = (id) => "lib:" + id;
 var libIdOf = (value) => isLibRef(value) ? String(value).slice(4) : "";
 var isVoice = (id) => VOICE_IDS.has(id) || isLibRef(id);
 var LIBRARY_VOICES = "library";
+var AA_VOICES = "aa";
+var AA_POOLS = { female: ["aa-female"], male: ["aa-male"], other: ["aa-female", "aa-male"], "": ["aa-female", "aa-male"] };
+var isFixedVoice = (id) => isLibRef(id) || Boolean(voiceById(id)?.fixed);
 var libraryBlips = (sounds2) => (sounds2 || []).filter((s) => s && s.kind === "blip" && s.id);
 function voiceLabel(id, blips) {
   if (isLibRef(id)) {
@@ -3825,12 +3894,13 @@ function poolOf(person, ui2, blips) {
   if (ui2?.voiceDefault === LIBRARY_VOICES) {
     const pool = libraryPool(libraryBlips(blips), person?.gender);
     if (pool.length) return pool;
-  } else if (isVoice(ui2?.voiceDefault)) return [ui2.voiceDefault];
+  } else if (ui2?.voiceDefault === AA_VOICES) return AA_POOLS[person?.gender] || AA_POOLS[""];
+  else if (isVoice(ui2?.voiceDefault)) return [ui2.voiceDefault];
   return VOICE_POOLS[person?.gender] || VOICE_POOLS[""];
 }
 function autoVoice(id, name2, pitch) {
   const h = nameHash(name2);
-  const spread = id === "classic" ? 12 * Math.log2((420 + h % 7 * 38) / 420) : isLibRef(id) ? 0 : (h >>> 8) % 5 - 2;
+  const spread = id === "classic" ? 12 * Math.log2((420 + h % 7 * 38) / 420) : isFixedVoice(id) ? 0 : (h >>> 8) % 5 - 2;
   return { id, pitch: pitch + spread, auto: true };
 }
 function resolveVoice(person, name2, ui2, blips) {
@@ -3893,6 +3963,18 @@ function builtinPreset(ui2) {
     patch.narrationPitch = -6;
   }
   return Object.keys(patch).length ? patch : null;
+}
+function aaPreset(ui2) {
+  const patch = {};
+  if (ui2?.voiceDefault !== AA_VOICES) patch.voiceDefault = AA_VOICES;
+  if (ui2?.narrationVoice !== "aa-typewriter" || ui2?.narrationPitch !== 0) Object.assign(patch, { narrationVoice: "aa-typewriter", narrationPitch: 0 });
+  return Object.keys(patch).length ? patch : null;
+}
+function narrationPatch(ui2, voice) {
+  const patch = { narrationVoice: voice };
+  if (isFixedVoice(voice)) patch.narrationPitch = 0;
+  else if (voice !== "off" && isFixedVoice(ui2?.narrationVoice) && !ui2?.narrationPitch) patch.narrationPitch = -6;
+  return patch;
 }
 
 // lib/stature.js
@@ -10901,7 +10983,7 @@ function readSidecar(text) {
   const out = /* @__PURE__ */ new Map();
   for (const t of data.tracks) {
     if (!t || typeof t.file !== "string" || !t.file) continue;
-    out.set(t.file, { name: t.name, description: t.description, tags: t.tags });
+    out.set(t.file, { name: t.name, description: t.description, tags: t.tags, ...t.category !== void 0 ? { category: t.category } : {} });
   }
   return out;
 }
@@ -10910,7 +10992,7 @@ function writeSidecar(tracks, note = "") {
     format: FORMAT,
     version: 1,
     ...note ? { note } : {},
-    tracks: (tracks || []).filter((t) => t.file).map((t) => ({ file: t.file, name: t.name, description: t.description || "", tags: t.tags || [] }))
+    tracks: (tracks || []).filter((t) => t.file).map((t) => ({ file: t.file, name: t.name, ...t.category ? { category: t.category } : {}, description: t.description || "", tags: t.tags || [] }))
   }, null, 2) + "\n";
 }
 
@@ -11980,7 +12062,7 @@ function Field({ label, hint, children }) {
 function Toggle({ value, onChange, disabled = false }) {
   return /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: `fg-switch${value ? " is-on" : ""}`, "aria-pressed": Boolean(value), disabled, onClick: () => onChange(!value) });
 }
-function Text({ value, onCommit, type = "text", placeholder, style }) {
+function Text({ value, onCommit, type = "text", placeholder, style, list: list3 }) {
   const [v, setV] = import_react12.default.useState(value ?? "");
   import_react12.default.useEffect(() => {
     setV(value ?? "");
@@ -11988,7 +12070,7 @@ function Text({ value, onCommit, type = "text", placeholder, style }) {
   const commit = () => {
     if (String(v) !== String(value ?? "")) onCommit(type === "number" ? Number(v) : v);
   };
-  return /* @__PURE__ */ import_react12.default.createElement("input", { className: "fg-input", type, value: v, placeholder, style, onChange: (e) => setV(e.target.value), onBlur: commit, onKeyDown: (e) => {
+  return /* @__PURE__ */ import_react12.default.createElement("input", { className: "fg-input", type, value: v, placeholder, style, list: list3, onChange: (e) => setV(e.target.value), onBlur: commit, onKeyDown: (e) => {
     e.stopPropagation();
     if (e.key === "Enter") commit();
   } });
@@ -12516,19 +12598,23 @@ function SoundSection({ data }) {
   const narration = ui2.narrationVoice === "off" ? null : { id: ui2.narrationVoice, pitch: ui2.narrationPitch };
   const preset2 = libraryPreset(library);
   const builtin = builtinPreset(ui2);
+  const aa = aaPreset(ui2);
   const usable = library.filter((s) => s.use).length;
   const choose = (slot, value) => {
     p4({ sounds: { [slot]: value } });
     previewSound(slot, value, ui2);
   };
-  const defaultOptions = [["auto", "自动（按性别分）"], ...blips.length || ui2.voiceDefault === LIBRARY_VOICES ? [[LIBRARY_VOICES, "音效库里的打字音（按性别分）"]] : [], ...VOICES2.map((v) => [v.id, `都用「${v.label}」`]), { group: "都用音效库里的", options: blipOptions(blips, ui2.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }];
-  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, (preset2 || builtin) && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note fg-libpreset" }, usable > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, "音效库里有 ", usable, " 个标了用途的声音（比如逆转裁判音效包里的男声 / 女声哔哔、打字机、拍桌子、法槌）。"), preset2 && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-primary", onClick: () => {
+  const defaultOptions = [["auto", "自动（按性别分）"], [AA_VOICES, "逆转式（女性都用逆转女声、男性都用逆转男声）"], ...blips.length || ui2.voiceDefault === LIBRARY_VOICES ? [[LIBRARY_VOICES, "音效库里的打字音（按性别分）"]] : [], ...VOICES2.map((v) => [v.id, `都用「${v.label}」`]), { group: "都用音效库里的", options: blipOptions(blips, ui2.voiceDefault).map(([v, l]) => [v, `都用「${l}」`]) }];
+  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, (aa || preset2 || builtin) && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note fg-libpreset" }, aa && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, "逆转裁判那样的打字音：内置的逆转男声 / 女声 / 打字机，不用导入。"), aa && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-primary", onClick: () => {
+    p4(aa);
+    toast("已换成逆转式：男女各一个声音，旁白用逆转打字机");
+  } }, "套用逆转式"), usable > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, "音效库里有 ", usable, " 个标了用途的声音（比如逆转裁判音效包里的男声 / 女声哔哔、打字机、拍桌子、法槌）。"), preset2 && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-primary", onClick: () => {
     p4(preset2);
     toast("已套用音效库里的声音");
   } }, "一键套用"), builtin && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
     p4(builtin);
     toast("已换回内置的声音");
-  } }, "换回内置")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。" }, /* @__PURE__ */ import_react12.default.createElement(Select, { value: ui2.voiceDefault, options: defaultOptions, onChange: (v) => p4({ voiceDefault: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), { group: "音效库里的打字音", options: blipOptions(blips, ui2.narrationVoice) }, ["off", "不出声"]], style: INLINE, onChange: (v) => p4({ narrationVoice: v }) }), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length + blips.length, " 个（点一下试听）"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.map((v) => /* @__PURE__ */ import_react12.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react12.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react12.default.createElement("span", null, VOICE_GENDER[v.gender], " · ", v.desc))), blips.map((b) => /* @__PURE__ */ import_react12.default.createElement("button", { key: b.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: libRef(b.id), pitch: 0 }, ui2) }, /* @__PURE__ */ import_react12.default.createElement("b", null, "▶ ", b.name), /* @__PURE__ */ import_react12.default.createElement("span", null, "音效库 · ", VOICE_GENDER[b.gender || ""], b.use === "narration" ? " · 旁白用" : "", b.description ? " · " + b.description : "")))), !blips.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "想用逆转裁判那样的哔哔声：把打字音导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, { key: group }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）；也可以从音效库里挑一个。自己的文件和音效库的声音都按默认版本的响度放。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
+  } }, "换回内置")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。" }, /* @__PURE__ */ import_react12.default.createElement(Select, { value: ui2.voiceDefault, options: defaultOptions, onChange: (v) => p4({ voiceDefault: v }) })), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), { group: "音效库里的打字音", options: blipOptions(blips, ui2.narrationVoice) }, ["off", "不出声"]], style: INLINE, onChange: (v) => p4(narrationPatch(ui2, v)) }), /* @__PURE__ */ import_react12.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length + blips.length, " 个（点一下试听）"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.map((v) => /* @__PURE__ */ import_react12.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react12.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react12.default.createElement("span", null, VOICE_GENDER[v.gender], " · ", v.desc))), blips.map((b) => /* @__PURE__ */ import_react12.default.createElement("button", { key: b.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: libRef(b.id), pitch: 0 }, ui2) }, /* @__PURE__ */ import_react12.default.createElement("b", null, "▶ ", b.name), /* @__PURE__ */ import_react12.default.createElement("span", null, "音效库 · ", VOICE_GENDER[b.gender || ""], b.use === "narration" ? " · 旁白用" : "", b.description ? " · " + b.description : "")))), !blips.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "逆转女声、逆转男声、逆转打字机是照逆转裁判的声音合成的，不用导入。想用原版录音：把逆转裁判音效包（或别的打字音）导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, { key: group }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）；也可以从音效库里挑一个。自己的文件和音效库的声音都按默认版本的响度放。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
     const mine = ui2.customSounds[slot.id];
     const current = ui2.sounds[slot.id];
     const suggested = library.filter((s) => s.use === slot.id);
@@ -12554,19 +12640,21 @@ function LibPicker({ sounds: sounds2, slot, current, ui: ui2, onPick }) {
   return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-libpicker" }, /* @__PURE__ */ import_react12.default.createElement("input", { className: "fg-input", style: { width: "100%" }, value: query, autoFocus: true, placeholder: "搜名字、分类、标签、描述（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-libpicker-list" }, found.slice(0, PICKER_SHOWN).map((s) => /* @__PURE__ */ import_react12.default.createElement("div", { key: s.id, className: `fg-row fg-libpicker-item${current === libRef(s.id) ? " is-on" : ""}` }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", title: "试听", onClick: () => previewSound(slot, libRef(s.id), ui2) }, "▶"), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-libpicker-name" }, s.name, /* @__PURE__ */ import_react12.default.createElement("small", null, s.category, s.use === slot ? " · 推荐" : "")), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: current === libRef(s.id), onClick: () => onPick(libRef(s.id)) }, current === libRef(s.id) ? "正在用" : "用这个"))), !found.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "没找到。"), found.length > PICKER_SHOWN && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "还有 ", found.length - PICKER_SHOWN, " 个，多打几个字缩小范围。")));
 }
 var sizeMB = (bytes) => (bytes / 1048576).toFixed(1) + " MB";
-function TrackCard({ track, playing, onPlay }) {
+var MUSIC_LIST = "fg-music-cats";
+function TrackEditor({ track }) {
   const [busy, run] = useBusy3();
   const save = (patch) => run("s", async () => {
     await api.updateTrack(track.id, patch);
     await loadMusic();
   });
-  return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-track" }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: `fg-track-play${playing ? " is-on" : ""}`, title: playing ? "停止试听" : "试听", onClick: onPlay }, playing ? "■" : "▶"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-track-body" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Text, { value: track.name, style: { flex: 1, width: "auto", fontWeight: 600 }, onCommit: (v) => save({ name: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note", title: track.file }, sizeMB(track.bytes)), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "d", onClick: () => {
+  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Text, { value: track.name, style: { flex: 2, width: "auto", fontWeight: 600 }, onCommit: (v) => save({ name: v }) }), /* @__PURE__ */ import_react12.default.createElement(Text, { value: track.category, list: MUSIC_LIST, placeholder: "分类，两层用 / 隔开：日常/校园", style: { flex: 1, width: "auto" }, onCommit: (v) => save({ category: v }) }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "d", onClick: () => {
     if (window.confirm(`从曲库删除「${track.name}」？电脑上的原文件不受影响。`)) run("d", async () => {
       await api.removeTrack(track.id);
       await loadMusic();
     }, "已删除");
-  } }, "删除")), /* @__PURE__ */ import_react12.default.createElement(TextArea, { value: track.description, placeholder: "听起来什么样、适合什么场面。例如：慢板萨克斯和雨声，深夜独处、心事重重，也适合告白前的沉默", onCommit: (v) => save({ description: v }) }), /* @__PURE__ */ import_react12.default.createElement(Text, { value: (track.tags || []).join("、"), placeholder: "标签，用顿号或逗号隔开：深夜、城市、雨、怀旧", style: { width: "100%" }, onCommit: (v) => save({ tags: v }) })));
+  } }, "删除")), /* @__PURE__ */ import_react12.default.createElement(TextArea, { value: track.description, placeholder: "听起来什么样、适合什么场面。例如：慢板萨克斯和雨声，深夜独处、心事重重，也适合告白前的沉默", onCommit: (v) => save({ description: v }) }), /* @__PURE__ */ import_react12.default.createElement(Text, { value: (track.tags || []).join("、"), placeholder: "标签，用顿号或逗号隔开：深夜、城市、雨、怀旧", style: { width: "100%" }, onCommit: (v) => save({ tags: v }) }), track.file && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "文件：", track.file));
 }
+var trackSummary = (t) => [(t.tags || []).join("、"), t.description].filter(Boolean).join(" · ") || "（还没有描述和标签）";
 function TextArea({ value, onCommit, placeholder }) {
   const [v, setV] = import_react12.default.useState(value ?? "");
   import_react12.default.useEffect(() => {
@@ -12575,6 +12663,151 @@ function TextArea({ value, onCommit, placeholder }) {
   return /* @__PURE__ */ import_react12.default.createElement("textarea", { className: "fg-textarea fg-track-desc", value: v, placeholder, onChange: (e) => setV(e.target.value), onBlur: () => {
     if (v !== (value ?? "")) onCommit(v);
   }, onKeyDown: (e) => e.stopPropagation() });
+}
+var folderCategory = (file2) => String(file2.webkitRelativePath || "").split("/").slice(1, -1).slice(0, 2).join("/");
+var NO_CAT = "\0未分类";
+var LIB_PAGE_SIZE = 200;
+var catOf = (item) => item.category && item.category !== "未分类" ? item.category : "";
+var underCat = (item, cat) => {
+  const c = catOf(item);
+  return cat === NO_CAT ? !c : !cat || c === cat || c.startsWith(cat + "/");
+};
+var fmtBytes = (bytes) => bytes >= 1073741824 ? (bytes / 1073741824).toFixed(1) + " GB" : sizeMB(bytes);
+var rowSize = (bytes) => bytes >= 1048576 ? sizeMB(bytes) : Math.max(1, Math.round(bytes / 1024)) + " KB";
+var byZh = (a, b) => String(a).localeCompare(String(b), "zh-CN", { numeric: true });
+var LIB_SORTS = [["name", "按名字"], ["new", "最近导入的在前"], ["size", "文件大的在前"]];
+var LIB_FILTERS = [["all", "全部"], ["notag", "没标签的"], ["nodesc", "没描述的"]];
+var splitTags2 = (text) => String(text || "").split(/[,，、\s]+/).filter(Boolean);
+function LibBrowser({ items, unit = "个", kinds = null, playing, onPlay, editor, summary, ops, extras = null, listId }) {
+  const [cat, setCat] = import_react12.default.useState("");
+  const [query, setQuery] = import_react12.default.useState("");
+  const [filter2, setFilter] = import_react12.default.useState("all");
+  const [kind, setKind] = import_react12.default.useState("");
+  const [sort, setSort] = import_react12.default.useState("name");
+  const [selected, setSelected] = import_react12.default.useState(() => /* @__PURE__ */ new Set());
+  const [open, setOpen] = import_react12.default.useState("");
+  const [limit, setLimit] = import_react12.default.useState(LIB_PAGE_SIZE);
+  const [renaming, setRenaming] = import_react12.default.useState(false);
+  const [moveTo, setMoveTo] = import_react12.default.useState("");
+  const [tagText, setTagText] = import_react12.default.useState("");
+  const [busy, run] = useBusy3();
+  const last = import_react12.default.useRef(-1);
+  const pool = import_react12.default.useMemo(() => kind ? items.filter((it) => (it.kind || "sfx") === kind) : items, [items, kind]);
+  const tree = import_react12.default.useMemo(() => {
+    const tops = /* @__PURE__ */ new Map();
+    let none = 0;
+    for (const it of pool) {
+      const c = catOf(it);
+      if (!c) {
+        none++;
+        continue;
+      }
+      const [top, sub] = c.split("/");
+      if (!tops.has(top)) tops.set(top, { n: 0, subs: /* @__PURE__ */ new Map() });
+      const t = tops.get(top);
+      t.n++;
+      if (sub) t.subs.set(sub, (t.subs.get(sub) || 0) + 1);
+    }
+    return { none, tops: [...tops.entries()].sort((a, b) => byZh(a[0], b[0])).map(([name2, t]) => ({ name: name2, n: t.n, subs: [...t.subs.entries()].sort((a, b) => byZh(a[0], b[0])) })) };
+  }, [pool]);
+  const allCats = import_react12.default.useMemo(() => [...new Set(items.map(catOf).filter(Boolean).flatMap((c) => [c.split("/")[0], c]))].sort(byZh), [items]);
+  const list3 = import_react12.default.useMemo(() => {
+    const words = query.trim().split(/\s+/).filter(Boolean);
+    const out = pool.filter((it) => {
+      if (!underCat(it, cat)) return false;
+      if (filter2 === "notag" && (it.tags || []).length) return false;
+      if (filter2 === "nodesc" && it.description) return false;
+      if (words.length) {
+        const text = `${it.name} ${catOf(it)} ${(it.tags || []).join(" ")} ${it.description || ""} ${it.file || ""}`;
+        if (!words.every((w) => text.includes(w))) return false;
+      }
+      return true;
+    });
+    const cmp = { name: (a, b) => byZh(a.name, b.name), new: (a, b) => (b.addedAt || 0) - (a.addedAt || 0), size: (a, b) => (b.bytes || 0) - (a.bytes || 0) }[sort];
+    return out.sort(cmp);
+  }, [pool, cat, filter2, sort, query]);
+  import_react12.default.useEffect(() => {
+    setLimit(LIB_PAGE_SIZE);
+    last.current = -1;
+  }, [cat, kind, filter2, sort, query]);
+  import_react12.default.useEffect(() => {
+    setRenaming(false);
+  }, [cat]);
+  import_react12.default.useEffect(() => {
+    const have = new Set(items.map((it) => it.id));
+    setSelected((s) => {
+      const n = new Set([...s].filter((id) => have.has(id)));
+      return n.size === s.size ? s : n;
+    });
+    if (cat && !pool.some((it) => underCat(it, cat))) setCat("");
+  }, [items, pool]);
+  const pick = (index, e) => {
+    const id = list3[index].id;
+    const from = e && e.shiftKey && last.current >= 0 && last.current < list3.length ? last.current : -1;
+    setSelected((s) => {
+      const n = new Set(s);
+      const on = !n.has(id);
+      if (from >= 0) {
+        for (let i = Math.min(from, index); i <= Math.max(from, index); i++) on ? n.add(list3[i].id) : n.delete(list3[i].id);
+      } else if (on) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+    last.current = index;
+  };
+  const allPicked = list3.length > 0 && list3.every((it) => selected.has(it.id));
+  const pickAll = () => setSelected((s) => {
+    const n = new Set(s);
+    for (const it of list3) allPicked ? n.delete(it.id) : n.add(it.id);
+    return n;
+  });
+  const ids = [...selected];
+  const moveSelected = () => {
+    const to = moveTo.trim();
+    run("move", () => ops.update(ids, { category: to }).then(() => toast(to ? `已把 ${ids.length} ${unit}移到「${to}」` : `已把 ${ids.length} ${unit}改成未分类`)));
+  };
+  const tagSelected = (mode) => {
+    const tags = splitTags2(tagText);
+    if (!tags.length) return;
+    run("tag", () => ops.update(ids, mode === "add" ? { addTags: tags } : { removeTags: tags }).then(() => toast(mode === "add" ? `已给 ${ids.length} ${unit}加上「${tags.join("、")}」` : `已从 ${ids.length} ${unit}去掉「${tags.join("、")}」`)));
+  };
+  const removeSelected = () => {
+    if (!window.confirm(`删掉选中的 ${ids.length} ${unit}？存进 FlowGal 的音频一起删，电脑上的原文件不受影响。`)) return;
+    run("del", () => ops.remove(ids).then(() => {
+      setSelected(/* @__PURE__ */ new Set());
+      toast(`已删除 ${ids.length} ${unit}`);
+    }));
+  };
+  const named = cat && cat !== NO_CAT;
+  const inCat = named ? pool.filter((it) => underCat(it, cat)) : [];
+  const renameCat = (to) => {
+    const name2 = String(to || "").trim().split(/[\\/]/).map((s) => s.trim()).filter(Boolean).slice(0, 2).join("/");
+    if (!name2 || name2 === cat) {
+      setRenaming(false);
+      return;
+    }
+    run("rename", () => ops.rename(cat, name2, kind).then(() => {
+      setCat(name2);
+      toast(`「${cat}」改名为「${name2}」`);
+    }));
+  };
+  const removeCat = () => {
+    if (!window.confirm(`把「${cat}」这一类的 ${inCat.length} ${unit}都删掉${cat.includes("/") ? "" : "（连子分类）"}？存进 FlowGal 的音频一起删，电脑上的原文件不受影响。`)) return;
+    run("delcat", () => ops.remove(inCat.map((it) => it.id)).then(() => {
+      setCat("");
+      toast(`已删除「${cat}」这一类`);
+    }));
+  };
+  const catButton = (value, label, n, sub = false) => /* @__PURE__ */ import_react12.default.createElement("button", { key: value || "*", type: "button", className: `fg-libcat${sub ? " is-sub" : ""}${cat === value ? " is-on" : ""}`, title: label, onClick: () => setCat(value) }, /* @__PURE__ */ import_react12.default.createElement("span", null, label), /* @__PURE__ */ import_react12.default.createElement("i", null, n));
+  const shown = list3.slice(0, limit);
+  return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-lib" }, /* @__PURE__ */ import_react12.default.createElement("datalist", { id: listId }, allCats.map((c) => /* @__PURE__ */ import_react12.default.createElement("option", { key: c, value: c }))), /* @__PURE__ */ import_react12.default.createElement("nav", { className: "fg-lib-tree" }, catButton("", "全部", pool.length), tree.tops.map((t) => /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, { key: t.name }, catButton(t.name, t.name, t.n), (cat === t.name || cat.startsWith(t.name + "/")) && t.subs.map(([sub, n]) => catButton(`${t.name}/${sub}`, sub, n, true)))), tree.none > 0 && catButton(NO_CAT, "未分类", tree.none)), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-lib-main" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-lib-tools" }, /* @__PURE__ */ import_react12.default.createElement("input", { className: "fg-input fg-lib-search", value: query, placeholder: "搜索名字、分类、标签、描述、文件名（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), kinds && /* @__PURE__ */ import_react12.default.createElement(Select, { value: kind, options: kinds, style: INLINE, onChange: setKind }), /* @__PURE__ */ import_react12.default.createElement(Select, { value: filter2, options: LIB_FILTERS, style: INLINE, onChange: setFilter }), /* @__PURE__ */ import_react12.default.createElement(Select, { value: sort, options: LIB_SORTS, style: INLINE, onChange: setSort })), named && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-lib-cathead" }, renaming ? /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "「", cat, "」改名为"), /* @__PURE__ */ import_react12.default.createElement(Text, { value: cat, list: listId, style: { flex: 1, width: "auto" }, onCommit: renameCat }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setRenaming(false) }, "取消")) : /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("b", null, cat), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, inCat.length, " ", unit), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: Boolean(busy), title: "子分类跟着走；改成已有的分类名就是并进去", onClick: () => setRenaming(true) }, "改名"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: Boolean(busy), onClick: removeCat }, "删除这一类"))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-lib-count" }, /* @__PURE__ */ import_react12.default.createElement("label", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("input", { type: "checkbox", checked: allPicked, disabled: !list3.length, onChange: pickAll }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "全选这 ", list3.length, " ", unit)), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "按住 Shift 点勾选框能连着选一串；点名字展开编辑")), !list3.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note fg-lib-empty" }, pool.length ? "没有符合条件的。" : "还是空的。"), shown.map((it, i) => /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, { key: it.id }, /* @__PURE__ */ import_react12.default.createElement("div", { className: `fg-librow${selected.has(it.id) ? " is-picked" : ""}${open === it.id ? " is-open" : ""}` }, /* @__PURE__ */ import_react12.default.createElement("input", { type: "checkbox", checked: selected.has(it.id), onChange: () => {
+  }, onClick: (e) => pick(i, e), "aria-label": `选中 ${it.name}` }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: `fg-librow-play${playing === it.id ? " is-on" : ""}`, title: playing === it.id ? "停止试听" : "试听", onClick: () => onPlay(it) }, playing === it.id ? "■" : "▶"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-librow-main", title: open === it.id ? "收起" : "点开编辑", onClick: () => setOpen((o) => o === it.id ? "" : it.id) }, /* @__PURE__ */ import_react12.default.createElement("b", null, it.name), /* @__PURE__ */ import_react12.default.createElement("span", null, summary(it))), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: `fg-libchip${catOf(it) ? "" : " is-none"}`, title: "只看这一类", onClick: () => setCat(catOf(it) || NO_CAT) }, catOf(it) || "未分类"), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-librow-size", title: it.file }, rowSize(it.bytes || 0))), open === it.id && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-libedit" }, editor(it)))), list3.length > limit && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn fg-lib-more", onClick: () => setLimit((n) => n + LIB_PAGE_SIZE) }, "再显示 ", Math.min(LIB_PAGE_SIZE, list3.length - limit), " ", unit, "（还有 ", list3.length - limit, " ", unit, "没列出来）"), ids.length > 0 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-lib-bar" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("b", null, "已选 ", ids.length, " ", unit), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: Boolean(busy), onClick: removeSelected }, "删除"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", onClick: () => setSelected(/* @__PURE__ */ new Set()) }, "取消选择")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "移到分类"), /* @__PURE__ */ import_react12.default.createElement("input", { className: "fg-input", list: listId, style: { flex: 1, width: "auto" }, value: moveTo, placeholder: "两层用 / 隔开，比如 日常/校园；空着就是未分类", onChange: (e) => setMoveTo(e.target.value), onKeyDown: (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") moveSelected();
+  } }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: Boolean(busy), onClick: moveSelected }, "移过去")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "标签"), /* @__PURE__ */ import_react12.default.createElement("input", { className: "fg-input", style: { flex: 1, width: "auto" }, value: tagText, placeholder: "一个或几个标签，用顿号或空格隔开", onChange: (e) => setTagText(e.target.value), onKeyDown: (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") tagSelected("add");
+  } }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: Boolean(busy) || !tagText.trim(), onClick: () => tagSelected("add") }, "都加上"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: Boolean(busy) || !tagText.trim(), onClick: () => tagSelected("remove") }, "都去掉")), extras && extras({ ids, run, busy }))));
 }
 function MusicSection({ data }) {
   const cfg = data.config;
@@ -12606,7 +12839,7 @@ function MusicSection({ data }) {
         toast(`${sidecar.webkitRelativePath || sidecar.name} 没读成：${e.message}。这份先不用`, "error");
       }
     }
-    const audio = files2.filter((f) => AUDIO_FILE.test(f.name)).sort((a, b) => a.name.localeCompare(b.name, "zh-CN", { numeric: true }));
+    const audio = files2.filter((f) => AUDIO_FILE.test(f.name)).sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name, "zh-CN", { numeric: true }));
     if (!audio.length) {
       toast("没找到音频文件（mp3、m4a、aac、ogg、opus、wav、flac）", "error");
       return;
@@ -12619,10 +12852,10 @@ function MusicSection({ data }) {
       try {
         const track = await api.uploadTrack(file2);
         const m = meta.get(file2.name);
-        if (m) {
-          await api.updateTrack(track.id, m);
-          described++;
-        }
+        const folder = folderCategory(file2);
+        const patch = { ...m || {}, ...folder && !track.category && (!m || m.category === void 0) ? { category: folder } : {} };
+        if (Object.keys(patch).length) await api.updateTrack(track.id, patch);
+        if (m) described++;
       } catch (e) {
         failed.push(`${file2.name}：${e.message}`);
       }
@@ -12644,13 +12877,21 @@ function MusicSection({ data }) {
     setClearing(false);
     toast(`已清空曲库：删掉 ${cleared.tracks} 首${cleared.failed ? `；${cleared.failed} 个文件没删掉（可能正被占用），曲库里已经没有它们了` : ""}`, cleared.failed ? "error" : void 0);
   });
-  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "播放"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "配乐" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: cfg.ui.bgm, onChange: (v) => p4({ bgm: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.bgmVolume, onChange: (e) => p4({ bgmVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "我的曲库", tracks ? ` · ${tracks.length} 首` : ""), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "后台导演整理每一轮时会读到下面每首的描述和标签，自己决定这一幕放哪首、哪句话换歌。描述随便写：听感、乐器、适合的场面和情绪都行，越具体导演选得越准。导演还没整理完的轮次会先按描述粗配一首。"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: Boolean(progress), onClick: () => filesRef.current && filesRef.current.click() }, "添加曲子"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: !tracks || !tracks.some((t) => t.file), onClick: exportSidecar }, "导出描述"), !clearing && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn fg-danger", disabled: !tracks || !tracks.length || Boolean(progress), title: "把整个曲库删光，重新选曲", onClick: () => setClearing(true) }, "清空曲库"), progress && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react12.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
+  const ops = {
+    update: (ids, patch) => api.updateTracks(ids, patch).then(() => loadMusic()),
+    remove: (ids) => {
+      if (ids.includes(playing)) stopPreview();
+      return api.removeTracks(ids).then(() => loadMusic());
+    },
+    rename: (from, to) => api.renameMusicCategory(from, to).then(() => loadMusic())
+  };
+  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "播放"), /* @__PURE__ */ import_react12.default.createElement(Field, { label: "配乐" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: cfg.ui.bgm, onChange: (v) => p4({ bgm: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.bgmVolume, onChange: (e) => p4({ bgmVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "我的曲库", tracks ? ` · ${tracks.length} 首` : ""), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "后台导演整理每一轮时会读到每首的分类、描述和标签，自己决定这一幕放哪首、哪句话换歌。描述随便写：听感、乐器、适合的场面和情绪都行，越具体导演选得越准。导演还没整理完的轮次会先按描述粗配一首。曲子多的时候导演每轮按分类各挑几首看，分好类它就不会只看到一种情绪。"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: Boolean(progress), onClick: () => filesRef.current && filesRef.current.click() }, "添加曲子"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: !tracks || !tracks.some((t) => t.file), onClick: exportSidecar }, "导出描述"), !clearing && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn fg-danger", disabled: !tracks || !tracks.length || Boolean(progress), title: "把整个曲库删光，重新选曲", onClick: () => setClearing(true) }, "清空曲库"), progress && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react12.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
     importFiles(e.target.files);
     e.target.value = "";
   } }), /* @__PURE__ */ import_react12.default.createElement("input", { ref: filesRef, type: "file", accept: `audio/*,${MUSIC_SIDECAR}`, multiple: true, hidden: true, onChange: (e) => {
     importFiles(e.target.files);
     e.target.value = "";
-  } })), clearing && tracks && tracks.length > 0 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-manage" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "删掉曲库里全部 ", tracks.length, " 首（", totalBytes >= 1073741824 ? (totalBytes / 1073741824).toFixed(1) + " GB" : sizeMB(totalBytes), "），描述、标签和存进 FlowGal 的音频一起删；电脑上的原文件不受影响。描述想留着的话先点「导出描述」。"), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "clear", onClick: clearAll }, busy === "clear" ? "清空中…" : "确认清空"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "clear", onClick: () => setClearing(false) }, "取消")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "文件夹里放一份 ", /* @__PURE__ */ import_react12.default.createElement("code", null, MUSIC_SIDECAR), "（就是「导出描述」得到的文件；分了子文件夹的，每个子文件夹各放一份也行），导入时会按文件名自动带上描述；同一首再导入不会重复存，但描述会以这个文件为准。"), !tracks && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "读取中…"), tracks && !tracks.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "曲库还是空的。没有曲子时剧场不放音乐。"), tracks && tracks.map((t) => /* @__PURE__ */ import_react12.default.createElement(TrackCard, { key: t.id, track: t, playing: playing === t.id, onPlay: () => play(t) })));
+  } })), clearing && tracks && tracks.length > 0 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-manage" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "删掉曲库里全部 ", tracks.length, " 首（", fmtBytes(totalBytes), "），分类、描述、标签和存进 FlowGal 的音频一起删；电脑上的原文件不受影响。描述想留着的话先点「导出描述」。"), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "clear", onClick: clearAll }, busy === "clear" ? "清空中…" : "确认清空"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "clear", onClick: () => setClearing(false) }, "取消")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "导入文件夹时，分了子文件夹的按子文件夹分类（最多两层，「日常/校园」）。文件夹里放一份 ", /* @__PURE__ */ import_react12.default.createElement("code", null, MUSIC_SIDECAR), "（就是「导出描述」得到的文件；每个子文件夹各放一份也行），导入时会按文件名自动带上分类和描述；同一首再导入不会重复存，但描述会以这个文件为准。"), !tracks && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "读取中…"), tracks && !tracks.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, "曲库还是空的。没有曲子时剧场不放音乐。"), tracks && tracks.length > 0 && /* @__PURE__ */ import_react12.default.createElement(LibBrowser, { items: tracks, unit: "首", listId: MUSIC_LIST, playing, onPlay: play, editor: (t) => /* @__PURE__ */ import_react12.default.createElement(TrackEditor, { track: t }), summary: trackSummary, ops }));
 }
 function saveText(text, name2) {
   const a = document.createElement("a");
@@ -12661,24 +12902,39 @@ function saveText(text, name2) {
 }
 var KIND_LABEL2 = { ambience: "环境音", blip: "打字音", sfx: "音效" };
 var USE_OPTIONS = [["", "没有"], ...SOUND_SLOTS.map((s) => [s.id, `${s.group === "ui" ? "界面音" : "落字音效"} · ${s.label}`]), ["narration", "旁白的打字音"]];
-var LIB_SHOWN = 200;
 var VOLUME_DB = [-30, 20 * Math.log10(MAX_SOUND_VOLUME)];
 var volumeDb = (v) => v > 0 ? Math.min(VOLUME_DB[1], Math.max(VOLUME_DB[0], 20 * Math.log10(v))) : VOLUME_DB[0];
 var dbVolume = (db) => db <= VOLUME_DB[0] ? 0 : Math.min(MAX_SOUND_VOLUME, Math.round(10 ** (db / 20) * 100) / 100);
 var volumeText = (v) => v > 0 ? `${Number(v.toFixed(2))} 倍` : "静音";
-function LibSoundCard({ sound, playing, onPlay }) {
+var KIND_OPTIONS = [["sfx", "音效（响一次）"], ["ambience", "环境音（循环）"], ["blip", "打字音（一个字一下）"]];
+var GENDER_OPTIONS = [["", "不分男女"], ["female", "女声"], ["male", "男声"]];
+var useText = (use) => (USE_OPTIONS.find(([v]) => v === use) || [])[1] || use;
+var soundSummary = (s) => [s.kind === "blip" ? `打字音 · ${VOICE_GENDER[s.gender || ""]}` : (s.tags || []).join("、"), s.use ? `推荐用途：${useText(s.use)}` : "", (s.volume ?? 1) !== 1 ? `音量 ${volumeText(s.volume ?? 1)}` : "", s.description].filter(Boolean).join(" · ") || "（还没有描述和标签）";
+function LibSoundEditor({ sound, listId }) {
   const [busy, run] = useBusy3();
-  const [open, setOpen] = import_react12.default.useState(false);
   const save = (patch) => run("s", async () => {
     await api.updateLibSound(sound.id, patch);
     await loadSoundlib();
   });
-  return /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-track fg-libsound" }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: `fg-track-play${playing ? " is-on" : ""}`, title: playing ? "停止试听" : "试听", onClick: onPlay }, playing ? "■" : "▶"), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-track-body" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Text, { value: sound.name, style: { flex: 1, width: "auto", fontWeight: 600 }, onCommit: (v) => save({ name: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note", title: sound.file }, sizeMB(sound.bytes)), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpen((v) => !v) }, open ? "收起" : "编辑"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "d", onClick: () => {
+  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Text, { value: sound.name, style: { flex: 2, width: "auto", fontWeight: 600 }, onCommit: (v) => save({ name: v }) }), /* @__PURE__ */ import_react12.default.createElement(Text, { value: catOf(sound), list: listId, placeholder: "分类，两层用 / 隔开：门窗/敲门", style: { flex: 1, width: "auto" }, onCommit: (v) => save({ category: v }) }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "d", onClick: () => {
     if (window.confirm(`从音效库删除「${sound.name}」？电脑上的原文件不受影响。`)) run("d", async () => {
       await api.removeLibSounds([sound.id]);
       await loadSoundlib();
     }, "已删除");
-  } }, "删除")), !open && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note fg-libsound-tags" }, sound.kind === "blip" ? `打字音 · ${VOICE_GENDER[sound.gender || ""]}` : (sound.tags || []).join("、") || "（没有标签）", sound.use ? ` · 推荐用途：${(USE_OPTIONS.find(([v]) => v === sound.use) || [])[1] || sound.use}` : "", sound.description ? " · " + sound.description : ""), open && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("select", { className: "fg-select", style: { width: "auto" }, value: sound.kind, onChange: (e) => save({ kind: e.target.value }) }, /* @__PURE__ */ import_react12.default.createElement("option", { value: "sfx" }, "音效（响一次）"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "ambience" }, "环境音（循环）"), /* @__PURE__ */ import_react12.default.createElement("option", { value: "blip" }, "打字音（一个字一下）")), sound.kind === "blip" && /* @__PURE__ */ import_react12.default.createElement(Select, { value: sound.gender || "", options: [["", "不分男女"], ["female", "女声"], ["male", "男声"]], style: INLINE, onChange: (v) => save({ gender: v }) }), /* @__PURE__ */ import_react12.default.createElement(Text, { value: sound.category, placeholder: "分类，两层用 / 隔开：门窗/敲门", style: { flex: 1, width: "auto" }, onCommit: (v) => save({ category: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "音量"), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: VOLUME_DB[0], max: VOLUME_DB[1], step: "any", value: volumeDb(sound.volume ?? 1), onChange: (e) => save({ volume: dbVolume(Number(e.target.value)) }), style: { width: "8cqw" } }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, volumeText(sound.volume ?? 1))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "推荐用途"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: sound.use || "", options: USE_OPTIONS, style: INLINE, onChange: (v) => save({ use: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "「声音」页一键套用时用")), sound.kind !== "blip" && /* @__PURE__ */ import_react12.default.createElement(Text, { value: (sound.tags || []).join("、"), placeholder: "标签：正文里会出现的词，用顿号隔开。导演按它们挑候选，例如：敲门、咚咚、门", style: { width: "100%" }, onCommit: (v) => save({ tags: v }) }), /* @__PURE__ */ import_react12.default.createElement(TextArea, { value: sound.description, placeholder: "听起来什么样、什么时候用。例如：木门被轻轻敲了两下，礼貌、迟疑", onCommit: (v) => save({ description: v }) }))));
+  } }, "删除")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Select, { value: sound.kind, options: KIND_OPTIONS, style: INLINE, onChange: (v) => save({ kind: v }) }), sound.kind === "blip" && /* @__PURE__ */ import_react12.default.createElement(Select, { value: sound.gender || "", options: GENDER_OPTIONS, style: INLINE, onChange: (v) => save({ gender: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "音量"), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: VOLUME_DB[0], max: VOLUME_DB[1], step: "any", value: volumeDb(sound.volume ?? 1), onChange: (e) => save({ volume: dbVolume(Number(e.target.value)) }), style: { width: "8cqw" } }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, volumeText(sound.volume ?? 1))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "推荐用途"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: sound.use || "", options: USE_OPTIONS, style: INLINE, onChange: (v) => save({ use: v }) }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "「声音」页一键套用时用")), sound.kind !== "blip" && /* @__PURE__ */ import_react12.default.createElement(Text, { value: (sound.tags || []).join("、"), placeholder: "标签：正文里会出现的词，用顿号隔开。导演按它们挑候选，例如：敲门、咚咚、门", style: { width: "100%" }, onCommit: (v) => save({ tags: v }) }), /* @__PURE__ */ import_react12.default.createElement(TextArea, { value: sound.description, placeholder: "听起来什么样、什么时候用。例如：木门被轻轻敲了两下，礼貌、迟疑", onCommit: (v) => save({ description: v }) }), sound.file && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "文件：", sound.file));
+}
+function SoundBatch({ ids, run, busy, kind }) {
+  const [to, setTo] = import_react12.default.useState(kind === "sfx" ? "blip" : "sfx");
+  const [gender, setGender] = import_react12.default.useState("female");
+  const [db, setDb] = import_react12.default.useState(0);
+  const go = (patch, text) => run("batch", async () => {
+    await api.updateLibSounds(ids, patch);
+    await loadSoundlib();
+    toast(text);
+  });
+  const pageOf = (k) => k === "ambience" ? "ambience" : "sfx";
+  const moved = pageOf(to) !== kind ? `，挪到了${LIB_PAGE[pageOf(to)].title}` : "";
+  return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "种类改成"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: to, options: KIND_OPTIONS, style: INLINE, onChange: setTo }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: Boolean(busy), onClick: () => go({ kind: to }, `已把 ${ids.length} 个改成${KIND_LABEL2[to]}${moved}`) }, "改"), kind === "sfx" && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "打字音的男女"), /* @__PURE__ */ import_react12.default.createElement(Select, { value: gender, options: GENDER_OPTIONS, style: INLINE, onChange: setGender }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: Boolean(busy), onClick: () => go({ gender }, `已把 ${ids.length} 个标成${VOICE_GENDER[gender]}`) }, "标上"))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "音量"), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: VOLUME_DB[0], max: VOLUME_DB[1], step: "any", value: db, onChange: (e) => setDb(Number(e.target.value)), style: { flex: 1 } }), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, volumeText(dbVolume(db))), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: Boolean(busy), onClick: () => go({ volume: dbVolume(db) }, `已把 ${ids.length} 个的音量都设成 ${volumeText(dbVolume(db))}`) }, "都设成这个音量")));
 }
 function ErosField({ cfg, p: p4 }) {
   const [open, setOpen] = import_react12.default.useState(false);
@@ -12687,7 +12943,7 @@ function ErosField({ cfg, p: p4 }) {
   return /* @__PURE__ */ import_react12.default.createElement(Field, { label: "亲密场面", hint: "成年人之间的亲密戏。导演按正文给一段一段配节奏：爱抚、缓慢、加快、激烈、余韵，节奏底一直响，镜头跟着一下一下轻轻地送，画面边上泛起潮红；有触手时画面边上有暗影在动，配湿黏的蠕动声。插入、顶到最深、射精这些读到那句时响；高潮时画面柔和地白一下，射精时跟着声音一下一下地亮。正文里的 [SE：…] 提示和日文拟声（ぬぷ、こつん、どくどく……）也认得。音量跟剧情音效走，画面上不出字。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: cfg.ui.eros, onChange: (v) => p4({ eros: v }) }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpen((v) => !v) }, open ? "收起试听" : "试听")), open && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: row }, EROS_PACES.filter((k) => k !== "none").map((k) => /* @__PURE__ */ import_react12.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => previewEros(k, "", volume) }, EROS_LABEL[k])), TENTACLE.filter((k) => k !== "none").map((k) => /* @__PURE__ */ import_react12.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => previewEros("", k, volume) }, TENTACLE_LABEL[k])), PEAKS.map((k) => /* @__PURE__ */ import_react12.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => erosPeak(k, volume) }, PEAK_LABEL[k]))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: row }, Object.keys(EROS_SFX).map((name2) => /* @__PURE__ */ import_react12.default.createElement("button", { key: name2, type: "button", className: "fg-btn", onClick: () => erosFoley(EROS_SFX[name2].id, volume) }, name2)))));
 }
 var LIB_PAGE = {
-  sfx: { kinds: ["sfx", "blip"], title: "音效库", unit: "个音效", other: "环境音库", empty: "音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。", note: "推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时只看几十个候选，再决定哪句配什么音效。候选怎么挑见下面「导演怎么挑」；标签写正文里会出现的说法最稳。" },
+  sfx: { kinds: ["sfx", "blip"], title: "音效库", unit: "个音效", filter: [["", "音效和打字音"], ["sfx", "只看音效"], ["blip", "只看打字音"]], other: "环境音库", empty: "音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。", note: "推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时只看几十个候选，再决定哪句配什么音效。候选怎么挑见下面「导演怎么挑」；标签写正文里会出现的说法最稳。" },
   ambience: { kinds: ["ambience"], title: "环境音库", unit: "个环境音", other: "音效库", empty: "环境音库还是空的。没有环境音时剧场不放环境音。", note: "雨声、蝉鸣、车站广播这类循环的底。后台导演整理每一轮时从一批候选里给每一幕挑一个，跨轮沿用。候选怎么挑见下面「导演怎么挑」；标签写地点、天气、时段这类词最管用。" }
 };
 function PickingFields({ cfg, kind, count }) {
@@ -12709,16 +12965,12 @@ function SoundLibSection({ data, kind = "sfx" }) {
   const otherKind = kind === "sfx" ? "ambience" : "sfx";
   const [playing, setPlaying] = import_react12.default.useState("");
   const [progress, setProgress] = import_react12.default.useState("");
-  const [query, setQuery] = import_react12.default.useState("");
-  const [openGroup, setOpenGroup] = import_react12.default.useState("");
   const [clearing, setClearing] = import_react12.default.useState(false);
   const [busy, run] = useBusy3();
   const folderRef = import_react12.default.useRef(null);
   const p4 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
   import_react12.default.useEffect(() => () => stopPreview(), []);
   import_react12.default.useEffect(() => {
-    setQuery("");
-    setOpenGroup("");
     setClearing(false);
   }, [kind]);
   const play = (s) => {
@@ -12776,28 +13028,15 @@ function SoundLibSection({ data, kind = "sfx" }) {
     });
     toast(`新导入 ${added} 个${elsewhere ? `（其中 ${elsewhere} 个描述文件写的是${KIND_LABEL2[otherKind]}，放进了${LIB_PAGE[otherKind].title}）` : ""}${updated ? `，更新了 ${updated} 个的描述` : ""}${failed.length ? `；${failed.length} 个失败：${failed.slice(0, 3).join("；")}` : ""}${useful && !failed.length ? "。里面有打字音和标了用途的声音，到「声音」页可以一键套用" : ""}`, failed.length ? "error" : void 0);
   };
-  const groups = import_react12.default.useMemo(() => {
-    const map = /* @__PURE__ */ new Map();
-    for (const s of sounds2 || []) {
-      const key = `${s.kind}|${String(s.category || "未分类").split("/")[0]}`;
-      if (!map.has(key)) map.set(key, { key, kind: s.kind, name: key.split("|")[1], items: [] });
-      map.get(key).items.push(s);
-    }
-    return [...map.values()].sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name, "zh-CN") : a.kind === kind ? -1 : 1);
-  }, [sounds2, kind]);
-  const words = query.trim().split(/\s+/).filter(Boolean);
-  const found = words.length ? (sounds2 || []).filter((s) => {
-    const text = `${s.name} ${s.category} ${(s.tags || []).join(" ")} ${s.description}`;
-    return words.every((w) => text.includes(w));
-  }) : null;
-  const cards = (list3) => list3.slice(0, LIB_SHOWN).map((s) => /* @__PURE__ */ import_react12.default.createElement(LibSoundCard, { key: s.id, sound: s, playing: playing === s.id, onPlay: () => play(s) }));
-  const removeGroup = (g) => {
-    if (!window.confirm(`把「${g.kind === kind ? g.name : `${KIND_LABEL2[g.kind]} · ${g.name}`}」这一类 ${g.items.length} 个都从${page.title}删掉？电脑上的原文件不受影响。`)) return;
-    run("g" + g.key, async () => {
-      await api.removeLibSounds(g.items.map((s) => s.id));
-      await loadSoundlib();
-    }, "已删除");
+  const ops = {
+    update: (ids, patch) => api.updateLibSounds(ids, patch).then(() => loadSoundlib()),
+    remove: (ids) => {
+      if (ids.includes(playing)) stopPreview();
+      return api.removeLibSounds(ids).then(() => loadSoundlib());
+    },
+    rename: (from, to, only) => api.renameLibCategory(from, to, only ? [only] : page.kinds).then(() => loadSoundlib())
   };
+  const listId = `fg-lib-cats-${kind}`;
   const inUse = new Set([...Object.values(cfg.ui.sounds || {}), cfg.ui.narrationVoice, cfg.ui.voiceDefault].map(libIdOf).filter(Boolean));
   const doomed = (sounds2 || []).filter((s) => s.kind === kind && !inUse.has(s.id));
   const kept = { blips: (sounds2 || []).filter((s) => s.kind === "blip").length, used: (sounds2 || []).filter((s) => s.kind === kind && inUse.has(s.id)).length };
@@ -12814,7 +13053,22 @@ function SoundLibSection({ data, kind = "sfx" }) {
   return /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "播放"), kind === "ambience" && /* @__PURE__ */ import_react12.default.createElement(Field, { label: "环境音", hint: "雨声、蝉鸣、车站的嘈杂……导演按地点、天气给每一幕配，循环播放。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: cfg.ui.amb, onChange: (v) => p4({ amb: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.05", value: cfg.ui.ambVolume, onChange: (e) => p4({ ambVolume: Number(e.target.value) }), style: { flex: 1 } }))), kind === "sfx" && /* @__PURE__ */ import_react12.default.createElement(Field, { label: "剧情音效", hint: "推门、手机震动、杯子摔碎……导演给正文里写到的声音配，读到那句时响一次。音效库里没有合适的（或者库是空的）时，用内置的拟声音效：砰、咚、叮、哗、咔嚓、轰……现场合成。" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react12.default.createElement(Toggle, { value: cfg.ui.storySfx, onChange: (v) => p4({ storySfx: v }) }), /* @__PURE__ */ import_react12.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.05", value: cfg.ui.storySfxVolume, onChange: (e) => p4({ storySfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), kind === "sfx" && /* @__PURE__ */ import_react12.default.createElement(ErosField, { cfg, p: p4 }), /* @__PURE__ */ import_react12.default.createElement(PickingFields, { cfg, kind, count: (sounds2 || []).filter((s) => s.kind === kind).length }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-section" }, "我的", page.title, sounds2 ? ` · ${sounds2.length} 个` : ""), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, page.note), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row", style: { margin: "1cqw 0" } }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-primary", disabled: Boolean(progress), onClick: () => folderRef.current && folderRef.current.click() }, "导入文件夹"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: !sounds2 || !sounds2.some((s) => s.file), onClick: () => saveText(writeSoundSidecar(sounds2 || []), SOUND_SIDECAR) }, "导出描述"), !clearing && /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn fg-danger", disabled: !doomed.length || Boolean(progress), title: `把${page.title}删光，重新整理；${page.other}${kind === "sfx" ? "、打字音" : ""}和「声音」页正在用的不动`, onClick: () => setClearing(true) }, "清空", page.title), progress && /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-pill is-busy" }, progress), /* @__PURE__ */ import_react12.default.createElement("input", { ref: folderRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
     importFiles(e.target.files);
     e.target.value = "";
-  } })), clearing && doomed.length > 0 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-manage" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "删掉", page.title, "里的 ", doomed.length, " ", page.unit, "（", totalBytes >= 1073741824 ? (totalBytes / 1073741824).toFixed(1) + " GB" : sizeMB(totalBytes), "），名字、分类、标签和存进 FlowGal 的音频一起删；", page.other, "不动", kept.blips ? `，${kept.blips} 个打字音留着` : "", kept.used ? `，「声音」页正在用的 ${kept.used} 个留着` : "", "，电脑上的原文件也不受影响。描述想留着的话先点「导出描述」。"), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "clear", onClick: clearAll }, busy === "clear" ? "清空中…" : "确认清空"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "clear", onClick: () => setClearing(false) }, "取消")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "文件夹最上面放一份 ", /* @__PURE__ */ import_react12.default.createElement("code", null, SOUND_SIDECAR), "（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹，在这一页导入的算", KIND_LABEL2[kind], "。同一个文件再导入不会重复存，但描述会以描述文件为准。", kind === "sfx" ? "种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。" : ""), !sounds2 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "读取中…"), sounds2 && !sounds2.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, page.empty), sounds2 && sounds2.length > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("input", { className: "fg-input", style: { width: "100%", margin: "0.6cqw 0 1cqw" }, value: query, placeholder: "搜索名字、分类、标签、描述（空格隔开几个词）", onChange: (e) => setQuery(e.target.value), onKeyDown: (e) => e.stopPropagation() }), found && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "找到 ", found.length, " 个", found.length > LIB_SHOWN ? `，先列出前 ${LIB_SHOWN} 个` : ""), found && cards(found), !found && groups.map((g) => /* @__PURE__ */ import_react12.default.createElement("div", { key: g.key, className: "fg-libgroup" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-libgroup-head" }, /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpenGroup((k) => k === g.key ? "" : g.key) }, openGroup === g.key ? "▾" : "▸", " ", g.kind === kind ? g.name : `${KIND_LABEL2[g.kind]} · ${g.name}`), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, g.items.length, " 个"), /* @__PURE__ */ import_react12.default.createElement("span", { style: { flex: 1 } }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "g" + g.key, onClick: () => removeGroup(g) }, "删除这一类")), openGroup === g.key && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, g.items.length > LIB_SHOWN && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "这一类有 ", g.items.length, " 个，先列出前 ", LIB_SHOWN, " 个；用搜索找其余的。"), cards(g.items))))));
+  } })), clearing && doomed.length > 0 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-row fg-manage" }, /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-note" }, "删掉", page.title, "里的 ", doomed.length, " ", page.unit, "（", fmtBytes(totalBytes), "），名字、分类、标签和存进 FlowGal 的音频一起删；", page.other, "不动", kept.blips ? `，${kept.blips} 个打字音留着` : "", kept.used ? `，「声音」页正在用的 ${kept.used} 个留着` : "", "，电脑上的原文件也不受影响。描述想留着的话先点「导出描述」。"), /* @__PURE__ */ import_react12.default.createElement("span", { className: "fg-spacer" }), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "clear", onClick: clearAll }, busy === "clear" ? "清空中…" : "确认清空"), /* @__PURE__ */ import_react12.default.createElement("button", { type: "button", className: "fg-btn is-mini", disabled: busy === "clear", onClick: () => setClearing(false) }, "取消")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "文件夹最上面放一份 ", /* @__PURE__ */ import_react12.default.createElement("code", null, SOUND_SIDECAR), "（就是「导出描述」得到的文件，子文件夹里也可以各放一份），导入时按路径自动带上名字、种类、分类和标签（打字音还有男声 / 女声，以及推荐用途）；没有描述文件时名字取文件名、分类取所在的文件夹（最多两层），在这一页导入的算", KIND_LABEL2[kind], "。同一个文件再导入不会重复存，但描述会以描述文件为准。", kind === "sfx" ? "种类是「打字音」的不给导演用，而是出现在「声音」页和人物档案的音色里。" : ""), !sounds2 && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note" }, "读取中…"), sounds2 && !sounds2.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "fg-note", style: { marginTop: "1cqw" } }, page.empty), sounds2 && sounds2.length > 0 && /* @__PURE__ */ import_react12.default.createElement(
+    LibBrowser,
+    {
+      key: kind,
+      items: sounds2,
+      unit: "个",
+      kinds: page.filter || null,
+      listId,
+      playing,
+      onPlay: play,
+      ops,
+      editor: (s) => /* @__PURE__ */ import_react12.default.createElement(LibSoundEditor, { sound: s, listId }),
+      summary: soundSummary,
+      extras: (args) => /* @__PURE__ */ import_react12.default.createElement(SoundBatch, { ...args, kind })
+    }
+  ));
 }
 var stamp = (t) => new Date(t).toLocaleString("zh-CN", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 function UpdateSection({ data }) {
