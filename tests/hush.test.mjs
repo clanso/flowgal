@@ -14,9 +14,10 @@ test('gate: 导演写的留白：认中文写法，不算换歌，一轮有上�
   const list = ['b', 'hush', 'b', '无声', 'a', 'hush', 'b']
   const units = unitsOf(list.length)
   const raw = { scene: { bgm: 'a' }, cast: [], lines: list.map((bgm, i) => ({ u: units[i].id, sp: '林岚', bgm })) }
-  const script = normalizeScript(raw, units, { trackIds, limits: { hush: MAX_HUSH_PER_TURN } })
+  const script = normalizeScript(raw, units, { trackIds, limits: { hush: MAX_HUSH_PER_TURN, bgmSwaps: 1 } })
   assert.deepEqual(units.map(u => script.lines[u.id].bgm), ['b', 'hush', 'b', 'hush', 'a', undefined, undefined])
   assert.equal(normalizeScript(raw, units, { trackIds }).lines.U6.bgm, 'hush', '默认不限')
+  assert.equal(normalizeScript(raw, units, { trackIds }).lines.U7.bgm, 'b', '转折点以外换歌默认也不限')
   const hushOnly = normalizeScript({ scene: { bgm: 'a' }, cast: [], lines: [{ u: 'U1', sp: '林岚', bgm: 'hush' }] }, unitsOf(1), { trackIds })
   assert.equal(playingAfter(hushOnly), 'a', '留白不是换歌，下一轮接着放原来的')
 

@@ -76,7 +76,7 @@ test('gate: 给导演挑候选：标签、名字、分类在正文里出现的�
   assert.ok(['door2', 'door3'].includes(ids[2]) && ids.length === 3, '开门这一类最多两个；没提到的杯子不进')
 })
 
-test('gate: 导演配环境音和音效：编号 / none / keep 规整，中途换环境音一轮一次，音效只收库里的、一轮最多几个；库空时不写', async () => {
+test('gate: 导演配环境音和音效：编号 / none / keep 规整，变化点以外换环境音默认不限、设置里能限，音效只收库里的、一轮最多几个；库空时不写', async () => {
   const units = segmentTurn('雨下个不停。\n她推开门。\n“你来了。”\n手机震动了一下。\n雷声。\n杯子掉了。\n门又开了。\n有人敲窗。\n风更大了。')
   const sfxIds = ['door', 'phone', 'thunder', 'glass', 'knock', 'wind']
   const raw = {
@@ -84,12 +84,13 @@ test('gate: 导演配环境音和音效：编号 / none / keep 规整，中途�
     lines: [{ u: 'U2', sfx: 'door' }, { u: 'U3', sfx: 'ghost', amb: 'rain' }, { u: 'U4', sfx: 'phone', amb: 'storm' }, { u: 'U5', sfx: 'thunder', amb: 'rain' },
       { u: 'U6', sfx: 'glass' }, { u: 'U7', sfx: 'door' }, { u: 'U8', sfx: 'knock' }, { u: 'U9', sfx: 'wind' }],
   }
-  const s = normalizeScript(raw, units, { ambienceIds: ['rain', 'storm'], sfxIds, limits: { sfx: MAX_SFX_PER_TURN } })
+  assert.equal(normalizeScript(raw, units, { ambienceIds: ['rain', 'storm'], sfxIds }).lines.U5.amb, 'rain', '默认不限：变化点以外再换也照收')
+  const s = normalizeScript(raw, units, { ambienceIds: ['rain', 'storm'], sfxIds, limits: { sfx: MAX_SFX_PER_TURN, ambSwaps: 1 } })
   assert.equal(s.scene.amb, 'rain')
   assert.equal(s.lines.U3.sfx, undefined, '库里没有的音效丢掉')
   assert.equal(s.lines.U3.amb, undefined, '换成同一个不算换')
   assert.equal(s.lines.U4.amb, 'storm')
-  assert.equal(s.lines.U5.amb, undefined, '一轮只换一次')
+  assert.equal(s.lines.U5.amb, undefined, '限了 1 次：只换一次')
   assert.equal(ambienceAfter(s), 'storm')
   assert.equal(Object.values(s.lines).filter(l => l.sfx).length, MAX_SFX_PER_TURN)
   assert.equal(s.lines.U9.sfx, undefined, '超出的按正文顺序丢掉后面的')

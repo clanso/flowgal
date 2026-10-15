@@ -76,15 +76,24 @@ test('gate: 清空曲库：曲目和音频一起删，别的资源（图片、�
   }
 })
 
-test('gate: 导演选曲：编号 / none / keep 规整，一轮最多换一次，没有曲库时不写配乐', async () => {
+test('gate: 导演选曲：编号 / none / keep 规整，转折点以外换歌默认不限、设置里能限，没有曲库时不写配乐', async () => {
   const units = segmentTurn('雨下个不停。\n“你还在等吗？”林岚问。\n我没有回答。\n“那我先走了。”')
   const raw = { scene: { location: '车站', bgm: 'night' }, lines: [{ u: 'U2', bgm: 'rain' }, { u: 'U4', bgm: 'none' }, { u: 'U3', bgm: 'ghost' }] }
-  const s = normalizeScript(raw, units, { trackIds: ['night', 'rain'] })
+  const free = normalizeScript(raw, units, { trackIds: ['night', 'rain'] })
+  assert.equal(free.lines.U2.bgm, 'rain')
+  assert.equal(free.lines.U3.bgm, undefined, '曲库里没有的编号不收')
+  assert.equal(free.lines.U4.bgm, 'none', '默认不限：转折点以外再换也照收')
+  assert.equal(playingAfter(free), 'none')
+  // 设置里限了「转折点以外换歌」1 次：只留第一处
+  const s = normalizeScript(raw, units, { trackIds: ['night', 'rain'], limits: { bgmSwaps: 1 } })
   assert.equal(s.scene.bgm, 'night')
   assert.equal(s.lines.U2.bgm, 'rain')
   assert.equal(s.lines.U3.bgm, undefined)
   assert.equal(s.lines.U4.bgm, undefined)
   assert.equal(playingAfter(s), 'rain')
+  // 转折点（基调变了、换地方）上换不占名额
+  const turning = normalizeScript({ scene: { bgm: 'night' }, lines: [{ u: 'U1', bgm: 'rain' }, { u: 'U2', bgm: 'night', scene: { mood: 'tense' } }, { u: 'U3', bgm: 'rain', scene: { location: '天台' } }] }, units, { trackIds: ['night', 'rain'], limits: { bgmSwaps: 1 } })
+  assert.deepEqual(['U1', 'U2', 'U3'].map(u => turning.lines[u].bgm), ['rain', 'night', 'rain'])
 
   // keep、乱写都沿用上一幕结束时的曲子；上一幕的曲子被删了就不沿用。
   assert.equal(normalizeScript({ scene: { bgm: 'keep' } }, units, { previous: s, trackIds: ['night', 'rain'] }).scene.bgm, 'rain')
