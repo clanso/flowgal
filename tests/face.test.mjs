@@ -275,9 +275,10 @@ test('gate: 只换脸整条流程（以前的画法：不放大、硬方框、�
     const infill = requests[1]
     assert.equal(infill.action, 'infill')
     assert.equal(infill.model, 'nai-diffusion-4-5-full-inpainting')
-    assert.equal(infill.parameters.seed, 7, '默认跟底图同一个种子')
+    assert.equal(infill.parameters.seed, lin.sprites[cold].seed, '默认跟底图同一个种子')
+    assert.equal(requests[0].parameters.seed, lin.sprites[cold].seed)
     const caption = infill.parameters.v4_prompt.caption.char_captions[0].char_caption
-    assert.match(caption, /^long black hair, blue eyes, 1\.2::angry::, 1\.2::v-shaped eyebrows::/, '没设性别：角色块不加 girl / boy；表情词加重')
+    assert.match(caption, /^1\.3::arms crossed::, long black hair, blue eyes, 1\.2::angry::, 1\.2::v-shaped eyebrows::/, '没设性别：角色块不加 girl / boy；表情词加重；底图的动作词照底图画的时候那样排最前、加重')
     assert.doesNotMatch(caption, /expressionless|cold eyes/)
     assert.match(infill.parameters.v4_negative_prompt.caption.char_captions[0].char_caption, /expressionless.*cold eyes|cold eyes.*expressionless/, '底图「冷淡」的表情压进负面')
     const mask = await decodePng(fromBase64(infill.parameters.mask))
