@@ -853,6 +853,10 @@ function VariantEditor({ gameId, person, group, emotion: token, emotions, sheet 
   const [poseName, setPoseName] = React.useState('')
   const toggleInto = id => setInto(list => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]))
   const bound = (designed ? into.length : bare) || asPose
+  // 单张换种子重画（词不变）：不填随机换一个，填了用填的；换过的这张以后重画、重写都用自己的种子，「用回这个人的种子」撤掉
+  const [seedText, setSeedText] = React.useState('')
+  const ownSeed = Boolean(record && Number.isInteger(record.seedOwn))
+  const reseed = (extra, ok) => run('rs', async () => { await api.cast(gameId, 'sprite-reseed', { name: person.name, key, ...extra }); setSeedText('') }, ok)
   // 存成了新动作就把那一项收起来（再点一次不会又存一个）
   const drawFree = (id, extra, ok) => run(id, async () => {
     await api.cast(gameId, 'sprite-free', { name: person.name, emotion, ask, into: designed ? into : [], bare: !designed && bare, newPose: asPose ? { label: poseName.trim() } : null, ...extra, ...at })
@@ -927,6 +931,15 @@ function VariantEditor({ gameId, person, group, emotion: token, emotions, sheet 
             run('up', () => api.cast(gameId, 'upload', { name: person.name, emotion: token, dataUrl, ...at }), '立绘已上传')
           }} />
         </div>
+        {record && !record.face && (
+          <div className="fg-row">
+            <span className="fg-note">种子 {record.seed != null ? record.seed : '还没画'}{ownSeed ? '（这张自己的）' : `（这个人的种子 ${person.seed}）`}</span>
+            <button type="button" className="fg-btn" disabled={!record.tags || busy === 'rs'} title="词不变，随机换一个种子重画这一张；别的立绘还用这个人的种子" onClick={() => reseed({}, '已排队：换个种子重画')}>换个种子重画</button>
+            <input className="fg-input fg-seedinput" inputMode="numeric" value={seedText} placeholder="指定种子" onChange={e => setSeedText(e.target.value.replace(/\D/g, ''))} onKeyDown={e => e.stopPropagation()} />
+            <button type="button" className="fg-btn" disabled={!record.tags || !seedText || busy === 'rs'} onClick={() => reseed({ seed: Number(seedText) }, `已排队：用种子 ${seedText} 重画`)}>按这个种子重画</button>
+            {ownSeed && <button type="button" className="fg-btn" disabled={!record.tags || busy === 'rs'} title="这张不再用自己的种子，回到这个人的种子重画" onClick={() => reseed({ reset: true }, '已排队：用回这个人的种子重画')}>用回这个人的种子</button>}
+          </div>
+        )}
         <div className="fg-row">
           <span className="fg-note">{record && record.aa ? `逆转式素材包${record.aa.pack && record.aa.pack.name ? `「${record.aa.pack.name}」` : ''}：${record.aa.pack && record.aa.pack.version === 2 ? `会眨眼，说话时按字动嘴${Object.keys(record.aa.pack.poses || {}).length > 1 ? '，导演让他侧头时会转过去' : ''}` : '会呼吸、眨眼，说话时动嘴'}` : '逆转式立绘：导入素材包文件夹（motion.json 或 sprite.json 加图片），这张就会眨眼、动嘴（新版还会侧头）；图会换成素材包自带的那张'}</span>
           <button type="button" className="fg-btn" disabled={!reachable || busy === 'aa'} onClick={() => aaRef.current && aaRef.current.click()}>{busy === 'aa' ? '导入中…' : record && record.aa ? '换素材包' : '导入素材包'}</button>

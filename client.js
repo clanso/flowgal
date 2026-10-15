@@ -1712,6 +1712,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-tick small { font-size: .8cqw; opacity: .6; }
 .fg-textarea.fg-askline { font-family: var(--font-body); }
 .fg-askbox .fg-count { width: 10cqw; } .fg-askbox .fg-posename { width: 16cqw; }
+.fg-row .fg-input.fg-seedinput { width: 12cqw; flex: none; }
 .fg-btn.fg-danger:not(:disabled) { border-color: #ff6b6b; color: #ffb3b3; }
 /* 逆转式立绘工作台：左边勾差分，右边框眼睛和嘴、看效果 */
 .fg-aa-bench { padding: 1.4cqw; border-radius: 1.2cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }
@@ -2106,6 +2107,7 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-tick { font-size: 2.8cqw; padding: .8cqw 2.2cqw; } .fg-tick small { font-size: 2.3cqw; }
   .fg-askbox .fg-count { width: 24cqw; } .fg-askbox .fg-posename { flex: 1; width: auto; min-width: 30cqw; }
   .fg-variant-body b { font-size: 3.4cqw; }
+  .fg-row .fg-input.fg-seedinput { width: 26cqw; }
   .fg-aa-grid { grid-template-columns: 1fr; } .fg-aa-list { max-height: 50cqw; }
   .fg-aa-vision { font-size: 2.6cqw; } .fg-aa-badge { font-size: 2.2cqw; } .fg-aa-vision progress { height: 1.6cqw; }
   .fg-acting .fg-field { grid-template-columns: 1fr; }
@@ -12349,6 +12351,12 @@ function VariantEditor({ gameId, person, group, emotion: token, emotions, sheet 
   const [poseName, setPoseName] = import_react14.default.useState("");
   const toggleInto = (id) => setInto((list3) => list3.includes(id) ? list3.filter((x) => x !== id) : [...list3, id]);
   const bound = (designed ? into.length : bare) || asPose;
+  const [seedText, setSeedText] = import_react14.default.useState("");
+  const ownSeed = Boolean(record && Number.isInteger(record.seedOwn));
+  const reseed = (extra, ok) => run("rs", async () => {
+    await api.cast(gameId, "sprite-reseed", { name: person.name, key, ...extra });
+    setSeedText("");
+  }, ok);
   const drawFree = (id, extra, ok) => run(id, async () => {
     await api.cast(gameId, "sprite-free", { name: person.name, emotion, ask: ask2, into: designed ? into : [], bare: !designed && bare, newPose: asPose ? { label: poseName.trim() } : null, ...extra, ...at2 });
     setAsPose(false);
@@ -12375,7 +12383,7 @@ function VariantEditor({ gameId, person, group, emotion: token, emotions, sheet 
     if (!file2) return;
     const dataUrl = await readFile(file2);
     run("up", () => api.cast(gameId, "upload", { name: person.name, emotion: token, dataUrl, ...at2 }), "立绘已上传");
-  } })), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement("span", { className: "fg-note" }, record && record.aa ? `逆转式素材包${record.aa.pack && record.aa.pack.name ? `「${record.aa.pack.name}」` : ""}：${record.aa.pack && record.aa.pack.version === 2 ? `会眨眼，说话时按字动嘴${Object.keys(record.aa.pack.poses || {}).length > 1 ? "，导演让他侧头时会转过去" : ""}` : "会呼吸、眨眼，说话时动嘴"}` : "逆转式立绘：导入素材包文件夹（motion.json 或 sprite.json 加图片），这张就会眨眼、动嘴（新版还会侧头）；图会换成素材包自带的那张"), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: !reachable || busy === "aa", onClick: () => aaRef.current && aaRef.current.click() }, busy === "aa" ? "导入中…" : record && record.aa ? "换素材包" : "导入素材包"), record && record.aa && record.aa.pack && /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "aa-rm", onClick: () => run("aa-rm", () => api.cast(gameId, "aa-remove", { name: person.name, key }), "已取消动态，图留着") }, "取消动态"), /* @__PURE__ */ import_react14.default.createElement("input", { ref: aaRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
+  } })), record && !record.face && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement("span", { className: "fg-note" }, "种子 ", record.seed != null ? record.seed : "还没画", ownSeed ? "（这张自己的）" : `（这个人的种子 ${person.seed}）`), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: !record.tags || busy === "rs", title: "词不变，随机换一个种子重画这一张；别的立绘还用这个人的种子", onClick: () => reseed({}, "已排队：换个种子重画") }, "换个种子重画"), /* @__PURE__ */ import_react14.default.createElement("input", { className: "fg-input fg-seedinput", inputMode: "numeric", value: seedText, placeholder: "指定种子", onChange: (e) => setSeedText(e.target.value.replace(/\D/g, "")), onKeyDown: (e) => e.stopPropagation() }), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: !record.tags || !seedText || busy === "rs", onClick: () => reseed({ seed: Number(seedText) }, `已排队：用种子 ${seedText} 重画`) }, "按这个种子重画"), ownSeed && /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: !record.tags || busy === "rs", title: "这张不再用自己的种子，回到这个人的种子重画", onClick: () => reseed({ reset: true }, "已排队：用回这个人的种子重画") }, "用回这个人的种子")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement("span", { className: "fg-note" }, record && record.aa ? `逆转式素材包${record.aa.pack && record.aa.pack.name ? `「${record.aa.pack.name}」` : ""}：${record.aa.pack && record.aa.pack.version === 2 ? `会眨眼，说话时按字动嘴${Object.keys(record.aa.pack.poses || {}).length > 1 ? "，导演让他侧头时会转过去" : ""}` : "会呼吸、眨眼，说话时动嘴"}` : "逆转式立绘：导入素材包文件夹（motion.json 或 sprite.json 加图片），这张就会眨眼、动嘴（新版还会侧头）；图会换成素材包自带的那张"), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: !reachable || busy === "aa", onClick: () => aaRef.current && aaRef.current.click() }, busy === "aa" ? "导入中…" : record && record.aa ? "换素材包" : "导入素材包"), record && record.aa && record.aa.pack && /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === "aa-rm", onClick: () => run("aa-rm", () => api.cast(gameId, "aa-remove", { name: person.name, key }), "已取消动态，图留着") }, "取消动态"), /* @__PURE__ */ import_react14.default.createElement("input", { ref: aaRef, type: "file", webkitdirectory: "", multiple: true, hidden: true, onChange: (e) => {
     const files2 = [...e.target.files || []];
     e.target.value = "";
     if (files2.length) run("aa", async () => {
