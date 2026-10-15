@@ -1405,6 +1405,10 @@ button.fg-pm-name:hover { color: var(--accent); }
 .fg-pm-star { padding: 0 .2cqw; font-size: 1.15cqw; line-height: 1; color: var(--accent); background: none; border: 0; cursor: pointer; }
 .fg-pm-star[disabled] { cursor: default; opacity: 1; }
 .fg-pm-cell:not(.is-anchor) .fg-pm-star { opacity: .45; } .fg-pm-cell:not(.is-anchor) .fg-pm-star:hover:not([disabled]) { opacity: 1; }
+/* 表下面那行：★ 是什么（按开没开「表情只换脸」说） */
+.fg-pm-legend { line-height: 1.7; }
+.fg-pm-warn { font-size: .9cqw; line-height: 1.5; color: var(--warn, #e8b04a); }
+.fg-pm-legend b { color: var(--accent); font-weight: 600; }
 .fg-pm-thumb { display: inline-grid; place-items: center; width: 2.8cqw; height: 3.6cqw; margin-left: .3cqw; padding: 0; overflow: hidden; border-radius: .4cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink-dim); font-size: .9cqw; cursor: pointer; }
 .fg-pm-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
 .fg-pm-thumb:hover { border-color: var(--accent); }
@@ -1745,6 +1749,7 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-pm-offtag { font-size: 2.2cqw; } .fg-pm-status { font-size: 2.6cqw; } .fg-pm-life { font-size: 2.4cqw; } .fg-pm-situ { gap: 1cqw; padding-top: 1cqw; }
   .fg-pm-cell input { width: 3.6cqw; height: 3.6cqw; } .fg-pm-star { font-size: 3.6cqw; padding: 0 .6cqw; }
   .fg-pm-thumb { width: 7cqw; height: 9cqw; font-size: 2.6cqw; border-radius: 1cqw; }
+  .fg-pm-warn { font-size: 2.6cqw; }
   .fg-pm-face { grid-template-columns: 1fr; max-width: 80cqw; }
   .fg-face-editor .fg-aa-frame { height: 80cqw; }
   .fg-aa-frame, .fg-aa-play { height: 90cqw; } .fg-aa-play.is-close { width: 90cqw; }
