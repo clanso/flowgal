@@ -345,3 +345,38 @@ test('gate: 一个情绪挂在几个动作下：让设计师重写其中一个�
     assert.notEqual(prompts[0], prompts[1], '两个动作发出去的词不一样')
   })
 })
+
+test('gate: 单张换种子重画：词不变，这张用自己的种子（指定的或随机的），别的立绘还用这个人的种子；用回这个人的种子能撤掉', async () => {
+  await withEngine(request => (isActing(request) ? JSON.stringify(SHEET) : isSprite(request) ? spriteReply(request) : '{}'), async ({ engine, requests }) => {
+    const smile = variantKey(look, 'smile'), happy = variantKey(look, 'happy')
+    await engine.castAction('g', 'sprite', { name: '林岚', emotions: ['smile', 'happy'] })
+    let lin = await until(engine, 'g', p => [smile, happy].every(k => p.sprites[k]?.assetId && !p.spriteStatus[k]), '先画两张')
+    assert.deepEqual(requests.map(r => r.parameters.seed), [7, 7], '默认都用这个人的种子')
+    const tags = lin.sprites[smile].tags
+    const drawn = n => p => requests.length === n && !p.spriteStatus[smile]
+
+    const fixed = await engine.castAction('g', 'sprite-reseed', { name: '林岚', key: smile, seed: 42 })
+    assert.deepEqual([fixed.seed, fixed.own], [42, true])
+    lin = await until(engine, 'g', drawn(3), '指定种子')
+    assert.equal(requests[2].parameters.seed, 42)
+    assert.deepEqual([lin.sprites[smile].seedOwn, lin.sprites[smile].seed, lin.sprites[smile].tags], [42, 42, tags], '词不变')
+
+    const random = await engine.castAction('g', 'sprite-reseed', { name: '林岚', key: smile })
+    lin = await until(engine, 'g', drawn(4), '随机换一个')
+    assert.equal(requests[3].parameters.seed, random.seed)
+    assert.ok(![7, 42].includes(random.seed))
+
+    // 这张以后重画还用自己的种子；别的立绘照旧
+    await engine.castAction('g', 'sprite', { name: '林岚', emotions: ['smile', 'happy'], tags: '1girl, long black hair, smile' })
+    lin = await until(engine, 'g', p => requests.length === 6 && !p.spriteStatus[smile] && !p.spriteStatus[happy], '重画两张')
+    assert.deepEqual(requests.slice(4).map(r => r.parameters.seed).sort(), [7, random.seed].sort(), '一张用自己的，一张用这个人的')
+    assert.equal(lin.sprites[happy].seedOwn, undefined)
+
+    await engine.castAction('g', 'sprite-reseed', { name: '林岚', key: smile, reset: true })
+    lin = await until(engine, 'g', drawn(7), '用回这个人的种子')
+    assert.equal(requests[6].parameters.seed, 7)
+    assert.equal(lin.sprites[smile].seedOwn, undefined)
+
+    await assert.rejects(engine.castAction('g', 'sprite-reseed', { name: '林岚', key: variantKey(look, 'angry') }), /还没有提示词/)
+  })
+})
