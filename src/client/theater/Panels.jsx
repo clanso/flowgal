@@ -37,7 +37,7 @@ import { CG_MAX_CHARACTERS, POSES } from '../../../lib/vocab.js'
 import { faceBoxFrom, cleanFaceBox } from '../../../lib/face.js'
 import { heightOf } from '../../../lib/stature.js'
 import { DIRECTOR_LIMITS } from '../../../lib/limits.js'
-import { STAGE_SIZES, POSE_WEIGHT, imageConcurrency } from '../../../lib/config.js'
+import { STAGE_SIZES, imageConcurrency } from '../../../lib/config.js'
 import { defaultRects } from '../../../lib/aa-sprite.js'
 
 const STATUS_LABEL = { writing: '分镜中', queued: '排队中', running: '绘制中', failed: '失败', cancelled: '已取消', ready: '' }
@@ -1056,8 +1056,6 @@ function ActingEditor({ gameId, person, emotions, group, turn, used, onOpen, sit
   const [saving, setSaving] = React.useState('') // '' | 'saving' | 'saved' | 出错的原因
   const [incoming, setIncoming] = React.useState(false) // 改着的时候设计师写了新的一版
   const [form, setForm] = React.useState('') // 开着的那块：'more' 让 AI 加动作，'full' 重新设计整套（都能定动作数、写要求）
-  const conf = useConfig()
-  const swap = Boolean(conf && conf.config.images.faceSwap && conf.config.images.backend === 'novelai') // 表情只换脸：★ 是底图，其余只换脸；关着每张整张画
   const [counts, setCounts] = React.useState({ more: '2', full: '' }) // 加几个 / 整套设计几个（空着由设计师定）
   const [ask, setAsk] = React.useState('')
   const [draw, setDraw] = React.useState('base')
@@ -1186,7 +1184,7 @@ function ActingEditor({ gameId, person, emotions, group, turn, used, onOpen, sit
           <div className="fg-row">
             <select className="fg-select" value={reachable ? draw : ''} disabled={!reachable} onChange={e => setDraw(e.target.value)}>
               <option value="">先不画（用到了再画）</option>
-              <option value="base">{swap ? '画每个新动作的底图' : '每个新动作先画 ★ 那一张'}</option>
+              <option value="base">画每个新动作的底图</option>
               <option value="all">新动作里的表情全画出来</option>
             </select>
             <span className="fg-note">{reachable ? `画「${lookLabel(group.look)}」这一身` : '这套样子在剧情里已经不会再出现，只加不画'}</span>
@@ -1215,7 +1213,7 @@ function ActingEditor({ gameId, person, emotions, group, turn, used, onOpen, sit
   const setPoses = poses => setDraft(d => ({ ...d, poses: settleNeutral(poses.map(p => ({ ...p, emotions: [...p.emotions] }))) }))
   const setFace = (e, patch) => setDraft(d => ({ ...d, faces: { ...d.faces, [e]: { desc: '', tags: '', ...(d.faces[e] || {}), ...patch } } }))
   const redraw = async () => {
-    if (!(await confirmBox(`按这套设计重画${person.name}「${lookLabel(group.look)}」的 ${drawn.length} 张差分？${swap ? '每个动作的底图整张重画，其余表情在新底图上换脸。' : '每张照它所在动作的身体 tag 整张重画，每个动作各用一个种子。'}`, { ok: '重画' }))) return
+    if (!(await confirmBox(`按这套设计重画${person.name}「${lookLabel(group.look)}」的 ${drawn.length} 张差分？每个动作的底图整张重画，其余表情在新底图上换脸。`, { ok: '重画' }))) return
     run('redraw', () => api.cast(gameId, 'sprite', { name: person.name, emotions: drawn, rewrite: true, keepFaces: true, ...at }), '已排队：照这套设计重画')
   }
   // 这一身里每一格存在哪张差分（lib/poses.js 的 slotKey）：勾上了还没画的，「一键补足」一起画
@@ -1226,7 +1224,7 @@ function ActingEditor({ gameId, person, emotions, group, turn, used, onOpen, sit
   const missing = draft.poses.flatMap(p => p.emotions.map(e => ({ p, e, key: slot(p, e) })))
     .filter(c => !(sprites[c.key] && sprites[c.key].assetId) && !BUSY.includes(((person.spriteStatus || {})[c.key] || {}).status))
   const fillAll = async () => {
-    if (!(await confirmBox(`把${person.name}「${lookLabel(group.look)}」勾上了还没画的 ${missing.length} 个「动作 × 表情」都画出来？${swap ? '每个动作没有底图的先整张画底图，其余在底图上只换脸。' : '每张照它所在的动作整张画。'}`, { ok: '都画出来' }))) return
+    if (!(await confirmBox(`把${person.name}「${lookLabel(group.look)}」勾上了还没画的 ${missing.length} 个「动作 × 表情」都画出来？每个动作没有底图的先整张画底图，其余在底图上只换脸。`, { ok: '都画出来' }))) return
     run('fill', () => api.cast(gameId, 'sprite', { name: person.name, emotions: [...new Set(missing.map(c => tokenFor(sheet, c.e, c.p.id, emotions)))], rewrite: false, ...at }), `已排队：${missing.length} 张`)
   }
   const cell = (pose, e) => {
@@ -1283,9 +1281,9 @@ function ActingEditor({ gameId, person, emotions, group, turn, used, onOpen, sit
         {unlabeled(acting) && <button type="button" className="fg-btn is-mini" disabled={designing || busy === 'label'} title="设计师读一遍资料和剧情，给每个动作标本性还是处境、写前提，表演笔记分成本性和这一局两条" onClick={labelAll}>让设计师标出本性和处境</button>}
         <button type="button" className="fg-btn is-mini" disabled={designing || busy === 'review'} title="设计师读到最新一轮，按他现在的处境复盘：前提不成立的处境动作收起，收起的动作里的情绪重新安家，需要时设计新动作，重写表演笔记·这一局" onClick={review}>{designing ? '设计中…' : '让设计师按现在的处境复盘'}</button>
       </div>
-      <PoseMatrix poses={draft.poses} rows={rows} lib={emotions} onChange={setPoses} prefix="p" lockLast keepOne cell={cell} rowOpen={faceRow} extra={extra} off={off} swap={swap} />
+      <PoseMatrix poses={draft.poses} rows={rows} lib={emotions} onChange={setPoses} prefix="p" lockLast keepOne cell={cell} rowOpen={faceRow} extra={extra} off={off} />
       <div className="fg-row" style={{ justifyContent: 'flex-end' }}>
-        <span className="fg-note">改了自动存，只影响之后画的；平静总在第一个动作上（登场立绘就是它）。</span>
+        <span className="fg-note">改了自动存，只影响之后画的；平静总在第一个动作的底图上（登场立绘就是它）。</span>
         {status && <span className="fg-note">{status}</span>}
       </div>
     </div>
@@ -2122,9 +2120,6 @@ function ImagesSection({ data }) {
       <Field label="表情只换脸" hint="galgame 的「一个动作 + 一套表情」：同一套衣服每个动作整张画一张底图，同一个动作的其余情绪用 NovelAI 局部重绘只重画脸（眉、眼、两颊、嘴），身体和衣服一个像素都不动。每个人有哪些动作、哪种情绪归哪个动作、脸上什么样，是立绘设计师读完资料和剧情给他设计的（人物志 →「动作与表情」）。底图画好后要认一次脸：开着 FlowGal 的页面（聊天页、剧场都行）、认脸模型下好时自动认（下了认脸大模型就一律用大模型），认不准的在人物志里点开底图框一下。只对 NovelAI 有效；关掉就像以前一样每个情绪整张画。已经画好的立绘不会自动重画。"><Toggle value={cfg.images.faceSwap} onChange={v => p({ faceSwap: v, faceSwapPicked: true })} /></Field>
       {cfg.images.faceSwap && cfg.images.backend === 'novelai' && <FaceSettings cfg={cfg} onPatch={p} />}
       {cfg.images.faceSwap && <PoseGroups cfg={cfg} onPatch={p} />}
-      <Field label="动作拉开差别" hint="同一种情绪画在这个人的几个动作上时，让动作真的不一样。每个动作各用一个种子：第一个动作（平静、登场立绘在它上面）用这个人自己的种子，别的动作各错开一个固定的种子，同一个动作里的几张表情还是同一个种子，构图稳。动作词加重：这个动作的身体 tag（站姿、手放哪儿）提到角色块最前面，按这个权重加重；1 是只提前不加重。动作里写了手怎么放时，立绘设计师另写的手（按着胸口、握着手腕这种）跟动作打架，拿掉，手照动作画；坐着、跪着的动作不再补 standing（都在「提示词 → 过滤规则 → 动作」里能改）。以前都用一个种子、动作的词排在最后，种子定下的构图压过动作，同一种情绪在几个动作上画出来差不多。只影响之后画的，已经画好的在人物志里重画。">
-        <div className="fg-row"><Toggle value={cfg.images.poseSeeds} onChange={v => p({ poseSeeds: v })} /><span className="fg-note">每个动作各用一个种子</span><span className="fg-note">动作词加重</span><Dial value={cfg.images.poseWeight} min={POSE_WEIGHT[0]} max={POSE_WEIGHT[1]} step={0.05} label="动作词加重" onCommit={v => p({ poseWeight: v })} /></div>
-      </Field>
       <Field label="立绘设计师" hint="给一个人画第一张立绘之前，先读完人物卡、世界书和到这一轮为止的全部剧情，按他的人设和经历设计专属的几个动作和每种情绪的表情（人物志 →「动作与表情」里能看能改）；之后每张差分的提示词也由它读完资料来写，照设计画，只换脸的表情直接用设计好的。一个角色一次写一批差分（用导演的模型和资料长度设置；窗口装不下时从最早的剧情删起）。关掉则按档案机械拼、用通用动作组。"><Toggle value={cfg.images.spriteWriter} onChange={v => p({ spriteWriter: v })} /></Field>
       {cfg.images.backend === 'novelai' && (cfg.novelai?.endpoint || 'official') === 'official'
         ? <Field label="并发"><span className="fg-note">一次画 1 张：NovelAI 官方接口一个账号同时只能画一张（多发的会被它拒绝）。换成自建接入点、ComfyUI、WebUI、OpenAI 兼容时这里能调。</span></Field>

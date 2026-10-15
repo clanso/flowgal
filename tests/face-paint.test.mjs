@@ -303,9 +303,8 @@ test('gate: 换脸（默认画法）：等认脸的底图进后台清单 → 放
     assert.equal(infills.length, 2, '第一次跑偏，第二次过了')
     const [first, second] = infills
     assert.deepEqual([first.parameters.width, first.parameters.height], [1024, 1024], '头那一块放大到 1024 见方')
-    assert.equal(first.parameters.seed, lin.sprites[cold].seed, '第一次跟底图同一个种子')
-    assert.notEqual(lin.sprites[cold].seed, 7, '抱臂不是第一个动作：底图用这个动作自己的种子')
-    assert.notEqual(second.parameters.seed, lin.sprites[cold].seed, '再画换种子')
+    assert.equal(first.parameters.seed, 7, '第一次跟底图同一个种子')
+    assert.notEqual(second.parameters.seed, 7, '再画换种子')
     assert.deepEqual([first.parameters.inpaintImg2ImgStrength, second.parameters.inpaintImg2ImgStrength], [0.8, 0.8], '生气「强」0.8，跑偏了只换种子、强度不降')
     assert.match(first.parameters.v4_prompt.caption.base_caption, /portrait/)
     // 表情词加重；底图原来的表情（平静的，生气没有的）写进角色负面
@@ -369,7 +368,7 @@ test('gate: 换脸（默认画法）：等认脸的底图进后台清单 → 放
     const again = lin.sprites[angry].face.paint
     assert.deepEqual([again.strength, again.tries, again.check.ok, again.history.map(t => t.flat)], [1, 3, true, [true, true, false]])
 
-    // 大笑默认「极」：不换脸，整张画（同一个种子；大笑在第一个动作「日常」里，用这个人自己的种子）
+    // 大笑默认「极」：不换脸，整张画（同一个种子）
     const laugh = variantKey(look, 'laugh')
     const before = requests.length
     await engine.castAction('g', 'sprite', { name: '林岚', emotion: 'laugh' })
