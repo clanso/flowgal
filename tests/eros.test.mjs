@@ -126,11 +126,14 @@ const PACK = [
   { id: 'rainLong', kind: 'sfx', name: '雨打窗户', category: '天气/雨', description: '雨点一直打在玻璃上（约 1 分钟）', tags: ['雨', '窗户'] },
   { id: 'nolen', kind: 'sfx', name: '床吱呀', category: '床铺/摇晃', description: '', tags: ['床', '吱呀'] },
   { id: 'blip', kind: 'blip', name: '女声哔哔', category: '打字音', description: '（约 30 秒）', tags: [] },
+  // 放在环境音库里的循环：没写时长也算（环境音本来就是循环的底）
+  { id: 'ambTent', kind: 'ambience', name: '触手巢穴', category: '异形/巢穴', description: '满屋子的触手一直在蠕动的湿黏声', tags: ['触手', '蠕动'] },
+  { id: 'ambShort', kind: 'ambience', name: '水滴', category: '室内/水', description: '一滴水落下（约 2 秒）', tags: ['水滴'] },
 ]
 
 test('gate: 音效包里的时长认得出：十秒以上的连续录音能当节奏底，单发的不能；给导演看的那一行截短时时长留着', () => {
   assert.deepEqual(['kiss1', 'cum1', 'slow', 'tent', 'tentTap', 'nolen'].map(id => soundSeconds(PACK.find(s => s.id === id))), [1, 1, 138, 24, 2, null])
-  assert.deepEqual(PACK.filter(bedLength).map(s => s.id), ['slow', 'slow2', 'slowBin', 'fast', 'tent', 'rainLong', 'nolen'], '没写时长的交给导演按名字判断；打字音不算')
+  assert.deepEqual(PACK.filter(bedLength).map(s => s.id), ['slow', 'slow2', 'slowBin', 'fast', 'tent', 'rainLong', 'nolen', 'ambTent'], '没写时长的交给导演按名字判断；环境音库里的也算；打字音、写着很短的不算')
   assert.ok(BED_MIN_SECONDS >= 8)
   const long = { id: 'bin', name: '抽插·中速（黑耳）', category: '亲密/抽插', description: '中速稳定节奏的交合抽插声，湿润黏腻的水声一直在，偶尔有床的吱呀；黑耳人头立体声录制，适合戴耳机听（约 2.1 分钟）' }
   const line = soundLine(long)
@@ -143,7 +146,7 @@ test('gate: 音效包里的时长认得出：十秒以上的连续录音能当�
 test('gate: 节奏底候选：按正文挑十秒以上的录音，同一种只列一段，音效候选里已经列了的（和同一种的）不重复；日常的段落不列', () => {
   const text = '他压着她慢速地抽插，触手也缠了上来。'
   const picked = bedCandidates(PACK, text).map(s => s.id)
-  assert.ok(picked.includes('tent') && picked.includes('fast'), picked.join())
+  assert.ok(picked.includes('tent') && picked.includes('fast') && picked.includes('ambTent'), picked.join())
   assert.equal(picked.filter(id => id.startsWith('slow')).length, 1, '抽插·慢速、慢速 2、慢速（黑耳）是同一种')
   assert.ok(!picked.includes('tentTap') && !picked.includes('kiss1'), '单发的不列')
   assert.ok(!picked.includes('rainLong'), '正文没提的不列')
@@ -177,6 +180,7 @@ test('gate: 节奏底的录音（erosLoop）只收音效库里够长的，换档
   assert.equal(script.lines.U6.scene.erosLoop, undefined, '一秒的单发不能当节奏底')
   assert.equal(script.lines.U8.scene.erosLoop, 'none')
   assert.equal(normalizeScript({ scene: { erosLoop: 'ghost' }, cast: [], lines: [] }, units, ids).scene.erosLoop, undefined)
+  assert.equal(normalizeScript({ scene: { erosLoop: 'ambTent' }, cast: [], lines: [] }, units, ids).scene.erosLoop, 'ambTent', '环境音库里的循环也能当节奏底')
   // 亲密场面里配的库里的声音算进亲密音效的名额，不挤掉日常的音效名额
   const busy = normalizeScript({ scene: { eros: 'slow' }, cast: [], lines: units.map((u, i) => ({ u: u.id, sfx: i < 6 ? 'cum1' : 'kiss1', ...(i === 6 ? { scene: { eros: 'none' } } : {}) })) }, units, { ...ids, limits: { sfx: 1, erosSfx: 5 } })
   assert.deepEqual(units.map(u => busy.lines[u.id]?.sfx || ''), ['cum1', 'cum1', 'cum1', 'cum1', 'cum1', '', 'kiss1', '', ''])
@@ -205,6 +209,7 @@ test('gate: 导演提示词里声音先用音效库：像亲密场面的一轮�
   assert.match(beds, /- tent｜触手抽插/)
   for (const id of ['slow', 'slow2', 'slowBin', 'fast', 'tent']) assert.ok(!(sfx.includes(`- ${id}｜`) && beds.includes(`- ${id}｜`)), id + ' 两边重复列了')
   assert.doesNotMatch(beds, /tentTap|kiss1|rainLong/)
+  assert.ok(text.includes('- ambTent｜触手巢穴') && !beds.includes('ambTent'), '环境音候选里列过的不在节奏底候选里重复')
   assert.match(text, /声音先用玩家音效库里的录音/)
   assert.equal(out.script.scene.erosLoop, 'slow')
   assert.equal(out.script.lines.U2.scene.erosLoop, 'fast')
