@@ -33,12 +33,33 @@ function spriteWriterReply(prompt) {
     const id = emotionId((m[2].match(/情绪「([^」]+)」/) || [])[1])
     const base = emotionId((m[2].match(/接近 (\S+)$/) || [])[1])
     const face = EXPRESSIONS[id] || EMOTION_TAGS[id] || EMOTION_TAGS[base] || EMOTION_TAGS.neutral
-    sprites.push({ key: m[1], tags: [appearance, outfit, ...states, face].filter(Boolean).join(', ') })
+    // 不按动作库（人物志里自由画的一张）：照玩家的要求摆一个动作，另写这个动作的名字、描述、身体 tag
+    const free = m[2].includes('不按动作库') ? freePose((m[2].match(/玩家对这张的要求（[^）]*）：(.*)$/) || [])[1] || '') : null
+    sprites.push({ key: m[1], tags: [appearance, outfit, ...states, free && free.tags, face].filter(Boolean).join(', '), ...(free ? { pose: free } : {}) })
   }
   // 补设计合进写词：先补设计（同假的表演设计师），两份一起回
   if (prompt.includes('【先补设计】')) return JSON.stringify({ acting: JSON.parse(actingWriterReply(prompt)), sprites }, null, 1)
   return JSON.stringify({ sprites }, null, 1)
 }
+
+// 假立绘设计师自由设计的动作：要求里提到窗、书、剑就照着摆，其余靠着墙
+function freePose(ask) {
+  const pick = [
+    [/窗/, { label: '倚着窗台', tags: 'leaning on windowsill, looking outside, hand on window frame' }],
+    [/书|信/, { label: '捧着书', tags: 'holding book with both hands, book against chest' }],
+    [/剑|刀/, { label: '握剑回头', tags: 'holding sword, looking back over shoulder' }],
+  ].find(([re]) => re.test(ask))
+  const pose = pick ? pick[1] : { label: '靠着墙', tags: 'leaning against wall, arms behind back, one knee bent' }
+  return { ...pose, desc: ask || '设计师自由发挥的一个动作', kind: 'self' }
+}
+
+// 让 AI 加动作：从这几个里按顺序挑，情绪只放清单里有的
+const MORE_POSES = [
+  { label: '托着下巴', kind: 'self', desc: '想事情、听人说话入神的时候', tags: 'hand on own chin, head tilt, elbow resting on arm', emotions: ['thinking', 'smile', 'serious', 'neutral'] },
+  { label: '双手捧着书', kind: 'self', desc: '在乐谱和书后面藏住表情', tags: 'holding book with both hands, book against chest, looking over book', emotions: ['shy', 'happy', 'surprised', 'smile'] },
+  { label: '扶着窗框回头', kind: 'situ', premise: '还在琴房里等人', desc: '听见脚步声回过头来', tags: 'hand on window frame, looking back over shoulder', emotions: ['sad', 'worried', 'smile', 'surprised'] },
+  { label: '伸手要击掌', kind: 'self', desc: '高兴到忍不住的时候', tags: 'arm raised, open palm, leaning forward', emotions: ['happy', 'laugh', 'smug', 'determined'] },
+]
 
 // 假动作与表情设计：按角色档案里的名字回一套写好的设计（真模型会读完资料和剧情来设计）。
 // 情绪清单里每个都至少放进一个动作（平静、微笑这类常用的放进好几个，演示剧场身子不动只换脸）：写好的按写好的放，其余放进第一个动作；补设计时只回要补的那几条。
@@ -96,6 +117,16 @@ function actingWriterReply(prompt) {
   const list = prompt.slice(prompt.indexOf(head)).split('\n').map(line => (line.match(/^- ([^（：]+)（/) || [])[1]).filter(Boolean)
   const adding = prompt.includes('【已有的动作与表情设计】')
   const faces = list.map(e => ({ emotion: e, ...(plan.faces[e] || { desc: '', tags: EXPRESSIONS[e] || EMOTION_TAGS[e] || 'calm, closed mouth' }) }))
+  const more = prompt.match(/给这个人新加 (\d+) 个动作/)
+  if (more) {
+    const poses = Array.from({ length: Number(more[1]) }, (_, i) => {
+      const base = MORE_POSES[i % MORE_POSES.length]
+      const emotions = base.emotions.filter(e => list.includes(e))
+      return { ...base, id: 'new' + (i + 1), label: base.label + (i >= MORE_POSES.length ? ' ' + (Math.floor(i / MORE_POSES.length) + 1) : ''), emotions: emotions.length ? emotions : list.slice(0, 1) }
+    })
+    const wanted = new Set(poses.flatMap(p => p.emotions))
+    return JSON.stringify({ poses, faces: faces.filter(f => wanted.has(f.emotion)) }, null, 1)
+  }
   if (adding) return JSON.stringify({ poses: [{ id: 'p1', emotions: list }], faces }, null, 1)
   const placed = new Set(plan.poses.flatMap(p => p.emotions))
   const poses = plan.poses.map((p, i) => ({ id: 'p' + (i + 1), ...p, emotions: [...p.emotions, ...(i ? [] : list.filter(e => !placed.has(e)))] }))

@@ -10,6 +10,7 @@ import { PoseMatrix } from './PoseMatrix.jsx'
 import { PromptBook } from './PromptBook.jsx'
 import { settleNeutral, slotKey, tokenFor, parseToken, cleanPoseGroups, sheetOf, homePose, poseFor } from '../../../lib/poses.js'
 import { poseLife, lifeText, KIND_LABEL as POSE_KIND_LABEL, knownStates, unlabeled } from '../../../lib/pose-life.js'
+import { ASK_CHARS } from '../../../lib/acting.js'
 import { AaWorkbench, RectEditor } from './AaWorkbench.jsx'
 import { visionApi, frameSprite } from './vision.js'
 import { framedResult } from './faceFramer.js'
@@ -842,6 +843,27 @@ function VariantEditor({ gameId, person, group, emotion: token, emotions, sheet 
   const at = group.current ? {} : group.era ? { look: group.key } : { turn }
   const label = `${person.name} · ${lookLabel(group.look)} · ${entry.label}${pose && sheet && sheet.poses.length > 1 ? ` · ${pose.label}` : ''}`
   const [viewing, setViewing] = React.useState(false)
+  // 给设计师的要求（接在这张差分那一行后面）；不按动作库：动作照要求自由设计，画好绑到勾的动作 / 这个情绪的格子，或者另存成新动作（都行）
+  const designed = Boolean(sheet && sheet.designed)
+  const [ask, setAsk] = React.useState(() => (record ? record.ask || (record.free && record.free.ask) || '' : ''))
+  const [free, setFree] = React.useState(() => Boolean(record && record.free))
+  const [into, setInto] = React.useState(() => (designed && pose ? [pose.id] : []))
+  const [bare, setBare] = React.useState(!designed)
+  const [asPose, setAsPose] = React.useState(false)
+  const [poseName, setPoseName] = React.useState('')
+  const toggleInto = id => setInto(list => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]))
+  const bound = (designed ? into.length : bare) || asPose
+  // 存成了新动作就把那一项收起来（再点一次不会又存一个）
+  const drawFree = (id, extra, ok) => run(id, async () => {
+    await api.cast(gameId, 'sprite-free', { name: person.name, emotion, ask, into: designed ? into : [], bare: !designed && bare, newPose: asPose ? { label: poseName.trim() } : null, ...extra, ...at })
+    setAsPose(false)
+    setPoseName('')
+  }, ok)
+  const whereText = () => {
+    const names = designed ? sheet.poses.filter(p => into.includes(p.id)).map(p => `「${p.label}」`) : bare ? [`「${entry.label}」这一格`] : []
+    const parts = [...(names.length ? [`放进${names.join('、')}`] : []), ...(asPose ? [`存成新动作${poseName.trim() ? `「${poseName.trim()}」` : ''}`] : [])]
+    return parts.length ? `画一张，${parts.join('，再')}（共用同一张图）` : '还没选：勾一个动作，或者存成新动作'
+  }
   return (
     <div className="fg-variant" ref={boxRef}>
       {/* 做过逆转式动态的直接动起来；点一下放大看 */}
@@ -853,11 +875,48 @@ function VariantEditor({ gameId, person, group, emotion: token, emotions, sheet 
         {st && st.error && <div className={`fg-note${st.status === 'face' || st.status === 'writing' ? '' : ' fg-err'}`}>{st.error}</div>}
         <FaceInfo gameId={gameId} person={person} group={group} emotionKey={key} record={record} emotions={emotions} />
         <EyeInfo gameId={gameId} person={person} spriteKey={key} record={record} emotions={emotions} />
-        <textarea className="fg-textarea" value={tags} onChange={e => setTags(e.target.value)} onKeyDown={e => e.stopPropagation()} placeholder={record && record.face ? '只换脸：这里只写表情（眉、眼、嘴、脸红、泪、视线）' : '还没有提示词：点「让设计师写」，它会读完资料和剧情来写'} />
-        <div className="fg-note">{record && record.writer ? WRITER_LABEL[record.writer] || record.writer : ''}{record && record.seed != null ? ` · 种子 ${record.seed}` : ''}{!reachable ? ' · 这套样子在剧情里已经不会再出现（外貌改过），只能删除或上传' : ''}</div>
         <div className="fg-row">
-          <button type="button" className="fg-btn is-primary" disabled={!reachable || busy === 'w'} onClick={() => run('w', () => api.cast(gameId, 'sprite', { name: person.name, emotion: token, rewrite: true, ...at }), '已交给立绘设计师：写好词就画')}>{record && record.assetId ? '让设计师重写并重画' : '让设计师写并画'}</button>
-          <button type="button" className="fg-btn" disabled={!reachable || !tags.trim() || busy === 'u'} onClick={() => run('u', () => api.cast(gameId, 'sprite', { name: person.name, emotion: token, tags, ...at }), '已排队：按这些词画')}>按这些词画</button>
+          <span className="fg-note">画法</span>
+          <button type="button" className={`fg-btn is-mini${!free ? ' is-on' : ''}`} onClick={() => setFree(false)}>按动作库</button>
+          <button type="button" className={`fg-btn is-mini${free ? ' is-on' : ''}`} onClick={() => setFree(true)}>不按动作库</button>
+          <span className="fg-note">{free ? '这一张的动作照你的要求自由设计（不写要求设计师自己发挥），画好绑到下面选的地方' : pose && designed ? `动作照「${pose.label}」画` : '动作照设置里的通用动作组画'}</span>
+        </div>
+        {free && (
+          <div className="fg-askbox">
+            {designed ? (
+              <div className="fg-ticks">
+                <span className="fg-note">绑到</span>
+                {sheet.poses.map(p => (
+                  <label key={p.id} className={`fg-tick${into.includes(p.id) ? ' is-on' : ''}`} title={p.emotions.includes(emotion) ? `画好放进「${p.label} × ${entry.label}」这一格` : `「${p.label}」里还没有「${entry.label}」：放进去`}>
+                    <input type="checkbox" checked={into.includes(p.id)} onChange={() => toggleInto(p.id)} />{p.label}{p.emotions.includes(emotion) ? null : <small>＋{entry.label}</small>}
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="fg-ticks">
+                <label className={`fg-tick${bare ? ' is-on' : ''}`}><input type="checkbox" checked={bare} onChange={e => setBare(e.target.checked)} />放到「{entry.label}」这一格</label>
+              </div>
+            )}
+            <div className="fg-ticks">
+              <label className={`fg-tick${asPose ? ' is-on' : ''}`} title="这张当底图，另存成一个新动作（这个情绪放进去）；之后这个动作里的别的情绪在它上面画"><input type="checkbox" checked={asPose} onChange={e => setAsPose(e.target.checked)} />另存成新动作</label>
+              {asPose && <input className="fg-input fg-posename" maxLength={12} value={poseName} placeholder="动作名（不填设计师起）" onChange={e => setPoseName(e.target.value)} onKeyDown={e => e.stopPropagation()} />}
+            </div>
+            <div className="fg-note">{whereText()}{asPose && !designed ? '。他还没有动作设计：会以这个动作开一份设计（平静也放进来），别的情绪之后由表演设计师补进来' : ''}</div>
+          </div>
+        )}
+        <textarea className="fg-textarea" value={tags} onChange={e => setTags(e.target.value)} onKeyDown={e => e.stopPropagation()} placeholder={record && record.face ? '只换脸：这里只写表情（眉、眼、嘴、脸红、泪、视线）' : '还没有提示词：点「让设计师写」，它会读完资料和剧情来写'} />
+        <textarea className="fg-textarea is-short fg-askline" maxLength={ASK_CHARS} value={ask} onChange={e => setAsk(e.target.value)} onKeyDown={e => e.stopPropagation()}
+          placeholder={free ? '你的要求（可以不写，设计师自己发挥）：这一张想要什么动作、什么感觉，比如「坐在窗台上抱着膝盖往外看」「举着剑回头」' : '你的要求（可以不写）：比如「表情再收着一点」「手里拿着那封信」「视线往下」'} />
+        <div className="fg-note">{record && record.writer ? WRITER_LABEL[record.writer] || record.writer : ''}{record && record.seed != null ? ` · 种子 ${record.seed}` : ''}{record && record.free ? ` · 不按动作库自由画的${record.free.ask ? `：${record.free.ask}` : ''}` : record && record.ask ? ` · 带着你的要求：${record.ask}` : ''}{!reachable ? ' · 这套样子在剧情里已经不会再出现（外貌改过），只能删除或上传' : ''}</div>
+        <div className="fg-note">要求接在提示词本「立绘设计师 · 你对这张的要求」那条里发给设计师（那条能改），跟规矩冲突时以你的为准；「按这些词画」只照上面的词。</div>
+        <div className="fg-row">
+          {free ? <>
+            <button type="button" className="fg-btn is-primary" disabled={!reachable || !bound || busy === 'fw'} title={bound ? '' : '先选绑到哪，或者存成新动作'} onClick={() => drawFree('fw', {}, '已交给立绘设计师：自由设计这一张的动作，写好词就画')}>让设计师自由设计并画</button>
+            <button type="button" className="fg-btn" disabled={!reachable || !bound || !tags.trim() || busy === 'fu'} title={bound ? '照上面的词画，动作也照词里写的' : '先选绑到哪，或者存成新动作'} onClick={() => drawFree('fu', { tags }, '已排队：按这些词画')}>按这些词画</button>
+          </> : <>
+            <button type="button" className="fg-btn is-primary" disabled={!reachable || busy === 'w'} onClick={() => run('w', () => api.cast(gameId, 'sprite', { name: person.name, emotion: token, rewrite: true, ask, ...at }), ask.trim() ? '已交给立绘设计师：照你的要求写好词就画' : '已交给立绘设计师：写好词就画')}>{record && record.assetId ? '让设计师重写并重画' : '让设计师写并画'}</button>
+            <button type="button" className="fg-btn" disabled={!reachable || !tags.trim() || busy === 'u'} onClick={() => run('u', () => api.cast(gameId, 'sprite', { name: person.name, emotion: token, tags, ...at }), '已排队：按这些词画')}>按这些词画</button>
+          </>}
           <button type="button" className="fg-btn" disabled={!reachable} onClick={() => fileRef.current && fileRef.current.click()}>上传到这张</button>
           {record && <button type="button" className="fg-btn" onClick={() => run('d', () => api.cast(gameId, 'sprite-delete', { name: person.name, key }), '已删除').then(onClose)}>删除</button>}
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={async e => {
@@ -882,6 +941,9 @@ function VariantEditor({ gameId, person, group, emotion: token, emotions, sheet 
     </div>
   )
 }
+
+/** 玩家填的动作数：正整数，没填或填错了是 0（不设上限）。 */
+const countValue = v => { const n = Math.floor(Number(v)); return Number.isFinite(n) && n > 0 ? n : 0 }
 
 /**
  * 这一身已经画过、或者记过提示词的情绪（「按这套设计重画」「按新笔记重写表情」重画它们）。
@@ -993,7 +1055,12 @@ function ActingEditor({ gameId, person, emotions, group, turn, used, onOpen, sit
   latest.current = draft
   const [saving, setSaving] = React.useState('') // '' | 'saving' | 'saved' | 出错的原因
   const [incoming, setIncoming] = React.useState(false) // 改着的时候设计师写了新的一版
+  const [form, setForm] = React.useState('') // 开着的那块：'more' 让 AI 加动作，'full' 重新设计整套（都能定动作数、写要求）
+  const [counts, setCounts] = React.useState({ more: '2', full: '' }) // 加几个 / 整套设计几个（空着由设计师定）
+  const [ask, setAsk] = React.useState('')
+  const [draw, setDraw] = React.useState('base')
   const unsaved = d => Boolean(d) && JSON.stringify(d) !== sent.current
+  const pending = unsaved(draft) || saving === 'saving'
   React.useEffect(() => {
     if (!acting) { setDraft(null); sent.current = JSON.stringify(null); setIncoming(false); return }
     if (inflight.current || acting.at === ownAt.current) return
@@ -1082,24 +1149,69 @@ function ActingEditor({ gameId, person, emotions, group, turn, used, onOpen, sit
   for (const p of draft ? draft.poses : []) { const life = lifeOf(p.id); if (!life.live) off[p.id] = lifeText(life, stored(p.id)) }
   const review = () => run('review', () => api.cast(gameId, 'acting-review', { name: person.name }), '已交给表演设计师：按到最新一轮的处境复盘（导演日志里能看进度）')
   const labelAll = () => run('label', () => api.cast(gameId, 'acting-label', { name: person.name }), '已交给表演设计师：给每个动作标本性和处境，表演笔记分成两条')
+  // 整套设计（第一次 / 重新设计）可以定动作数、写要求；不填动作数设计师自己定
   const design = async () => {
     if (acting && !(await confirmBox(`让表演设计师重新读一遍资料和剧情，给${person.name}重新设计整套动作和表情？你改过的动作和表情会被换掉（表演笔记里你写的那条不动）；已经画好的立绘不动，要换成新设计就点「按这套设计重画」。`, { ok: '重新设计' }))) return
-    run('design', () => api.cast(gameId, 'acting-design', { name: person.name }), '已交给表演设计师：读完资料和剧情就设计好（导演日志里能看进度）')
+    const n = countValue(counts.full)
+    run('design', async () => { await api.cast(gameId, 'acting-design', { name: person.name, ...(n ? { count: n } : {}), ask }); setForm(''); setAsk('') }, `已交给表演设计师：读完资料和剧情就设计好${n ? `（${n} 个动作）` : ''}（导演日志里能看进度）`)
   }
-  const designing = person.actingBusy || busy === 'design'
+  const designing = person.actingBusy || busy === 'design' || busy === 'more'
+  const { drawn, reachable, at } = drawnIn(person, group, turn)
+  // 让 AI 加动作：已有的不动，只往上加 count 个；加好以后按 draw 画人物志里选着的这一身
+  const more = () => {
+    const n = countValue(counts.more) || 1
+    const paint = reachable ? draw : ''
+    run('more', async () => { await api.cast(gameId, 'acting-more', { name: person.name, count: n, ask, draw: paint, ...at }); setForm(''); setAsk('') }, `已交给表演设计师：加 ${n} 个动作${paint ? '，加好就画' : ''}（导演日志里能看进度）`)
+  }
+  const askBox = mode => (
+    <div className="fg-askbox">
+      <div className="fg-row">
+        <b>{mode === 'more' ? '让 AI 加动作' : acting ? '重新设计整套' : '设计动作与表情'}</b>
+        <span className="fg-note">{mode === 'more' ? '已有的动作和表情一概不动，只往上加新的动作（新动作里放哪些情绪、各自的表情，设计师一起设计）' : '设计师读完资料和剧情设计整套动作和每种情绪的表情'}</span>
+      </div>
+      <div className="fg-field"><label>{mode === 'more' ? '加几个动作' : '设计几个动作'}</label>
+        <div className="fg-row">
+          <input className="fg-input fg-count" type="number" min="1" step="1" value={counts[mode]} placeholder={mode === 'more' ? '1' : '设计师定'} onChange={e => { const v = e.target.value; setCounts(c => ({ ...c, [mode]: v })) }} onKeyDown={e => e.stopPropagation()} />
+          <span className="fg-note">{mode === 'more' ? '想加多少写多少' : '不填由设计师按人设和剧情自己定；填了就照这个数设计'}</span>
+        </div>
+      </div>
+      <div className="fg-field"><label>你的要求</label>
+        <textarea className="fg-textarea is-short" maxLength={ASK_CHARS} value={ask} onChange={e => setAsk(e.target.value)} onKeyDown={e => e.stopPropagation()}
+          placeholder={mode === 'more' ? '可以不写。比如：加一个坐着的、一个跟阿黛尔有关的；要有拿着坠子的；别再要抱臂类的了' : '可以不写。比如：动作要安静克制一点；多设计几个和剑有关的；要有一个躺着的'} />
+      </div>
+      {mode === 'more' && (
+        <div className="fg-field"><label>加好以后</label>
+          <div className="fg-row">
+            <select className="fg-select" value={reachable ? draw : ''} disabled={!reachable} onChange={e => setDraw(e.target.value)}>
+              <option value="">先不画（用到了再画）</option>
+              <option value="base">画每个新动作的底图</option>
+              <option value="all">新动作里的表情全画出来</option>
+            </select>
+            <span className="fg-note">{reachable ? `画「${lookLabel(group.look)}」这一身` : '这套样子在剧情里已经不会再出现，只加不画'}</span>
+          </div>
+        </div>
+      )}
+      <div className="fg-row">
+        <span className="fg-note">要求接在提示词本「表演设计师 · 追加要求」那条里发给设计师（那条能改），跟规矩冲突时以你的为准。</span>
+        <span className="fg-spacer" />
+        {acting && <button type="button" className="fg-btn is-mini" onClick={() => setForm('')}>收起</button>}
+        {mode === 'more'
+          ? <button type="button" className="fg-btn is-mini is-primary" disabled={designing || pending} title={pending ? '等修改存好' : ''} onClick={more}>{designing ? '设计中…' : `让设计师加 ${countValue(counts.more) || 1} 个动作`}</button>
+          : <button type="button" className={`fg-btn is-primary${acting ? ' is-mini' : ''}`} disabled={designing} onClick={design}>{designing ? '设计中…' : acting ? '重新设计' : '现在设计'}</button>}
+      </div>
+    </div>
+  )
   if (!draft) {
     return (
       <div className="fg-person-form fg-acting">
         <div className="fg-note">还没设计。第一次给{person.name}画立绘之前，表演设计师会先读完人物卡、世界书、到这一轮为止的全部剧情和档案，写一份表演笔记（这个人怎么流露情绪，在「档案」里能看能改），按人设、经历和在故事里的处境设计专属的动作，以及每种情绪在脸上的样子；之后的底图和表情差分都照着画。没开立绘设计师、或者设计不出来时，用设置里的通用动作组。</div>
-        <div className="fg-row" style={{ justifyContent: 'flex-end' }}><button type="button" className="fg-btn is-primary" disabled={designing} onClick={design}>{designing ? '设计中…' : '现在设计'}</button></div>
+        {askBox('full')}
       </div>
     )
   }
   // 表里改的：平静总在第一个动作的底图上（跟存的时候规整的一样，免得删了第一个动作以后表上看不出来）
   const setPoses = poses => setDraft(d => ({ ...d, poses: settleNeutral(poses.map(p => ({ ...p, emotions: [...p.emotions] }))) }))
   const setFace = (e, patch) => setDraft(d => ({ ...d, faces: { ...d.faces, [e]: { desc: '', tags: '', ...(d.faces[e] || {}), ...patch } } }))
-  const { drawn, reachable, at } = drawnIn(person, group, turn)
-  const pending = unsaved(draft) || saving === 'saving'
   const redraw = async () => {
     if (!(await confirmBox(`按这套设计重画${person.name}「${lookLabel(group.look)}」的 ${drawn.length} 张差分？每个动作的底图整张重画，其余表情在新底图上换脸。`, { ok: '重画' }))) return
     run('redraw', () => api.cast(gameId, 'sprite', { name: person.name, emotions: drawn, rewrite: true, keepFaces: true, ...at }), '已排队：照这套设计重画')
@@ -1150,10 +1262,12 @@ function ActingEditor({ gameId, person, emotions, group, turn, used, onOpen, sit
       <div className="fg-row">
         <span className="fg-note">{acting.by === 'user' ? '你改过的设计' : `表演设计师读到第 ${acting.turn != null ? acting.turn : '?'} 轮设计的`} · {draft.poses.length} 个动作{acting.height ? ` · 估的身高 ${acting.height} 厘米${person.height ? `（档案里写的 ${person.height} 优先）` : '（档案里能改）'}` : ''}</span>
         <span className="fg-spacer" />
-        <button type="button" className="fg-btn is-mini" disabled={designing} onClick={design}>{designing ? '设计中…' : '重新设计'}</button>
+        <button type="button" className={`fg-btn is-mini${form === 'more' ? ' is-on' : ''}`} title="已有的动作和表情不动，让设计师照你的要求再加几个动作" onClick={() => setForm(form === 'more' ? '' : 'more')}>让 AI 加动作</button>
+        <button type="button" className={`fg-btn is-mini${form === 'full' ? ' is-on' : ''}`} onClick={() => setForm(form === 'full' ? '' : 'full')}>{designing ? '设计中…' : '重新设计'}</button>
         <button type="button" className="fg-btn is-mini" disabled={!reachable || pending || !drawn.length || busy === 'redraw'} title={pending ? '等修改存好' : ''} onClick={redraw}>按这套设计重画「{lookLabel(group.look)}」{drawn.length ? `（${drawn.length} 张）` : ''}</button>
         <button type="button" className="fg-btn is-mini is-primary" disabled={!reachable || pending || !missing.length || busy === 'fill'} title={pending ? '等修改存好' : '平时用到了才画；这里把勾上了还没画的组合全部画出来'} onClick={fillAll}>一键补足所有表情{missing.length ? `（${missing.length} 张）` : ''}</button>
       </div>
+      {form && askBox(form)}
       {incoming && (
         <div className="fg-row fg-note">
           设计师刚改了这份设计，你正在改的没有冲掉（接着改会存成你的这版）。
