@@ -1328,6 +1328,17 @@
 .fg-emo.is-picked { border-color: #ff6b6b; box-shadow: 0 0 0 2px #ff6b6b; }
 .fg-emo.is-picked::before { content: "✓"; position: absolute; top: .3cqw; right: .3cqw; z-index: 1; width: 1.4cqw; height: 1.4cqw; border-radius: 50%; background: #ff6b6b; color: #111; font-size: .9cqw; line-height: 1.4cqw; text-align: center; }
 .fg-emo:disabled { opacity: .35; cursor: default; transform: none; }
+/* 让 AI 加动作、设计时写的要求；画一张差分「不按动作库」时绑到哪：一块虚线框 */
+.fg-askbox { display: grid; gap: .5cqw; margin: .5cqw 0; padding: .8cqw 1cqw; border-radius: .8cqw; border: 1px dashed color-mix(in oklab, var(--accent) 45%, var(--box-border)); background: rgba(255, 255, 255, .03); }
+.fg-askbox .fg-field { margin: 0; }
+.fg-askbox > .fg-row:first-child b { letter-spacing: .08em; }
+.fg-ticks { display: flex; flex-wrap: wrap; gap: .4cqw; align-items: center; }
+.fg-tick { display: inline-flex; align-items: center; gap: .35em; padding: .25cqw .8cqw; border-radius: 99px; border: 1px solid var(--box-border); font-size: .95cqw; cursor: pointer; }
+.fg-tick.is-on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 18%, transparent); }
+.fg-tick input { margin: 0; accent-color: var(--accent); }
+.fg-tick small { font-size: .8cqw; opacity: .6; }
+.fg-textarea.fg-askline { font-family: var(--font-body); }
+.fg-askbox .fg-count { width: 10cqw; } .fg-askbox .fg-posename { width: 16cqw; }
 .fg-btn.fg-danger:not(:disabled) { border-color: #ff6b6b; color: #ffb3b3; }
 /* 逆转式立绘工作台：左边勾差分，右边框眼睛和嘴、看效果 */
 .fg-aa-bench { padding: 1.4cqw; border-radius: 1.2cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }
@@ -1718,6 +1729,10 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-pb-preview { padding: 2cqw; border-radius: 2cqw; } .fg-pb-preview .fg-row { flex-wrap: wrap; }
   .fg-dlog-chip small { font-size: 2.4cqw; }
   .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }
+  .fg-askbox { padding: 2cqw; gap: 1.4cqw; border-radius: 2cqw; } .fg-ticks { gap: 1.2cqw; }
+  .fg-tick { font-size: 2.8cqw; padding: .8cqw 2.2cqw; } .fg-tick small { font-size: 2.3cqw; }
+  .fg-askbox .fg-count { width: 24cqw; } .fg-askbox .fg-posename { flex: 1; width: auto; min-width: 30cqw; }
+  .fg-variant-body b { font-size: 3.4cqw; }
   .fg-aa-grid { grid-template-columns: 1fr; } .fg-aa-list { max-height: 50cqw; }
   .fg-aa-vision { font-size: 2.6cqw; } .fg-aa-badge { font-size: 2.2cqw; } .fg-aa-vision progress { height: 1.6cqw; }
   .fg-acting .fg-field { grid-template-columns: 1fr; }
