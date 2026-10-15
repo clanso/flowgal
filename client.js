@@ -2875,9 +2875,11 @@ var DIRECTOR_LIMITS = [
   { key: "phone", label: "手机", unit: "个", was: 8, phrase: (n) => `一轮最多 ${n} 个。` },
   { key: "stress", label: "重音", unit: "处", was: 3, phrase: (n) => `一轮最多 ${n} 处，` },
   { key: "pauses", label: "停顿", unit: "处", was: 6, phrase: (n) => `一轮最多 ${n} 处，` },
+  { key: "bgmSwaps", label: "转折点以外换歌", unit: "次", was: 1, phrase: (n) => `一轮最多再换 ${n} 次，` },
   { key: "hush", label: "配乐留白", unit: "次", was: 2, phrase: (n) => `一轮最多 ${n} 次，` },
   { key: "textFx", label: "文字效果", unit: "处", was: 16, phrase: (n) => `一轮最多 ${n} 处，` },
   { key: "textFxPerLine", label: "一句里的文字效果", unit: "处", was: 2, phrase: (n) => `一句最多 ${n} 处，` },
+  { key: "ambSwaps", label: "变化点以外换环境音", unit: "次", was: 1, phrase: (n) => `一轮最多再换 ${n} 次，` },
   { key: "sfx", label: "剧情音效", unit: "个", was: 6, phrase: (n) => `一轮最多 ${n} 个，` },
   { key: "erosSfx", label: "R18 音效", unit: "个", was: 14, phrase: (n) => `，一轮最多 ${n} 个` },
   { key: "peaks", label: "高潮", unit: "次", was: 6, phrase: (n) => `；一轮最多 ${n} 次` },
@@ -2952,7 +2954,7 @@ var FRAGMENTS = {
   // 听音师
   "listen.first": "这是第一幕，没有上一幕。",
   "listen.noCats": "（库里还没分类）",
-  "listen.bgm": "\n分类：{{cats}}\n常用标签：{{tags}}",
+  "listen.bgm": "\n分类：{{cats}}\n常用标签：{{tags}}{{limit}}",
   "listen.noBgm": "这一轮不用找配乐（曲库没超过导演的候选数，或者没有曲子），bgm 写 []。",
   // 情绪归类
   "judge.emotions": "写左边的编号：内置情绪是英文键，新加的就是原词本身。\n{{list}}",
@@ -11747,6 +11749,8 @@ var DEFAULT_CONFIG = {
     cgLlm: { source: "", provider: "", model: "", baseURL: "", contextWindow: 128e3, stream: true },
     // 先听一遍：音效、环境音或曲子比给导演看的候选多时，导演之前先让听音师读一遍正文，列出听得见的声音、该放什么样的配乐和找它们的词，候选照它找（lib/director.js 的 listenSounds）
     listen: true,
+    listenBgm: null,
+    // 听音师每轮最多找几段配乐：null 不限（开头一段，中途每个转折各一段）
     // 听音师用的模型，跟 cgLlm 一样三种来源；Key 另存一份（listenllm）
     listenLlm: { source: "", provider: "", model: "", baseURL: "", contextWindow: 128e3, stream: true },
     soundCandidates: { sfx: SFX_CANDIDATES, ambience: AMBIENCE_CANDIDATES },
@@ -13528,7 +13532,7 @@ function MusicPicking({ cfg, count }) {
   return /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "导演怎么挑"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, state2), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "每轮候选", hint: "后台导演每一轮能看到几首（编号、曲名、描述、分类和标签各一行，每首大约一百字）。曲库没超过这个数时全给它看。填得很大时提示词会很长，超出模型窗口时先缩人物卡资料。" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Text, { type: "number", style: { width: "7cqw" }, value: quota, onCommit: (v) => {
     const n = Math.trunc(Number(v));
     if (n >= 1) pd({ musicCandidates: n });
-  } }), /* @__PURE__ */ import_react14.default.createElement("span", { className: "fg-note" }, "首，最多 5000（填到曲库的首数就是整张都给）"))), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "先听一遍", hint: "曲子比候选多时，导演之前先让听音师读一遍这一轮正文，说出该放什么样的音乐（开头的基调，中途情绪转折再各一段），连同找它们的词（会参照曲库里常用的标签）。候选照它说的去对标签和描述，跟你怎么分类没关系。每轮多一次模型调用（跟音效共用这一次），听音师的模型在「导演」页换，提示词在「提示词 → 听音师」里改。它出错时退回按分组轮流挑。音效库、环境音库和配乐共用这一个开关。" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: listen, onChange: (v) => pd({ listen: v }) })));
+  } }), /* @__PURE__ */ import_react14.default.createElement("span", { className: "fg-note" }, "首，最多 5000（填到曲库的首数就是整张都给）"))), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "先听一遍", hint: "曲子比候选多时，导演之前先让听音师读一遍这一轮正文，说出该放什么样的音乐（开头的基调，中途情绪转折再各一段），连同找它们的词（会参照曲库里常用的标签）。候选照它说的去对标签和描述，跟你怎么分类没关系。每轮多一次模型调用（跟音效共用这一次），听音师的模型在「导演」页换，提示词在「提示词 → 听音师」里改。它出错时退回按分组轮流挑。音效库、环境音库和配乐共用这一个开关。" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: listen, onChange: (v) => pd({ listen: v }) })), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "听音师找几段", hint: "听音师一轮最多说几段配乐（开头的基调一段，中途每个情绪转折各一段），每段各去曲库里找一批。默认不限，转折多的一轮每个转折都有曲子可挑。" }, /* @__PURE__ */ import_react14.default.createElement(Limit, { value: cfg.director.listenBgm ?? null, fallback: 3, min: 1, unit: "段", onCommit: (v) => pd({ listenBgm: v }) })), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, "导演一轮里换几次歌：换地方、情绪转折、进出回忆这些转折点上随时能换，不限；转折点以外默认也不限，想让它少换在「导演」页的「每轮上限 → 转折点以外换歌」里填个数。"));
 }
 function MusicSection({ data }) {
   const cfg = data.config;

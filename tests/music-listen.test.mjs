@@ -95,3 +95,36 @@ test('gate: 曲子比候选多时先听一遍：听音师看到曲库的分类�
   await direct({ llm: llm2, provider: 'fake', model: 'fake-1', units, previous, castList: [], context: {}, config, backend: 'novelai', music: LIBRARY.slice(0, 10), sounds, trace: {} })
   assert.match(userOf(quiet[0]), /【曲库】这一轮不用找配乐/)
 })
+
+test('gate: 一轮选几首默认不限：听音师找几段配乐不限、设置里能限；转折点以外换歌的上限写进导演提示词', async () => {
+  const many = Array.from({ length: 6 }, (_, i) => ({ at: 'U1', what: '段' + i, words: ['紧张', '词' + i] }))
+  assert.equal(cleanHeard({ bgm: many }, units).bgm.length, 6, '默认不限几段')
+  assert.equal(cleanHeard({ bgm: many }, units, { bgm: 2 }).bgm.length, 2)
+  assert.equal(DEFAULT_CONFIG.director.listenBgm, null)
+  assert.equal(resolveConfig({ director: { listenBgm: '4' } }).director.listenBgm, 4)
+  assert.equal(resolveConfig({ director: { listenBgm: 'x' } }).director.listenBgm, null)
+  assert.deepEqual([DEFAULT_CONFIG.director.limits.bgmSwaps, DEFAULT_CONFIG.director.limits.ambSwaps], [null, null])
+
+  const run = async director => {
+    const calls = []
+    const llm = {
+      stream(request) {
+        calls.push(request)
+        const isListen = String(request.system || '').includes('你是视觉小说的拟音师')
+        const text = isListen ? JSON.stringify({ amb: [], sfx: [], bgm: many }) : '{"scene":{"bgm":"chase"},"lines":[]}'
+        return (async function* () { yield { type: 'text-delta', text }; yield { type: 'finish', reason: { kind: 'stop' } } })()
+      },
+    }
+    const trace = {}
+    await direct({ llm, provider: 'fake', model: 'fake-1', units, previous: null, castList: [], context: {}, config: resolveConfig({ director: { musicCandidates: 60, ...director } }), backend: 'novelai', music: LIBRARY, trace })
+    return { listen: calls[0].messages[0].content[0].text, director: calls[1].messages[0].content[0].text, heard: trace.listen.heard.bgm }
+  }
+  const free = await run({})
+  assert.doesNotMatch(free.listen, /配乐一轮最多写/)
+  assert.equal(free.heard.length, 6)
+  assert.match(free.director, /除了这些转折点，只在气氛真的变了的地方换/)
+  const capped = await run({ listenBgm: 2, limits: { bgmSwaps: 2 } })
+  assert.match(capped.listen, /配乐一轮最多写 2 条。/)
+  assert.equal(capped.heard.length, 2)
+  assert.match(capped.director, /除了这些转折点，一轮最多再换 2 次，只在气氛真的变了的地方换/)
+})
