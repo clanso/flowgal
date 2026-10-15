@@ -297,3 +297,51 @@ test('gate: 没有设计也能自由画：放到这个情绪自己的格子；�
     assert.equal(requests.length, 2)
   })
 })
+
+test('gate: 一个情绪挂在几个动作下：让设计师重写其中一个动作上的那张（顺手重新设计这个表情），那张照它自己的动作写，不拿主动作的词（不然几个动作画出来一样）', async () => {
+  // 假立绘设计师：照那一行写的动作写身体；先设计再写的那条照它放进的动作（主动作「背手站着」）写全
+  const body = line => (line.match(/这个人的动作「([^」]+)」/) || [])[1] || 'none'
+  const reply = request => {
+    const text = userText(request)
+    const lines = [...text.matchAll(/^- (s\d+)：(.*)$/gm)]
+    return JSON.stringify({
+      ...(/先设计再写——/.test(text) ? { acting: { poses: [{ id: 'p1', emotions: ['smile'] }], faces: [{ emotion: 'smile', tags: 'gentle smile' }] } } : {}),
+      sprites: lines.map(([, id, line]) => ({ key: id, tags: line.startsWith('先设计再写——') ? '1girl, long black hair, hands behind back, gentle smile' : `1girl, long black hair, body-${body(line)}, smile` })),
+    })
+  }
+  await withEngine(request => (isActing(request) ? JSON.stringify(SHEET) : isSprite(request) ? reply(request) : '{}'), async ({ engine, llm, requests }) => {
+    await engine.castAction('g', 'acting-design', { name: '林岚' })
+    let lin = await until(engine, 'g', p => p.acting && !p.actingBusy, '设计')
+    // 微笑也勾进「抱着胳膊别过脸」：两个动作上各画一张
+    const sheet = structuredClone(lin.acting)
+    sheet.poses[1].emotions.push('smile')
+    await engine.castAction('g', 'acting-save', { name: '林岚', acting: sheet })
+    const home = variantKey(look, 'smile'), onP2 = variantKey(look, 'smile', 'p2')
+    const settled = (p, n) => requests.length >= n && [home, onP2].every(k => p.sprites[k]?.assetId && !p.spriteStatus[k])
+    await engine.castAction('g', 'sprite', { name: '林岚', emotions: ['smile', 'smile@p2'], rewrite: false })
+    lin = await until(engine, 'g', p => settled(p, 2), '两个动作各画一张')
+    assert.match(lin.sprites[home].tags, /body-背手站着/)
+    assert.match(lin.sprites[onP2].tags, /body-抱着胳膊别过脸/)
+    const homeTags = lin.sprites[home].tags
+
+    // 点开「抱着胳膊别过脸」那格，让设计师重写并重画（没写要求：顺手重新设计微笑的表情）
+    const designs = () => llm.calls.filter(r => isSprite(r) && /先设计再写——/.test(userText(r))).length
+    await engine.castAction('g', 'sprite', { name: '林岚', emotion: 'smile@p2', rewrite: true })
+    lin = await until(engine, 'g', p => settled(p, 3), '重写别的动作上的那张')
+    assert.equal(designs(), 1, '顺手重新设计了微笑')
+    assert.match(lin.sprites[onP2].tags, /body-抱着胳膊别过脸/, '照它自己的动作写')
+    assert.doesNotMatch(lin.sprites[onP2].tags, /hands behind back/, '不拿主动作的词')
+    assert.match(userText(llm.calls.filter(isSprite).at(-1)), /这个人的动作「抱着胳膊别过脸」/)
+    assert.equal(lin.sprites[home].tags, homeTags, '主动作那张不动')
+    assert.equal(requests.length, 3, '只重画这一张')
+
+    // 「按新笔记重写表情」：两个动作上的一起重写，主动作那张用设计时写的，另一张照它的动作另写
+    await engine.castAction('g', 'sprite', { name: '林岚', emotions: ['smile', 'smile@p2'], rewrite: true })
+    lin = await until(engine, 'g', p => settled(p, 5), '两张一起重写')
+    assert.equal(designs(), 2)
+    assert.equal(lin.sprites[home].tags, '1girl, long black hair, hands behind back, gentle smile')
+    assert.match(lin.sprites[onP2].tags, /body-抱着胳膊别过脸/)
+    const prompts = requests.slice(-2).map(r => r.parameters.v4_prompt.caption.char_captions[0].char_caption)
+    assert.notEqual(prompts[0], prompts[1], '两个动作发出去的词不一样')
+  })
+})
