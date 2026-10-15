@@ -10,7 +10,7 @@ import { DirectorLog } from './DirectorLog.jsx'
 import { asking } from '../ask.jsx'
 import { useFaceFramer } from './faceFramer.js'
 import { useParallax } from './parallax.js'
-import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros, warmVoices } from './audio.js'
+import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros, playErosLoop, warmVoices } from './audio.js'
 import { ErosPeak, useErosPulse } from './Eros.jsx'
 import { EROS_SFX } from '../../../lib/eros.js'
 import { ONOMATOPOEIA } from '../../../lib/foley.js'
@@ -42,6 +42,9 @@ function senseLayer(beat, scene) {
 const BG_WAIT_MS = 1500
 /** 提前把后面几处换场要用的背景下载、解码好。 */
 const BG_AHEAD = 60
+
+/** 节奏底循环音效库里的录音时，比同一段录音当剧情音效放时轻一些：一直在响，压在台词和配乐下面。 */
+const EROS_LOOP_LEVEL = 0.7
 
 /** 提前下载后面几拍要用的字形分片。 */
 const GLYPH_AHEAD = 12
@@ -343,17 +346,20 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }, [sfxKey])
   // 亲密场面（lib/eros.js）：节奏底跟着场景的 eros（抽插的快慢）和 tentacle（触手）一直响，镜头跟着每一下轻轻一送；
   // 高潮那一下（beat.peak）见下面的 ErosPeak。开关是设置里的「亲密音效」，音量跟剧情音效走；快进、标题画面时停。
+  // 导演配了音效库里的录音（scene.erosLoop）就循环那段录音，合成的节奏不响；录音的拍子对不上，镜头也不跟着送（潮红、触手的影子照旧）。
   const erosOn = ui0.eros !== false && ui0.storySfx !== false && !skip && !title
   const erosVolume = (ui0.storySfxVolume ?? 0.8) / 0.8
   const bedScene = erosOn && soundBeat ? soundBeat.scene : null
   const bedPace = bedScene && bedScene.eros !== 'none' ? bedScene.eros || '' : ''
   const bedTentacle = bedScene && bedScene.tentacle !== 'none' ? bedScene.tentacle || '' : ''
+  const bedSound = ((bedPace || bedTentacle) && bedScene.erosLoop && soundById.get(bedScene.erosLoop)) || null
   React.useEffect(() => {
     if (closingRef.current) return
-    if (bedPace || bedTentacle) playEros(bedPace, bedTentacle, erosVolume)
+    playErosLoop(bedSound ? { id: bedSound.id, url: assetUrl(bedSound.assetId) } : null, (ui0.storySfxVolume ?? 0.8) * (bedSound ? bedSound.volume ?? 1 : 1) * EROS_LOOP_LEVEL)
+    if ((bedPace || bedTentacle) && !bedSound) playEros(bedPace, bedTentacle, erosVolume)
     else stopEros()
-  }, [bedPace, bedTentacle, erosVolume])
-  useErosPulse(cameraRef, Boolean(bedPace))
+  }, [bedPace, bedTentacle, erosVolume, bedSound && bedSound.id, bedSound && bedSound.volume])
+  useErosPulse(cameraRef, Boolean(bedPace) && !bedSound)
 
   const go = React.useCallback(i => {
     if (!beats.length) return
@@ -516,7 +522,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         {beat && !title && <SceneCover key={beat.key} plan={hold.change} state={coverState} />}
         {beat && !title && <Flash beat={beat} recallStyle={recallStyle} tone={recallTone} wake={Boolean(hold.wake) && speed > 0} rising={waking} changed={Boolean(hold.change)} recallFx={recallFx} />}
         <div className="fg-hitflash" ref={flashRef} aria-hidden="true" />
-        {beat && !title && !skip && !change && beat.peak && ui0.eros !== false && <ErosPeak key={beat.key} beat={beat} cameraRef={cameraRef} volume={ui0.storySfx !== false ? erosVolume : 0} />}
+        {beat && !title && !skip && !change && beat.peak && ui0.eros !== false && <ErosPeak key={beat.key} beat={beat} cameraRef={cameraRef} volume={ui0.storySfx !== false ? erosVolume : 0} sound={!soundById.has(beat.sfx)} />}
         {beat && !title && beat.hit && <HitImpact key={beat.key} beat={beat} sound={sfxOn} fx={hit} />}
         {beat && !title && beat.moment && <MomentLayer key={beat.key} beat={beat} view={view} sound={sfxOn} />}
         {/* 手机：响着的来电 / 拨出、视频通话的小窗、挂断的小卡、通知横幅（「通话中」在右上角） */}

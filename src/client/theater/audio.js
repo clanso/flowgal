@@ -123,8 +123,10 @@ function loopPlayer({ loud = false } = {}) {
 }
 const music = loopPlayer()
 const ambience = loopPlayer({ loud: true })
-const players = [music, ambience]
-const loops = () => [music.current, ambience.current].filter(Boolean)
+/** 亲密场面的节奏底用音效库里的录音时（scene.erosLoop），循环它的那一条；音量跟剧情音效走，库里调过的音量也算。 */
+const erosRecording = loopPlayer({ loud: true })
+const players = [music, ambience, erosRecording]
+const loops = () => players.map(p => p.current).filter(Boolean)
 
 export function playBgm(track, volume = 0.45) { music.play(track, volume) }
 export function stopBgm() { music.stop() }
@@ -143,6 +145,7 @@ export function stopAll() {
   for (const src of [...oneShots]) { try { src.stop() } catch {} }
   oneShots.clear()
   stopEros()
+  erosRecording.stop()
 }
 
 /** 试听一首（设置里的配乐页、音效库）：剧场配乐先淡出，试听停了再淡回来。onEnd 在停下时调用（播完、换一首或手动停）。volume 能超过 1。 */
@@ -656,6 +659,7 @@ export function previewSound(slot, choice, ui = sounds) {
 
 // ───────────── 亲密场面（lib/eros.js）─────────────
 // 一下一下的音效、节奏底（两条：eros 一条、触手一条）、高潮那一下。开关和音量跟剧情音效走（调用方给），画面上不出字。
+// 这些是合成的兜底：导演配了音效库里的录音时放录音（剧情音效走 playLibSound，节奏底走 playErosLoop），合成的不响。
 
 /** 随机抖一点（音高、拍子），同一个声音连着响也不机械。 */
 const wobble = (k = 0.06) => 1 - k + Math.random() * 2 * k
@@ -749,15 +753,21 @@ export function playEros(pace, tentacle, volume = 1) {
   tentacleBed.set(tentacle, tentacleLoop(tentacle), volume * 0.8)
 }
 export function stopEros() { erosBed.stop(); tentacleBed.stop() }
+/** 节奏底循环音效库里的一段录音：{ id, url }，null 停掉（淡出）。换一段时交叉淡入淡出。 */
+export function playErosLoop(sound, volume = 1) { erosRecording.play(sound, volume) }
 
-/** 高潮那一下（climax / cum / both）：节奏底停一会儿、配乐压低一会儿，只剩心跳、长鸣和脉动。 */
+/**
+ * 高潮那一下（climax / cum / both）：节奏底停一会儿（录音压得很低）、配乐压低一会儿，只剩心跳、长鸣和脉动。
+ * sound 为 false 时合成的心跳和脉动不响（那一句配了音效库里的射精、高潮声），只停节奏、压配乐。
+ */
 const PEAK_QUIET = { climax: 2.6, cum: 1.8, both: 2.6 }
-export function erosPeak(kind, volume = 1) {
+export function erosPeak(kind, volume = 1, { sound = true } = {}) {
   const ac = PEAK_FOLEY[kind] && volume > 0 && audioCtx()
   if (!ac) return
-  for (const id of PEAK_FOLEY[kind]) playParts(ac, EROS_FOLEY[id], { volume })
+  if (sound) for (const id of PEAK_FOLEY[kind]) playParts(ac, EROS_FOLEY[id], { volume })
   erosBed.quiet(PEAK_QUIET[kind])
   tentacleBed.quiet(PEAK_QUIET[kind])
+  erosRecording.duck(0.2, PEAK_QUIET[kind] * 1000)
   music.duck(0.35, PEAK_QUIET[kind] * 1000)
 }
 
@@ -771,5 +781,6 @@ export function previewEros(pace, tentacle, volume = 1, seconds = 5) {
   beds[1].set('trial', tentacleLoop(tentacle), volume * 0.8)
   erosBed.quiet(seconds + 0.5)
   tentacleBed.quiet(seconds + 0.5)
+  erosRecording.duck(0, (seconds + 0.5) * 1000)
   trial = { beds, timer: setTimeout(() => { beds.forEach(b => b.stop()); trial = null }, seconds * 1000) }
 }
