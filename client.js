@@ -2931,6 +2931,7 @@ var FRAGMENTS = {
   "director.sounds.now": "上一幕结束时的环境音：{{id}}（{{name}}）。",
   "director.sounds.silent": "上一幕结束时没有环境音。",
   "director.sounds.none": "（没有合适的）",
+  "director.eros.beds": "\n【节奏底候选】（音效库里十秒以上的连续录音，按这一轮正文挑的，能写进 scene.erosLoop；上面音效候选里够长的也能用；编号｜名字｜分类｜说明）\n{{beds}}\n",
   // 听音师
   "listen.first": "这是第一幕，没有上一幕。",
   "listen.noCats": "（库里还没分类）",
@@ -3622,7 +3623,7 @@ function personEmotions(name2, custom = [], { used = [], drawn = [] } = {}) {
 }
 
 // lib/scenes.js
-var SCENE_DEFAULTS = { location: "", time: "afternoon", weather: "clear", mood: "daily", light: "normal", fx: "none", romance: "none", sense: "none", bars: "none", eros: "none", tentacle: "none", bg: "" };
+var SCENE_DEFAULTS = { location: "", time: "afternoon", weather: "clear", mood: "daily", light: "normal", fx: "none", romance: "none", sense: "none", bars: "none", eros: "none", tentacle: "none", erosLoop: "", bg: "" };
 var MODE_TRANSITION = { memory: "haze", dream: "swirl", illusion: "glitch", imagine: "iris", pov: "blink", inner: "black", screen: "glitch", tale: "dissolve", vision: "flash", digital: "glitch" };
 function applyDelta(scene, delta, known) {
   if (!delta) return scene;
@@ -3637,7 +3638,13 @@ function applyDelta(scene, delta, known) {
     if (!change.bars) next.bars = "none";
     if (!change.eros) next.eros = "none";
     if (!change.tentacle) next.tentacle = "none";
+    if (!change.erosLoop) next.erosLoop = "";
   }
+  if (!change.erosLoop && (change.eros || change.tentacle)) {
+    const off = (next.eros || "none") === "none" && (next.tentacle || "none") === "none";
+    if (off || change.eros === "afterglow" && scene.eros !== "afterglow") next.erosLoop = "";
+  }
+  if (next.erosLoop === "none") next.erosLoop = "";
   if (next.bg && next.location) known.set(next.location, next.bg);
   return next;
 }
@@ -5306,7 +5313,7 @@ function buildBeats(view) {
     });
     const last = scenes[scenes.length - 1];
     if (last) {
-      scene = { ...last.real.scene, eros: "none", tentacle: "none", transition: "dissolve" };
+      scene = { ...last.real.scene, eros: "none", tentacle: "none", erosLoop: "", transition: "dissolve" };
       bgm = last.real.bgm;
       amb = last.real.amb;
       layer = last.layer;
@@ -7257,8 +7264,9 @@ function loopPlayer({ loud = false } = {}) {
 }
 var music = loopPlayer();
 var ambience = loopPlayer({ loud: true });
-var players = [music, ambience];
-var loops = () => [music.current, ambience.current].filter(Boolean);
+var erosRecording = loopPlayer({ loud: true });
+var players = [music, ambience, erosRecording];
+var loops = () => players.map((p4) => p4.current).filter(Boolean);
 function playBgm(track, volume = 0.45) {
   music.play(track, volume);
 }
@@ -7281,6 +7289,7 @@ function stopAll() {
   }
   oneShots.clear();
   stopEros();
+  erosRecording.stop();
 }
 function previewTrack(track, onEnd) {
   stopPreview();
@@ -7857,13 +7866,17 @@ function stopEros() {
   erosBed.stop();
   tentacleBed.stop();
 }
+function playErosLoop(sound, volume = 1) {
+  erosRecording.play(sound, volume);
+}
 var PEAK_QUIET = { climax: 2.6, cum: 1.8, both: 2.6 };
-function erosPeak(kind, volume = 1) {
+function erosPeak(kind, volume = 1, { sound = true } = {}) {
   const ac = PEAK_FOLEY[kind] && volume > 0 && audioCtx();
   if (!ac) return;
-  for (const id of PEAK_FOLEY[kind]) playParts(ac, EROS_FOLEY[id], { volume });
+  if (sound) for (const id of PEAK_FOLEY[kind]) playParts(ac, EROS_FOLEY[id], { volume });
   erosBed.quiet(PEAK_QUIET[kind]);
   tentacleBed.quiet(PEAK_QUIET[kind]);
+  erosRecording.duck(0.2, PEAK_QUIET[kind] * 1e3);
   music.duck(0.35, PEAK_QUIET[kind] * 1e3);
 }
 var trial = null;
@@ -7878,6 +7891,7 @@ function previewEros(pace, tentacle, volume = 1, seconds = 5) {
   beds[1].set("trial", tentacleLoop(tentacle), volume * 0.8);
   erosBed.quiet(seconds + 0.5);
   tentacleBed.quiet(seconds + 0.5);
+  erosRecording.duck(0, (seconds + 0.5) * 1e3);
   trial = { beds, timer: setTimeout(() => {
     beds.forEach((b) => b.stop());
     trial = null;
@@ -13552,7 +13566,7 @@ function ErosField({ cfg, p: p4 }) {
   const [open, setOpen] = import_react14.default.useState(false);
   const volume = (cfg.ui.storySfxVolume ?? 0.8) / 0.8;
   const row = { gap: ".5cqw", marginTop: ".6cqw" };
-  return /* @__PURE__ */ import_react14.default.createElement(Field, { label: "亲密场面", hint: "成年人之间的亲密戏。导演按正文给一段一段配节奏：爱抚、缓慢、加快、激烈、余韵，节奏底一直响，镜头跟着一下一下轻轻地送，画面边上泛起潮红；有触手时画面边上有暗影在动，配湿黏的蠕动声。插入、顶到最深、射精这些读到那句时响；高潮时画面柔和地白一下，射精时跟着声音一下一下地亮。正文里的 [SE：…] 提示和日文拟声（ぬぷ、こつん、どくどく……）也认得。音量跟剧情音效走，画面上不出字。" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: cfg.ui.eros, onChange: (v) => p4({ eros: v }) }), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpen((v) => !v) }, open ? "收起试听" : "试听")), open && /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row", style: row }, EROS_PACES.filter((k) => k !== "none").map((k) => /* @__PURE__ */ import_react14.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => previewEros(k, "", volume) }, EROS_LABEL[k])), TENTACLE.filter((k) => k !== "none").map((k) => /* @__PURE__ */ import_react14.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => previewEros("", k, volume) }, TENTACLE_LABEL[k])), PEAKS.map((k) => /* @__PURE__ */ import_react14.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => erosPeak(k, volume) }, PEAK_LABEL[k]))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row", style: row }, Object.keys(EROS_SFX).map((name2) => /* @__PURE__ */ import_react14.default.createElement("button", { key: name2, type: "button", className: "fg-btn", onClick: () => erosFoley(EROS_SFX[name2].id, volume) }, name2)))));
+  return /* @__PURE__ */ import_react14.default.createElement(Field, { label: "亲密场面", hint: "成年人之间的亲密戏。声音先用这个音效库里的：插入、射精、触手这些一下一下的，导演从候选里挑；一直在响的节奏底也直接循环库里十秒以上的录音（抽插、套弄、触手蠕动，按快慢换，描述里写上「约 1 分钟」这样的时长才认得出多长）。库里找不到合适的，才用剧场现场合成的兜底，「试听合成的」听的就是这些。画面跟着节奏：边上泛起潮红，有触手时边上有暗影在动；高潮时画面柔和地白一下，射精时一下一下地亮；用合成的节奏时镜头还跟着每一下轻轻地送。正文里的 [SE：…] 提示和日文拟声（ぬぷ、こつん、どくどく……）也认得。音量跟剧情音效走，画面上不出字。" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: cfg.ui.eros, onChange: (v) => p4({ eros: v }) }), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => setOpen((v) => !v) }, open ? "收起试听" : "试听合成的")), open && /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row", style: row }, EROS_PACES.filter((k) => k !== "none").map((k) => /* @__PURE__ */ import_react14.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => previewEros(k, "", volume) }, EROS_LABEL[k])), TENTACLE.filter((k) => k !== "none").map((k) => /* @__PURE__ */ import_react14.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => previewEros("", k, volume) }, TENTACLE_LABEL[k])), PEAKS.map((k) => /* @__PURE__ */ import_react14.default.createElement("button", { key: k, type: "button", className: "fg-btn", onClick: () => erosPeak(k, volume) }, PEAK_LABEL[k]))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row", style: row }, Object.keys(EROS_SFX).map((name2) => /* @__PURE__ */ import_react14.default.createElement("button", { key: name2, type: "button", className: "fg-btn", onClick: () => erosFoley(EROS_SFX[name2].id, volume) }, name2)))));
 }
 var LIB_PAGE = {
   sfx: { kinds: ["sfx", "blip"], title: "音效库", unit: "个音效", filter: [["", "音效和打字音"], ["sfx", "只看音效"], ["blip", "只看打字音"]], other: "环境音库", empty: "音效库还是空的。剧情音效先用内置的拟声音效（砰、咚、叮……现场合成）。", note: "推门、手机震动、杯子摔碎这类响一次的声音。库再大也没关系：后台导演整理每一轮时只看几十个候选，再决定哪句配什么音效。候选怎么挑见下面「导演怎么挑」；标签写正文里会出现的说法最稳。" },
@@ -14010,10 +14024,10 @@ function useErosPulse(cameraRef, on) {
     };
   }, [on]);
 }
-function ErosPeak({ beat, cameraRef, volume }) {
+function ErosPeak({ beat, cameraRef, volume, sound = true }) {
   const kind = beat.peak;
   import_react17.default.useEffect(() => {
-    if (volume > 0) erosPeak(kind, volume);
+    if (volume > 0) erosPeak(kind, volume, { sound });
     const cam = cameraRef && cameraRef.current;
     if (!cam || typeof cam.animate !== "function" || still()) return void 0;
     const moves = kind !== "cum" ? [cam.animate([{ scale: "1" }, { scale: "1.03", offset: 0.28 }, { scale: "1" }], { duration: 2600, easing: "cubic-bezier(.3, 0, .2, 1)" })] : EROS_PULSES.map((ms, i) => cam.animate([{ scale: "1" }, { scale: String(1.016 - i * 3e-3), offset: 0.2 }, { scale: "1" }], { duration: 360, delay: ms, easing: "ease-out" }));
@@ -14078,6 +14092,7 @@ function senseLayer(beat, scene) {
 }
 var BG_WAIT_MS = 1500;
 var BG_AHEAD = 60;
+var EROS_LOOP_LEVEL = 0.7;
 var GLYPH_AHEAD = 12;
 var GLYPH_WAIT = 1200;
 var glyphsOf = (list3) => ({
@@ -14374,12 +14389,14 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const bedScene = erosOn && soundBeat ? soundBeat.scene : null;
   const bedPace = bedScene && bedScene.eros !== "none" ? bedScene.eros || "" : "";
   const bedTentacle = bedScene && bedScene.tentacle !== "none" ? bedScene.tentacle || "" : "";
+  const bedSound = (bedPace || bedTentacle) && bedScene.erosLoop && soundById.get(bedScene.erosLoop) || null;
   import_react18.default.useEffect(() => {
     if (closingRef.current) return;
-    if (bedPace || bedTentacle) playEros(bedPace, bedTentacle, erosVolume);
+    playErosLoop(bedSound ? { id: bedSound.id, url: assetUrl(bedSound.assetId) } : null, (ui0.storySfxVolume ?? 0.8) * (bedSound ? bedSound.volume ?? 1 : 1) * EROS_LOOP_LEVEL);
+    if ((bedPace || bedTentacle) && !bedSound) playEros(bedPace, bedTentacle, erosVolume);
     else stopEros();
-  }, [bedPace, bedTentacle, erosVolume]);
-  useErosPulse(cameraRef, Boolean(bedPace));
+  }, [bedPace, bedTentacle, erosVolume, bedSound && bedSound.id, bedSound && bedSound.volume]);
+  useErosPulse(cameraRef, Boolean(bedPace) && !bedSound);
   const go = import_react18.default.useCallback((i) => {
     if (!beats.length) return;
     const next = Math.max(0, Math.min(beats.length - 1, i));
@@ -14599,7 +14616,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     beat && !title && /* @__PURE__ */ import_react18.default.createElement(SceneCover, { key: beat.key, plan: hold.change, state: coverState }),
     beat && !title && /* @__PURE__ */ import_react18.default.createElement(Flash, { beat, recallStyle, tone: recallTone, wake: Boolean(hold.wake) && speed > 0, rising: waking, changed: Boolean(hold.change), recallFx }),
     /* @__PURE__ */ import_react18.default.createElement("div", { className: "fg-hitflash", ref: flashRef, "aria-hidden": "true" }),
-    beat && !title && !skip && !change && beat.peak && ui0.eros !== false && /* @__PURE__ */ import_react18.default.createElement(ErosPeak, { key: beat.key, beat, cameraRef, volume: ui0.storySfx !== false ? erosVolume : 0 }),
+    beat && !title && !skip && !change && beat.peak && ui0.eros !== false && /* @__PURE__ */ import_react18.default.createElement(ErosPeak, { key: beat.key, beat, cameraRef, volume: ui0.storySfx !== false ? erosVolume : 0, sound: !soundById.has(beat.sfx) }),
     beat && !title && beat.hit && /* @__PURE__ */ import_react18.default.createElement(HitImpact, { key: beat.key, beat, sound: sfxOn, fx: hit }),
     beat && !title && beat.moment && /* @__PURE__ */ import_react18.default.createElement(MomentLayer, { key: beat.key, beat, view, sound: sfxOn }),
     beat && !title && beat.call && beat.call.state === "ringing" && /* @__PURE__ */ import_react18.default.createElement(PhoneRing, { key: beat.call.id, beat, view, sound: sfxOn }),

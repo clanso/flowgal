@@ -279,7 +279,7 @@ export function buildBeats(view) {
     // 一轮结束：现实里的场景、配乐接着往下一轮带；还在段落里的先记着，下一轮第一句接着演同一种段落才留着。
     const last = scenes[scenes.length - 1]
     // 亲密场面的节奏底、触手只管这一轮（导演下一轮还在继续会再写），还没整理的下一轮先不带着
-    if (last) { scene = { ...last.real.scene, eros: 'none', tentacle: 'none', transition: 'dissolve' }; bgm = last.real.bgm; amb = last.real.amb; layer = last.layer }
+    if (last) { scene = { ...last.real.scene, eros: 'none', tentacle: 'none', erosLoop: '', transition: 'dissolve' }; bgm = last.real.bgm; amb = last.real.amb; layer = last.layer }
     else layer = null
   })
   return { beats, byKey: new Map(beats.map((b, i) => [b.key, i])) }

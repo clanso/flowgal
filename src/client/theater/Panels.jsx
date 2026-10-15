@@ -2926,14 +2926,14 @@ function SoundBatch({ ids, run, busy, kind }) {
   )
 }
 
-/** 亲密场面（lib/eros.js）：开关，和一排试听（节奏底、触手、高潮、一下一下的音效）。音量跟剧情音效走。 */
+/** 亲密场面（lib/eros.js）：开关，和一排合成兜底音的试听（节奏底、触手、高潮、一下一下的音效）。声音先用音效库里的，音量跟剧情音效走。 */
 function ErosField({ cfg, p }) {
   const [open, setOpen] = React.useState(false)
   const volume = (cfg.ui.storySfxVolume ?? 0.8) / 0.8
   const row = { gap: '.5cqw', marginTop: '.6cqw' }
   return (
-    <Field label="亲密场面" hint="成年人之间的亲密戏。导演按正文给一段一段配节奏：爱抚、缓慢、加快、激烈、余韵，节奏底一直响，镜头跟着一下一下轻轻地送，画面边上泛起潮红；有触手时画面边上有暗影在动，配湿黏的蠕动声。插入、顶到最深、射精这些读到那句时响；高潮时画面柔和地白一下，射精时跟着声音一下一下地亮。正文里的 [SE：…] 提示和日文拟声（ぬぷ、こつん、どくどく……）也认得。音量跟剧情音效走，画面上不出字。">
-      <div className="fg-row"><Toggle value={cfg.ui.eros} onChange={v => p({ eros: v })} /><button type="button" className="fg-btn" onClick={() => setOpen(v => !v)}>{open ? '收起试听' : '试听'}</button></div>
+    <Field label="亲密场面" hint="成年人之间的亲密戏。声音先用这个音效库里的：插入、射精、触手这些一下一下的，导演从候选里挑；一直在响的节奏底也直接循环库里十秒以上的录音（抽插、套弄、触手蠕动，按快慢换，描述里写上「约 1 分钟」这样的时长才认得出多长）。库里找不到合适的，才用剧场现场合成的兜底，「试听合成的」听的就是这些。画面跟着节奏：边上泛起潮红，有触手时边上有暗影在动；高潮时画面柔和地白一下，射精时一下一下地亮；用合成的节奏时镜头还跟着每一下轻轻地送。正文里的 [SE：…] 提示和日文拟声（ぬぷ、こつん、どくどく……）也认得。音量跟剧情音效走，画面上不出字。">
+      <div className="fg-row"><Toggle value={cfg.ui.eros} onChange={v => p({ eros: v })} /><button type="button" className="fg-btn" onClick={() => setOpen(v => !v)}>{open ? '收起试听' : '试听合成的'}</button></div>
       {open && (
         <>
           <div className="fg-row" style={row}>

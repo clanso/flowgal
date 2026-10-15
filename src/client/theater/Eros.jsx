@@ -37,12 +37,13 @@ export function useErosPulse(cameraRef, on) {
 
 /**
  * 高潮那一下（beat.peak）：climax 画面柔和地白起来、再慢慢回来，镜头轻轻往前一涌；cum 跟着声音的四下一下一下地脉动；both 两样一起。
- * volume 是音量（0 不响）。镜头动的是单独的 scale 属性，不碰推拉摇用的 transform。
+ * volume 是音量（0 不响）；sound 为 false 时合成的心跳、脉动声不响（那一句配了音效库里的声音），节奏底照样停一下、配乐照样压低。
+ * 镜头动的是单独的 scale 属性，不碰推拉摇用的 transform。
  */
-export function ErosPeak({ beat, cameraRef, volume }) {
+export function ErosPeak({ beat, cameraRef, volume, sound = true }) {
   const kind = beat.peak
   React.useEffect(() => {
-    if (volume > 0) erosPeak(kind, volume)
+    if (volume > 0) erosPeak(kind, volume, { sound })
     const cam = cameraRef && cameraRef.current
     if (!cam || typeof cam.animate !== 'function' || still()) return undefined
     // both 时镜头只涌那一下（两个动画都动 scale 会互相顶掉），一下一下的脉动交给白光层
