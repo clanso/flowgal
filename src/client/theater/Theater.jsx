@@ -273,8 +273,12 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
   React.useEffect(() => { if (panel && !done) finish() }, [panel, done])
   const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])
-  // 甩镜：「唰」一下
-  React.useEffect(() => { if (beat && beat.cam === 'whip' && !title && sfxOn) stinger('whoosh') }, [beat && beat.key])
+  // 甩镜：「唰」一下；心头一震（cam: throb）：这句没有单配 sfx 时，自动配一声沉沉的心搏
+  React.useEffect(() => {
+    if (!beat || title || !sfxOn) return
+    if (beat.cam === 'whip') stinger('whoosh')
+    else if (beat.cam === 'throb' && !beat.sfx) storyFoley('throb', (ui0.storySfxVolume ?? 0.8) / 0.8)
+  }, [beat && beat.key])
   const cameraRef = React.useRef(null)
   const cam = useCamera(title ? null : beat, cameraRef)
   useParallax(stageRef, cameraRef, !off.has('look.parallax'))

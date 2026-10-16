@@ -31,19 +31,25 @@ test('gate: 导演写的镜头：新镜头收下；camOn 只给对准人的镜�
 })
 
 test('gate: 移焦是整个画面的镜头，不对准人；窗光、漏光、逆光和「褪成回忆」导演写了就收下', () => {
-  const units = ['U1', 'U2', 'U3'].map(id => ({ id, type: 'dialogue', text: id }))
+  const units = ['U1', 'U2', 'U3', 'U4'].map(id => ({ id, type: 'dialogue', text: id }))
   const script = normalizeScript({
-    scene: { light: 'sunbeam', weather: 'dust' }, cast: [],
+    scene: { light: 'sunbeam', weather: 'dust', fx: 'pulse' }, cast: [],
     lines: [
       { u: 'U1', sp: '林岚', cam: 'rackfocus', camOn: '苏晴' },
-      { u: 'U2', sp: '林岚', scene: { light: 'leak' } },
+      { u: 'U2', sp: '林岚', cam: 'throb', camOn: '苏晴', scene: { light: 'leak', fx: 'heartbeat', sense: 'pulse' } },
       { u: 'U3', sp: '林岚', cam: 'fadeblack', scene: { light: 'flare', fx: 'fading' } },
+      { u: 'U4', sp: '林岚', scene: { fx: 'palpitate' } },
     ],
   }, units)
   assert.deepEqual([script.lines.U1.cam, script.lines.U1.camOn], ['rackfocus', undefined])
+  assert.deepEqual([script.lines.U2.cam, script.lines.U2.camOn], ['throb', undefined], '心头一震不对准人')
   assert.equal(script.scene.light, 'sunbeam')
+  assert.equal(script.scene.fx, 'pulse')
   assert.equal(script.lines.U2.scene.light, 'leak')
+  assert.equal(script.lines.U2.scene.fx, 'heartbeat')
+  assert.equal(script.lines.U2.scene.sense, 'pulse')
   assert.deepEqual([script.lines.U3.scene.light, script.lines.U3.scene.fx], ['flare', 'fading'])
+  assert.equal(script.lines.U4.scene.fx, 'palpitate')
 })
 
 // 推完以后脸在画面上的位置：transform: scale(zs) translate(tx, ty)，原点在框中心

@@ -691,6 +691,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-camera[data-cam="dolly"] .fg-bg { scale: 1.28; }\r
 .fg-camera[data-cam="dolly"] .fg-cast { scale: .96; }\r
 .fg-camera[data-cam="shake"] { animation: fg-shake .5s linear; }\r
+.fg-camera[data-cam="throb"] { animation: fg-cam-throb .78s cubic-bezier(.22, .68, .32, 1); }\r
 .fg-camera[data-cam="whip"] { animation: fg-whip .55s cubic-bezier(.6, 0, .3, 1); }\r
 .fg-camera[data-cam="zoomout"] { animation: fg-zoomout 1.6s cubic-bezier(.2, .7, .2, 1) both; }\r
 .fg-camera[data-cam="pan"] { animation: fg-pan 3s ease-in-out both; }\r
@@ -704,6 +705,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-camera[data-cam="rackfocus"] .fg-cast { filter: blur(calc(var(--rack-cast) * .45cqw)) brightness(calc(1 - var(--rack-cast) * .18)); transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }\r
 @keyframes fg-rack { 0% { --rack-bg: 0; --rack-cast: 0; } 26%, 36% { --rack-bg: 1; --rack-cast: 0; } 100% { --rack-bg: 0; --rack-cast: 1; } }\r
 @keyframes fg-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-1.2%, .6%); } 30% { transform: translate(1%, -.8%); } 45% { transform: translate(-.8%, .4%); } 60% { transform: translate(.6%, .6%); } 80% { transform: translate(-.3%, -.2%); } }\r
+@keyframes fg-cam-throb { 0%, 100% { transform: scale(1); } 16% { transform: scale(1.014); } 34% { transform: scale(1.002); } 52% { transform: scale(1.008); } }\r
 @keyframes fg-whip { 0% { transform: none; filter: none; } 35% { transform: translateX(-9%) scale(1.04); filter: blur(10px); } 60% { transform: translateX(2.5%) scale(1.02); filter: blur(3px); } 100% { transform: none; filter: none; } }\r
 @keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }\r
 @keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }\r
@@ -1135,9 +1137,19 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-world-in[data-sense="breath"] :is(.fg-actor-body, .fg-down-mist i) { animation-play-state: paused !important; }\r
 .fg-sense[data-v="daze"] { background: radial-gradient(100% 80% at 50% 50%, rgba(255, 255, 255, .05) 30%, rgba(228, 222, 255, .24)); backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); -webkit-backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); }\r
 .fg-world-in[data-sense="daze"] .fg-cast { filter: drop-shadow(1.4cqw 0 0 rgba(255, 120, 160, .26)) drop-shadow(-1.4cqw 0 0 rgba(120, 200, 255, .26)); animation: fg-daze-sway 6s ease-in-out infinite; }\r
+/* 心音（pulse）：靠在对方怀里、脸贴上胸口听见对方沉稳温热的心音——从胸口位置（50% 56%）一圈圈漾开暖柔的微光涟漪，画面稳稳不动 */\r
+.fg-sense[data-v="pulse"] { background: radial-gradient(64% 56% at 50% 56%, rgba(255, 224, 212, .16), transparent 72%), radial-gradient(110% 90% at 50% 50%, transparent 52%, rgba(235, 145, 168, .2)); mix-blend-mode: screen; }\r
+.fg-sense[data-v="pulse"]::before, .fg-sense[data-v="pulse"]::after {\r
+  inset: auto; left: 50%; top: 56%; width: 38cqw; height: 38cqw; border-radius: 50%;\r
+  transform: translate(-50%, -50%);\r
+  background: radial-gradient(circle, rgba(255, 236, 226, .28) 0%, transparent 32%, rgba(255, 198, 212, .42) 50%, rgba(255, 162, 185, .18) 60%, transparent 72%);\r
+  animation: fg-sense-pulse 2.4s cubic-bezier(.22, .62, .35, 1) infinite;\r
+}\r
+.fg-sense[data-v="pulse"]::after { animation-delay: .36s; opacity: .7; }\r
 @keyframes fg-blind-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }\r
 @keyframes fg-ear-breath { 0%, 100% { opacity: .55; transform: scale(.96); } 45% { opacity: 1; transform: scale(1.04); } }\r
 @keyframes fg-touch-ripple { from { transform: translate(-50%, -50%) scale(.3); opacity: .9; } to { transform: translate(-50%, -50%) scale(2.4); opacity: 0; } }\r
+@keyframes fg-sense-pulse { 0% { transform: translate(-50%, -50%) scale(.38); opacity: .88; } 75% { opacity: .22; } 100% { transform: translate(-50%, -50%) scale(2.05); opacity: 0; } }\r
 @keyframes fg-heat-rise { to { -webkit-mask-position: 0 -3.6cqw; mask-position: 0 -3.6cqw; } }\r
 @keyframes fg-scent-drift { from { transform: translateX(-3%); } to { transform: translateX(3%); } }\r
 @keyframes fg-breath-close { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }\r
@@ -1150,7 +1162,8 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-bars::after { bottom: 0; }\r
 .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 10.5%; }\r
 \r
-/* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。 */\r
+/* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。\r
+   心跳分三档：pulse 慢心跳（心动、温存，完全不晃画面，只留柔和光晕呼吸）/ heartbeat 持续心跳（告白、屏息等待门后，极轻微的呼吸缩放 0.4%）/ palpitate 急促心跳（受刺激、惊惧、心跳飙升，0.7% 搏动）。 */\r
 .fg-world[data-fx="sway"] { animation: fg-fx-sway 7s ease-in-out infinite; }\r
 .fg-world[data-fx="ride"] { animation: fg-fx-ride 1.7s ease-in-out infinite; }\r
 .fg-world[data-fx="handheld"] { animation: fg-fx-handheld 6.5s ease-in-out infinite; }\r
@@ -1159,7 +1172,8 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-world[data-fx="heat"] { animation: fg-fx-heat 2.6s ease-in-out infinite; }\r
 .fg-world[data-fx="underwater"] { animation: fg-fx-water 6s ease-in-out infinite; }\r
 .fg-world[data-fx="rumble"] { animation: fg-fx-rumble .16s linear infinite; }\r
-.fg-world[data-fx="heartbeat"] { animation: fg-fx-beat 1.05s ease-out infinite; }\r
+.fg-world[data-fx="heartbeat"] { animation: fg-fx-beat 1.8s ease-in-out infinite; }\r
+.fg-world[data-fx="palpitate"] { animation: fg-fx-palpitate 1.1s ease-in-out infinite; }\r
 /* 慢动作：画面极慢地推近，粒子几乎停住（见 Particles 的 speed）；时间停止：画面褪成灰、一切静止（立绘不呼吸、插画不动） */\r
 .fg-world { transition: filter .9s ease; }\r
 .fg-world[data-fx="slowmo"] { animation: fg-fx-slowmo 10s ease-in-out infinite alternate; }\r
@@ -1177,7 +1191,8 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-fx-heat { 0%, 100% { transform: scale(1.02) skewX(0); } 25% { transform: scale(1.02) skewX(.35deg) scaleY(1.004); } 75% { transform: scale(1.02) skewX(-.35deg); } }\r
 @keyframes fg-fx-water { 0%, 100% { transform: scale(1.05) skewX(-.6deg) translateY(.4%); } 50% { transform: scale(1.05) skewX(.6deg) translateY(-.4%); } }\r
 @keyframes fg-fx-rumble { 0% { transform: scale(1.03) translate(.25%, -.2%); } 25% { transform: scale(1.03) translate(-.3%, .15%); } 50% { transform: scale(1.03) translate(.2%, .25%); } 75% { transform: scale(1.03) translate(-.15%, -.25%); } 100% { transform: scale(1.03) translate(.25%, -.2%); } }\r
-@keyframes fg-fx-beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.022); } 24% { transform: scale(1.004); } 36% { transform: scale(1.014); } 60% { transform: scale(1); } }\r
+@keyframes fg-fx-beat { 0%, 62%, 100% { transform: scale(1); } 16% { transform: scale(1.004); } 30% { transform: scale(1.001); } 44% { transform: scale(1.0025); } }\r
+@keyframes fg-fx-palpitate { 0%, 58%, 100% { transform: scale(1); } 14% { transform: scale(1.0075); } 28% { transform: scale(1.0015); } 42% { transform: scale(1.005); } }\r
 .fg-fxlayer { z-index: 8; }\r
 .fg-fxlayer[data-v="slowmo"] { background: radial-gradient(100% 85% at 50% 50%, transparent 45%, rgba(10, 24, 48, .5)); backdrop-filter: saturate(.72) contrast(1.06); -webkit-backdrop-filter: saturate(.72) contrast(1.06); }\r
 .fg-fxlayer[data-v="slowmo"]::before { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); -webkit-mask-image: radial-gradient(75% 65% at 50% 50%, transparent 50%, #000 95%); mask-image: radial-gradient(75% 65% at 50% 50%, transparent 50%, #000 95%); }\r
@@ -1202,9 +1217,15 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-fxlayer[data-v="heat"] { background: linear-gradient(0deg, rgba(255, 140, 40, .22), transparent 55%); mix-blend-mode: screen; }\r
 .fg-fxlayer[data-v="heat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-breathe-light 2.6s ease-in-out infinite; }\r
 .fg-fxlayer[data-v="woozy"] { backdrop-filter: blur(.5px); -webkit-backdrop-filter: blur(.5px); background: radial-gradient(100% 80% at 50% 50%, transparent 40%, rgba(80, 40, 90, .35)); }\r
-.fg-fxlayer[data-v="heartbeat"] { background: radial-gradient(95% 80% at 50% 48%, transparent 38%, rgba(140, 0, 24, .5) 75%, rgba(90, 0, 14, .85)); }\r
-.fg-fxlayer[data-v="heartbeat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-beat-vignette 1.05s ease-out infinite; }\r
-@keyframes fg-beat-vignette { 0%, 60%, 100% { opacity: .45; } 12% { opacity: 1; } 24% { opacity: .6; } 36% { opacity: .85; } }\r
+.fg-fxlayer[data-v="pulse"] { background: radial-gradient(115% 92% at 50% 48%, transparent 50%, rgba(255, 178, 198, .18) 82%, rgba(235, 120, 152, .26)); mix-blend-mode: screen; }\r
+.fg-fxlayer[data-v="pulse"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-pulse-vignette 2.8s ease-in-out infinite; }\r
+.fg-fxlayer[data-v="heartbeat"] { background: radial-gradient(110% 88% at 50% 48%, transparent 48%, rgba(215, 85, 118, .2) 80%, rgba(155, 32, 64, .32)); }\r
+.fg-fxlayer[data-v="heartbeat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-beat-vignette 1.8s ease-in-out infinite; }\r
+.fg-fxlayer[data-v="palpitate"] { background: radial-gradient(102% 84% at 50% 48%, transparent 44%, rgba(185, 36, 68, .28) 78%, rgba(125, 12, 38, .44)); }\r
+.fg-fxlayer[data-v="palpitate"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-palpitate-vignette 1.1s ease-in-out infinite; }\r
+@keyframes fg-pulse-vignette { 0%, 100% { opacity: .62; } 35% { opacity: .94; } 55% { opacity: .76; } 72% { opacity: .88; } }\r
+@keyframes fg-beat-vignette { 0%, 62%, 100% { opacity: .55; } 18% { opacity: .88; } 32% { opacity: .66; } 46% { opacity: .78; } }\r
+@keyframes fg-palpitate-vignette { 0%, 58%, 100% { opacity: .52; } 15% { opacity: .95; } 28% { opacity: .65; } 42% { opacity: .85; } }\r
 .fg-fxlayer[data-v="rumble"] { background: radial-gradient(110% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, .35)); }\r
 .fg-fxlayer[data-v="drift"], .fg-fxlayer[data-v="sway"], .fg-fxlayer[data-v="ride"], .fg-fxlayer[data-v="handheld"] { display: none; }\r
 .fg-fxlayer[data-v="fading"] { background: radial-gradient(115% 85% at 50% 45%, transparent 50%, rgba(255, 236, 205, .42)), radial-gradient(150% 120% at 50% 50%, transparent 62%, rgba(40, 24, 10, .3)); }\r
@@ -2759,7 +2780,7 @@ var EMOTION_FACE = {
   suspicious: { add: "suspicious, narrowed eyes, raised eyebrow, closed mouth", neg: "smile, blush, tears" },
   passion: { add: "blush, half-closed eyes, parted lips", neg: "frown, angry, tears" }
 };
-var CAMERAS = ["shake", "zoom", "zoomout", "flash", "pan", "blur", "fadeblack", "redflash", "tilt", "closeup", "focus", "whip", "sink", "rise", "lowangle", "dolly", "empty", "slowpush", "rackfocus"];
+var CAMERAS = ["shake", "throb", "zoom", "zoomout", "flash", "pan", "blur", "fadeblack", "redflash", "tilt", "closeup", "focus", "whip", "sink", "rise", "lowangle", "dolly", "empty", "slowpush", "rackfocus"];
 var HIT_EFFECTS = ["hit", "crit", "miss", "block", "down", "heal"];
 var HIT_EFFECT_LABEL = { hit: "命中", crit: "暴击", miss: "闪避", block: "格挡", down: "击倒", heal: "治疗" };
 var MOMENTS = ["photo", "touch", "pat", "poke", "cheers", "fireworks", "cook", "nickname", "promise", "contact"];
@@ -2781,11 +2802,11 @@ var TEXT_FX_LABEL = { shake: "发抖", wave: "波浪", big: "放大", roar: "吼
 var WEATHER = ["clear", "rain", "storm", "snow", "blizzard", "wind", "sakura", "leaves", "fireflies", "fog", "embers", "dust", "bokeh", "stars", "sparkles", "bubbles"];
 var TRANSITIONS = ["dissolve", "fade", "cinematic", "wipe", "iris", "strips", "black", "flash", "blink", "glitch", "swirl", "haze", "none"];
 var LIGHTS = ["normal", "dim", "dark", "black", "candle", "spot", "neon", "screen", "alarm", "moon", "warm", "cold", "glare", "flicker", "sunbeam", "leak", "flare"];
-var FX = ["none", "sway", "ride", "handheld", "drift", "woozy", "heat", "underwater", "rumble", "speed", "heartbeat", "slowmo", "timestop", "fading"];
+var FX = ["none", "sway", "ride", "handheld", "drift", "woozy", "heat", "underwater", "rumble", "speed", "heartbeat", "pulse", "palpitate", "slowmo", "timestop", "fading"];
 var ROMANCE = ["none", "ambiguous", "intimate"];
 var ROMANCE_LABEL = { none: "", ambiguous: "暧昧", intimate: "亲密" };
-var SENSES = ["none", "blind", "ear", "touch", "heat", "cold", "scent", "breath", "daze"];
-var SENSE_LABEL = { none: "", blind: "蒙眼", ear: "耳边", touch: "触碰", heat: "发烫", cold: "发凉", scent: "香气", breath: "屏息", daze: "失神" };
+var SENSES = ["none", "blind", "ear", "touch", "heat", "cold", "scent", "breath", "daze", "pulse"];
+var SENSE_LABEL = { none: "", blind: "蒙眼", ear: "耳边", touch: "触碰", heat: "发烫", cold: "发凉", scent: "香气", breath: "屏息", daze: "失神", pulse: "心音" };
 var VOICES = ["phone", "radio", "telepathy", "chorus", "offscreen", "echo", "memory", "machine"];
 var CG_INS = ["dissolve", "slow", "black", "flash", "focus", "cut", "impact"];
 var CG_OUTS = ["dissolve", "slow", "black", "flash", "cut"];
@@ -5263,7 +5284,7 @@ var TIME_LABEL = { dawn: "黎明", morning: "清晨", noon: "正午", afternoon:
 var WEATHER_LABEL = { clear: "晴", rain: "雨", storm: "暴雨", snow: "雪", blizzard: "暴风雪", wind: "狂风", sakura: "樱吹雪", leaves: "落叶", fireflies: "萤火", fog: "雾", embers: "余烬", dust: "浮尘", bokeh: "光斑", stars: "星空", sparkles: "光点", bubbles: "气泡" };
 var MOOD_LABEL = { daily: "日常", cheerful: "轻快", comic: "滑稽", sweet: "甜蜜", touching: "感动", calm: "静谧", solemn: "庄严", sad: "感伤", despair: "绝望", tense: "紧张", mystery: "悬疑", eerie: "诡异", battle: "激战", heroic: "热血", silence: "寂静" };
 var LIGHT_LABEL = { normal: "", dim: "昏暗", dark: "熄灯", black: "漆黑", candle: "烛光", spot: "聚光", neon: "霓虹", screen: "屏幕光", alarm: "警报红光", moon: "月光", warm: "暖光", cold: "冷光", glare: "强光", flicker: "灯光闪烁", sunbeam: "窗光", leak: "漏光", flare: "逆光" };
-var FX_LABEL = { none: "", sway: "摇晃", ride: "颠簸", handheld: "手持", drift: "推近", woozy: "晕眩", heat: "热浪", underwater: "水下", rumble: "震动", speed: "疾驰", heartbeat: "心跳", slowmo: "慢动作", timestop: "时间停止", fading: "褪成回忆" };
+var FX_LABEL = { none: "", sway: "摇晃", ride: "颠簸", handheld: "手持", drift: "推近", woozy: "晕眩", heat: "热浪", underwater: "水下", rumble: "震动", speed: "疾驰", heartbeat: "心跳", pulse: "慢心跳", palpitate: "急促心跳", slowmo: "慢动作", timestop: "时间停止", fading: "褪成回忆" };
 var MODE_LABEL = { ...MODE_NAMES, real: "回到现实" };
 var CUT_LABEL = { time: "Time Skip", date: "Date", chapter: "Chapter", meanwhile: "Meanwhile" };
 var VOICE_LABEL = { phone: "电话", radio: "广播", telepathy: "心灵感应", chorus: "齐声", offscreen: "画外音", echo: "回声", memory: "回忆", machine: "机械音" };
@@ -5272,7 +5293,7 @@ var CG_OUT_LABEL = { dissolve: "溶回场景", slow: "慢慢淡去", black: "暗
 var CG_MOTION_LABEL = { still: "静止", push: "极慢推近", pan: "横移一遍" };
 var CARD_LABEL = { sms: "短信", letter: "信", note: "便条", news: "报纸", terminal: "终端", notice: "告示", diary: "日记", scroll: "卷轴" };
 var POS_LABEL = { farleft: "最左", left: "左", center: "中", right: "右", farright: "最右" };
-var CAMERA_LABEL = { shake: "震动", zoom: "推近", zoomout: "拉远", flash: "闪白", pan: "平移", blur: "虚焦", fadeblack: "黑场", redflash: "红闪", tilt: "倾斜", closeup: "特写", focus: "背景虚化", whip: "甩镜", sink: "下沉", rise: "升起", lowangle: "仰拍", dolly: "希区柯克变焦", empty: "空镜", slowpush: "缓推", rackfocus: "移焦" };
+var CAMERA_LABEL = { shake: "震动", throb: "心头一震", zoom: "推近", zoomout: "拉远", flash: "闪白", pan: "平移", blur: "虚焦", fadeblack: "黑场", redflash: "红闪", tilt: "倾斜", closeup: "特写", focus: "背景虚化", whip: "甩镜", sink: "下沉", rise: "升起", lowangle: "仰拍", dolly: "希区柯克变焦", empty: "空镜", slowpush: "缓推", rackfocus: "移焦" };
 var SYMBOL_LABEL = { heart: "爱心", anger: "怒筋", sweat: "汗滴", sparkle: "闪光", surprise: "惊叹", gloom: "阴云", note: "音符", zzz: "睡着", bulb: "灵光", heartbreak: "心碎", sigh: "叹气", dizzy: "眩晕", fire: "燃起", blush: "红晕", bloom: "开花", silence: "无语" };
 var TRANSITION_LABEL = { dissolve: "溶解", fade: "慢慢变化", cinematic: "电影黑边", wipe: "横扫", iris: "圆形收缩", strips: "百叶", black: "黑场", flash: "白闪", blink: "闭眼睁眼", glitch: "画面撕裂", swirl: "旋转入梦", haze: "起雾", none: "直接切" };
 var POS_X = { farleft: 14, left: 28, center: 50, right: 72, farright: 86 };
@@ -6096,6 +6117,8 @@ var FOLEY = Object.freeze({
   shutter: [p2("noise", 4200, 0.035, 0.22, { q: 1.4 }), p2("square", 1800, 0.02, 0.015, { attack: 1e-3, lp: 3200 }), p2("noise", 2600, 0.05, 0.16, { q: 1.1, at: 0.085 })],
   // 心动：两下轻轻的心跳，再一声很轻的铃
   heartbeat: [p2("sine", 64, 0.16, 0.3, { to: 48 }), p2("sine", 64, 0.2, 0.24, { to: 46, at: 0.22 }), p2("sine", 1568, 0.9, 0.025, { at: 0.36 }), p2("sine", 2093, 0.8, 0.02, { at: 0.44 })],
+  // 心头一震（咚——）：被某句话或回忆猛然戳中时，胸口只沉沉地搏动一下（不带高音铃声）
+  throb: [p2("sine", 72, 0.18, 0.34, { to: 46, attack: 4e-3 }), p2("sine", 58, 0.32, 0.26, { to: 38, at: 0.19, attack: 6e-3 }), p2("noise", 180, 0.14, 0.06, { q: 0.9 })],
   // 摸头：噗、噗两下软软的
   pat: [p2("sine", 340, 0.09, 0.13, { to: 230, attack: 4e-3 }), p2("noise", 900, 0.05, 0.04, { q: 0.8 }), p2("sine", 340, 0.09, 0.11, { to: 230, attack: 4e-3, at: 0.24 }), p2("noise", 900, 0.05, 0.035, { q: 0.8, at: 0.24 })],
   // 戳脸：啵嘤（往上一挑）
@@ -14678,7 +14701,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }, [panel, done]);
   const talk = import_react18.default.useMemo(() => beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null, [beat, chars, typed, typeSpeed, typedAt, done]);
   import_react18.default.useEffect(() => {
-    if (beat && beat.cam === "whip" && !title && sfxOn) stinger("whoosh");
+    if (!beat || title || !sfxOn) return;
+    if (beat.cam === "whip") stinger("whoosh");
+    else if (beat.cam === "throb" && !beat.sfx) storyFoley("throb", (ui0.storySfxVolume ?? 0.8) / 0.8);
   }, [beat && beat.key]);
   const cameraRef = import_react18.default.useRef(null);
   const cam = useCamera(title ? null : beat, cameraRef);
