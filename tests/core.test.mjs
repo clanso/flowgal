@@ -560,13 +560,27 @@ test('gate: 插画提示词：人名不发出去，固定外貌补进角色块�
   assert.equal(fb.writer, 'fallback')
 })
 
-test('gate: 设置校验：未知键丢弃、非法地址回落、NAI 官方接入点常在', () => {
-  const saved = applyPatch({}, { evil: 1, comfyui: { baseURL: 'javascript:alert(1)' }, novelai: { endpoints: [{ id: 'relay', name: '中转', baseURL: 'https://relay.example' }], endpoint: 'relay' } })
+test('gate: 设置校验：未知键丢弃、非法地址回落、NAI 官方接入点常在且多个中转站共存去重', () => {
+  const saved = applyPatch({}, {
+    evil: 1,
+    comfyui: { baseURL: 'javascript:alert(1)' },
+    novelai: {
+      endpoints: [
+        { id: 'relay1', name: ' 中转一 ', baseURL: ' https://relay1.example ' },
+        { id: 'relay2', name: '中转二', baseURL: 'https://relay2.example' },
+        { id: 'relay1', name: '重复ID会被去重', baseURL: 'https://dup.example' },
+      ],
+      endpoint: 'relay2',
+    },
+  })
   assert.equal(saved.evil, undefined)
   const cfg = resolveConfig(saved)
   assert.equal(cfg.comfyui.baseURL, 'http://127.0.0.1:8188')
+  assert.equal(cfg.novelai.endpoints.length, 3)
   assert.equal(cfg.novelai.endpoints[0].id, 'official')
-  assert.equal(cfg.novelai.endpoint, 'relay')
+  assert.deepEqual(cfg.novelai.endpoints[1], { id: 'relay1', name: '中转一', baseURL: 'https://relay1.example' })
+  assert.deepEqual(cfg.novelai.endpoints[2], { id: 'relay2', name: '中转二', baseURL: 'https://relay2.example' })
+  assert.equal(cfg.novelai.endpoint, 'relay2')
 })
 
 test('gate: 聊天生图回复里取图', async () => {
