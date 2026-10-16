@@ -10,7 +10,7 @@ import { DirectorLog } from './DirectorLog.jsx'
 import { asking } from '../ask.jsx'
 import { useFaceFramer } from './faceFramer.js'
 import { useParallax } from './parallax.js'
-import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros, playErosLoop, warmVoices } from './audio.js'
+import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros, playErosLoop, playHeartbeat, stopHeartbeat, warmVoices } from './audio.js'
 import { ErosPeak, useErosPulse } from './Eros.jsx'
 import { EROS_SFX } from '../../../lib/eros.js'
 import { ONOMATOPOEIA } from '../../../lib/foley.js'
@@ -364,6 +364,18 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     else stopEros()
   }, [bedPace, bedTentacle, erosVolume, bedSound && bedSound.id, bedSound && bedSound.volume])
   useErosPulse(cameraRef, bedPace, !bedSound)
+  // 心跳画面特效与心音联动：当场景开着 sense: pulse 或 fx: pulse / heartbeat / palpitate，且当前环境音不是心跳录音时，按画面呼吸的同一拍子自动响起对应快慢的心音。
+  const heartScene = ui0.storySfx !== false && !skip && !title && soundBeat ? soundBeat.scene : null
+  const ambHasHeart = Boolean(ambSound && /心|脉|beat/i.test(`${ambSound.name || ''} ${ambSound.category || ''}`))
+  const heartKind = !heartScene || ambHasHeart ? ''
+    : heartScene.sense === 'pulse' ? 'sense:pulse'
+    : ['pulse', 'heartbeat', 'palpitate'].includes(heartScene.fx) ? heartScene.fx : ''
+  const heartVolume = (ui0.storySfxVolume ?? 0.8) / 0.8
+  React.useEffect(() => {
+    if (closingRef.current) return
+    if (heartKind) playHeartbeat(heartKind, heartVolume)
+    else stopHeartbeat()
+  }, [heartKind, heartVolume])
 
   const go = React.useCallback(i => {
     if (!beats.length) return

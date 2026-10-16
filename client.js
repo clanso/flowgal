@@ -7548,6 +7548,7 @@ function stopAll() {
   }
   oneShots.clear();
   stopEros();
+  stopHeartbeat();
   erosRecording.stop();
 }
 function previewTrack(track, onEnd) {
@@ -8116,6 +8117,36 @@ function tentacleLoop(kind) {
 }
 var erosBed = rhythm();
 var tentacleBed = rhythm();
+var heartBed = rhythm();
+var HEARTBEAT_SPEC = {
+  "sense:pulse": { beat: 2.4, f1: 58, f2: 52, sep: 0.24, gain: 0.56 },
+  pulse: { beat: 2.8, f1: 60, f2: 54, sep: 0.23, gain: 0.45 },
+  heartbeat: { beat: 1.8, f1: 64, f2: 58, sep: 0.19, gain: 0.65 },
+  palpitate: { beat: 1.1, f1: 72, f2: 65, sep: 0.15, gain: 0.82 }
+};
+function heartLoop(kind) {
+  const spec = HEARTBEAT_SPEC[kind];
+  if (!spec) return null;
+  const { beat, f1, f2, sep, gain } = spec;
+  const parts = [
+    { wave: "sine", f: f1, to: f1 * 0.62, dur: 0.16, gain: 0.26 * gain, attack: 5e-3, at: 0 },
+    { wave: "noise", f: 185, q: 1.2, dur: 0.07, gain: 0.11 * gain, at: 0 },
+    { wave: "sine", f: f2, to: f2 * 0.62, dur: 0.18, gain: 0.19 * gain, attack: 6e-3, at: sep },
+    { wave: "noise", f: 165, q: 1.2, dur: 0.07, gain: 0.08 * gain, at: sep }
+  ];
+  return {
+    gap: () => beat,
+    play(ac, at2, step2, volume) {
+      playParts(ac, parts, { volume, at: at2 });
+    }
+  };
+}
+function playHeartbeat(kind, volume = 1) {
+  heartBed.set(kind || "", heartLoop(kind), volume);
+}
+function stopHeartbeat() {
+  heartBed.stop();
+}
 function playEros(pace, tentacle, volume = 1) {
   const writhing = Boolean(TENTACLE_LOOPS[tentacle]);
   erosBed.set(pace + (writhing ? "|tentacle" : ""), paceLoop(pace, writhing), volume);
@@ -8150,6 +8181,7 @@ function previewEros(pace, tentacle, volume = 1, seconds = 5) {
   beds[1].set("trial", tentacleLoop(tentacle), volume * 0.8);
   erosBed.quiet(seconds + 0.5);
   tentacleBed.quiet(seconds + 0.5);
+  heartBed.quiet(seconds + 0.5);
   erosRecording.duck(0, (seconds + 0.5) * 1e3);
   trial = { beds, timer: setTimeout(() => {
     beds.forEach((b) => b.stop());
@@ -14782,6 +14814,15 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     else stopEros();
   }, [bedPace, bedTentacle, erosVolume, bedSound && bedSound.id, bedSound && bedSound.volume]);
   useErosPulse(cameraRef, bedPace, !bedSound);
+  const heartScene = ui0.storySfx !== false && !skip && !title && soundBeat ? soundBeat.scene : null;
+  const ambHasHeart = Boolean(ambSound && /心|脉|beat/i.test(`${ambSound.name || ""} ${ambSound.category || ""}`));
+  const heartKind = !heartScene || ambHasHeart ? "" : heartScene.sense === "pulse" ? "sense:pulse" : ["pulse", "heartbeat", "palpitate"].includes(heartScene.fx) ? heartScene.fx : "";
+  const heartVolume = (ui0.storySfxVolume ?? 0.8) / 0.8;
+  import_react18.default.useEffect(() => {
+    if (closingRef.current) return;
+    if (heartKind) playHeartbeat(heartKind, heartVolume);
+    else stopHeartbeat();
+  }, [heartKind, heartVolume]);
   const go = import_react18.default.useCallback((i) => {
     if (!beats.length) return;
     const next = Math.max(0, Math.min(beats.length - 1, i));
