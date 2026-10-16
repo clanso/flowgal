@@ -81,7 +81,18 @@ test('gate: 跟 people 对齐：people 写的是结束时的样子、开头的�
   script = { lines: { U4: { look: [{ name: '柯萝伊', outfit: '铠甲' }] } }, people: [{ name: '柯萝伊', outfit: '铠甲', outfitTags: 'silver armor' }] }
   settleShifts(game, null, script, 2)
   assert.equal(script.lines.U4.look[0].from, '炼金术师短外套')
-  applyPeople(game, null, script.people, 2)
+  // 导演在第一次换装写了 from（或者本轮来回换装 A → B → A、people 写的是结束时的 B）：一开头穿 A，不退回上一轮的
+  script = {
+    lines: {
+      U2: { look: [{ name: '柯萝伊', outfit: '轻便和服', from: '当主男装和服' }] },
+      U5: { look: [{ name: '柯萝伊', outfit: '当主男装和服' }] },
+      U8: { look: [{ name: '柯萝伊', outfit: '轻便和服' }] },
+    },
+    people: [{ name: '柯萝伊', outfit: '轻便和服' }],
+  }
+  settleShifts(game, null, script, 2)
+  assert.deepEqual([script.lines.U2.look[0].from, script.lines.U5.look[0].from, script.lines.U8.look[0].from], ['当主男装和服', '轻便和服', '当主男装和服'])
+  applyPeople(game, null, [{ name: '柯萝伊', outfit: '铠甲' }], 2)
   assert.equal(lookAt({ wear: game.looks.柯萝伊.wear, outfits: {} }, 2).outfit, '铠甲', '档案按轮记结束时的样子，下一轮接着')
 })
 

@@ -2177,12 +2177,11 @@ button.fg-pm-name:hover { color: var(--accent); }\r
 @keyframes fg-tentacle-writhe { 0% { transform: skewX(-3.5deg) scale(1.01, .97); } 40% { transform: skewX(2.5deg) scale(.985, 1.05) translateY(-1.2%); } 100% { transform: skewX(4deg) scale(1, 1.01); } }\r
 @keyframes fg-tentacle-glint { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }\r
 \r
-/* 高潮：画面柔和地白起来、带一点虚，再慢慢回来；射精：跟着声音一下一下地亮，一下比一下弱。 */\r
-.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; }\r
-.fg-peak.is-climax, .fg-peak.is-both { background: radial-gradient(78% 72% at 50% 48%, rgba(255, 253, 250, .94), rgba(255, 238, 242, .62) 55%, rgba(255, 222, 232, .28)); backdrop-filter: blur(3px) brightness(1.15); -webkit-backdrop-filter: blur(3px) brightness(1.15); animation: fg-peak-bloom 2.6s cubic-bezier(.3, 0, .2, 1) both; }\r
-.fg-peak i { position: absolute; inset: 0; opacity: 0; background: radial-gradient(90% 80% at 50% 56%, rgba(255, 250, 246, .9), rgba(255, 236, 240, .36) 58%, transparent 92%); animation: fg-peak-pulse .55s ease-out var(--at, 0ms) both; }\r
-@keyframes fg-peak-bloom { 0% { opacity: 0; } 22% { opacity: .84; } 42% { opacity: .7; } 100% { opacity: 0; } }\r
-@keyframes fg-peak-pulse { 0% { opacity: 0; } 14% { opacity: calc(.6 * var(--k, 1)); } 100% { opacity: 0; } }\r
+/* 高潮：画面柔和地白起来、带一点虚，再慢慢回来；射精：加上跟着声音一下一下亮起的脉动，一下比一下弱。 */\r
+.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; background: radial-gradient(78% 72% at 50% 48%, rgba(255, 253, 250, .94), rgba(255, 238, 242, .62) 55%, rgba(255, 222, 232, .28)); backdrop-filter: blur(3px) brightness(1.15); -webkit-backdrop-filter: blur(3px) brightness(1.15); animation: fg-peak-bloom 2.6s cubic-bezier(.3, 0, .2, 1) both; }\r
+.fg-peak i { position: absolute; inset: 0; opacity: 0; background: radial-gradient(90% 80% at 50% 56%, rgba(255, 250, 246, .95), rgba(255, 236, 240, .45) 58%, transparent 92%); animation: fg-peak-pulse .55s ease-out var(--at, 0ms) both; }\r
+@keyframes fg-peak-bloom { 0% { opacity: 0; } 22% { opacity: .88; } 42% { opacity: .72; } 100% { opacity: 0; } }\r
+@keyframes fg-peak-pulse { 0% { opacity: 0; } 14% { opacity: calc(.7 * var(--k, 1)); } 100% { opacity: 0; } }\r
 @media (prefers-reduced-motion: reduce) {\r
   .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */\r
 }\r
@@ -14129,8 +14128,8 @@ function ErosPeak({ beat, cameraRef, volume, sound = true }) {
     if (volume > 0) erosPeak(kind, volume, { sound });
     const cam = cameraRef && cameraRef.current;
     if (!cam || typeof cam.animate !== "function" || still()) return void 0;
-    const moves = kind !== "cum" ? [cam.animate([{ scale: "1" }, { scale: "1.03", offset: 0.28 }, { scale: "1" }], { duration: 2600, easing: "cubic-bezier(.3, 0, .2, 1)" })] : EROS_PULSES.map((ms, i) => cam.animate([{ scale: "1" }, { scale: String(1.016 - i * 3e-3), offset: 0.2 }, { scale: "1" }], { duration: 360, delay: ms, easing: "ease-out" }));
-    return () => moves.forEach((m) => m.cancel());
+    const move = cam.animate([{ scale: "1" }, { scale: "1.03", offset: 0.28 }, { scale: "1" }], { duration: 2600, easing: "cubic-bezier(.3, 0, .2, 1)" });
+    return () => move.cancel();
   }, []);
   return /* @__PURE__ */ import_react17.default.createElement("div", { className: `fg-peak is-${kind}`, "aria-hidden": "true" }, kind !== "climax" && EROS_PULSES.map((ms, i) => /* @__PURE__ */ import_react17.default.createElement("i", { key: ms, style: { "--at": ms + "ms", "--k": (1 - i * 0.2).toFixed(2) } })));
 }

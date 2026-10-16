@@ -46,11 +46,8 @@ export function ErosPeak({ beat, cameraRef, volume, sound = true }) {
     if (volume > 0) erosPeak(kind, volume, { sound })
     const cam = cameraRef && cameraRef.current
     if (!cam || typeof cam.animate !== 'function' || still()) return undefined
-    // both 时镜头只涌那一下（两个动画都动 scale 会互相顶掉），一下一下的脉动交给白光层
-    const moves = kind !== 'cum'
-      ? [cam.animate([{ scale: '1' }, { scale: '1.03', offset: 0.28 }, { scale: '1' }], { duration: 2600, easing: 'cubic-bezier(.3, 0, .2, 1)' })]
-      : EROS_PULSES.map((ms, i) => cam.animate([{ scale: '1' }, { scale: String(1.016 - i * 0.003), offset: 0.2 }, { scale: '1' }], { duration: 360, delay: ms, easing: 'ease-out' }))
-    return () => moves.forEach(m => m.cancel())
+    const move = cam.animate([{ scale: '1' }, { scale: '1.03', offset: 0.28 }, { scale: '1' }], { duration: 2600, easing: 'cubic-bezier(.3, 0, .2, 1)' })
+    return () => move.cancel()
   }, [])
   return (
     <div className={`fg-peak is-${kind}`} aria-hidden="true">

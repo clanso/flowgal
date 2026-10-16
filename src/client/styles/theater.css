@@ -1804,12 +1804,11 @@ button.fg-pm-name:hover { color: var(--accent); }
 @keyframes fg-tentacle-writhe { 0% { transform: skewX(-3.5deg) scale(1.01, .97); } 40% { transform: skewX(2.5deg) scale(.985, 1.05) translateY(-1.2%); } 100% { transform: skewX(4deg) scale(1, 1.01); } }
 @keyframes fg-tentacle-glint { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
 
-/* 高潮：画面柔和地白起来、带一点虚，再慢慢回来；射精：跟着声音一下一下地亮，一下比一下弱。 */
-.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
-.fg-peak.is-climax, .fg-peak.is-both { background: radial-gradient(78% 72% at 50% 48%, rgba(255, 253, 250, .94), rgba(255, 238, 242, .62) 55%, rgba(255, 222, 232, .28)); backdrop-filter: blur(3px) brightness(1.15); -webkit-backdrop-filter: blur(3px) brightness(1.15); animation: fg-peak-bloom 2.6s cubic-bezier(.3, 0, .2, 1) both; }
-.fg-peak i { position: absolute; inset: 0; opacity: 0; background: radial-gradient(90% 80% at 50% 56%, rgba(255, 250, 246, .9), rgba(255, 236, 240, .36) 58%, transparent 92%); animation: fg-peak-pulse .55s ease-out var(--at, 0ms) both; }
-@keyframes fg-peak-bloom { 0% { opacity: 0; } 22% { opacity: .84; } 42% { opacity: .7; } 100% { opacity: 0; } }
-@keyframes fg-peak-pulse { 0% { opacity: 0; } 14% { opacity: calc(.6 * var(--k, 1)); } 100% { opacity: 0; } }
+/* 高潮：画面柔和地白起来、带一点虚，再慢慢回来；射精：加上跟着声音一下一下亮起的脉动，一下比一下弱。 */
+.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; background: radial-gradient(78% 72% at 50% 48%, rgba(255, 253, 250, .94), rgba(255, 238, 242, .62) 55%, rgba(255, 222, 232, .28)); backdrop-filter: blur(3px) brightness(1.15); -webkit-backdrop-filter: blur(3px) brightness(1.15); animation: fg-peak-bloom 2.6s cubic-bezier(.3, 0, .2, 1) both; }
+.fg-peak i { position: absolute; inset: 0; opacity: 0; background: radial-gradient(90% 80% at 50% 56%, rgba(255, 250, 246, .95), rgba(255, 236, 240, .45) 58%, transparent 92%); animation: fg-peak-pulse .55s ease-out var(--at, 0ms) both; }
+@keyframes fg-peak-bloom { 0% { opacity: 0; } 22% { opacity: .88; } 42% { opacity: .72; } 100% { opacity: 0; } }
+@keyframes fg-peak-pulse { 0% { opacity: 0; } 14% { opacity: calc(.7 * var(--k, 1)); } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */
 }
