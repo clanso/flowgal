@@ -5,6 +5,7 @@
 // 导演标了 skip 的单元（状态栏、网页外壳、作者的话……）不演；导演改判了类型的单元按改判后的演。
 import { placeKey, speakersOf, MODE_NAMES, RECALL_TONES, RECALL_TONE_NAMES, cgIn, cgOut, cgMotion } from '../../../lib/vocab.js'
 import { stageWalk, playedUnits, hintedSpeaker, unitSpeakers } from '../../../lib/staging.js'
+import { splitUnitPages } from '../../../lib/segment.js'
 import { walkScenes, recallRuns, markRecalls, autoRecallTone, intimateRuns, holdIntimateCgs, SCENE_DEFAULTS, MODE_TRANSITION } from '../../../lib/scenes.js'
 import { sizeFor } from '../../../lib/image/style.js'
 import { shiftsAhead } from '../../../lib/look.js'
@@ -212,68 +213,74 @@ export function buildBeats(view) {
       if (line.bgm === 'hush') hush = HUSH_BEATS
       const hushed = hush ? (hush === HUSH_BEATS ? 'start' : 'on') : ''
       if (hush) hush--
-      beats.push({
-        key: `${t.turn}:${unit.id}`,
-        turn: t.turn,
-        textVersion: t.textVersion,
-        unitId: unit.id,
-        type,
-        text: unit.text,
-        ...(unit.orig ? { orig: unit.orig } : {}), // 双语对照的原文（剧场上方小字）
-        speaker,
-        ...(speakers.length > 1 ? { speakers } : {}), // 齐声：几个人一起高亮
-        ...(voice ? { voice } : {}), // 声音的样子：电话里、广播、心灵感应……
-        ...(split ? { split } : {}),
-        alias: line.as || '',
-        emo: line.emo || '',
-        sym: line.sym || '',
-        cam: line.cam || '',
-        ...(line.camOn ? { camOn: line.camOn } : {}), // 镜头对准谁（不写是说话的人）
-        ...(hit ? { hit } : {}), // 一次出手：被打的人一震
-        ...(line.moment ? { moment: line.moment } : {}), // 小瞬间：拍照、摸头、干杯、约定……
-        ...(calling ? { call: calling } : {}), // 正在打的电话：响着（ringing）还是接通了（live）
-        ...(phoneEdge ? { phone: phoneEdge } : {}), // 手机这一句的事：来电、拨出、挂断、通知、语音留言
-        say: line.say || '',
-        stress: line.stress || '',
-        ...(line.textfx ? { textfx: line.textfx } : {}), // 句中文字效果：某几个字发抖、放大、越说越小……
-        card: line.card || '',
-        scene: at.scene,
-        mode: at.mode,
-        ...(at.layer && at.layer.then ? { then: at.layer.then } : {}), // 段落里的人当时的样子（回忆里还没受伤、穿着当时的衣服……）
-        ...(ahead[ui] ? { ahead: ahead[ui] } : {}), // 这一轮后面才变的样子（之后才缠上发带、才换衣服）：这一拍按变化之前的
-        ...(at.cut ? { cut: at.cut } : {}),
-        ...(recall ? { recall } : {}), // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
-        ...(recallEdge ? { recallEdge } : {}),
-        bgm: at.bgm,
-        ...(hushed ? { hush: hushed } : {}), // 配乐留白：start 是停下的那一句，on 是还没回来
-        amb: at.amb,
-        sfx: line.sfx || '',
-        ...(line.peak ? { peak: line.peak } : {}), // 高潮那一下：climax / cum / both（lib/eros.js）
-        ...(line.pause ? { pause: line.pause } : {}), // 「間」：这句的字出来之前先停一下
-        sceneEnter: enter,
-        set,
-        transition,
-        cast: steps[ui].cast,
-        recent: steps[ui].cast.map(c => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)), // 台上的人，最近有动静的在前
-        ...(front.length ? { front } : {}), // 台上开过口的人，最近开口的在前：谁挡在谁前面（lib/blocking.js 的 stackLayers）
-        entered: steps[ui].entered,
-        left: steps[ui].left,
-        ...(reacts.length ? { reacts } : {}), // 没在说话的人的反应 [{ name, emo, sym }]
-        ...(Object.keys(block.poses).length ? { poses: block.poses } : {}), // 走位：每个人现在的样子（靠近谁、上前、背对……）
-        ...(block.moves.length ? { moves: block.moves } : {}), // 这一拍发生的走位
-        ...(Object.keys(ways).length ? { enterHow: ways } : {}), // 跑进来、探头、慢慢走进来
-        ...(Object.keys(gone).length ? { exitHow: gone } : {}), // 甩头离开、跑开、慢慢走远
-        emotions: { ...emotions },
-        ...(Object.keys(postures).length ? { postures } : {}), // 每个人此刻在哪个动作（动作编号；没走到过的人按他情绪的主动作）
-        ...(Object.values(offs).some(list => list.length) ? { offPoses: offs } : {}), // 这一刻收起了的动作：剧场找图时不退到它们上面
-        cg,
-        cgAnchor: Boolean(cgEntry && cgEntry.at === ui),
-        directed: Boolean(script),
-        status: t.status,
-        error: t.error,
-        lastOfTurn: ui === units.length - 1,
-        lastTurn: ti === turns.length - 1,
-        choices: ti === turns.length - 1 && ui === units.length - 1 && script ? script.choices || [] : [],
+      // 过长的单元（例如旧存档或双语配对合并后的长句）按呼吸节奏拆成几拍（连珠炮 chatter 除外：话痨就是要一口气塞满再自动跳下一句）
+      const pages = line.say === 'chatter' || line.card ? [unit] : splitUnitPages(unit)
+      pages.forEach((page, pi) => {
+        const first = pi === 0
+        const last = pi === pages.length - 1
+        beats.push({
+          key: first ? `${t.turn}:${unit.id}` : `${t.turn}:${unit.id}.${pi + 1}`,
+          turn: t.turn,
+          textVersion: t.textVersion,
+          unitId: unit.id,
+          type,
+          text: page.text,
+          ...(page.orig ? { orig: page.orig } : {}), // 双语对照的原文（剧场上方小字）
+          speaker,
+          ...(speakers.length > 1 ? { speakers } : {}), // 齐声：几个人一起高亮
+          ...(voice ? { voice } : {}), // 声音的样子：电话里、广播、心灵感应……
+          ...(split ? { split } : {}),
+          alias: line.as || '',
+          emo: line.emo || '',
+          sym: first ? line.sym || '' : '',
+          cam: first ? line.cam || '' : '',
+          ...(first && line.camOn ? { camOn: line.camOn } : {}), // 镜头对准谁（不写是说话的人）
+          ...(first && hit ? { hit } : {}), // 一次出手：被打的人一震
+          ...(first && line.moment ? { moment: line.moment } : {}), // 小瞬间：拍照、摸头、干杯、约定……
+          ...(calling ? { call: calling } : {}), // 正在打的电话：响着（ringing）还是接通了（live）
+          ...(first && phoneEdge ? { phone: phoneEdge } : {}), // 手机这一句的事：来电、拨出、挂断、通知、语音留言
+          say: line.say || '',
+          stress: line.stress && page.text.includes(line.stress) ? line.stress : '',
+          ...(line.textfx ? { textfx: line.textfx.filter(f => page.text.includes(f.text)) } : {}), // 句中文字效果：落在这页上的才算
+          card: first ? line.card || '' : '',
+          scene: at.scene,
+          mode: at.mode,
+          ...(at.layer && at.layer.then ? { then: at.layer.then } : {}), // 段落里的人当时的样子（回忆里还没受伤、穿着当时的衣服……）
+          ...(ahead[ui] ? { ahead: ahead[ui] } : {}), // 这一轮后面才变的样子（之后才缠上发带、才换衣服）：这一拍按变化之前的
+          ...(first && at.cut ? { cut: at.cut } : {}),
+          ...(recall ? { recall } : {}), // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
+          ...(first && recallEdge ? { recallEdge } : {}),
+          bgm: at.bgm,
+          ...(hushed ? { hush: first ? hushed : 'on' } : {}), // 配乐留白：start 是停下的那一句，on 是还没回来
+          amb: at.amb,
+          sfx: first ? line.sfx || '' : '',
+          ...(first && line.peak ? { peak: line.peak } : {}), // 高潮那一下：climax / cum / both（lib/eros.js）
+          ...(first && line.pause ? { pause: line.pause } : {}), // 「間」：这句的字出来之前先停一下
+          sceneEnter: first ? enter : false,
+          set,
+          transition: first ? transition : '',
+          cast: steps[ui].cast,
+          recent: steps[ui].cast.map(c => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)), // 台上的人，最近有动静的在前
+          ...(front.length ? { front } : {}), // 台上开过口的人，最近开口的在前：谁挡在谁前面（lib/blocking.js 的 stackLayers）
+          entered: first ? steps[ui].entered : [],
+          left: first ? steps[ui].left : [],
+          ...(first && reacts.length ? { reacts } : {}), // 没在说话的人的反应 [{ name, emo, sym }]
+          ...(Object.keys(block.poses).length ? { poses: block.poses } : {}), // 走位：每个人现在的样子（靠近谁、上前、背对……）
+          ...(first && block.moves.length ? { moves: block.moves } : {}), // 这一拍发生的走位
+          ...(first && Object.keys(ways).length ? { enterHow: ways } : {}), // 跑进来、探头、慢慢走进来
+          ...(first && Object.keys(gone).length ? { exitHow: gone } : {}), // 甩头离开、跑开、慢慢走远
+          emotions: { ...emotions },
+          ...(Object.keys(postures).length ? { postures } : {}), // 每个人此刻在哪个动作（动作编号；没走到过的人按他情绪的主动作）
+          ...(Object.values(offs).some(list => list.length) ? { offPoses: offs } : {}), // 这一刻收起了的动作：剧场找图时不退到它们上面
+          cg,
+          cgAnchor: first && Boolean(cgEntry && cgEntry.at === ui),
+          directed: Boolean(script),
+          status: t.status,
+          error: t.error,
+          lastOfTurn: ui === units.length - 1 && last,
+          lastTurn: ti === turns.length - 1,
+          choices: ti === turns.length - 1 && ui === units.length - 1 && last && script ? script.choices || [] : [],
+        })
       })
     })
     // 一轮结束：现实里的场景、配乐接着往下一轮带；还在段落里的先记着，下一轮第一句接着演同一种段落才留着。

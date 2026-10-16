@@ -359,7 +359,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if ((bedPace || bedTentacle) && !bedSound) playEros(bedPace, bedTentacle, erosVolume)
     else stopEros()
   }, [bedPace, bedTentacle, erosVolume, bedSound && bedSound.id, bedSound && bedSound.volume])
-  useErosPulse(cameraRef, Boolean(bedPace) && !bedSound)
+  useErosPulse(cameraRef, bedPace, !bedSound)
 
   const go = React.useCallback(i => {
     if (!beats.length) return
@@ -378,13 +378,18 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     go(index + 1)
   }, [beat, done, atEnd, index, go, finish, pausing, change, visit])
 
-  // 自动 / 快进。
+  // 自动 / 快进 / 连珠炮（chatter：像逆转裁判的大场香大婶那样机关枪似的一口气说完，打完字不等玩家按键，只停 120ms 直接跳下一句）。
+  const rushedRef = React.useRef('')
   React.useEffect(() => {
     if (title || panel || choosing || !beat) return undefined
     if (skip) { const t = setTimeout(() => (atEnd ? setSkip(false) : go(index + 1)), 70); return () => clearTimeout(t) }
+    if (typed && typed.rush && done && !atEnd && speed > 0 && rushedRef.current !== visit) {
+      const t = setTimeout(() => { rushedRef.current = visit; go(index + 1) }, 120)
+      return () => clearTimeout(t)
+    }
     if (auto && done && !atEnd) { const t = setTimeout(() => go(index + 1), ui0.autoDelay + chars.length * 18); return () => clearTimeout(t) }
     return undefined
-  }, [auto, skip, done, index, title, panel, choosing, atEnd])
+  }, [auto, skip, done, index, title, panel, choosing, atEnd, typed && typed.rush, speed, visit])
 
   // 读到末尾时新的一拍到了（导演补了单元 / 新一轮）：继续往下演。
   const prevLen = React.useRef(beats.length)

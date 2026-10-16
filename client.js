@@ -1069,17 +1069,22 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-flare-ghost { from { opacity: .7; transform: translate(.6%, -.6%); } to { opacity: 1; transform: translate(-.6%, .7%); } }\r
 @keyframes fg-flicker { 0%, 100% { opacity: 1; } 8% { opacity: .25; } 9% { opacity: 1; } 11% { opacity: .35; } 12% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .15; } 50% { opacity: .9; } 51% { opacity: .3; } 53% { opacity: 1; } 78% { opacity: .45; } 79% { opacity: 1; } }\r
 \r
-/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密更暖，人离得更近一点，四角像心跳一样一明一暗。压在背景和立绘上，插画不受影响。 */\r
+/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密更暖，人离得更近一点，四角像心跳一样一明一暗。压在背景和立绘上，插画不受影响。\r
+   只用纯 GPU 合成的渐变与混合模式，不用 backdrop-filter（Chromium 在多层 backdrop-filter 叠在动画背景上时会闪烁掉帧）。 */\r
 .fg-romance { z-index: 5; }\r
-.fg-romance[data-v="ambiguous"] { background: radial-gradient(120% 95% at 50% 40%, rgba(255, 215, 235, .05) 35%, rgba(255, 150, 195, .3)); backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); -webkit-backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); }\r
+.fg-romance[data-v="ambiguous"] { background: radial-gradient(115% 92% at 50% 42%, rgba(255, 228, 240, .08) 32%, rgba(255, 145, 192, .34)); mix-blend-mode: screen; }\r
 .fg-romance[data-v="ambiguous"]::before { bottom: -100%; background:\r
-    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .5) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .42) 0 .8cqw, transparent 1.6cqw),\r
-    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .32) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .45) 0 1.1cqw, transparent 2cqw),\r
-    radial-gradient(circle at 80% 54%, rgba(255, 195, 222, .38) 0 1.6cqw, transparent 2.6cqw), radial-gradient(circle at 93% 90%, rgba(255, 236, 246, .4) 0 .9cqw, transparent 1.7cqw);\r
-  background-size: 100% 50%; filter: blur(.2cqw); animation: fg-bokeh-rise 24s linear infinite, fg-bokeh-twinkle 4.5s ease-in-out infinite alternate; }\r
-.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .28), transparent 72%); }\r
-.fg-romance[data-v="intimate"] { background: radial-gradient(110% 90% at 50% 45%, rgba(255, 190, 150, .14) 25%, rgba(235, 95, 125, .42)); backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); -webkit-backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); }\r
-.fg-romance[data-v="intimate"]::after { background: radial-gradient(90% 76% at 50% 46%, transparent 40%, rgba(110, 0, 40, .5) 78%, rgba(80, 0, 30, .72)); animation: fg-romance-beat 1.15s ease-out infinite; }\r
+    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .55) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .48) 0 .8cqw, transparent 1.6cqw),\r
+    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .38) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .5) 0 1.1cqw, transparent 2cqw),\r
+    radial-gradient(circle at 80% 54%, rgba(255, 195, 222, .42) 0 1.6cqw, transparent 2.6cqw), radial-gradient(circle at 93% 90%, rgba(255, 236, 246, .45) 0 .9cqw, transparent 1.7cqw);\r
+  background-size: 100% 50%; filter: blur(.18cqw); animation: fg-bokeh-rise 24s linear infinite, fg-bokeh-twinkle 4.5s ease-in-out infinite alternate; }\r
+.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .32), transparent 72%); }\r
+.fg-romance[data-v="intimate"] { background: radial-gradient(108% 88% at 50% 44%, rgba(255, 200, 175, .14) 24%, rgba(235, 92, 128, .44)); }\r
+.fg-romance[data-v="intimate"]::before { bottom: -100%; background:\r
+    radial-gradient(circle at 16% 76%, rgba(255, 215, 225, .5) 0 1.6cqw, transparent 2.8cqw), radial-gradient(circle at 38% 28%, rgba(255, 240, 230, .42) 0 1cqw, transparent 2cqw),\r
+    radial-gradient(circle at 68% 62%, rgba(255, 185, 205, .45) 0 1.8cqw, transparent 3cqw), radial-gradient(circle at 86% 24%, rgba(255, 228, 236, .46) 0 1.2cqw, transparent 2.2cqw);\r
+  background-size: 100% 50%; filter: blur(.22cqw); mix-blend-mode: screen; animation: fg-bokeh-rise 20s linear infinite, fg-bokeh-twinkle 3.6s ease-in-out infinite alternate; }\r
+.fg-romance[data-v="intimate"]::after { background: radial-gradient(92% 78% at 50% 46%, transparent 42%, rgba(125, 12, 48, .46) 78%, rgba(82, 4, 32, .68)); animation: fg-romance-beat 1.25s ease-out infinite; }\r
 [data-romance="intimate"] .fg-cast { scale: 1.035; }\r
 @keyframes fg-bokeh-rise { to { transform: translateY(-50%); } }\r
 @keyframes fg-bokeh-twinkle { from { opacity: .55; } to { opacity: .95; } }\r
@@ -1425,6 +1430,8 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char.is-stress-soft { display: inline-block; white-space: pre; }\r
 .fg-text.say-menace .fg-char { animation-name: fg-char-stamp; animation-duration: .2s; }\r
 .fg-text.say-excited .fg-char { animation-name: fg-char-hop; animation-duration: .14s; }\r
+.fg-text.say-chatter { line-height: 1.48; letter-spacing: -.01em; }\r
+.fg-text.say-chatter .fg-char { animation-name: fg-char-hop; animation-duration: .09s; }\r
 .fg-text.say-shout .fg-char { animation-name: fg-char-pop; animation-duration: .28s; font-size: 1.16em; font-weight: 700; }\r
 .fg-text.say-hesitant .fg-char { animation-duration: .32s; }\r
 .fg-text.say-whisper { opacity: .8; }\r
@@ -2155,20 +2162,61 @@ button.fg-pm-name:hover { color: var(--accent); }\r
   .fg-lib-bar .fg-row { flex-wrap: wrap; }\r
 }\r
 \r
-/* 亲密场面（lib/eros.js、Eros.jsx）：潮红 .fg-eros（scene.eros，节奏越快越深，余韵时转成一层暖雾）、触手的影子 .fg-tentacle（scene.tentacle）、\r
-   高潮那一下的白光 .fg-peak。不出字、不出爱心和漫画符号，只动光和影。潮红和影子在插画上面一层（z-index 7），只压画面边上一圈，不挡脸；\r
-   白光在对话框下面（z-index 15），字照样读得到。镜头跟着节奏的一送一落、高潮时的一涌是 Eros.jsx 用 Web Animations 动的。 */\r
+/* 亲密场面（lib/eros.js、Eros.jsx）：潮红与热气 .fg-eros（scene.eros，节奏越快越深、四周泛起丝绒般的绯红热气与微光，余韵时转成一层柔蜜暖雾）、\r
+   触手的影子 .fg-tentacle（scene.tentacle）、高潮那一下的白光 .fg-peak。\r
+   全程使用纯 GPU 渐变与混合模式（不用 backdrop-filter，彻底杜绝 Chromium 多层背景滤镜重采样造成的贴图闪烁故障）。\r
+   潮红和影子在插画上面一层（z-index 7），正中留出通透的视觉区不挡画，只渲染画面四周的呼吸热气；白光在对话框下面（z-index 15），字照样读得到。 */\r
 .fg-eros, .fg-tentacle { position: absolute; inset: 0; z-index: 7; pointer-events: none; animation: fg-layer-in var(--fade, 1.2s) ease both; }\r
 .fg-eros.is-leave, .fg-tentacle.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }\r
 .fg-eros::before, .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { content: ""; position: absolute; inset: 0; pointer-events: none; }\r
-.fg-eros { --flush: rgba(205, 72, 98, .4); --glow: 4.2s; background: radial-gradient(118% 92% at 50% 46%, rgba(255, 180, 170, .06) 30%, var(--flush)); backdrop-filter: saturate(1.08); -webkit-backdrop-filter: saturate(1.08); }\r
-.fg-eros::after { background: radial-gradient(85% 55% at 50% 104%, rgba(255, 168, 150, .2), transparent 70%), radial-gradient(70% 40% at 50% -6%, rgba(255, 190, 200, .12), transparent 70%); animation: fg-eros-glow var(--glow) ease-in-out infinite; }\r
-.fg-eros[data-v="tease"] { --flush: rgba(225, 112, 124, .28); --glow: 5s; }\r
-.fg-eros[data-v="fast"] { --flush: rgba(200, 62, 92, .48); --glow: 2.6s; backdrop-filter: saturate(1.12) contrast(1.02); -webkit-backdrop-filter: saturate(1.12) contrast(1.02); }\r
-.fg-eros[data-v="frantic"] { --flush: rgba(190, 46, 84, .56); --glow: 1.5s; backdrop-filter: saturate(1.18) contrast(1.05); -webkit-backdrop-filter: saturate(1.18) contrast(1.05); }\r
-.fg-eros[data-v="afterglow"] { --glow: 7s; background: radial-gradient(120% 95% at 50% 46%, rgba(255, 236, 226, .1) 30%, rgba(222, 150, 150, .24)); backdrop-filter: brightness(1.04) contrast(.93) saturate(.95); -webkit-backdrop-filter: brightness(1.04) contrast(.93) saturate(.95); }\r
-.fg-eros[data-v="afterglow"]::before { background: radial-gradient(60% 55% at 50% 44%, rgba(255, 250, 246, .16), transparent 72%); filter: blur(1cqw); }\r
-@keyframes fg-eros-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }\r
+.fg-eros {\r
+  --flush-inner: rgba(255, 165, 182, .16);\r
+  --flush-edge: rgba(185, 38, 78, .46);\r
+  --glow: 3.4s;\r
+  background: radial-gradient(108% 86% at 50% 44%, transparent 38%, var(--flush-inner) 68%, var(--flush-edge) 100%);\r
+}\r
+/* ::before 漂浮的细碎温存光晕与绯红雾气；::after 随呼吸与心跳一明一暗的体温热浪 */\r
+.fg-eros::before {\r
+  bottom: -100%;\r
+  background:\r
+    radial-gradient(circle at 12% 84%, rgba(255, 195, 212, .45) 0 1.2cqw, transparent 2.6cqw),\r
+    radial-gradient(circle at 28% 36%, rgba(255, 232, 238, .38) 0 .7cqw, transparent 1.7cqw),\r
+    radial-gradient(circle at 52% 72%, rgba(255, 175, 198, .32) 0 1.6cqw, transparent 3cqw),\r
+    radial-gradient(circle at 76% 28%, rgba(255, 220, 230, .4) 0 .9cqw, transparent 2cqw),\r
+    radial-gradient(circle at 88% 64%, rgba(255, 185, 208, .42) 0 1.3cqw, transparent 2.6cqw);\r
+  background-size: 100% 50%;\r
+  mix-blend-mode: screen;\r
+  opacity: .75;\r
+  animation: fg-bokeh-rise 22s linear infinite, fg-bokeh-twinkle var(--glow) ease-in-out infinite alternate;\r
+}\r
+.fg-eros::after {\r
+  background:\r
+    radial-gradient(88% 52% at 50% 104%, rgba(255, 130, 155, .34), transparent 72%),\r
+    radial-gradient(76% 42% at 50% -6%, rgba(255, 185, 205, .22), transparent 70%),\r
+    radial-gradient(96% 80% at 50% 45%, transparent 48%, rgba(140, 14, 52, .32) 84%, rgba(92, 6, 34, .52));\r
+  animation: fg-eros-pulse var(--glow) ease-in-out infinite;\r
+}\r
+.fg-eros[data-v="tease"] { --flush-inner: rgba(255, 185, 202, .12); --flush-edge: rgba(210, 75, 110, .32); --glow: 4.8s; }\r
+.fg-eros[data-v="slow"] { --flush-inner: rgba(255, 165, 182, .16); --flush-edge: rgba(190, 44, 82, .44); --glow: 3.4s; }\r
+.fg-eros[data-v="fast"] { --flush-inner: rgba(255, 140, 168, .22); --flush-edge: rgba(185, 28, 72, .56); --glow: 1.9s; }\r
+.fg-eros[data-v="frantic"] { --flush-inner: rgba(255, 120, 155, .28); --flush-edge: rgba(175, 16, 62, .66); --glow: 1.1s; }\r
+.fg-eros[data-v="afterglow"] {\r
+  --glow: 6.5s;\r
+  background:\r
+    radial-gradient(95% 80% at 50% 44%, rgba(255, 244, 234, .14) 0%, rgba(255, 212, 205, .18) 55%, rgba(215, 128, 145, .32) 100%);\r
+}\r
+.fg-eros[data-v="afterglow"]::before { opacity: .95; animation-duration: 32s, 5.5s; }\r
+.fg-eros[data-v="afterglow"]::after {\r
+  background:\r
+    radial-gradient(68% 58% at 50% 42%, rgba(255, 250, 244, .22), transparent 74%),\r
+    radial-gradient(90% 50% at 50% 102%, rgba(255, 205, 185, .28), transparent 72%);\r
+}\r
+@keyframes fg-eros-pulse {\r
+  0%, 100% { opacity: .48; transform: scale(1); }\r
+  38% { opacity: .96; transform: scale(1.012); }\r
+  56% { opacity: .68; transform: scale(1.004); }\r
+  74% { opacity: .88; transform: scale(1.008); }\r
+}\r
 \r
 /* 触手：画面两边和角落里暗紫的触手剪影往里探、慢慢地扭（像镜头前景里没对上焦的东西），身上一道湿亮的反光；\r
    潜伏（idle）时缩在画面外沿、淡一些，蠕动（writhe）时探进来、扭得快。形状是两张 SVG：剪影一张、反光一张，跟着同一个动画走。 */\r
@@ -2188,13 +2236,44 @@ button.fg-pm-name:hover { color: var(--accent); }\r
 @keyframes fg-tentacle-writhe { 0% { transform: skewX(-3.5deg) scale(1.01, .97); } 40% { transform: skewX(2.5deg) scale(.985, 1.05) translateY(-1.2%); } 100% { transform: skewX(4deg) scale(1, 1.01); } }\r
 @keyframes fg-tentacle-glint { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }\r
 \r
-/* 高潮：画面柔和地白起来、带一点虚，再慢慢回来；射精：加上跟着声音一下一下亮起的脉动，一下比一下弱。 */\r
-.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; background: radial-gradient(78% 72% at 50% 48%, rgba(255, 253, 250, .94), rgba(255, 238, 242, .62) 55%, rgba(255, 222, 232, .28)); backdrop-filter: blur(3px) brightness(1.15); -webkit-backdrop-filter: blur(3px) brightness(1.15); animation: fg-peak-bloom 2.6s cubic-bezier(.3, 0, .2, 1) both; }\r
-.fg-peak i { position: absolute; inset: 0; opacity: 0; background: radial-gradient(90% 80% at 50% 56%, rgba(255, 250, 246, .95), rgba(255, 236, 240, .45) 58%, transparent 92%); animation: fg-peak-pulse .55s ease-out var(--at, 0ms) both; }\r
-@keyframes fg-peak-bloom { 0% { opacity: 0; } 22% { opacity: .88; } 42% { opacity: .72; } 100% { opacity: 0; } }\r
-@keyframes fg-peak-pulse { 0% { opacity: 0; } 14% { opacity: calc(.7 * var(--k, 1)); } 100% { opacity: 0; } }\r
+/* 高潮与射精（ErosPeak）：\r
+   - climax / both：.fg-peak-veil 先骤然涌起一层纯白强光（0.16s 到顶），随后化作柔和的暖粉白光晕再痉挛着亮一下，最后在 3.1 秒内缓缓消融；\r
+   - cum / both：四道脉冲环（.fg-peak i）跟着声音的四下（0ms / 380ms / 780ms / 1220ms）从下腹与画面四周同时潮涌收缩，一下比一下柔和。\r
+   纯 opacity + transform 合成，完全不用 backdrop-filter，丝滑不闪贴图。 */\r
+.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; overflow: hidden; }\r
+.fg-peak-veil {\r
+  position: absolute; inset: 0; display: block; opacity: 0; will-change: opacity, transform;\r
+  background:\r
+    radial-gradient(72% 66% at 50% 46%, #fff 0%, rgba(255, 252, 250, .97) 42%, rgba(255, 232, 240, .86) 76%, rgba(255, 205, 222, .68) 100%);\r
+  animation: fg-peak-bloom 3.1s cubic-bezier(.22, 0, .2, 1) both;\r
+}\r
+.fg-peak.is-both .fg-peak-veil {\r
+  background:\r
+    radial-gradient(76% 70% at 50% 48%, #fff 0%, rgba(255, 253, 252, .98) 48%, rgba(255, 228, 238, .9) 80%, rgba(255, 195, 216, .75) 100%);\r
+}\r
+.fg-peak i {\r
+  position: absolute; inset: -4%; opacity: 0; will-change: opacity, transform;\r
+  background:\r
+    radial-gradient(64% 58% at 50% 58%, rgba(255, 253, 250, .96) 0%, rgba(255, 234, 242, .68) 44%, rgba(255, 182, 206, .36) 72%, rgba(255, 150, 185, .18) 100%);\r
+  animation: fg-peak-pulse .68s cubic-bezier(.2, .65, .3, 1) var(--at, 0ms) both;\r
+}\r
+@keyframes fg-peak-bloom {\r
+  0% { opacity: 0; transform: scale(.98); }\r
+  6% { opacity: .98; transform: scale(1.01); }\r
+  14% { opacity: .66; transform: scale(1); }\r
+  22% { opacity: .90; transform: scale(1.008); }\r
+  38% { opacity: .62; transform: scale(1.002); }\r
+  65% { opacity: .26; transform: scale(1); }\r
+  100% { opacity: 0; transform: scale(1); }\r
+}\r
+@keyframes fg-peak-pulse {\r
+  0% { opacity: 0; transform: scale(.94); }\r
+  18% { opacity: calc(.88 * var(--k, 1)); transform: scale(1.02); }\r
+  48% { opacity: calc(.42 * var(--k, 1)); transform: scale(1.005); }\r
+  100% { opacity: 0; transform: scale(1); }\r
+}\r
 @media (prefers-reduced-motion: reduce) {\r
-  .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */\r
+  .fg-eros::before, .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */\r
 }\r
 \r
 /* 设置 → 声音：音色一览按男女分组；自己做音色的编辑器；自动分配的音色组 */\r
@@ -2686,8 +2765,8 @@ var ENTER_HOWS = ["run", "peek", "slow"];
 var EXIT_HOWS = ["storm", "run", "slow"];
 var ENTER_HOW_LABEL = { run: "跑进来", peek: "探头", slow: "慢慢走进来" };
 var EXIT_HOW_LABEL = { storm: "甩头离开", run: "跑开", slow: "慢慢走远" };
-var DELIVERIES = ["menace", "excited", "shout", "hesitant", "whisper", "breakdown"];
-var DELIVERY_LABEL = { menace: "威压", excited: "激动", shout: "怒吼", hesitant: "迟疑", whisper: "低语", breakdown: "崩溃" };
+var DELIVERIES = ["menace", "excited", "shout", "hesitant", "whisper", "breakdown", "chatter"];
+var DELIVERY_LABEL = { menace: "威压", excited: "激动", shout: "怒吼", hesitant: "迟疑", whisper: "低语", breakdown: "崩溃", chatter: "连珠炮" };
 var TEXT_FX = ["shake", "wave", "big", "roar", "grow", "dwindle", "small", "faint", "glow", "warm", "cold", "dot", "choke", "flutter"];
 var TEXT_FX_LABEL = { shake: "发抖", wave: "波浪", big: "放大", roar: "吼", grow: "越说越大", dwindle: "越说越小", small: "小声", faint: "轻淡", glow: "发光强调", warm: "暖意", cold: "冰冷", dot: "着重号", choke: "哽咽", flutter: "心醉" };
 var WEATHER = ["clear", "rain", "storm", "snow", "blizzard", "wind", "sakura", "leaves", "fireflies", "fog", "embers", "dust", "bokeh", "stars", "sparkles", "bubbles"];
@@ -2875,6 +2954,95 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null, ca
   });
   cast = cast.filter((c) => !after.includes(c.name) && !c.extra);
   return { steps, end: saved || cast, inside: saved ? cast : null };
+}
+
+// lib/segment.js
+var QUOTE_PAIRS = [["“", "”"], ["「", "」"], ["『", "』"], ['"', '"'], ["﹁", "﹂"]];
+var OPENERS = new Map(QUOTE_PAIRS);
+var PAGE_LIMIT = 96;
+var SOFT_PAGE_LIMIT = 56;
+var DIALOGUE_PAGE_LIMIT = 52;
+var DUAL_PAGE_LIMIT = 38;
+var MIN_TAIL_CHARS = 10;
+var SPEAKER_BEFORE = /([\p{Script=Han}A-Za-z゠-ヿ·・]{1,8}?)(?:[^\p{Script=Han}A-Za-z]{0,2}(?:轻声|低声|小声|大声|笑着|笑|冷冷地|淡淡地|喃喃|忍不住|开口|回答|回应|反问|追问|补充|嘟囔|嘀咕|咕哝|叹气|叹)?(?:说道|说|道|问道|问|喊道|喊|叫道|叫|答道|答|笑道|嚷道|嚷|骂道|哼道|吼道|应道|应))?\s*[：:，,]?\s*$/u;
+var SPEAKER_ONLY = new RegExp("^\\s*" + SPEAKER_BEFORE.source, "u");
+function splitSentences(text) {
+  const parts = String(text).match(/[^。！？!?…~～\n]+(?:[。！？!?…~～]+[」』”"）)]*|$)/gu) || [];
+  const merged = [];
+  for (const raw of parts.map((s) => s.trim()).filter(Boolean)) {
+    if (merged.length && /[…~～]$/.test(merged[merged.length - 1]) && !/[。！？!?]$/.test(merged[merged.length - 1]) && merged[merged.length - 1].length < 18) {
+      merged[merged.length - 1] += raw;
+    } else merged.push(raw);
+  }
+  return merged;
+}
+function splitLongSentence(sentence, hard = PAGE_LIMIT, soft = SOFT_PAGE_LIMIT) {
+  const limit = Math.min(hard, soft + 16);
+  if (sentence.length <= limit) return [sentence];
+  const clauses = sentence.match(/[^——；;，,]+(?:——|[；;，,]+|$)/gu) || [sentence];
+  if (clauses.length <= 1) return [sentence];
+  const out = [];
+  let cur = "";
+  for (let i = 0; i < clauses.length; i++) {
+    const c = clauses[i];
+    const rest = clauses.slice(i).join("").length;
+    if (cur && cur.length >= 16 && (cur.length + c.length > hard || cur.length >= Math.min(soft, 28) && rest >= 14)) {
+      out.push(cur.trim());
+      cur = "";
+    }
+    cur += c;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out.length ? out : [sentence];
+}
+function pageText(text, { soft = SOFT_PAGE_LIMIT, hard = PAGE_LIMIT } = {}) {
+  const raw = String(text || "").trim();
+  if (!raw) return [];
+  const sentences = splitSentences(raw).flatMap((s) => splitLongSentence(s, hard, soft));
+  const pages = [];
+  let current2 = "";
+  for (let i = 0; i < sentences.length; i++) {
+    const sentence = sentences[i];
+    const remaining = sentences.slice(i).reduce((sum, s) => sum + s.length, 0);
+    if (current2 && (current2.length + sentence.length > hard || (current2.length >= soft || current2.length + sentence.length >= soft + 10) && remaining >= MIN_TAIL_CHARS)) {
+      pages.push(current2);
+      current2 = "";
+    }
+    current2 += sentence;
+  }
+  if (current2) pages.push(current2);
+  return pages.length ? pages : [raw];
+}
+var SCRIPTS = [["kana", /[\p{Script=Hiragana}\p{Script=Katakana}]/u], ["han", new RegExp("\\p{Script=Han}", "u")], ["hangul", new RegExp("\\p{Script=Hangul}", "u")], ["latin", new RegExp("\\p{Script=Latin}", "u")], ["cyrillic", new RegExp("\\p{Script=Cyrillic}", "u")], ["greek", new RegExp("\\p{Script=Greek}", "u")], ["thai", new RegExp("\\p{Script=Thai}", "u")], ["arabic", new RegExp("\\p{Script=Arabic}", "u")]];
+function splitUnitPages(unit) {
+  if (!unit || !unit.text) return [unit];
+  const soft = unit.orig ? DUAL_PAGE_LIMIT : unit.type === "dialogue" ? DIALOGUE_PAGE_LIMIT : SOFT_PAGE_LIMIT;
+  const hard = unit.orig ? 68 : PAGE_LIMIT;
+  const pages = pageText(unit.text, { soft, hard });
+  if (pages.length <= 1) return [unit];
+  let origPages = null;
+  if (unit.orig) {
+    const oSents = splitSentences(unit.orig);
+    if (oSents.length === pages.length) origPages = oSents;
+    else {
+      const total = pages.reduce((s, p4) => s + p4.length, 0) || 1;
+      const oChars = Array.from(unit.orig);
+      let pos = 0;
+      origPages = pages.map((p4, i) => {
+        if (i === pages.length - 1) return oChars.slice(pos).join("").trim();
+        const take = Math.max(1, Math.round(p4.length / total * oChars.length));
+        const slice = oChars.slice(pos, pos + take).join("").trim();
+        pos += take;
+        return slice;
+      });
+    }
+  }
+  return pages.map((text, i) => ({
+    ...unit,
+    text,
+    ...origPages ? { orig: origPages[i] } : {},
+    ...i > 0 ? { pageIndex: i } : {}
+  }));
 }
 
 // lib/limits.js
@@ -5259,92 +5427,97 @@ function buildBeats(view) {
       if (line.bgm === "hush") hush = HUSH_BEATS;
       const hushed = hush ? hush === HUSH_BEATS ? "start" : "on" : "";
       if (hush) hush--;
-      beats.push({
-        key: `${t.turn}:${unit.id}`,
-        turn: t.turn,
-        textVersion: t.textVersion,
-        unitId: unit.id,
-        type,
-        text: unit.text,
-        ...unit.orig ? { orig: unit.orig } : {},
-        // 双语对照的原文（剧场上方小字）
-        speaker,
-        ...speakers.length > 1 ? { speakers } : {},
-        // 齐声：几个人一起高亮
-        ...voice ? { voice } : {},
-        // 声音的样子：电话里、广播、心灵感应……
-        ...split ? { split } : {},
-        alias: line.as || "",
-        emo: line.emo || "",
-        sym: line.sym || "",
-        cam: line.cam || "",
-        ...line.camOn ? { camOn: line.camOn } : {},
-        // 镜头对准谁（不写是说话的人）
-        ...hit ? { hit } : {},
-        // 一次出手：被打的人一震
-        ...line.moment ? { moment: line.moment } : {},
-        // 小瞬间：拍照、摸头、干杯、约定……
-        ...calling ? { call: calling } : {},
-        // 正在打的电话：响着（ringing）还是接通了（live）
-        ...phoneEdge ? { phone: phoneEdge } : {},
-        // 手机这一句的事：来电、拨出、挂断、通知、语音留言
-        say: line.say || "",
-        stress: line.stress || "",
-        ...line.textfx ? { textfx: line.textfx } : {},
-        // 句中文字效果：某几个字发抖、放大、越说越小……
-        card: line.card || "",
-        scene: at2.scene,
-        mode: at2.mode,
-        ...at2.layer && at2.layer.then ? { then: at2.layer.then } : {},
-        // 段落里的人当时的样子（回忆里还没受伤、穿着当时的衣服……）
-        ...ahead[ui2] ? { ahead: ahead[ui2] } : {},
-        // 这一轮后面才变的样子（之后才缠上发带、才换衣服）：这一拍按变化之前的
-        ...at2.cut ? { cut: at2.cut } : {},
-        ...recall ? { recall } : {},
-        // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
-        ...recallEdge ? { recallEdge } : {},
-        bgm: at2.bgm,
-        ...hushed ? { hush: hushed } : {},
-        // 配乐留白：start 是停下的那一句，on 是还没回来
-        amb: at2.amb,
-        sfx: line.sfx || "",
-        ...line.peak ? { peak: line.peak } : {},
-        // 高潮那一下：climax / cum / both（lib/eros.js）
-        ...line.pause ? { pause: line.pause } : {},
-        // 「間」：这句的字出来之前先停一下
-        sceneEnter: enter,
-        set,
-        transition,
-        cast: steps[ui2].cast,
-        recent: steps[ui2].cast.map((c) => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)),
-        // 台上的人，最近有动静的在前
-        ...front.length ? { front } : {},
-        // 台上开过口的人，最近开口的在前：谁挡在谁前面（lib/blocking.js 的 stackLayers）
-        entered: steps[ui2].entered,
-        left: steps[ui2].left,
-        ...reacts.length ? { reacts } : {},
-        // 没在说话的人的反应 [{ name, emo, sym }]
-        ...Object.keys(block.poses).length ? { poses: block.poses } : {},
-        // 走位：每个人现在的样子（靠近谁、上前、背对……）
-        ...block.moves.length ? { moves: block.moves } : {},
-        // 这一拍发生的走位
-        ...Object.keys(ways).length ? { enterHow: ways } : {},
-        // 跑进来、探头、慢慢走进来
-        ...Object.keys(gone).length ? { exitHow: gone } : {},
-        // 甩头离开、跑开、慢慢走远
-        emotions: { ...emotions },
-        ...Object.keys(postures).length ? { postures } : {},
-        // 每个人此刻在哪个动作（动作编号；没走到过的人按他情绪的主动作）
-        ...Object.values(offs).some((list3) => list3.length) ? { offPoses: offs } : {},
-        // 这一刻收起了的动作：剧场找图时不退到它们上面
-        cg,
-        cgAnchor: Boolean(cgEntry && cgEntry.at === ui2),
-        directed: Boolean(script),
-        status: t.status,
-        error: t.error,
-        lastOfTurn: ui2 === units.length - 1,
-        lastTurn: ti === turns.length - 1,
-        choices: ti === turns.length - 1 && ui2 === units.length - 1 && script ? script.choices || [] : []
+      const pages = line.say === "chatter" || line.card ? [unit] : splitUnitPages(unit);
+      pages.forEach((page, pi) => {
+        const first = pi === 0;
+        const last2 = pi === pages.length - 1;
+        beats.push({
+          key: first ? `${t.turn}:${unit.id}` : `${t.turn}:${unit.id}.${pi + 1}`,
+          turn: t.turn,
+          textVersion: t.textVersion,
+          unitId: unit.id,
+          type,
+          text: page.text,
+          ...page.orig ? { orig: page.orig } : {},
+          // 双语对照的原文（剧场上方小字）
+          speaker,
+          ...speakers.length > 1 ? { speakers } : {},
+          // 齐声：几个人一起高亮
+          ...voice ? { voice } : {},
+          // 声音的样子：电话里、广播、心灵感应……
+          ...split ? { split } : {},
+          alias: line.as || "",
+          emo: line.emo || "",
+          sym: first ? line.sym || "" : "",
+          cam: first ? line.cam || "" : "",
+          ...first && line.camOn ? { camOn: line.camOn } : {},
+          // 镜头对准谁（不写是说话的人）
+          ...first && hit ? { hit } : {},
+          // 一次出手：被打的人一震
+          ...first && line.moment ? { moment: line.moment } : {},
+          // 小瞬间：拍照、摸头、干杯、约定……
+          ...calling ? { call: calling } : {},
+          // 正在打的电话：响着（ringing）还是接通了（live）
+          ...first && phoneEdge ? { phone: phoneEdge } : {},
+          // 手机这一句的事：来电、拨出、挂断、通知、语音留言
+          say: line.say || "",
+          stress: line.stress && page.text.includes(line.stress) ? line.stress : "",
+          ...line.textfx ? { textfx: line.textfx.filter((f) => page.text.includes(f.text)) } : {},
+          // 句中文字效果：落在这页上的才算
+          card: first ? line.card || "" : "",
+          scene: at2.scene,
+          mode: at2.mode,
+          ...at2.layer && at2.layer.then ? { then: at2.layer.then } : {},
+          // 段落里的人当时的样子（回忆里还没受伤、穿着当时的衣服……）
+          ...ahead[ui2] ? { ahead: ahead[ui2] } : {},
+          // 这一轮后面才变的样子（之后才缠上发带、才换衣服）：这一拍按变化之前的
+          ...first && at2.cut ? { cut: at2.cut } : {},
+          ...recall ? { recall } : {},
+          // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
+          ...first && recallEdge ? { recallEdge } : {},
+          bgm: at2.bgm,
+          ...hushed ? { hush: first ? hushed : "on" } : {},
+          // 配乐留白：start 是停下的那一句，on 是还没回来
+          amb: at2.amb,
+          sfx: first ? line.sfx || "" : "",
+          ...first && line.peak ? { peak: line.peak } : {},
+          // 高潮那一下：climax / cum / both（lib/eros.js）
+          ...first && line.pause ? { pause: line.pause } : {},
+          // 「間」：这句的字出来之前先停一下
+          sceneEnter: first ? enter : false,
+          set,
+          transition: first ? transition : "",
+          cast: steps[ui2].cast,
+          recent: steps[ui2].cast.map((c) => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)),
+          // 台上的人，最近有动静的在前
+          ...front.length ? { front } : {},
+          // 台上开过口的人，最近开口的在前：谁挡在谁前面（lib/blocking.js 的 stackLayers）
+          entered: first ? steps[ui2].entered : [],
+          left: first ? steps[ui2].left : [],
+          ...first && reacts.length ? { reacts } : {},
+          // 没在说话的人的反应 [{ name, emo, sym }]
+          ...Object.keys(block.poses).length ? { poses: block.poses } : {},
+          // 走位：每个人现在的样子（靠近谁、上前、背对……）
+          ...first && block.moves.length ? { moves: block.moves } : {},
+          // 这一拍发生的走位
+          ...first && Object.keys(ways).length ? { enterHow: ways } : {},
+          // 跑进来、探头、慢慢走进来
+          ...first && Object.keys(gone).length ? { exitHow: gone } : {},
+          // 甩头离开、跑开、慢慢走远
+          emotions: { ...emotions },
+          ...Object.keys(postures).length ? { postures } : {},
+          // 每个人此刻在哪个动作（动作编号；没走到过的人按他情绪的主动作）
+          ...Object.values(offs).some((list3) => list3.length) ? { offPoses: offs } : {},
+          // 这一刻收起了的动作：剧场找图时不退到它们上面
+          cg,
+          cgAnchor: first && Boolean(cgEntry && cgEntry.at === ui2),
+          directed: Boolean(script),
+          status: t.status,
+          error: t.error,
+          lastOfTurn: ui2 === units.length - 1 && last2,
+          lastTurn: ti === turns.length - 1,
+          choices: ti === turns.length - 1 && ui2 === units.length - 1 && last2 && script ? script.choices || [] : []
+        });
       });
     });
     const last = scenes[scenes.length - 1];
@@ -6079,7 +6252,8 @@ var STYLES = {
   shout: { gap: 1.1, chunk: 3, pause: 0.7, blip: { every: 1, pitch: 1.1, gain: 1.3 }, mouth: "wide" },
   hesitant: { gap: 1.35, pause: 1.8, stall: true, blip: { every: 3, pitch: 0.95, gain: 0.8 }, mouth: "loop" },
   whisper: { gap: 1.25, pause: 1.2, blip: { every: 2, pitch: 0.9, gain: 0.35 }, mouth: "soft" },
-  breakdown: { gap: 0.8, jitter: true, pause: 0.6, blip: { every: 1, pitch: 1.25, gain: 1.2 }, mouth: "wide" }
+  breakdown: { gap: 0.8, jitter: true, pause: 0.6, blip: { every: 1, pitch: 1.25, gain: 1.2 }, mouth: "wide" },
+  chatter: { gap: 0.36, pause: 0.12, rush: true, blip: { every: 2, pitch: 1.24, gain: 0.92 }, mouth: "loop" }
 };
 var IMPACT = {
   "": [["shake", 1], ["sound", "impact"]],
@@ -6088,7 +6262,8 @@ var IMPACT = {
   shout: [["shake", 3], ["box", 3], ["flash", 2], ["sound", "slam"]],
   hesitant: [["sound", "impact"]],
   whisper: [],
-  breakdown: [["shake", 3], ["redflash", 2], ["sound", "stab"]]
+  breakdown: [["shake", 3], ["redflash", 2], ["sound", "stab"]],
+  chatter: []
 };
 var GENTLE_STRESS_EMO = /* @__PURE__ */ new Set(["love", "smile", "happy", "shy", "blush", "sad", "cry", "tired", "worried", "wronged", "wry", "passion"]);
 var GENTLE_STRESS_MOOD = /* @__PURE__ */ new Set(["sweet", "touching", "calm", "daily"]);
@@ -6168,7 +6343,7 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", mood = "", ty
   const S = STYLES[style];
   const base = Math.max(speed * S.gap, S.min || 0);
   const gentle = isGentleStress(emo, style, mood);
-  const plan = { times: [], marks: new Array(n).fill(""), say: style, gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: S.blip, fx: [], tx: new Array(n).fill(""), txk: new Array(n).fill(0), txi: new Array(n).fill(0), blips: null };
+  const plan = { times: [], marks: new Array(n).fill(""), say: style, rush: Boolean(S.rush), gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: S.blip, fx: [], tx: new Array(n).fill(""), txk: new Array(n).fill(0), txi: new Array(n).fill(0), blips: null };
   if (!n) return plan;
   const spans = textFxSpans(chars, textfx);
   const spanAt = new Array(n).fill(null);
@@ -14126,29 +14301,53 @@ function useParallax(stageRef, targetRef, enabled = true) {
 // src/client/theater/Eros.jsx
 var import_react17 = __toESM(require("react"), 1);
 var still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-var PUSH = { slow: 0.45, fast: 0.55, frantic: 0.7 };
-function useErosPulse(cameraRef, on) {
+var PUSH = {
+  tease: { y: 0.16, scale: 1.003, beat: 2400 },
+  slow: { y: 0.42, scale: 1.006, beat: 1250 },
+  fast: { y: 0.56, scale: 1.009, beat: 680 },
+  frantic: { y: 0.72, scale: 1.013, beat: 440 }
+};
+function useErosPulse(cameraRef, pace, synced = false) {
   import_react17.default.useEffect(() => {
-    if (!on || still()) return void 0;
-    const moving = /* @__PURE__ */ new Set();
-    const off = onErosBeat(({ in: delay, beat, pace }) => {
-      const cam = cameraRef.current;
-      const amp2 = PUSH[pace];
-      if (!amp2 || !cam || typeof cam.animate !== "function") return;
-      const move = cam.animate([
+    if (!pace || still()) return void 0;
+    const spec = PUSH[pace];
+    if (!spec) return void 0;
+    const pulseOnce = (delay, duration) => {
+      const cam2 = cameraRef.current;
+      if (!cam2 || typeof cam2.animate !== "function") return null;
+      const { y: y2, scale } = spec;
+      return cam2.animate([
         { translate: "0 0" },
-        { translate: `0 ${-amp2}%`, offset: 0.2, easing: "cubic-bezier(.3, 0, .3, 1)" },
-        { translate: `0 ${(amp2 * 0.15).toFixed(3)}%`, offset: 0.58 },
+        { translate: `0 ${-y2}%`, offset: 0.22, easing: "cubic-bezier(.28, 0, .25, 1)" },
+        { translate: `0 ${(y2 * 0.14).toFixed(3)}%`, offset: 0.62 },
         { translate: "0 0" }
-      ], { duration: Math.min(beat * 0.9, 1e3), delay, easing: "cubic-bezier(.2, .6, .4, 1)" });
-      moving.add(move);
-      move.onfinish = () => moving.delete(move);
-    });
-    return () => {
-      off();
-      moving.forEach((m) => m.cancel());
+      ], { duration: Math.min(duration * 0.92, 1400), delay, easing: "cubic-bezier(.22, .6, .36, 1)" });
     };
-  }, [on]);
+    if (synced && pace !== "tease") {
+      const moving = /* @__PURE__ */ new Set();
+      const off = onErosBeat(({ in: delay, beat }) => {
+        const move = pulseOnce(delay, beat);
+        if (move) {
+          moving.add(move);
+          move.onfinish = () => moving.delete(move);
+        }
+      });
+      return () => {
+        off();
+        moving.forEach((m) => m.cancel());
+      };
+    }
+    const cam = cameraRef.current;
+    if (!cam || typeof cam.animate !== "function") return void 0;
+    const { y } = spec;
+    const loop = cam.animate([
+      { translate: "0 0" },
+      { translate: `0 ${-y}%`, offset: 0.26, easing: "cubic-bezier(.32, 0, .28, 1)" },
+      { translate: `0 ${(y * 0.12).toFixed(3)}%`, offset: 0.64 },
+      { translate: "0 0" }
+    ], { duration: spec.beat, iterations: Infinity, easing: "cubic-bezier(.25, .6, .35, 1)" });
+    return () => loop.cancel();
+  }, [pace, synced]);
 }
 function ErosPeak({ beat, cameraRef, volume, sound = true }) {
   const kind = beat.peak;
@@ -14156,10 +14355,36 @@ function ErosPeak({ beat, cameraRef, volume, sound = true }) {
     if (volume > 0) erosPeak(kind, volume, { sound });
     const cam = cameraRef && cameraRef.current;
     if (!cam || typeof cam.animate !== "function" || still()) return void 0;
-    const move = cam.animate([{ scale: "1" }, { scale: "1.03", offset: 0.28 }, { scale: "1" }], { duration: 2600, easing: "cubic-bezier(.3, 0, .2, 1)" });
+    const keyframes = kind === "cum" ? [
+      { scale: "1", offset: 0 },
+      { scale: "1.026", offset: 0.06 },
+      { scale: "1.006", offset: 0.16 },
+      { scale: "1.022", offset: 0.22 },
+      { scale: "1.004", offset: 0.34 },
+      { scale: "1.016", offset: 0.4 },
+      { scale: "1.002", offset: 0.54 },
+      { scale: "1.010", offset: 0.6 },
+      { scale: "1", offset: 1 }
+    ] : kind === "both" ? [
+      { scale: "1", offset: 0 },
+      { scale: "1.042", offset: 0.08 },
+      { scale: "1.018", offset: 0.15 },
+      { scale: "1.032", offset: 0.21 },
+      { scale: "1.012", offset: 0.31 },
+      { scale: "1.022", offset: 0.38 },
+      { scale: "1.006", offset: 0.5 },
+      { scale: "1.014", offset: 0.56 },
+      { scale: "1", offset: 1 }
+    ] : [
+      { scale: "1", offset: 0 },
+      { scale: "1.038", offset: 0.12 },
+      { scale: "1.022", offset: 0.36 },
+      { scale: "1", offset: 1 }
+    ];
+    const move = cam.animate(keyframes, { duration: kind === "cum" ? 2200 : 3100, easing: "cubic-bezier(.25, 0, .2, 1)" });
     return () => move.cancel();
   }, []);
-  return /* @__PURE__ */ import_react17.default.createElement("div", { className: `fg-peak is-${kind}`, "aria-hidden": "true" }, kind !== "climax" && EROS_PULSES.map((ms, i) => /* @__PURE__ */ import_react17.default.createElement("i", { key: ms, style: { "--at": ms + "ms", "--k": (1 - i * 0.2).toFixed(2) } })));
+  return /* @__PURE__ */ import_react17.default.createElement("div", { className: `fg-peak is-${kind}`, "aria-hidden": "true" }, kind !== "cum" && /* @__PURE__ */ import_react17.default.createElement("b", { className: "fg-peak-veil" }), kind !== "climax" && EROS_PULSES.map((ms, i) => /* @__PURE__ */ import_react17.default.createElement("i", { key: ms, style: { "--at": ms + "ms", "--k": (1 - i * 0.2).toFixed(2) } })));
 }
 
 // src/client/theater/preload.js
@@ -14522,7 +14747,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if ((bedPace || bedTentacle) && !bedSound) playEros(bedPace, bedTentacle, erosVolume);
     else stopEros();
   }, [bedPace, bedTentacle, erosVolume, bedSound && bedSound.id, bedSound && bedSound.volume]);
-  useErosPulse(cameraRef, Boolean(bedPace) && !bedSound);
+  useErosPulse(cameraRef, bedPace, !bedSound);
   const go = import_react18.default.useCallback((i) => {
     if (!beats.length) return;
     const next = Math.max(0, Math.min(beats.length - 1, i));
@@ -14549,10 +14774,18 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     sfx("page");
     go(index + 1);
   }, [beat, done, atEnd, index, go, finish, pausing, change, visit]);
+  const rushedRef = import_react18.default.useRef("");
   import_react18.default.useEffect(() => {
     if (title || panel || choosing || !beat) return void 0;
     if (skip) {
       const t = setTimeout(() => atEnd ? setSkip(false) : go(index + 1), 70);
+      return () => clearTimeout(t);
+    }
+    if (typed && typed.rush && done && !atEnd && speed > 0 && rushedRef.current !== visit) {
+      const t = setTimeout(() => {
+        rushedRef.current = visit;
+        go(index + 1);
+      }, 120);
       return () => clearTimeout(t);
     }
     if (auto && done && !atEnd) {
@@ -14560,7 +14793,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       return () => clearTimeout(t);
     }
     return void 0;
-  }, [auto, skip, done, index, title, panel, choosing, atEnd]);
+  }, [auto, skip, done, index, title, panel, choosing, atEnd, typed && typed.rush, speed, visit]);
   const prevLen = import_react18.default.useRef(beats.length);
   import_react18.default.useEffect(() => {
     if (beats.length > prevLen.current && choosing && index === prevLen.current - 1) {

@@ -8,13 +8,17 @@ const plan = (text, opts = {}) => planLine(chars(text), 30, { seed: 'k', ...opts
 const gaps = p => p.times.slice(1).map((t, i) => t - p.times[i])
 const kinds = p => p.fx.map(f => f.kind + (f.sound ? ':' + f.sound : ''))
 
-test('gate: 威压一个字一个字蹦，激动连珠炮', () => {
+test('gate: 威压一个字一个字蹦，激动飞快，连珠炮标点几乎不停、打完自动下一句', () => {
   const menace = plan('你以为我会放过你吗', { say: 'menace' })
   assert.ok(gaps(menace).every(g => g >= 110), '威压每个字至少隔 110ms')
   assert.equal(menace.mouth, 'syllable')
   const excited = plan('等等等等你说什么', { say: 'excited' })
   assert.ok(gaps(excited).every(g => g < 20), '激动字距不到普通的一半')
   assert.ok(excited.times.at(-1) < plan('等等等等你说什么').times.at(-1) / 1.5)
+  assert.equal(excited.rush, false)
+  const chatter = plan('小哥我跟你说啊那天晚上真是不得了，噼里啪啦的什么都看不清！', { say: 'chatter' })
+  assert.equal(chatter.rush, true)
+  assert.ok(chatter.times.at(-1) < plan('小哥我跟你说啊那天晚上真是不得了，噼里啪啦的什么都看不清！', { say: 'excited' }).times.at(-1), '连珠炮比激动更快、标点几乎不停')
 })
 
 test('gate: 怒吼几个字一块砸出来，一开口就震屏、闪白、拍桌声', () => {
