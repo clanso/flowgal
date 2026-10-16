@@ -371,1977 +371,1977 @@ function useDirectorLog(gameId, active = true) {
 var import_react19 = __toESM(require("react"), 1);
 
 // src/client/styles/theater.css
-var theater_default = `/* ───────────── 沉浸式 Galgame · 剧场 ─────────────
-   所有类名以 fg- 开头；皮肤只改 data-skin 上的变量与少量装饰。
-   舞台是 16:9 的容器（container-type:size），字号用 cqw 随舞台缩放。 */
-
-.fg-theater {
-  --accent: #ff7eb6; --accent2: #9b7bff; --accent3: #5ee7ff;
-  --ink: #f5f3ff; --ink-dim: rgba(235, 232, 255, .62);
-  --box-bg: linear-gradient(180deg, rgba(18, 16, 40, .66), rgba(8, 8, 24, .86));
-  --box-border: rgba(255, 255, 255, .14);
-  --box-radius: 1.4cqw;
-  --box-blur: blur(18px) saturate(1.5);
-  --name-ink: #fff;
-  --panel-bg: rgba(10, 10, 26, .82);
-  --chip-bg: rgba(10, 10, 28, .5);
-  --font-body: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
-  --font-display: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", serif;
-  --font-latin: "Cormorant Garamond", "Playfair Display", Georgia, serif;
-  --wait-glyph: "◆";
-  /* 宽高写死成视口大小：酒馆给 <html> 加了 transform，fixed 层的「inset: 0」会跟着 html（高 0）算 */
-  position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 2147483000; overflow: hidden; overflow: clip;
-  display: flex; align-items: center; justify-content: center;
-  background: #05040c; color: var(--ink);
-  font-family: var(--font-body);
-  -webkit-font-smoothing: antialiased;
-  user-select: none; -webkit-user-select: none;
-  animation: fg-fade-in .5s ease both;
-}
-.fg-theater *, .fg-theater *::before, .fg-theater *::after { box-sizing: border-box; }
-:where(.fg-theater) button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
-.fg-theater.is-closing { animation: fg-fade-out .35s ease both; }
-
-.fg-stage {
-  position: relative; overflow: hidden; overflow: clip;
-  /* 宽高比由剧场根节点的 --stage-ar 给（默认跟横版插画一样，NovelAI 的 1216×832）。 */
-  width: min(100vw, calc(100vh * var(--stage-ar, 1.4615))); height: min(100vh, calc(100vw / var(--stage-ar, 1.4615)));
-  container-type: size; container-name: stage;
-  background: #000;
-  box-shadow: 0 0 120px rgba(0, 0, 0, .8);
-}
-@media (max-aspect-ratio: 4/5) {
-  /* 竖屏手机：舞台铺满，立绘居中放大，对话框加高。 */
-  .fg-stage { width: 100vw; height: 100vh; }
-}
-.fg-camera { position: absolute; inset: 0; transform-origin: 50% 50%; }
-
-/* ── 背景层 ── */
-/* 外层管进出场的转场，里层（.fg-bg-art）画图、慢慢推拉；新层盖在旧层上面演转场，旧层不动，演完才移除（不先淡出，中途不会露出底下的黑） */
-.fg-bg { position: absolute; inset: -3%; will-change: transform, opacity; }
-.fg-bg-art { position: absolute; inset: 0; background-size: cover; background-position: center 42%; }
-.fg-bg.is-image > .fg-bg-art { animation: fg-kenburns 38s ease-in-out infinite alternate; }
-.fg-theater[data-off~="kenburns"] .fg-bg.is-image > .fg-bg-art { animation: none; }
-.fg-bg.is-enter { animation: var(--enter-anim, fg-dissolve) var(--enter-dur, 1.1s) cubic-bezier(.45, 0, .55, 1) both; }
-.fg-bg.is-leave { animation: none; }
-@keyframes fg-kenburns { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.1) translate(-1.6%, -1.2%); } }
-@keyframes fg-dissolve { from { opacity: 0; filter: blur(8px) brightness(1.3); } to { opacity: 1; filter: none; } }
-@keyframes fg-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-@keyframes fg-iris { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(80% at 50% 50%); } }
-@keyframes fg-cinematic { 0% { clip-path: inset(50% 0 50% 0); filter: brightness(2); } 60% { clip-path: inset(8% 0 8% 0); } 100% { clip-path: inset(0 0 0 0); filter: none; } }
-@keyframes fg-strips { from { -webkit-mask-size: 100% 0%; mask-size: 100% 0%; } to { -webkit-mask-size: 100% 100%; mask-size: 100% 100%; } }
-.fg-bg.is-enter[data-tr="strips"] { -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 8%, transparent 8% 8.0001%); mask-image: linear-gradient(#000, #000); -webkit-mask-repeat: no-repeat; }
-@keyframes fg-flash-in { 0% { opacity: 0; filter: brightness(4); } 30% { opacity: 1; filter: brightness(3); } 100% { filter: none; } }
-@keyframes fg-black-in { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }
-/* 起雾（进出回忆）：旧画面失焦、泛白着退下去，新画面从一片朦胧里慢慢清晰过来；配合 .fg-flash.is-haze 的白雾 */
-@keyframes fg-haze-in { 0% { opacity: 0; filter: blur(18px) brightness(1.5) saturate(.6); } 40% { opacity: 1; filter: blur(10px) brightness(1.3) saturate(.75); } 100% { opacity: 1; filter: none; } }
-.fg-bg.is-leave[data-out="haze"] { animation: fg-haze-out 1.4s ease-in both; }
-@keyframes fg-haze-out { to { opacity: 0; filter: blur(14px) brightness(1.4) saturate(.7); } }
-/* 起雾的那一句：新上台的人等雾起来了再慢慢浮出来，不在旧画面上先冒出来 */
-.fg-world-in[data-tr="haze"] .fg-actor:not(.is-leaving) { animation-duration: 1.3s; animation-delay: .8s; }
-.fg-world-in[data-tr="haze"] .fg-actor.is-leaving { animation-duration: .9s; }
-/* 从回忆里醒过来：换画面时已经白透了，回忆的背景和人直接撤掉（不在白雾散开时又露出来），现在的画面在雾后面从朦胧里清晰过来 */
-.fg-bg.is-leave[data-out="wake"], .fg-world-in[data-tr="wake"] .fg-actor.is-leaving, .fg-world-in[data-tr="wake"] .fg-cg.is-leaving { animation: none; opacity: 0; }
-.fg-world-in[data-tr="wake"] .fg-actor:not(.is-leaving) { animation-duration: 1.4s; animation-delay: .3s; }
-
-/* 没有背景图时的程序化舞台：天色渐变 + 远景剪影 + 光斑。 */
-.fg-sky { position: absolute; inset: 0; transition: background 1.6s ease; }
-.fg-sky::before { content: ""; position: absolute; left: -10%; right: -10%; bottom: 0; height: 46%;
-  background:
-    radial-gradient(60% 120% at 20% 100%, rgba(0, 0, 0, .55), transparent 70%),
-    radial-gradient(50% 90% at 78% 100%, rgba(0, 0, 0, .5), transparent 70%);
-}
-.fg-sky::after { content: ""; position: absolute; inset: 0;
-  background: radial-gradient(40% 30% at var(--sun-x, 70%) var(--sun-y, 30%), var(--sun, rgba(255, 220, 180, .55)), transparent 70%);
-  mix-blend-mode: screen; animation: fg-breathe-light 9s ease-in-out infinite;
-}
-.fg-skyline { position: absolute; left: 0; right: 0; bottom: 0; height: 38%; opacity: .9; }
-@keyframes fg-breathe-light { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
-
-/* 时段调色：叠一层渐变，混合模式按时段变化。 */
-.fg-grade { position: absolute; inset: 0; pointer-events: none; transition: background 1.4s ease, opacity 1.4s ease; mix-blend-mode: soft-light; }
-.fg-grade[data-time="dawn"] { background: linear-gradient(180deg, rgba(255, 170, 200, .55), rgba(120, 140, 255, .35)); }
-.fg-grade[data-time="morning"] { background: linear-gradient(180deg, rgba(255, 245, 220, .35), rgba(255, 255, 255, 0)); }
-.fg-grade[data-time="noon"] { opacity: 0; }
-.fg-grade[data-time="afternoon"] { background: linear-gradient(180deg, rgba(255, 220, 160, .35), rgba(255, 200, 120, .15)); }
-.fg-grade[data-time="dusk"] { background: linear-gradient(180deg, rgba(255, 120, 60, .7), rgba(140, 40, 120, .55)); mix-blend-mode: overlay; }
-.fg-grade[data-time="evening"] { background: linear-gradient(180deg, rgba(90, 60, 200, .6), rgba(255, 110, 120, .35)); mix-blend-mode: overlay; }
-.fg-grade[data-time="night"] { background: linear-gradient(180deg, rgba(10, 20, 80, .78), rgba(20, 10, 60, .7)); mix-blend-mode: multiply; }
-.fg-grade[data-time="midnight"] { background: linear-gradient(180deg, rgba(4, 6, 40, .86), rgba(10, 4, 30, .8)); mix-blend-mode: multiply; }
-/* 画好的背景本来就按日 / 黄昏 / 夜画过（出图时带着时段）：只在同一档里轻轻推一下，不再压一遍（夜景再压一层夜色就黑透了） */
-.fg-grade.is-drawn:is([data-time="dusk"], [data-time="evening"], [data-time="night"]) { opacity: .3; }
-.fg-grade.is-drawn[data-time="midnight"] { opacity: .45; }
-.fg-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, .55)); }
-.fg-letterbox::before, .fg-letterbox::after { content: ""; position: absolute; left: 0; right: 0; height: 9%; background: #000; z-index: 30; animation: fg-bars .8s cubic-bezier(.6, 0, .2, 1) both; }
-.fg-letterbox::before { top: 0; transform-origin: top; } .fg-letterbox::after { bottom: 0; transform-origin: bottom; }
-@keyframes fg-bars { from { transform: scaleY(0); } }
-
-.fg-particles { position: absolute; inset: -3%; width: 106%; height: 106%; pointer-events: none; z-index: 8; }
-/* 鼠标视差（parallax.js 给 --px / --py，-1～1）：背景动得最少、人多一点、天气粒子最多，按远近错开。粒子画布四边各多出 3%，挪开时边上不空。 */
-.fg-bg { translate: calc(var(--px, 0) * -.5cqw) calc(var(--py, 0) * -.3cqw); }
-.fg-cast { translate: calc(var(--px, 0) * -1.1cqw) calc(var(--py, 0) * -.55cqw); }
-.fg-particles { translate: calc(var(--px, 0) * -2cqw) calc(var(--py, 0) * -1.1cqw); }
-
-/* ── 立绘 ── */
-.fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1), filter 1.2s ease; }
-.fg-cast[data-split] { right: 34%; }
-.fg-cast[data-veil] { opacity: 0; } /* 亲密场面里立绘退下（Stage.jsx 的 Cast） */
-/* 分屏：右边斜切的一格，另一头的地点和人；白色斜边，滑进滑出；有插画时让开 */
-.fg-split { position: absolute; top: 0; bottom: 0; right: 0; width: 42%; z-index: 8; pointer-events: none; animation: fg-split-in .7s cubic-bezier(.2, .8, .2, 1) both; transition: opacity .6s ease; }
-.fg-split.is-leaving { animation: fg-split-out .6s cubic-bezier(.6, 0, .8, .3) both; }
-.fg-split.is-under { opacity: 0; }
-.fg-split::before { content: ""; position: absolute; inset: 0; z-index: 2; background: rgba(255, 255, 255, .92); clip-path: polygon(15.2% 0, 16.4% 0, 1.2% 100%, 0 100%); filter: drop-shadow(0 0 .6cqw rgba(255, 255, 255, .6)); }
-.fg-split-inner { position: absolute; inset: 0; overflow: hidden; clip-path: polygon(16% 0, 100% 0, 100% 100%, .8% 100%); background: #0b0d1a; }
-.fg-split-bg { position: absolute; inset: 0; background-size: cover; background-position: center; filter: brightness(.82) saturate(.92); }
-.fg-split-inner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10, 20, 50, .35), transparent 35%), radial-gradient(110% 90% at 60% 50%, transparent 55%, rgba(0, 0, 0, .45)); pointer-events: none; }
-.fg-split-cast { position: absolute; top: 0; bottom: 0; left: 6%; right: 0; }
-.fg-split-label { position: absolute; right: 5%; top: 11%; z-index: 3; display: flex; align-items: center; gap: .7cqw; font-family: var(--font-display); font-size: 1.35cqw; letter-spacing: .22em; color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, .7); }
-.fg-split-label i { width: 3cqw; height: 1px; background: linear-gradient(90deg, transparent, #fff); }
-@keyframes fg-split-in { from { transform: translateX(105%); } }
-@keyframes fg-split-out { to { transform: translateX(105%); } }
-.fg-actor {
-  position: absolute; bottom: calc(-2% + var(--db, 0%)); height: calc(92% * var(--s, 1) * var(--d, 1)); width: calc(34% * var(--s, 1) * var(--d, 1));
-  left: var(--x, 50%); transform: translateX(-50%);
-  transition: left .55s cubic-bezier(.4, .1, .2, 1), height .55s cubic-bezier(.4, .1, .2, 1), width .55s cubic-bezier(.4, .1, .2, 1), bottom .55s cubic-bezier(.4, .1, .2, 1), filter .4s ease, opacity .45s ease;
-  filter: brightness(.7) saturate(.78);
-  animation: fg-actor-in .6s cubic-bezier(.2, .7, .2, 1) both;
-}
-/* 谁挡在谁前面由 Stage.jsx 按 stackLayers 写进 z-index（说话的人在最前，说完也留在前面）；这里的 z-index 只给分屏、闪回里的人用 */
-.fg-actor.is-speaking { filter: brightness(1.04) saturate(1.05) drop-shadow(0 0 1.4cqw rgba(255, 255, 255, .18)); z-index: 2; }
-.fg-actor.is-leaving { animation: fg-actor-out .45s ease both; }
-/* 没在说话、但对这句有反应的人：比旁边站着的人亮一点（说话的人更亮） */
-.fg-actor.is-reacting { filter: brightness(.9) saturate(.92); }
-/* 走位：上前一步的站到前面；背过身：不翻面，身子往外一侧一晃（Stage.jsx 的 TURN_FRAMES），一边糊一下一边暗成一道背影；探头：站在舞台边上，身子往里探；
-   躲到谁身后：缩在他背后，从他肩旁往外探出半个身子（站位、图层在 lib/blocking.js） */
-.fg-actor[data-depth="-1"] { filter: brightness(.62) saturate(.72); }
-.fg-actor-turn, .fg-actor-react { position: absolute; inset: 0; transform-origin: 50% 100%; }
-.fg-actor-turn { transform: translateY(var(--drop, 0%)) rotate(var(--lean, 0deg)); transition: transform .5s cubic-bezier(.45, .05, .3, 1), filter .7s ease; }
-/* 没有背面的立绘：转过去以后压成一道微微糊开的背影（看不清脸），边上留一圈淡淡的轮廓光；转回来时从影子里亮回来 */
-.fg-actor.is-away .fg-actor-turn { filter: brightness(.12) saturate(.25) blur(.12cqw) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .28)); }
-.fg-actor.is-peek[data-peek="left"] .fg-actor-turn { --lean: 5deg; }
-.fg-actor.is-peek[data-peek="right"] .fg-actor-turn { --lean: -5deg; }
-.fg-actor.is-hiding:not(.is-down) .fg-actor-turn { --drop: 2%; }
-.fg-actor.is-hiding[data-hide="left"]:not(.is-down) .fg-actor-turn { --lean: -3deg; }
-.fg-actor.is-hiding[data-hide="right"]:not(.is-down) .fg-actor-turn { --lean: 3deg; }
-/* 被击倒：歪倒、往下沉、暗成一道影子（打中那一下之后才倒），上半身沉进一团黑雾里看不清脸；到他再开口、自己走位或被治疗时站起来、雾散掉。
-   雾在 .fg-actor-turn 里，跟着人一起歪倒；不倒的时候 visibility: hidden 不画 */
-.fg-actor.is-down .fg-actor-turn { --lean: -11deg; --drop: 14%; filter: brightness(.4) saturate(.35) grayscale(.4); transition-delay: .5s; }
-.fg-down-mist { position: absolute; left: 50%; top: calc(var(--head, 9%) - 8%); width: 100%; height: 62%; transform: translateX(-50%); pointer-events: none; visibility: hidden; opacity: 0;
-  background: radial-gradient(ellipse 42% 40% at 50% 38%, rgba(5, 3, 9, .98) 0 50%, rgba(5, 3, 9, .85) 68%, transparent 100%); transition: opacity .8s ease, visibility 0s linear .8s; }
-.fg-actor.is-down .fg-down-mist { visibility: visible; opacity: 1; transition: opacity 1.4s ease .55s, visibility 0s; }
-.fg-down-mist i { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(8, 5, 14, .92), rgba(8, 5, 14, .5) 46%, transparent 70%); filter: blur(.7cqw); animation: fg-mist-drift 7s ease-in-out infinite; }
-.fg-down-mist i:nth-child(1) { left: 4%; top: 18%; width: 54%; height: 60%; }
-.fg-down-mist i:nth-child(2) { left: 42%; top: 8%; width: 54%; height: 64%; animation-duration: 8.5s; animation-delay: -3s; }
-.fg-down-mist i:nth-child(3) { left: 20%; top: 44%; width: 62%; height: 56%; animation-duration: 6.2s; animation-delay: -1.5s; }
-.fg-down-mist i:nth-child(4) { left: 28%; top: -6%; width: 44%; height: 44%; animation: fg-mist-rise 5.6s ease-in infinite; }
-@keyframes fg-mist-drift { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(5%, -7%) scale(1.08); } }
-@keyframes fg-mist-rise { 0% { opacity: 0; transform: translateY(24%) scale(.8); } 30% { opacity: .85; } 100% { opacity: 0; transform: translateY(-46%) scale(1.35); } }
-/* 打中时身上的一下：命中、暴击是一道斩痕，格挡是一圈光；不写字。在打中那一刻（--impact）出来 */
-.fg-hit-mark { position: absolute; left: 50%; top: calc(var(--head, 9%) + 14%); width: 0; height: 0; z-index: 5; pointer-events: none; }
-.fg-hit-mark::before { content: ""; position: absolute; left: -9cqw; top: -.25cqw; width: 18cqw; height: .5cqw; border-radius: 1cqw; background: linear-gradient(90deg, transparent, #fff 30%, #fff 70%, transparent); box-shadow: 0 0 1.2cqw rgba(255, 255, 255, .9);
-  transform: rotate(-28deg) scaleX(0); opacity: 0; animation: fg-hit-slash .38s cubic-bezier(.2, .9, .3, 1) var(--impact, .4s) both; }
-.fg-hit-mark[data-effect="crit"]::before { height: .8cqw; background: linear-gradient(90deg, transparent, #fff 25%, #ff5a5a 50%, #fff 75%, transparent); box-shadow: 0 0 1.6cqw rgba(255, 60, 60, .9); }
-.fg-hit-mark:not([data-effect="hit"]):not([data-effect="crit"])::before { display: none; }
-.fg-hit-mark[data-effect="block"]::after { content: ""; position: absolute; left: -6cqw; top: -6cqw; width: 12cqw; height: 12cqw; border-radius: 50%; border: .35cqw solid rgba(150, 210, 255, .95); box-shadow: 0 0 2cqw rgba(80, 160, 255, .8), inset 0 0 2cqw rgba(80, 160, 255, .5);
-  opacity: 0; animation: fg-hit-ring .5s ease-out var(--impact, .4s) both; }
-@keyframes fg-hit-slash { 0% { opacity: 1; transform: rotate(-28deg) scaleX(0); } 45% { opacity: 1; transform: rotate(-28deg) scaleX(1); } 100% { opacity: 0; transform: rotate(-28deg) scaleX(1.1); } }
-@keyframes fg-hit-ring { 0% { opacity: 1; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.3); } }
-/* 进来的样子：跑进来（从远一点的地方冲进来、刹一下）、慢慢走进来、探头（从边上探出来） */
-.fg-actor[data-enter="run"] { animation: fg-actor-run-in .5s cubic-bezier(.2, .8, .3, 1.15) both; }
-.fg-actor[data-enter="slow"] { animation: fg-actor-in 1.6s cubic-bezier(.3, .4, .3, 1) both; }
-.fg-actor[data-enter="peek"] { animation: fg-actor-peek-in .9s cubic-bezier(.2, .7, .2, 1) both; }
-/* 走的样子：甩头离开（一下暗成背影、快步走掉，不翻面）、跑开、慢慢走远（缩小、淡掉）；时长对上 Stage.jsx 的 EXIT_MS */
-.fg-actor.is-leaving[data-exit="storm"] { animation: fg-actor-storm .65s cubic-bezier(.5, 0, .8, .4) both; }
-.fg-actor.is-leaving[data-exit="storm"] .fg-actor-turn { filter: brightness(.22) saturate(.35) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .2)); transition-duration: .2s; }
-.fg-actor.is-leaving[data-exit="run"] { animation: fg-actor-run-out .42s cubic-bezier(.5, 0, .9, .5) both; }
-.fg-actor.is-leaving[data-exit="slow"] { animation: fg-actor-slow-out 1.3s ease-in both; }
-/* --edge：离这个人近的那一边（站在中间的按他在左半边还是右半边），跑进跑出、探头都从那边来、往那边去 */
-@keyframes fg-actor-run-in { 0% { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.6)); } 55% { opacity: 1; } 82% { transform: translateX(calc(-50% - var(--edge, 40%) * .05)); } 100% { transform: translateX(-50%); } }
-@keyframes fg-actor-peek-in { from { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * .5)); } }
-@keyframes fg-actor-storm { 0%, 22% { opacity: 1; transform: translateX(-50%); } 100% { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.3)); } }
-@keyframes fg-actor-run-out { to { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.6)); } }
-@keyframes fg-actor-slow-out { to { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * .35)) scale(.92); } }
-.fg-actor-body { position: absolute; inset: 0; transform-origin: 50% 100%; animation: fg-breathe 4.8s ease-in-out infinite; }
-.fg-actor.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1), fg-breathe 4.8s ease-in-out .42s infinite; }
-/* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */
-.fg-actor.is-aa .fg-actor-body { animation: none; }
-.fg-actor.is-aa.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }
-/* 特效开关（Theater 在 .fg-theater 上写 data-off）：关掉呼吸只留开口时的轻跳，关掉轻跳只留呼吸 */
-.fg-theater[data-off~="breathe"] .fg-actor .fg-actor-body { animation: none; }
-.fg-theater[data-off~="breathe"] .fg-actor.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }
-.fg-theater[data-off~="hop"] .fg-actor.is-speaking .fg-actor-body { animation: fg-breathe 4.8s ease-in-out infinite; }
-.fg-theater[data-off~="hop"] .fg-actor.is-aa.is-speaking .fg-actor-body,
-.fg-theater[data-off~="hop"][data-off~="breathe"] .fg-actor.is-speaking .fg-actor-body { animation: none; }
-/* 浅景深：有人在说话时，旁边没说话也没反应的人微微虚一点，退后一步的更虚（Stage.jsx 的 Cast 写 data-talk；旁白时谁都不虚） */
-.fg-actor-body { transition: filter .8s ease; }
-.fg-cast[data-talk] .fg-actor:not(.is-speaking, .is-reacting, .is-leaving) .fg-actor-body { filter: blur(.1cqw); }
-.fg-cast[data-talk] .fg-actor[data-depth="-1"]:not(.is-speaking, .is-reacting, .is-leaving) .fg-actor-body { filter: blur(.2cqw); }
-/* --k 按脸框缩放（头一样大），--lift 按身高抬高或压低（lib/stature.js）；都按立绘框的高度算。每张图带着自己的（Stage.jsx 写在 img 上），
-   换图时新图从第一帧起就是自己的大小；过渡只在同一张图后来才量好脸框、改了身高时缓过去 */
-.fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: calc(var(--k, 1) * 100%); width: auto; max-width: none; transform: translateX(-50%);
-  transition: height .4s ease, bottom .4s ease;
-  -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 99%), radial-gradient(120% 100% at 50% 40%, #000 62%, transparent 82%);
-  -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, #000 78%, transparent 99%); }
-.fg-actor.is-upload img, .fg-actor.is-upload .fg-aa { -webkit-mask-image: none; mask-image: none; }
-/* 换立绘（换表情、换动作）：新图盖在旧图上淡入，旧图过了一小半才开始淡出，两张重叠的地方不透出背景。时长对上 Stage.jsx 的 SWAP_MS */
-.fg-actor img.is-in { animation: fg-sprite-in .28s ease-out both; }
-.fg-actor img.is-out { animation: fg-sprite-out .28s ease-in both; }
-/* 登场从靠近的一侧滑进来，退场往同一侧淡出（--side 由站位决定）。 */
-@keyframes fg-actor-in { from { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(3%); } }
-@keyframes fg-actor-out { to { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(2%); } }
-@keyframes fg-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.008) translateY(-.25%); } }
-@keyframes fg-speak-hop { 0% { transform: translateY(0); } 40% { transform: translateY(-1.6%); } 100% { transform: translateY(0); } }
-@keyframes fg-sprite-in { from { opacity: 0; } }
-@keyframes fg-sprite-out { 0%, 40% { opacity: 1; } 100% { opacity: 0; } }
-
-/* 没有立绘时的剪影立绘：角色色渐变 + 轮廓光。 */
-.fg-silhouette { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: 94%; aspect-ratio: 0.52; transform: translateX(-50%); }
-.fg-silhouette svg { width: 100%; height: 100%; overflow: visible; }
-.fg-silhouette .sil-rim { fill: none; stroke: color-mix(in oklab, var(--c) 55%, #fff); stroke-width: 2.4; opacity: .85; filter: drop-shadow(0 0 5px var(--c)) drop-shadow(0 0 14px var(--c)); stroke-dasharray: 1400; animation: fg-rim-draw 2.4s cubic-bezier(.4, 0, .2, 1) both; }
-@keyframes fg-rim-draw { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
-.fg-silhouette-name { position: absolute; left: 50%; top: 50%; transform: translateX(-50%); font-family: var(--font-display); font-size: 5.4cqw; font-weight: 900; letter-spacing: .25em; color: transparent; -webkit-text-stroke: 1px color-mix(in oklab, var(--c) 40%, #fff); opacity: .5; writing-mode: vertical-rl; white-space: nowrap; }
-.fg-silhouette-tag { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); font-family: var(--font-latin); font-size: .75cqw; letter-spacing: .5em; white-space: nowrap; color: rgba(255, 255, 255, .55); }
-
-/* ── CG ── */
-/* 一张插画：照 galgame 的做法，默认溶入 → 静止 → 溶回场景；导演只在这一刻的分量、节奏特别时换（data-in / data-out / data-motion）。
-   出现时对话框先让开、等画面出来再回来（Theater.jsx）；时长跟 Stage.jsx 的 CG_IN_MS / CG_OUT_MS 对上。 */
-.fg-cg { position: absolute; inset: 0; z-index: 6; overflow: hidden; }
-.fg-cg:not(.is-leaving) { animation: var(--cg-in, fg-cg-fade-in) var(--cg-in-dur, .8s) var(--cg-in-ease, ease-in-out) both; }
-.fg-cg.is-leaving { pointer-events: none; animation: var(--cg-out, fg-cg-fade-out) var(--cg-out-dur, .8s) var(--cg-out-ease, ease-in-out) both; }
-.fg-cg-art { position: absolute; inset: 0; }
-.fg-cg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 62%, rgba(0, 0, 0, .4)); pointer-events: none; }
-.fg-cg-img { position: absolute; inset: 0; background-size: cover; background-position: center; }
-/* 竖版插画：模糊的同图垫底，前景铺满宽度；停在顶上 → 慢慢看到底 → 拉远停在全貌，只看一遍（等出现演完再开始）。 */
-.fg-cg.is-tall { background: #000; }
-.fg-cg-back { position: absolute; inset: -6%; background-size: cover; background-position: center; filter: blur(2.4cqw) brightness(.5) saturate(1.15); }
-.fg-cg-pan { position: absolute; left: 0; top: 0; width: 100%; height: auto; transform-origin: 50% 0; box-shadow: 0 0 5cqw rgba(0, 0, 0, .65); animation: fg-cg-pan var(--pan, 26s) cubic-bezier(.45, 0, .55, 1) var(--cg-in-dur, 1s) both; will-change: transform; user-select: none; }
-@keyframes fg-cg-pan {
-  0%, 12% { transform: translateY(0) scale(1); }
-  60%, 68% { transform: translateY(calc((var(--r) - 1) * 100%)) scale(1); }
-  100% { transform: translateY(0) scale(var(--r)); }
-}
-/* 出现：溶入（默认，按基调分快 / 正常 / 慢）、暗场后浮现、白闪、由虚到实、直接切入、冲击 */
-.fg-cg[data-in="quick"] { --cg-in-dur: .4s; }
-.fg-cg[data-in="slow"] { --cg-in-dur: 1.5s; }
-.fg-cg[data-in="black"] { --cg-in: fg-cg-black-in; --cg-in-dur: 1.8s; }
-.fg-cg[data-in="flash"] { --cg-in: none; --cg-in-dur: .6s; }
-.fg-cg[data-in="focus"] { --cg-in: fg-cg-focus-in; --cg-in-dur: 1.5s; --cg-in-ease: ease-out; }
-.fg-cg[data-in="cut"] { --cg-in: none; }
-.fg-cg[data-in="impact"] { --cg-in: fg-cg-impact-in; --cg-in-dur: .6s; --cg-in-ease: linear; }
-@keyframes fg-cg-fade-in { from { opacity: 0; } to { opacity: 1; } }
-/* 暗场：先把画面压成全黑（约半秒）、停一下，再从黑里亮出这张画 */
-@keyframes fg-cg-black-in { 0% { opacity: 0; filter: brightness(0); } 28% { opacity: 1; filter: brightness(0); } 45% { filter: brightness(0); } 100% { opacity: 1; filter: brightness(1); } }
-/* 白闪：整个画面先白掉，插画从白里显出来。白的那层是 ::before，所以插画本身不淡入，只让画和底部压暗晚一点出现 */
-.fg-cg[data-in="flash"]:not(.is-leaving) > .fg-cg-art, .fg-cg[data-in="flash"]:not(.is-leaving)::after { animation: fg-cg-flash-in .6s linear both; }
-@keyframes fg-cg-flash-in { 0%, 16% { opacity: 0; } 17%, 100% { opacity: 1; } }
-.fg-cg[data-in="flash"]:not(.is-leaving)::before, .fg-cg[data-in="impact"]:not(.is-leaving)::before { content: ""; position: absolute; inset: 0; z-index: 2; background: #fff; pointer-events: none; animation: fg-cg-white var(--cg-in-dur, 1s) ease-out both; }
-/* 白闪：0.1 秒白掉，半秒退回来（Ren'Py 的「相机闪光」也是这个节奏）；一秒里最多闪一次 */
-@keyframes fg-cg-white { 0% { opacity: 0; } 17% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes fg-cg-focus-in { 0% { opacity: 0; filter: blur(24px); transform: scale(1.03); } 35% { opacity: 1; } 100% { opacity: 1; filter: blur(0); transform: none; } }
-/* 冲击：白闪一下，画面跟着震几下、越震越小（幅度约画面的 1.5%，跟大厂脚本里的 quake 差不多） */
-@keyframes fg-cg-impact-in {
-  0% { opacity: 1; transform: none; }
-  14% { transform: translate(-1.5%, 1%); }
-  28% { transform: translate(1.3%, -.8%); }
-  42% { transform: translate(-.9%, .5%); }
-  58% { transform: translate(.5%, -.3%); }
-  76% { transform: translate(-.2%, .1%); }
-  100% { opacity: 1; transform: none; }
-}
-/* 收起：溶回场景（默认，按基调分快 / 正常 / 慢）、暗下去、白闪；直接切掉（cut）不演 */
-.fg-cg[data-out="quick"] { --cg-out-dur: .4s; }
-.fg-cg[data-out="slow"] { --cg-out-dur: 1.5s; }
-.fg-cg[data-out="black"] { --cg-out: fg-cg-black-out; --cg-out-dur: 1.5s; }
-.fg-cg[data-out="flash"] { --cg-out: none; --cg-out-dur: .6s; }
-@keyframes fg-cg-fade-out { from { opacity: 1; } to { opacity: 0; } }
-/* 暗下去：插画先暗成全黑，再从黑里溶回场景 */
-@keyframes fg-cg-black-out { 0% { opacity: 1; filter: brightness(1); } 50% { opacity: 1; filter: brightness(0); } 100% { opacity: 0; filter: brightness(0); } }
-/* 白闪消失：画面白掉的那一刻插画没了，白再慢慢退掉露出场景（同样只让画和底部压暗消失，白层 ::before 留到最后） */
-.fg-cg.is-leaving[data-out="flash"] > .fg-cg-art, .fg-cg.is-leaving[data-out="flash"]::after { animation: fg-cg-flash-out .6s linear both; }
-@keyframes fg-cg-flash-out { 0%, 16% { opacity: 1; } 17%, 100% { opacity: 0; } }
-.fg-cg.is-leaving[data-out="flash"]::before { content: ""; position: absolute; inset: 0; z-index: 2; background: #fff; pointer-events: none; animation: fg-cg-white .6s ease-out both; }
-
-/* 停留：静止（默认）、极慢地推近、慢慢横移一遍；都只走一遍，停在最后的样子（竖版插画自己看一遍，不看这个） */
-.fg-cg[data-motion="push"] .fg-cg-img { animation: fg-cg-push 24s cubic-bezier(.4, 0, .6, 1) var(--cg-in-dur, 1s) both; }
-.fg-cg[data-motion="pan"] .fg-cg-img { animation: fg-cg-panx 24s cubic-bezier(.45, 0, .55, 1) var(--cg-in-dur, 1s) both; }
-@keyframes fg-cg-push { from { transform: scale(1); } to { transform: scale(1.08); } }
-@keyframes fg-cg-panx { from { transform: scale(1.1) translateX(-4%); } to { transform: scale(1.1) translateX(4%); } }
-.fg-cg-wait { position: absolute; right: 2.4%; top: 12%; z-index: 20; display: flex; align-items: center; gap: .6cqw; font-size: 1cqw; padding: .5cqw 1cqw; border-radius: 99px; background: var(--chip-bg); backdrop-filter: blur(8px); color: var(--ink-dim); }
-.fg-cg-wait i { width: .7cqw; height: .7cqw; border-radius: 50%; background: var(--accent); animation: fg-pulse 1.2s ease-in-out infinite; }
-
-/* ── 镜头 ──
-   推近、特写、仰拍、缓推、背景虚化、倾斜、下沉、升起、空镜、希区柯克变焦：过渡到那个样子停住，下一拍（data-cam 没了）缓回来。
-   对准人的那几种由 Stage.jsx 的 aimCamera 给 --zs 放大倍数、--tx / --ty 平移（脸停在画面中上，不推出框）。震动、甩镜、拉远、平移、虚焦演一下就完。 */
-.fg-camera { transition: transform 1s cubic-bezier(.4, 0, .2, 1); }
-.fg-camera[data-cam="zoom"], .fg-camera[data-cam="closeup"], .fg-camera[data-cam="slowpush"], .fg-camera[data-cam="focus"] { transform: scale(var(--zs, 1.12)) translate(var(--tx, 0%), var(--ty, 0%)); }
-.fg-camera[data-cam="zoom"] { transition: transform 1.6s cubic-bezier(.2, .7, .2, 1); }
-.fg-camera[data-cam="closeup"] { transition: transform .9s cubic-bezier(.2, .8, .2, 1); }
-.fg-camera[data-cam="slowpush"] { transition: transform 7s cubic-bezier(.3, 0, .4, 1); }
-.fg-camera[data-cam="focus"] { transition: transform 1.4s ease; }
-.fg-camera[data-cam="lowangle"] { transform: perspective(80cqw) rotateX(4deg) scale(var(--zs, 1.24)) translate(var(--tx, 0%), var(--ty, 0%)); transition: transform 1.3s cubic-bezier(.2, .7, .2, 1); }
-.fg-camera[data-cam="tilt"] { transform: rotate(-1.6deg) scale(1.05); transition: transform 1.2s ease; }
-.fg-camera[data-cam="sink"] { transform: translateY(-5%) scale(1.07); transition: transform 1.6s cubic-bezier(.4, 0, .2, 1); }
-.fg-camera[data-cam="rise"] { transform: translateY(5%) scale(1.07); transition: transform 1.6s cubic-bezier(.4, 0, .2, 1); }
-.fg-camera[data-cam="empty"] { transform: scale(1.04); transition: transform 3s ease; }
-/* 背景虚化只糊背景、人清楚；特写时背景也轻轻糊一点；空镜时人淡出、只剩背景；希区柯克变焦背景往前涌、人不动 */
-.fg-bg { transition: filter 1s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
-.fg-camera[data-cam="focus"] .fg-bg { filter: blur(6px) brightness(.86); }
-.fg-camera[data-cam="closeup"] .fg-bg { filter: blur(2.5px); }
-.fg-camera[data-cam="empty"] .fg-cast { opacity: 0; }
-.fg-camera[data-cam="dolly"] .fg-bg { scale: 1.28; }
-.fg-camera[data-cam="dolly"] .fg-cast { scale: .96; }
-.fg-camera[data-cam="shake"] { animation: fg-shake .5s linear; }
-.fg-camera[data-cam="whip"] { animation: fg-whip .55s cubic-bezier(.6, 0, .3, 1); }
-.fg-camera[data-cam="zoomout"] { animation: fg-zoomout 1.6s cubic-bezier(.2, .7, .2, 1) both; }
-.fg-camera[data-cam="pan"] { animation: fg-pan 3s ease-in-out both; }
-.fg-camera[data-cam="blur"] { animation: fg-blur 2.2s ease both; }
-/* 移焦：先对着人（背景慢慢糊开），停一下，焦点再慢慢移到背景：人糊开、暗一点，景清楚；镜头同时极慢地往前靠一点。下一拍缓回来。
-   --rack-bg / --rack-cast 是注册过的数字，能平滑地动；不支持 @property 的浏览器里会在中途一下子切过去。 */
-@property --rack-bg { syntax: '<number>'; inherits: true; initial-value: 0; }
-@property --rack-cast { syntax: '<number>'; inherits: true; initial-value: 0; }
-.fg-camera[data-cam="rackfocus"] { transform: scale(1.03); transition: transform 3.6s cubic-bezier(.3, 0, .3, 1); animation: fg-rack 3.6s cubic-bezier(.45, 0, .3, 1) both; }
-.fg-camera[data-cam="rackfocus"] .fg-bg { filter: blur(calc(var(--rack-bg) * 6px)) brightness(calc(1 - var(--rack-bg) * .1)); transition: scale 2.6s cubic-bezier(.4, 0, .2, 1); }
-.fg-camera[data-cam="rackfocus"] .fg-cast { filter: blur(calc(var(--rack-cast) * .45cqw)) brightness(calc(1 - var(--rack-cast) * .18)); transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
-@keyframes fg-rack { 0% { --rack-bg: 0; --rack-cast: 0; } 26%, 36% { --rack-bg: 1; --rack-cast: 0; } 100% { --rack-bg: 0; --rack-cast: 1; } }
-@keyframes fg-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-1.2%, .6%); } 30% { transform: translate(1%, -.8%); } 45% { transform: translate(-.8%, .4%); } 60% { transform: translate(.6%, .6%); } 80% { transform: translate(-.3%, -.2%); } }
-@keyframes fg-whip { 0% { transform: none; filter: none; } 35% { transform: translateX(-9%) scale(1.04); filter: blur(10px); } 60% { transform: translateX(2.5%) scale(1.02); filter: blur(3px); } 100% { transform: none; filter: none; } }
-@keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }
-@keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }
-@keyframes fg-blur { 0% { filter: blur(0); } 30% { filter: blur(6px); } 100% { filter: blur(0); } }
-/* 小瞬间：拍照、触碰、干杯、卡片。都在对话框下面，演完淡出（--hold 之后）。 */
-.fg-moment { position: absolute; inset: 0; z-index: 18; pointer-events: none; animation: fg-fade-out .45s ease var(--hold, 2s) forwards; }
-.fg-touch-ring { position: absolute; left: 50%; top: 44%; width: 26cqw; height: 26cqw; border-radius: 50%; transform: translate(-50%, -50%) scale(.2); opacity: 0;
-  background: radial-gradient(circle, transparent 46%, rgba(255, 190, 215, .55) 56%, rgba(255, 150, 190, .2) 62%, transparent 70%); animation: fg-touch-ripple-in 1.8s ease-out both; }
-@keyframes fg-touch-ripple-in { 0% { opacity: .95; transform: translate(-50%, -50%) scale(.2); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(2.2); } }
-/* 拍照：白闪一下，拍立得的白框框住这一刻（框外压暗），下面写题字；最后像存进相册一样往右上角飞走 */
-.fg-photo-flash { position: absolute; inset: 0; background: #fff; opacity: 0; animation: fg-photo-flash .5s ease-out both; }
-.fg-photo { position: absolute; left: 50%; top: 40%; width: 54%; height: 56%; box-sizing: border-box; border: 1.2cqw solid #fbf8f1; border-bottom-width: 5.2cqw; border-radius: .3cqw;
-  box-shadow: 0 0 0 300cqw rgba(8, 6, 14, .5), 0 1.4cqw 3cqw rgba(0, 0, 0, .55), inset 0 0 .6cqw rgba(0, 0, 0, .35);
-  transform: translate(-50%, -50%) rotate(-2.4deg); animation: fg-photo-snap .5s cubic-bezier(.2, .9, .3, 1.2) .12s both, fg-photo-away .5s cubic-bezier(.6, 0, .8, .4) calc(var(--hold, 2s) - 150ms) forwards; }
-.fg-photo-caption { position: absolute; left: 0; right: 0; bottom: -4.4cqw; text-align: center; font-family: var(--font-display); font-size: 1.7cqw; letter-spacing: .14em; color: #4a3a42; transform: rotate(-.6deg); }
-@keyframes fg-photo-flash { 0% { opacity: 0; } 18% { opacity: .95; } 100% { opacity: 0; } }
-@keyframes fg-photo-snap { from { opacity: 0; transform: translate(-50%, -50%) rotate(-2.4deg) scale(1.14); } to { opacity: 1; transform: translate(-50%, -50%) rotate(-2.4deg); } }
-@keyframes fg-photo-away { to { opacity: 0; transform: translate(10%, -120%) rotate(8deg) scale(.3); box-shadow: 0 0 0 300cqw rgba(8, 6, 14, 0), 0 1.4cqw 3cqw rgba(0, 0, 0, 0); } }
-/* 干杯：两只杯子从两边碰到一起，碰上那一刻一闪 */
-.fg-cup { position: absolute; top: 34%; width: 6cqw; height: 9.6cqw; filter: drop-shadow(0 .4cqw .8cqw rgba(0, 0, 0, .4)); }
-.fg-cup svg { width: 100%; height: 100%; display: block; }
-.fg-cup.is-left { left: calc(50% - 6.4cqw); transform-origin: 50% 90%; animation: fg-cup-left var(--clink, .5s) cubic-bezier(.3, .6, .4, 1) both, fg-cup-back-l .5s ease-out var(--clink, .5s) both; }
-.fg-cup.is-right { left: calc(50% + .4cqw); transform-origin: 50% 90%; animation: fg-cup-right var(--clink, .5s) cubic-bezier(.3, .6, .4, 1) both, fg-cup-back-r .5s ease-out var(--clink, .5s) both; }
-.fg-cup.is-right svg { transform: scaleX(-1); }
-.fg-clink { position: absolute; left: 50%; top: 36%; width: 9cqw; height: 9cqw; transform: translate(-50%, -50%) scale(0); opacity: 0;
-  background: repeating-conic-gradient(rgba(255, 246, 200, .95) 0 6deg, transparent 6deg 30deg); -webkit-mask-image: radial-gradient(circle, transparent 22%, #000 26%, #000 46%, transparent 50%); mask-image: radial-gradient(circle, transparent 22%, #000 26%, #000 46%, transparent 50%);
-  animation: fg-clink .45s ease-out var(--clink, .5s) both; }
-@keyframes fg-cup-left { from { opacity: 0; transform: translateX(-22cqw) rotate(-18deg); } to { opacity: 1; transform: rotate(14deg); } }
-@keyframes fg-cup-right { from { opacity: 0; transform: translateX(22cqw) rotate(18deg); } to { opacity: 1; transform: rotate(-14deg); } }
-@keyframes fg-cup-back-l { from { transform: rotate(14deg); } 30% { transform: translateX(-.8cqw) rotate(6deg); } to { transform: translateX(-.4cqw) rotate(8deg); } }
-@keyframes fg-cup-back-r { from { transform: rotate(-14deg); } 30% { transform: translateX(.8cqw) rotate(-6deg); } to { transform: translateX(.4cqw) rotate(-8deg); } }
-@keyframes fg-clink { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.3); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); } }
-/* 卡片：做好一道菜、新称呼、约定、交换联系方式。纸一样的小卡片从上面落下来，停一会儿淡出 */
-.fg-moment-card { position: absolute; left: 50%; top: 13%; min-width: 22cqw; max-width: 46cqw; box-sizing: border-box; padding: 1.4cqw 2.6cqw 1.6cqw; text-align: center; color: #3b2a33;
-  background: linear-gradient(180deg, #fffdf8, #fbf3e8); border-radius: .7cqw; border-top: .45cqw solid var(--who, #ff8fb4); box-shadow: 0 1.2cqw 3cqw rgba(0, 0, 0, .45);
-  transform: translateX(-50%) rotate(-1.4deg); animation: fg-moment-card .6s cubic-bezier(.2, .9, .3, 1.15) both; }
-.fg-moment-kicker { font-family: var(--font-latin); font-size: 1cqw; letter-spacing: .5em; padding-left: .5em; color: var(--who, #e0789c); opacity: .9; }
-.fg-moment-main { font-family: var(--font-display); font-size: 3cqw; font-weight: 800; letter-spacing: .08em; line-height: 1.25; margin: .3cqw 0; }
-.fg-moment-sub { font-size: 1.3cqw; letter-spacing: .3em; color: rgba(59, 42, 51, .7); }
-.fg-moment-place { margin-top: .4cqw; font-size: 1.5cqw; letter-spacing: .14em; color: rgba(59, 42, 51, .85); }
-.fg-moment-place::before { content: ""; display: inline-block; width: .9cqw; height: .9cqw; margin-right: .6cqw; vertical-align: -.05cqw; border-radius: 50% 50% 50% 0; background: var(--who, #ff8fb4); transform: rotate(-45deg); }
-.fg-moment[data-kind="cook"] .fg-moment-card { border-top-color: #f5a742; }
-.fg-moment[data-kind="cook"] .fg-moment-kicker { color: #e08a2c; }
-.fg-moment[data-kind="promise"] .fg-moment-card { border-top-color: #7fb6ff; background: linear-gradient(180deg, #fbfdff, #eef4ff); }
-.fg-moment[data-kind="promise"] .fg-moment-kicker { color: #5a8fe0; }
-.fg-moment[data-kind="nickname"] .fg-moment-main { color: #d4467a; }
-.fg-steam { position: absolute; left: 50%; top: -3.2cqw; width: 6cqw; height: 3.2cqw; transform: translateX(-50%); display: flex; justify-content: space-between; }
-.fg-steam i { width: .5cqw; height: 100%; border-radius: 1cqw; background: linear-gradient(0deg, rgba(255, 255, 255, .8), transparent); filter: blur(.12cqw); animation: fg-steam 1.6s ease-in-out infinite; }
-.fg-steam i:nth-child(2) { animation-delay: .4s; height: 120%; margin-top: -20%; }
-.fg-steam i:nth-child(3) { animation-delay: .8s; }
-.fg-contact { display: flex; align-items: center; gap: 1.2cqw; text-align: left; margin-top: .6cqw; }
-.fg-contact-face { display: grid; place-items: center; width: 4cqw; height: 4cqw; border-radius: 50%; background: var(--who, #ff8fb4); color: #fff; font-style: normal; font-size: 1.9cqw; font-weight: 700; box-shadow: 0 0 0 .3cqw #fff, 0 .3cqw .8cqw rgba(0, 0, 0, .25); }
-.fg-contact .fg-moment-main { font-size: 2.2cqw; margin: 0; }
-@keyframes fg-moment-card { from { opacity: 0; transform: translateX(-50%) translateY(-3cqw) rotate(-5deg); } to { opacity: 1; transform: translateX(-50%) rotate(-1.4deg); } }
-@keyframes fg-steam { 0% { opacity: 0; transform: translateY(.6cqw) scaleY(.6); } 40% { opacity: .9; } 100% { opacity: 0; transform: translateY(-1.2cqw) translateX(.3cqw) scaleY(1.1); } }
-/* 烟花：在背景和立绘之间，天上错开炸开三朵；升空的细线、炸开的光芒、天跟着亮一下 */
-.fg-fireworks { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
-.fg-firework i { position: absolute; display: block; }
-.fg-fw-trail { left: var(--x); top: var(--y); width: .25cqw; height: 8cqw; transform: translateX(-50%); background: linear-gradient(0deg, transparent, hsl(var(--hue) 100% 85%)); opacity: 0; animation: fg-fw-rise var(--rise, .7s) cubic-bezier(.2, .6, .4, 1) var(--at) both; }
-.fg-fw-burst { left: var(--x); top: var(--y); width: 30cqw; height: 30cqw; border-radius: 50%; transform: translate(-50%, -50%) scale(.1); opacity: 0;
-  background: repeating-conic-gradient(hsl(var(--hue) 100% 75%) 0 2.5deg, transparent 2.5deg 12deg); -webkit-mask-image: radial-gradient(circle, transparent 18%, #000 30%, rgba(0, 0, 0, .8) 46%, transparent 50%); mask-image: radial-gradient(circle, transparent 18%, #000 30%, rgba(0, 0, 0, .8) 46%, transparent 50%);
-  filter: drop-shadow(0 0 .6cqw hsl(var(--hue) 100% 70%)); animation: fg-fw-burst 1.7s cubic-bezier(.1, .7, .3, 1) calc(var(--at) + var(--rise, .7s)) both; }
-.fg-fw-burst.is-inner { width: 16cqw; height: 16cqw; background: repeating-conic-gradient(from 6deg, hsl(calc(var(--hue) + 40) 100% 82%) 0 3deg, transparent 3deg 18deg); animation-duration: 1.3s; }
-.fg-fw-glow { left: var(--x); top: var(--y); width: 90cqw; height: 90cqw; border-radius: 50%; transform: translate(-50%, -50%); opacity: 0; background: radial-gradient(circle, hsl(var(--hue) 100% 70% / .3), transparent 60%); animation: fg-fw-glow 1.4s ease-out calc(var(--at) + var(--rise, .7s)) both; }
-@keyframes fg-fw-rise { 0% { opacity: 1; top: 100%; } 85% { opacity: 1; } 100% { opacity: 0; top: var(--y); } }
-@keyframes fg-fw-burst { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.1); } 60% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -40%) scale(1); } }
-@keyframes fg-fw-glow { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
-/* 手机：来电 / 拨出时右边滑进来一部响着的手机，接通后收成右上角的「通话中」；挂断的小卡；视频通话的小窗；通知横幅 */
-.fg-phone { position: absolute; right: 4.5%; top: 13%; z-index: 18; pointer-events: none; animation: fg-phone-in .5s cubic-bezier(.2, .9, .3, 1.1) both; }
-.fg-phone-card { width: 17cqw; box-sizing: border-box; padding: 1.5cqw 1.4cqw 1.6cqw; border-radius: 2cqw; text-align: center; color: #fff;
-  background: linear-gradient(180deg, rgba(40, 44, 58, .86), rgba(18, 20, 28, .9)); border: 1px solid rgba(255, 255, 255, .16); box-shadow: 0 1.4cqw 3.4cqw rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-.fg-phone[data-side="left"] { right: auto; left: 4.5%; } /* 分屏在右边开着时 */
-.fg-phone[data-dir="in"] .fg-phone-card { animation: fg-phone-buzz .78s ease-in-out .1s 2; }
-.fg-phone-label { display: flex; align-items: center; justify-content: center; gap: .4cqw; font-size: 1.05cqw; letter-spacing: .24em; color: rgba(255, 255, 255, .72); }
-.fg-phone-label svg { width: 1.2cqw; height: 1.2cqw; }
-.fg-phone-avatar { position: relative; width: 7.4cqw; height: 7.4cqw; margin: 1.2cqw auto .8cqw; }
-.fg-phone-face, .fg-pip-face, .fg-notify-icon { position: relative; overflow: hidden; display: grid; place-items: center; color: #fff; font-weight: 700; background: radial-gradient(circle at 50% 35%, color-mix(in oklab, var(--who, #8aa4ff) 70%, #fff), var(--who, #8aa4ff)); }
-.fg-phone-face img, .fg-pip-face img, .fg-notify-icon img { position: absolute; max-width: none; height: auto; }
-.fg-phone-face { width: 100%; height: 100%; border-radius: 50%; font-size: 3.2cqw; box-shadow: 0 0 0 .25cqw rgba(255, 255, 255, .85), 0 .5cqw 1.4cqw rgba(0, 0, 0, .4); }
-.fg-phone-ripple { position: absolute; inset: 0; border-radius: 50%; border: .2cqw solid rgba(140, 255, 190, .8); opacity: 0; animation: fg-phone-ripple 1.2s ease-out infinite; }
-.fg-phone-name { font-family: var(--font-display); font-size: 2cqw; font-weight: 700; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fg-phone-keys { display: flex; justify-content: center; gap: 3.4cqw; margin-top: 1.4cqw; }
-.fg-phone-key { display: grid; place-items: center; width: 3.6cqw; height: 3.6cqw; border-radius: 50%; color: #fff; background: #f2484f; box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35); }
-.fg-phone-key svg { width: 55%; height: 55%; }
-.fg-phone-key.is-decline svg { transform: rotate(135deg); }
-.fg-phone-key.is-accept { background: #34c759; animation: fg-phone-accept 1.1s ease-in-out infinite; }
-.fg-phone[data-dir="out"] .fg-phone-label::after { content: ""; display: inline-block; width: 1.6cqw; height: .3cqw; margin-left: .3cqw; background: radial-gradient(circle, currentColor 40%, transparent 45%) 0 50% / .55cqw .3cqw repeat-x; animation: fg-phone-dots 1.2s steps(4) infinite; }
-.fg-phone.is-end { animation: fg-phone-in .4s cubic-bezier(.2, .9, .3, 1.1) both, fg-fade-out .45s ease var(--hold, 2s) forwards; }
-.fg-phone.is-end .fg-phone-face { filter: grayscale(.6) brightness(.85); }
-.fg-phone-result { display: flex; align-items: center; justify-content: center; gap: .5cqw; margin-top: .6cqw; font-size: 1.3cqw; letter-spacing: .12em; color: rgba(255, 255, 255, .8); font-variant-numeric: tabular-nums; }
-.fg-phone-result i { display: grid; place-items: center; width: 1.9cqw; height: 1.9cqw; border-radius: 50%; background: #f2484f; }
-.fg-phone-result svg { width: 60%; height: 60%; transform: rotate(135deg); color: #fff; }
-.fg-phone.is-end[data-result="missed"] .fg-phone-result, .fg-phone.is-end[data-result="declined"] .fg-phone-result, .fg-phone.is-end[data-result="hungup"] .fg-phone-result { color: #ff8a8f; }
-@keyframes fg-phone-in { from { opacity: 0; transform: translateX(6cqw) scale(.94); } to { opacity: 1; transform: none; } }
-@keyframes fg-phone-buzz { 0%, 46%, 100% { transform: none; } 6%, 18%, 30% { transform: translateX(-.3cqw) rotate(-1.5deg); } 12%, 24%, 36% { transform: translateX(.3cqw) rotate(1.5deg); } }
-@keyframes fg-phone-ripple { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.55); } }
-@keyframes fg-phone-accept { 0%, 100% { transform: none; box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35), 0 0 0 0 rgba(52, 199, 89, .6); } 50% { transform: translateY(-.25cqw); box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35), 0 0 0 .8cqw rgba(52, 199, 89, 0); } }
-@keyframes fg-phone-dots { from { width: 0; } to { width: 1.65cqw; } }
-.fg-call-chip { color: #b8ffd0; border-color: rgba(52, 199, 89, .55); background: rgba(10, 40, 22, .62); animation: fg-call-chip .45s cubic-bezier(.2, .9, .3, 1.2) both; }
-.fg-call-chip svg { width: 1.05cqw; height: 1.05cqw; }
-.fg-call-chip b { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .06em; color: #fff; }
-.fg-call-dot { width: .6cqw; height: .6cqw; border-radius: 50%; background: #34c759; box-shadow: 0 0 .6cqw #34c759; animation: fg-call-dot 1.4s ease-in-out infinite; }
-@keyframes fg-call-chip { from { opacity: 0; transform: translateX(3cqw) scale(.8); } to { opacity: 1; transform: none; } }
-@keyframes fg-call-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
-.fg-pip { position: absolute; right: 2.2%; top: 10%; z-index: 17; width: 12cqw; aspect-ratio: 3 / 4; border-radius: 1.2cqw; overflow: hidden; pointer-events: none;
-  border: .2cqw solid rgba(255, 255, 255, .75); box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .5); background: #111; animation: fg-phone-in .5s cubic-bezier(.2, .9, .3, 1.1) both; transition: border-color .3s, box-shadow .3s; }
-.fg-pip.is-talking { border-color: #34c759; box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .5), 0 0 1.4cqw rgba(52, 199, 89, .6); }
-.fg-pip-face { position: absolute; inset: 0; font-size: 4cqw; }
-.fg-pip-face img { filter: saturate(1.05) contrast(1.03); }
-.fg-pip-face::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .03) 0 1px, transparent 1px 3px), linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, .55)); }
-.fg-pip-name { position: absolute; left: .8cqw; right: .8cqw; bottom: .7cqw; display: flex; align-items: center; gap: .4cqw; font-size: 1.05cqw; letter-spacing: .1em; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fg-pip-name i { flex: none; width: .55cqw; height: .55cqw; border-radius: 50%; background: #ff453a; animation: fg-call-dot 1.4s ease-in-out infinite; }
-.fg-notify { position: absolute; left: 50%; top: 3%; z-index: 23; display: flex; gap: 1cqw; align-items: flex-start; width: 36cqw; box-sizing: border-box; padding: 1cqw 1.3cqw; border-radius: 1.6cqw; pointer-events: none; color: #fff;
-  background: rgba(30, 32, 40, .78); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .45); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  transform: translateX(-50%); animation: fg-notify-in .5s cubic-bezier(.2, .9, .3, 1.15) both, fg-notify-out .4s cubic-bezier(.6, 0, .8, .4) var(--hold, 3s) forwards; }
-.fg-notify-icon { flex: none; width: 3.4cqw; height: 3.4cqw; border-radius: .9cqw; font-size: 1.7cqw; }
-.fg-notify-body { flex: 1; min-width: 0; }
-.fg-notify-head { display: flex; justify-content: space-between; gap: 1cqw; font-size: 1.15cqw; }
-.fg-notify-head b { font-weight: 700; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fg-notify-head span { flex: none; color: rgba(255, 255, 255, .55); font-size: 1cqw; }
-.fg-notify-text { margin-top: .2cqw; font-size: 1.3cqw; line-height: 1.45; color: rgba(255, 255, 255, .9); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.fg-notify-wave { display: flex; align-items: center; gap: .22cqw; height: 2cqw; margin-top: .4cqw; }
-.fg-notify-wave i { width: .22cqw; height: var(--h, 50%); border-radius: 1px; background: rgba(255, 255, 255, .75); transform-origin: 50% 50%; animation: fg-notify-wave .9s ease-in-out infinite alternate; }
-.fg-notify-wave .fg-notify-play { width: 0; height: 0; margin-right: .6cqw; border-radius: 0; background: none; border-left: .9cqw solid #34c759; border-top: .55cqw solid transparent; border-bottom: .55cqw solid transparent; animation: none; }
-.fg-notify[data-kind="voicemail"] .fg-notify-head b { color: #b8ffd0; }
-@keyframes fg-notify-in { from { opacity: 0; transform: translateX(-50%) translateY(-120%); } to { opacity: 1; transform: translateX(-50%); } }
-@keyframes fg-notify-out { to { opacity: 0; transform: translateX(-50%) translateY(-120%); } }
-@keyframes fg-notify-wave { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
-/* 被打的不在台上（主角、画外的人）：整个画面替他挨这一下 */
-.fg-hurt { position: absolute; inset: 0; z-index: 17; pointer-events: none; animation: fg-hurt .7s ease-out both; background: radial-gradient(ellipse at center, transparent 45%, rgba(220, 20, 40, .55)); }
-.fg-hurt[data-effect="crit"] { background: radial-gradient(ellipse at center, rgba(255, 40, 40, .12) 30%, rgba(230, 10, 30, .75)); animation-duration: 1s; }
-.fg-hurt[data-effect="down"] { background: radial-gradient(ellipse at center, rgba(0, 0, 0, .3) 30%, rgba(120, 0, 20, .85)); animation: fg-hurt-down 2.2s ease-out both; }
-.fg-hurt[data-effect="block"] { background: radial-gradient(ellipse at center, transparent 50%, rgba(80, 160, 255, .5)); }
-.fg-hurt[data-effect="heal"] { background: radial-gradient(ellipse at center, rgba(120, 255, 170, .1) 30%, rgba(60, 230, 140, .45)); animation-duration: 1.6s; }
-@keyframes fg-hurt { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes fg-hurt-down { 0% { opacity: 0; } 10% { opacity: 1; } 70% { opacity: .85; } 100% { opacity: 0; } }
-.fg-hud-romance { color: #ff9ec4; }
-.fg-hud-sense { color: #c9b8ff; }
-.fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }
-.fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }
-.fg-flash.is-black { background: #000; animation: fg-black 1.6s ease both; }
-/* 起雾：整个画面慢慢起一层白雾、失焦，再散开（进出回忆）；薄雾是短闪回进出时的淡一层。都在对话框下面 */
-.fg-flash.is-haze, .fg-flash.is-mist { z-index: 15; background: radial-gradient(100% 90% at 50% 45%, rgba(255, 251, 242, .95), rgba(255, 238, 214, .75));
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: fg-haze-veil 2.6s ease-in-out both; }
-.fg-flash.is-mist { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); animation: fg-mist 1.5s ease-in-out both; }
-@keyframes fg-haze-veil { 0% { opacity: 0; } 38% { opacity: .92; } 55% { opacity: .8; } 100% { opacity: 0; } }
-@keyframes fg-mist { 0% { opacity: 0; } 40% { opacity: .38; } 100% { opacity: 0; } }
-/* 从回忆里醒过来：回忆的画面慢慢褪成一片暖白（这时舞台上还是回忆）；白透了才换成现在，停一下，再慢慢散开（时长见 playback.js 的 WAKE_MS） */
-.fg-flash.is-wake { z-index: 15; background: radial-gradient(100% 90% at 50% 45%, rgba(255, 252, 246, .98), rgba(248, 236, 216, .94));
-  backdrop-filter: blur(12px) sepia(.35); -webkit-backdrop-filter: blur(12px) sepia(.35); animation: fg-wake-clear var(--clear, 1.9s) ease-in-out both; }
-.fg-flash.is-wake.is-rising { animation: fg-wake-rise var(--rise, 1.7s) cubic-bezier(.45, 0, .7, 1) both; }
-@keyframes fg-wake-rise { from { opacity: 0; } to { opacity: 1; } }
-@keyframes fg-wake-clear { 0%, 22% { opacity: 1; } 100% { opacity: 0; } }
-/* 短闪回：现在的画面压暗、褪色、模糊，闪回里开口的人半透明浮在前面 */
-/* 滤镜写在这一层自己身上（子元素的 backdrop-filter 会被这一层的淡入淡出截住，滤不到下面的画面），浮出来的人是子元素，不被滤到 */
-.fg-recall { position: absolute; inset: 0; z-index: 9; pointer-events: none; animation: fg-layer-in var(--fade, .5s) ease both;
-  backdrop-filter: sepia(.65) saturate(.55) brightness(.5) blur(4px); -webkit-backdrop-filter: sepia(.65) saturate(.55) brightness(.5) blur(4px);
-  background: radial-gradient(110% 85% at 50% 42%, rgba(255, 236, 205, .12), rgba(24, 14, 4, .5)); }
-.fg-recall.is-leave { animation: fg-layer-out var(--fade, .5s) ease both; }
-.fg-recall-veil { position: absolute; inset: 0; background-image: var(--fg-noise); opacity: .12; mix-blend-mode: overlay; }
-.fg-recall .fg-actor { filter: sepia(.5) brightness(.8) saturate(.8); opacity: .72; }
-/* 闪回里的人等画面暗下去了再慢慢浮出来 */
-.fg-recall .fg-actor { animation: fg-ghost-in 1.1s .45s ease-out both; }
-@keyframes fg-ghost-in { from { opacity: 0; transform: translateX(-50%) translateY(1.5%); } }
-.fg-recall .fg-actor.is-speaking { filter: sepia(.32) brightness(1.04) drop-shadow(0 0 2cqw rgba(255, 238, 210, .55)); opacity: .95; }
-/* 短闪回（轻的演法）：画面不动，只是四角泛黄、起一点颗粒 */
-.fg-recall.is-light { backdrop-filter: none; -webkit-backdrop-filter: none; background: radial-gradient(120% 95% at 50% 45%, transparent 50%, rgba(130, 88, 36, .4)); }
-/* 短闪回的小头像：对话框右上角，泛黄，换人时重新浮出来 */
-.fg-recall-face { position: absolute; right: 3.2%; bottom: calc(100% - 1.4cqw); z-index: 2; width: 11cqw; aspect-ratio: 1; border-radius: 1.2cqw; overflow: hidden;
-  background: radial-gradient(circle at 50% 40%, rgba(120, 86, 46, .5), rgba(30, 20, 10, .75)); border: 1px solid rgba(240, 210, 160, .55);
-  box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .45), 0 0 2cqw rgba(255, 226, 180, .22), inset 0 0 0 2px color-mix(in oklab, var(--speaker, #f0d2a0) 35%, transparent); animation: fg-face-in .45s ease-out both; }
-.fg-recall-face img { position: absolute; max-width: none; height: auto; filter: sepia(.45) saturate(.85) brightness(1.03); }
-@keyframes fg-face-in { from { opacity: 0; transform: translateY(.8cqw); } }
-/* 短闪回的基调（data-tone）：上面的泛黄是 warm（温暖怀念）。轻的演法换四角的色调，压暗画面的演法换整个画面的滤镜，小头像换色调和出现的样子 */
-/* 甜蜜：四角泛粉，几点光斑慢慢飘 */
-.fg-recall.is-light[data-tone="sweet"] { background: radial-gradient(120% 95% at 50% 45%, transparent 48%, rgba(255, 150, 190, .36)); }
-.fg-recall[data-tone="sweet"]::after { content: ""; position: absolute; inset: -4%; pointer-events: none; filter: blur(.5cqw); opacity: .8; animation: fg-bokeh 9s ease-in-out infinite alternate;
-  background: radial-gradient(circle at 16% 26%, rgba(255, 224, 236, .5) 0 1.1cqw, transparent 1.5cqw), radial-gradient(circle at 84% 20%, rgba(255, 214, 232, .42) 0 .8cqw, transparent 1.1cqw),
-    radial-gradient(circle at 78% 66%, rgba(255, 232, 242, .36) 0 1.5cqw, transparent 1.9cqw), radial-gradient(circle at 24% 72%, rgba(255, 204, 226, .4) 0 .6cqw, transparent .9cqw),
-    radial-gradient(circle at 92% 46%, rgba(255, 236, 244, .3) 0 1cqw, transparent 1.3cqw); }
-@keyframes fg-bokeh { to { transform: translate(1.5%, -2%); } }
-/* 伤感：四周褪成冷灰、泛一点蓝，正中照旧 */
-.fg-recall.is-light[data-tone="sad"] { background: rgba(40, 62, 98, .34); backdrop-filter: grayscale(.85) brightness(.85); -webkit-backdrop-filter: grayscale(.85) brightness(.85);
-  -webkit-mask-image: radial-gradient(85% 75% at 50% 45%, transparent 28%, #000 85%); mask-image: radial-gradient(85% 75% at 50% 45%, transparent 28%, #000 85%); }
-/* 不安：四角暗红，像心跳一样一暗一暗，颗粒重一点 */
-.fg-recall.is-light[data-tone="dread"] { background: none; }
-.fg-recall[data-tone="dread"]::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(110% 90% at 50% 45%, transparent 36%, rgba(96, 0, 14, .66)); animation: fg-dread-pulse 1.2s ease-in-out infinite; }
-.fg-recall[data-tone="dread"] .fg-recall-veil { opacity: .3; }
-@keyframes fg-dread-pulse { 0%, 100% { opacity: .75; } 10% { opacity: 1; } 22% { opacity: .55; } 34% { opacity: .95; } }
-/* 猛然想起：四周一圈白、对比强一点 */
-.fg-recall.is-light[data-tone="flash"] { background: radial-gradient(120% 95% at 50% 45%, transparent 55%, rgba(255, 255, 255, .26)); backdrop-filter: contrast(1.12) saturate(.88); -webkit-backdrop-filter: contrast(1.12) saturate(.88); }
-/* 朦胧如梦：四周起白雾、失焦 */
-.fg-recall.is-light[data-tone="haze"] { background: rgba(255, 250, 240, .26); backdrop-filter: blur(3px) brightness(1.06); -webkit-backdrop-filter: blur(3px) brightness(1.06);
-  -webkit-mask-image: radial-gradient(90% 80% at 50% 45%, transparent 18%, #000 100%); mask-image: radial-gradient(90% 80% at 50% 45%, transparent 18%, #000 100%); }
-/* 压暗画面的演法：整个画面的滤镜和浮出来的人跟着基调换 */
-.fg-recall:not(.is-light)[data-tone="sweet"] { backdrop-filter: sepia(.3) saturate(.75) brightness(.58) blur(4px); -webkit-backdrop-filter: sepia(.3) saturate(.75) brightness(.58) blur(4px); background: radial-gradient(110% 85% at 50% 42%, rgba(255, 200, 225, .16), rgba(60, 10, 30, .45)); }
-.fg-recall:not(.is-light)[data-tone="sad"] { backdrop-filter: grayscale(.9) brightness(.45) blur(4px); -webkit-backdrop-filter: grayscale(.9) brightness(.45) blur(4px); background: radial-gradient(110% 85% at 50% 42%, rgba(150, 175, 215, .1), rgba(8, 14, 28, .55)); }
-.fg-recall:not(.is-light)[data-tone="sad"] .fg-actor { filter: grayscale(.75) brightness(.85); }
-.fg-recall:not(.is-light)[data-tone="dread"] { backdrop-filter: grayscale(.5) contrast(1.2) brightness(.35) blur(3px); -webkit-backdrop-filter: grayscale(.5) contrast(1.2) brightness(.35) blur(3px); background: none; }
-.fg-recall:not(.is-light)[data-tone="dread"] .fg-actor { filter: grayscale(.6) contrast(1.2) brightness(.8); }
-.fg-recall:not(.is-light)[data-tone="flash"] { backdrop-filter: brightness(.7) contrast(1.3) blur(2px); -webkit-backdrop-filter: brightness(.7) contrast(1.3) blur(2px); background: radial-gradient(110% 85% at 50% 42%, rgba(255, 255, 255, .12), rgba(0, 0, 0, .35)); }
-.fg-recall:not(.is-light)[data-tone="haze"] { backdrop-filter: brightness(.9) saturate(.7) blur(9px); -webkit-backdrop-filter: brightness(.9) saturate(.7) blur(9px); background: rgba(255, 248, 236, .28); }
-/* 小头像：甜蜜粉边柔光；伤感冷灰；不安暗红边、带噪点，时不时错位一下；猛然想起白边、弹出来；朦胧如梦边缘化开、慢慢浮现 */
-.fg-recall-face[data-tone="sweet"] { border-color: rgba(255, 182, 212, .75); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .4), 0 0 2.6cqw rgba(255, 170, 210, .45); background: radial-gradient(circle at 50% 40%, rgba(255, 190, 215, .45), rgba(60, 20, 36, .7)); }
-.fg-recall-face[data-tone="sweet"] img { filter: sepia(.12) saturate(1.05) brightness(1.06); }
-.fg-recall-face[data-tone="sad"] { border-color: rgba(172, 192, 222, .55); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .5); background: radial-gradient(circle at 50% 40%, rgba(70, 90, 122, .5), rgba(12, 18, 30, .8)); animation-duration: .9s; }
-.fg-recall-face[data-tone="sad"] img { filter: grayscale(.85) brightness(.92) contrast(.95); }
-.fg-recall-face[data-tone="sad"]::after { content: ""; position: absolute; inset: 0; background: rgba(80, 110, 160, .22); mix-blend-mode: soft-light; }
-.fg-recall-face[data-tone="dread"] { border-color: rgba(205, 42, 54, .75); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .55), 0 0 2cqw rgba(200, 20, 32, .42); background: #12060a; animation: fg-face-in .2s ease-out both, fg-face-jitter 2.6s steps(1) .4s infinite; }
-.fg-recall-face[data-tone="dread"] img { filter: grayscale(.55) contrast(1.25) brightness(.9); }
-.fg-recall-face[data-tone="dread"]::after { content: ""; position: absolute; inset: 0; background-image: var(--fg-noise); opacity: .35; mix-blend-mode: overlay; }
-@keyframes fg-face-jitter { 0%, 86%, 100% { transform: none; } 88% { transform: translate(.35cqw, -.15cqw); } 91% { transform: translate(-.3cqw, .12cqw); } 94% { transform: translate(.15cqw, 0); } }
-.fg-recall-face[data-tone="flash"] { border-color: rgba(255, 255, 255, .85); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .45), 0 0 2.4cqw rgba(255, 255, 255, .4); animation: fg-face-snap .35s cubic-bezier(.2, 1.6, .4, 1) both; }
-.fg-recall-face[data-tone="flash"] img { filter: contrast(1.15) saturate(.9); }
-@keyframes fg-face-snap { from { opacity: 0; transform: scale(.7); } }
-.fg-recall-face[data-tone="haze"] { border-color: rgba(255, 250, 240, .35); background: rgba(250, 244, 232, .35); box-shadow: 0 0 3cqw rgba(255, 250, 240, .35); animation-duration: 1.1s; }
-.fg-recall-face[data-tone="haze"] img { filter: blur(.6px) brightness(1.1) saturate(.8); -webkit-mask-image: radial-gradient(circle at 50% 48%, #000 45%, transparent 78%); mask-image: radial-gradient(circle at 50% 48%, #000 45%, transparent 78%); }
-/* 进短闪回的那一下：甜蜜泛起粉光、不安画面撕裂泛红闪两下、猛然想起白闪一下（都在对话框下面） */
-.fg-flash.is-bloom { z-index: 15; background: radial-gradient(90% 80% at 50% 45%, rgba(255, 222, 236, .72), rgba(255, 160, 200, .34)); animation: fg-bloom .9s ease-out both; }
-@keyframes fg-bloom { 0% { opacity: 0; } 30% { opacity: .85; } 100% { opacity: 0; } }
-.fg-flash.is-dread { z-index: 15; background: linear-gradient(transparent 0 18%, rgba(255, 30, 60, .45) 18% 21%, transparent 21% 57%, rgba(255, 255, 255, .35) 57% 58.5%, transparent 58.5%), radial-gradient(circle, rgba(120, 0, 15, .25), rgba(60, 0, 8, .88)); animation: fg-dread-in .6s steps(5) both; }
-@keyframes fg-dread-in { 0% { opacity: 0; } 20% { opacity: 1; } 40% { opacity: .2; } 60% { opacity: .9; transform: translateX(-.6%); } 80% { opacity: .3; transform: translateX(.5%); } 100% { opacity: 0; } }
-.fg-flash.is-snap { z-index: 15; animation: fg-flash .35s ease-out both; }
-@keyframes fg-flash { from { opacity: .95; } to { opacity: 0; } }
-/* 落字特效的闪光层：平时透明，由演出计划在某个字上点亮（Stage.jsx 的 useHits） */
-.fg-hitflash { position: absolute; inset: 0; z-index: 41; pointer-events: none; opacity: 0; background: #fff; }
-.fg-hitflash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .25), rgba(160, 0, 20, .8)); }
-@keyframes fg-black { 0% { opacity: 0; } 35%, 60% { opacity: 1; } 100% { opacity: 0; } }
-
-/* ── 换场（playback.js 的 changePlan，Theater 按时间线切 data-change）──
-   清场：台上的人先退下去，对话框、左上角的地点也让开；盖住画面的那一层盖满时下面才换成新地方，揭开后人再上来、出地点标题 */
-.fg-stage[data-change] .fg-cast { transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .45s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
-.fg-stage[data-clearing] .fg-cast { opacity: 0; transition-duration: .65s, .35s, 2.6s; }
-.fg-stage[data-change] .fg-hud { opacity: 0; transition: opacity .35s ease; }
-.fg-cover { position: absolute; inset: 0; z-index: 19; pointer-events: none; opacity: 0; transition: opacity .25s ease; }
-.fg-cover[data-cover="black"] { background: #000; }
-.fg-cover[data-cover="white"] { background: #fff; }
-.fg-cover[data-cover="swirl"] { background: radial-gradient(120% 100% at 50% 50%, rgba(255, 250, 255, .98), rgba(226, 206, 255, .96) 55%, rgba(120, 96, 200, .94)); }
-.fg-cover[data-cover="glitch"] { background: #05040c; }
-.fg-cover[data-state="up"] { animation: fg-cover-up var(--ms) cubic-bezier(.4, 0, .6, 1) both; }
-.fg-cover[data-state="full"] { opacity: 1; transition: none; }
-.fg-cover[data-state="down"] { animation: fg-cover-down var(--ms) cubic-bezier(.35, 0, .4, 1) both; }
-@keyframes fg-cover-up { from { opacity: 0; } to { opacity: 1; } }
-@keyframes fg-cover-down { from { opacity: 1; } to { opacity: 0; } }
-/* 白闪：一下子白透，再慢慢退回来 */
-.fg-cover[data-cover="white"][data-state="up"] { animation-timing-function: ease-out; }
-/* 闭眼睁眼：像真的眼皮。上眼皮往下走得多、下眼皮只抬一点（眼缝的中线慢慢往下移）；眼皮边缘软、是黑的（不带暗红）；
-   合上前眼皮发沉、挣扎着又睁开一点才合上，合着时是黑的；睁开时先睁一条缝、又合上，再睁开一半、眨一下才完全睁开，
-   画面一开始是糊的，睁开以后才慢慢对上焦。--eye 是眼缝的高度（95% 全睁开），--eye-y 是眼缝中线的位置，--eye-blur 是看出去有多糊 */
-@property --eye { syntax: '<percentage>'; inherits: false; initial-value: 95%; }
-@property --eye-y { syntax: '<percentage>'; inherits: false; initial-value: 50%; }
-@property --eye-blur { syntax: '<length>'; inherits: false; initial-value: 0px; }
-.fg-cover[data-cover="lids"] { opacity: 1; background: none; --eye-blur: 0px; -webkit-backdrop-filter: blur(var(--eye-blur)); backdrop-filter: blur(var(--eye-blur)); }
-.fg-cover[data-cover="lids"][data-state] { animation: none; }
-.fg-cover[data-cover="lids"][data-state="idle"], .fg-cover[data-cover="lids"][data-state="off"] { opacity: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.fg-cover[data-cover="lids"]::before { content: ""; position: absolute; inset: 0; --eye: 95%; --eye-y: 50%; background: radial-gradient(ellipse 72% var(--eye) at 50% var(--eye-y), transparent 70%, rgba(0, 0, 0, .6) 84%, #000 100%); }
-.fg-cover[data-cover="lids"][data-state="up"] { animation: fg-eye-blur-in var(--ms) ease-in both; }
-.fg-cover[data-cover="lids"][data-state="up"]::before { animation: fg-eye-shut var(--ms) ease-in-out both; }
-.fg-cover[data-cover="lids"][data-state="full"]::before { background: #000; }
-.fg-cover[data-cover="lids"][data-state="down"] { animation: fg-eye-blur-out var(--ms) ease-out both; }
-.fg-cover[data-cover="lids"][data-state="down"]::before { animation: fg-eye-open var(--ms) ease-in-out both; }
-@keyframes fg-eye-shut { 0% { --eye: 95%; --eye-y: 50%; } 30% { --eye: 44%; --eye-y: 52%; } 45% { --eye: 56%; --eye-y: 51%; } 75% { --eye: 14%; --eye-y: 57%; } 100% { --eye: 0%; --eye-y: 60%; } }
-@keyframes fg-eye-open { 0% { --eye: 0%; --eye-y: 60%; } 18% { --eye: 22%; --eye-y: 56%; } 30% { --eye: 3%; --eye-y: 59%; } 55% { --eye: 50%; --eye-y: 52%; } 66% { --eye: 38%; --eye-y: 53%; } 100% { --eye: 95%; --eye-y: 50%; } }
-@keyframes fg-eye-blur-in { from { --eye-blur: 0px; } to { --eye-blur: 6px; } }
-@keyframes fg-eye-blur-out { 0% { --eye-blur: 12px; } 55% { --eye-blur: 7px; } 100% { --eye-blur: 0px; } }
-/* 画面撕裂：几道色带闪过去，中间一下全黑换画面 */
-.fg-cover[data-cover="glitch"][data-state="up"] { animation: fg-cover-glitch var(--ms) steps(4) both; }
-.fg-cover[data-cover="glitch"][data-state="down"] { animation: fg-cover-glitch var(--ms) steps(4) reverse both; }
-@keyframes fg-cover-glitch {
-  0% { opacity: 0; background: linear-gradient(transparent 0 22%, rgba(255, 0, 90, .6) 22% 25%, transparent 25% 51%, rgba(0, 255, 220, .5) 51% 53%, transparent 53%); }
-  50% { opacity: .85; background: linear-gradient(#05040c 0 40%, rgba(255, 255, 255, .7) 40% 42%, #05040c 42%); }
-  100% { opacity: 1; background: #05040c; }
-}
-
-/* ───────────── 气氛：逐句可变 ─────────────
-   层次（都在 .fg-world-in 里）：背景 → 时段调色 → 立绘 → 基调色调 .fg-tone → 光线 .fg-light → 亲密氛围 .fg-romance → 插画 → 天气粒子
-   → 画面效果叠层 .fg-fxlayer → 暗角；感官 .fg-sense、特殊段落滤镜 .fg-mode 在镜头外面（推镜头时不跟着放大）。每层由 FadeLayer 换值时淡入淡出（--fade）。 */
-.fg-world, .fg-world-in { position: absolute; inset: 0; transform-origin: 50% 50%; }
-.fg-tone, .fg-light, .fg-romance, .fg-fxlayer, .fg-sense, .fg-mode { position: absolute; inset: 0; pointer-events: none; animation: fg-layer-in var(--fade, 1.2s) ease both; }
-.fg-tone.is-leave, .fg-light.is-leave, .fg-romance.is-leave, .fg-fxlayer.is-leave, .fg-sense.is-leave, .fg-mode.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }
-.fg-tone::before, .fg-tone::after, .fg-light::before, .fg-light::after, .fg-romance::before, .fg-romance::after, .fg-fxlayer::before, .fg-fxlayer::after, .fg-sense::before, .fg-sense::after, .fg-mode::before, .fg-mode::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
-@keyframes fg-layer-in { from { opacity: 0; } }
-@keyframes fg-layer-out { to { opacity: 0; } }
-.fg-theater { --fg-noise: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27><filter id=%27n%27><feTurbulence type=%27fractalNoise%27 baseFrequency=%27.85%27 numOctaves=%272%27 stitchTiles=%27stitch%27/><feColorMatrix values=%270 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .9 0%27/></filter><rect width=%27100%%27 height=%27100%%27 filter=%27url(%23n)%27/></svg>"); }
-
-/* 基调色调：很淡的一层，让「甜」「悲」「诡异」看得出来，不抢戏。立绘也在下面。 */
-.fg-tone { z-index: 5; }
-.fg-tone[data-v="cheerful"] { backdrop-filter: saturate(1.12) brightness(1.04); -webkit-backdrop-filter: saturate(1.12) brightness(1.04); }
-.fg-tone[data-v="comic"] { backdrop-filter: saturate(1.28) brightness(1.06) contrast(1.05); -webkit-backdrop-filter: saturate(1.28) brightness(1.06) contrast(1.05); }
-.fg-tone[data-v="sweet"] { backdrop-filter: saturate(1.1) brightness(1.04); -webkit-backdrop-filter: saturate(1.1) brightness(1.04); background: radial-gradient(110% 90% at 50% 45%, rgba(255, 190, 220, .06) 40%, rgba(255, 150, 200, .42)); }
-.fg-tone[data-v="touching"] { backdrop-filter: saturate(1.05); -webkit-backdrop-filter: saturate(1.05); background: radial-gradient(80% 70% at 50% 25%, rgba(255, 226, 180, .32), rgba(255, 200, 150, .14) 60%, rgba(120, 70, 40, .22)); }
-.fg-tone[data-v="calm"] { backdrop-filter: saturate(.92); -webkit-backdrop-filter: saturate(.92); background: linear-gradient(180deg, rgba(190, 215, 255, .2), rgba(160, 190, 230, .08) 70%); }
-.fg-tone[data-v="solemn"] { backdrop-filter: saturate(.82) contrast(1.06); -webkit-backdrop-filter: saturate(.82) contrast(1.06); background: linear-gradient(180deg, rgba(255, 236, 190, .22), transparent 55%); }
-.fg-tone[data-v="sad"] { backdrop-filter: saturate(.68) brightness(.95); -webkit-backdrop-filter: saturate(.68) brightness(.95); background: linear-gradient(180deg, rgba(60, 90, 150, .22), rgba(30, 40, 80, .18)); mix-blend-mode: multiply; }
-.fg-tone[data-v="despair"] { backdrop-filter: saturate(.4) brightness(.82) contrast(1.12); -webkit-backdrop-filter: saturate(.4) brightness(.82) contrast(1.12); background: radial-gradient(100% 80% at 50% 45%, transparent 35%, rgba(0, 0, 0, .62)); }
-.fg-tone[data-v="tense"] { backdrop-filter: saturate(.8) contrast(1.15); -webkit-backdrop-filter: saturate(.8) contrast(1.15); background: radial-gradient(90% 75% at 50% 45%, transparent 35%, rgba(20, 4, 4, .45) 75%, rgba(10, 0, 0, .75)); }
-.fg-tone[data-v="mystery"] { backdrop-filter: saturate(.8) brightness(.9); -webkit-backdrop-filter: saturate(.8) brightness(.9); background: radial-gradient(110% 85% at 50% 45%, rgba(70, 50, 140, .12) 30%, rgba(20, 10, 50, .55)); }
-.fg-tone[data-v="eerie"] { backdrop-filter: saturate(.55) contrast(1.08); -webkit-backdrop-filter: saturate(.55) contrast(1.08); background: radial-gradient(100% 80% at 50% 45%, rgba(40, 110, 90, .16) 30%, rgba(0, 18, 12, .6)); }
-.fg-tone[data-v="battle"] { backdrop-filter: contrast(1.18) saturate(1.18); -webkit-backdrop-filter: contrast(1.18) saturate(1.18); background: radial-gradient(100% 85% at 50% 50%, transparent 40%, rgba(220, 50, 10, .32) 80%, rgba(120, 10, 0, .55)); }
-.fg-tone[data-v="heroic"] { backdrop-filter: contrast(1.1) saturate(1.15) brightness(1.04); -webkit-backdrop-filter: contrast(1.1) saturate(1.15) brightness(1.04); background: linear-gradient(0deg, rgba(255, 160, 50, .34), rgba(255, 200, 120, .08) 55%, transparent); }
-.fg-tone[data-v="silence"] { backdrop-filter: saturate(.5) brightness(.94); -webkit-backdrop-filter: saturate(.5) brightness(.94); }
-
-/* 光线：关灯、停电、烛光、手电……压在背景和立绘上，插画不受影响。 */
-.fg-light { z-index: 5; }
-.fg-light[data-v="dim"] { background: rgba(20, 22, 50, .22); mix-blend-mode: multiply; }
-.fg-light[data-v="dark"] { background: rgba(8, 12, 40, .74); mix-blend-mode: multiply; backdrop-filter: saturate(.6); -webkit-backdrop-filter: saturate(.6); }
-.fg-light[data-v="black"] { background: #000; opacity: .93; }
-.fg-light[data-v="black"]::after { background: radial-gradient(40% 30% at 50% 60%, rgba(40, 40, 70, .25), transparent 70%); }
-/* 烛光、篝火：人脸被火映成暖色、看得清，暗下去的是画面四角 */
-.fg-light[data-v="candle"] { background: radial-gradient(80% 90% at 50% 70%, rgb(255, 234, 204), rgb(232, 168, 112) 55%, rgb(110, 62, 34) 100%); mix-blend-mode: multiply; }
-.fg-light[data-v="candle"]::after { background: radial-gradient(34% 40% at 50% 82%, rgba(255, 150, 50, .42), transparent 72%); mix-blend-mode: screen; transform-origin: 50% 82%; animation: fg-candle 2.6s ease-in-out infinite; }
-@keyframes fg-candle { 0%, 100% { opacity: .85; transform: scale(1); } 22% { opacity: 1; transform: scale(1.03); } 41% { opacity: .78; } 63% { opacity: .95; transform: scale(.99); } 80% { opacity: .82; } }
-.fg-light[data-v="spot"] { background: radial-gradient(30% 62% at 50% 52%, transparent 30%, rgba(0, 0, 0, .55) 70%, rgba(0, 0, 0, .92) 100%); }
-.fg-light[data-v="spot"]::after { background: linear-gradient(180deg, rgba(255, 250, 225, .22), rgba(255, 250, 225, 0) 80%); clip-path: polygon(44% 0, 56% 0, 72% 100%, 28% 100%); mix-blend-mode: screen; }
-.fg-light[data-v="neon"] { background: rgba(10, 6, 40, .55); mix-blend-mode: multiply; }
-.fg-light[data-v="neon"]::after { background: linear-gradient(115deg, rgba(255, 40, 200, .45), transparent 45%, transparent 55%, rgba(30, 220, 255, .45)); mix-blend-mode: screen; animation: fg-breathe-light 5s ease-in-out infinite; }
-.fg-light[data-v="screen"] { background: rgba(4, 8, 30, .78); mix-blend-mode: multiply; }
-.fg-light[data-v="screen"]::after { background: radial-gradient(45% 55% at 50% 85%, rgba(120, 180, 255, .55), transparent 75%); mix-blend-mode: screen; animation: fg-screenglow 3.2s steps(1) infinite; }
-@keyframes fg-screenglow { 0%, 100% { opacity: .9; } 30% { opacity: .75; } 31% { opacity: 1; } 70% { opacity: .82; } }
-.fg-light[data-v="alarm"] { background: rgba(20, 0, 0, .55); mix-blend-mode: multiply; }
-.fg-light[data-v="alarm"]::after { background: radial-gradient(120% 90% at 50% 0%, rgba(255, 30, 30, .6), rgba(160, 0, 0, .25) 70%); mix-blend-mode: screen; animation: fg-alarm 1.3s ease-in-out infinite; }
-@keyframes fg-alarm { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
-.fg-light[data-v="moon"] { background: linear-gradient(180deg, rgba(40, 60, 150, .55), rgba(10, 20, 70, .7)); mix-blend-mode: multiply; }
-.fg-light[data-v="moon"]::after { background: radial-gradient(60% 50% at 70% 15%, rgba(190, 210, 255, .35), transparent 70%); mix-blend-mode: screen; }
-.fg-light[data-v="warm"] { background: linear-gradient(180deg, rgb(255, 214, 160), rgb(255, 176, 110)); mix-blend-mode: multiply; opacity: .55; }
-.fg-light[data-v="warm"]::after { background: radial-gradient(60% 55% at 35% 30%, rgba(255, 190, 110, .35), transparent 70%); mix-blend-mode: screen; }
-.fg-light[data-v="cold"] { background: linear-gradient(180deg, rgb(170, 200, 255), rgb(130, 160, 230)); mix-blend-mode: multiply; opacity: .6; backdrop-filter: saturate(.75); -webkit-backdrop-filter: saturate(.75); }
-.fg-light[data-v="glare"] { background: radial-gradient(70% 60% at 50% 40%, rgba(255, 255, 255, .75), rgba(255, 255, 255, .15) 80%); mix-blend-mode: screen; backdrop-filter: brightness(1.15) contrast(.9); -webkit-backdrop-filter: brightness(1.15) contrast(.9); }
-.fg-light[data-v="flicker"] { background: rgba(6, 8, 24, .78); mix-blend-mode: multiply; }
-.fg-light[data-v="flicker"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-flicker 4.5s steps(1) infinite; }
-/* 窗光：窗外斜射进来的几道光柱，从左上往右下，边缘柔、往下渐渐散掉；两组光柱各自极慢地挪、明暗起伏（配 weather dust 像光里的浮尘） */
-.fg-light[data-v="sunbeam"] { mix-blend-mode: screen; background: linear-gradient(150deg, rgba(255, 226, 180, .2), rgba(255, 226, 180, .05) 45%, transparent 70%); }
-.fg-light[data-v="sunbeam"]::before, .fg-light[data-v="sunbeam"]::after { inset: -10%; transform-origin: 6% -18%; filter: blur(.9cqw);
-  -webkit-mask-image: linear-gradient(160deg, #000 20%, transparent 88%); mask-image: linear-gradient(160deg, #000 20%, transparent 88%); }
-.fg-light[data-v="sunbeam"]::before { animation: fg-beam-a 17s ease-in-out infinite alternate;
-  background: conic-gradient(from 122deg at 6% -18%, transparent 0deg 4deg, rgba(255, 240, 210, .34) 6deg, transparent 9.5deg 13deg, rgba(255, 240, 210, .22) 14.5deg 17deg, transparent 20.5deg 25deg,
-    rgba(255, 240, 210, .38) 27deg, transparent 30.5deg 34deg, rgba(255, 240, 210, .2) 37deg, transparent 42deg); }
-.fg-light[data-v="sunbeam"]::after { animation: fg-beam-b 11s ease-in-out infinite alternate;
-  background: conic-gradient(from 124deg at 6% -18%, transparent 0deg 9deg, rgba(255, 248, 225, .22) 10.5deg, transparent 12deg 21deg, rgba(255, 248, 225, .26) 22.5deg, transparent 24.5deg 31deg,
-    rgba(255, 248, 225, .18) 32deg, transparent 34deg); }
-@keyframes fg-beam-a { from { transform: rotate(-1.2deg); opacity: .75; } to { transform: rotate(1deg); opacity: 1; } }
-@keyframes fg-beam-b { 0% { transform: rotate(1.4deg); opacity: .45; } 50% { opacity: 1; } 100% { transform: rotate(-.8deg); opacity: .6; } }
-/* 漏光：胶片边上渗进来的暖橘色光（红橙到琥珀），从右上慢慢涌进来又退回去，左下角也泛一点（回忆、夕阳、告白） */
-.fg-light[data-v="leak"] { mix-blend-mode: screen; background: linear-gradient(235deg, rgba(255, 140, 40, .62), rgba(255, 70, 20, .3) 26%, rgba(255, 60, 20, .08) 48%, transparent 62%); }
-.fg-light[data-v="leak"]::before { background: radial-gradient(42% 66% at 100% 22%, rgba(255, 214, 140, .8), rgba(255, 110, 36, .42) 45%, transparent 75%); filter: blur(1.5cqw); animation: fg-leak 9s ease-in-out infinite alternate; }
-.fg-light[data-v="leak"]::after { background: radial-gradient(45% 55% at 0% 100%, rgba(255, 80, 40, .38), transparent 70%), radial-gradient(14% 30% at 93% 6%, rgba(255, 250, 230, .5), transparent 70%); animation: fg-leak-b 13s ease-in-out infinite alternate; }
-@keyframes fg-leak { from { opacity: .5; transform: translateX(3%) scale(.96); } to { opacity: 1; transform: translateX(-2%) scale(1.08); } }
-@keyframes fg-leak-b { 0% { opacity: .3; } 60% { opacity: .9; } 100% { opacity: .55; } }
-/* 逆光：迎着右上方的光，亮的光心、一圈光晕、一道横向的蓝白光条，对角线上几个彩色的光斑（鬼影）；光斑随鼠标微微挪动，像镜头在动 */
-.fg-light[data-v="flare"] { mix-blend-mode: screen; background:
-  radial-gradient(circle at 80% 16%, rgba(255, 252, 240, .95) 0, rgba(255, 240, 205, .75) 1.2cqw, rgba(255, 214, 150, .28) 5cqw, rgba(255, 190, 120, .1) 14cqw, transparent 30cqw),
-  radial-gradient(circle at 80% 16%, transparent 9cqw, rgba(255, 222, 180, .1) 9.6cqw, transparent 11cqw),
-  radial-gradient(130% 110% at 80% 16%, rgba(255, 220, 170, .2), transparent 55%); }
-.fg-light[data-v="flare"]::before { inset: auto; left: 20%; width: 120%; top: calc(16% - .25cqw); height: .5cqw; background: linear-gradient(90deg, transparent, rgba(170, 210, 255, .55) 50%, transparent);
-  filter: blur(.12cqw); animation: fg-flare-streak 7s ease-in-out infinite; }
-.fg-light[data-v="flare"]::after { filter: blur(.1cqw); translate: calc(var(--px, 0) * 2.2cqw) calc(var(--py, 0) * 1.6cqw); animation: fg-flare-ghost 9s ease-in-out infinite alternate; background:
-  radial-gradient(circle at 63.5% 34.7%, rgba(255, 214, 150, .32) 0 .5cqw, transparent .75cqw),
-  radial-gradient(circle at 42.5% 58.5%, rgba(140, 190, 255, .14) 0 2.2cqw, rgba(140, 190, 255, .24) 2.6cqw, transparent 2.9cqw),
-  radial-gradient(circle at 32% 70.4%, rgba(255, 140, 200, .12) 0 4cqw, transparent 4.6cqw),
-  radial-gradient(circle at 21.5% 82.3%, transparent 3cqw, rgba(150, 255, 220, .2) 3.3cqw, transparent 4cqw); }
-@keyframes fg-flare-streak { 0%, 100% { opacity: .75; transform: scaleX(.94); } 50% { opacity: 1; transform: scaleX(1.04); } }
-@keyframes fg-flare-ghost { from { opacity: .7; transform: translate(.6%, -.6%); } to { opacity: 1; transform: translate(-.6%, .7%); } }
-@keyframes fg-flicker { 0%, 100% { opacity: 1; } 8% { opacity: .25; } 9% { opacity: 1; } 11% { opacity: .35; } 12% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .15; } 50% { opacity: .9; } 51% { opacity: .3; } 53% { opacity: 1; } 78% { opacity: .45; } 79% { opacity: 1; } }
-
-/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密更暖，人离得更近一点，四角像心跳一样一明一暗。压在背景和立绘上，插画不受影响。 */
-.fg-romance { z-index: 5; }
-.fg-romance[data-v="ambiguous"] { background: radial-gradient(120% 95% at 50% 40%, rgba(255, 215, 235, .05) 35%, rgba(255, 150, 195, .3)); backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); -webkit-backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); }
-.fg-romance[data-v="ambiguous"]::before { bottom: -100%; background:
-    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .5) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .42) 0 .8cqw, transparent 1.6cqw),
-    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .32) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .45) 0 1.1cqw, transparent 2cqw),
-    radial-gradient(circle at 80% 54%, rgba(255, 195, 222, .38) 0 1.6cqw, transparent 2.6cqw), radial-gradient(circle at 93% 90%, rgba(255, 236, 246, .4) 0 .9cqw, transparent 1.7cqw);
-  background-size: 100% 50%; filter: blur(.2cqw); animation: fg-bokeh-rise 24s linear infinite, fg-bokeh-twinkle 4.5s ease-in-out infinite alternate; }
-.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .28), transparent 72%); }
-.fg-romance[data-v="intimate"] { background: radial-gradient(110% 90% at 50% 45%, rgba(255, 190, 150, .14) 25%, rgba(235, 95, 125, .42)); backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); -webkit-backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); }
-.fg-romance[data-v="intimate"]::after { background: radial-gradient(90% 76% at 50% 46%, transparent 40%, rgba(110, 0, 40, .5) 78%, rgba(80, 0, 30, .72)); animation: fg-romance-beat 1.15s ease-out infinite; }
-[data-romance="intimate"] .fg-cast { scale: 1.035; }
-@keyframes fg-bokeh-rise { to { transform: translateY(-50%); } }
-@keyframes fg-bokeh-twinkle { from { opacity: .55; } to { opacity: .95; } }
-@keyframes fg-romance-beat { 0%, 100% { opacity: .55; } 12% { opacity: 1; } 24% { opacity: .7; } 36% { opacity: .9; } 62% { opacity: .55; } }
-/* 感官主导的一段：蒙眼、耳边、触碰、发烫、发凉、香气、屏息、失神。在镜头外面（特写时不跟着放大），叠在插画和天气上面（眼睛被蒙住时什么都看不见），对话框不受影响。 */
-.fg-sense { z-index: 9; }
-.fg-sense[data-v="blind"] { background: #050307; opacity: .95; }
-.fg-sense[data-v="blind"]::before { background: radial-gradient(46% 12% at 50% 70%, rgba(255, 222, 192, .16), transparent 70%), radial-gradient(48% 10% at 50% 0%, rgba(255, 222, 192, .1), transparent 70%); animation: fg-blind-breathe 4.8s ease-in-out infinite; }
-.fg-sense[data-v="blind"]::after { background-image: var(--fg-noise); opacity: .05; }
-.fg-sense[data-v^="ear"]::before { backdrop-filter: blur(3px) brightness(.85); -webkit-backdrop-filter: blur(3px) brightness(.85); -webkit-mask-image: linear-gradient(90deg, #000 8%, transparent 62%); mask-image: linear-gradient(90deg, #000 8%, transparent 62%); }
-.fg-sense[data-v^="ear"]::after { background: repeating-radial-gradient(circle at 100% 45%, transparent 0 4.4cqw, rgba(255, 214, 226, .14) 4.6cqw 4.9cqw, transparent 5.1cqw 6.2cqw), radial-gradient(55% 75% at 100% 45%, rgba(255, 172, 192, .6), rgba(255, 150, 172, .18) 55%, transparent 75%);
-  -webkit-mask-image: linear-gradient(270deg, #000 15%, transparent 55%); mask-image: linear-gradient(270deg, #000 15%, transparent 55%); transform-origin: 100% 45%; animation: fg-ear-breath 3.6s ease-in-out infinite; }
-.fg-sense[data-v="ear-left"]::before { -webkit-mask-image: linear-gradient(270deg, #000 8%, transparent 62%); mask-image: linear-gradient(270deg, #000 8%, transparent 62%); }
-.fg-sense[data-v="ear-left"]::after { background: repeating-radial-gradient(circle at 0% 45%, transparent 0 4.4cqw, rgba(255, 214, 226, .14) 4.6cqw 4.9cqw, transparent 5.1cqw 6.2cqw), radial-gradient(55% 75% at 0% 45%, rgba(255, 172, 192, .6), rgba(255, 150, 172, .18) 55%, transparent 75%); transform-origin: 0 45%;
-  -webkit-mask-image: linear-gradient(90deg, #000 15%, transparent 55%); mask-image: linear-gradient(90deg, #000 15%, transparent 55%); }
-.fg-sense[data-v="touch"] { background: radial-gradient(40% 36% at 50% 55%, rgba(255, 226, 210, .22), transparent 70%), radial-gradient(100% 85% at 50% 50%, transparent 50%, rgba(255, 170, 160, .26)); backdrop-filter: saturate(1.1) brightness(1.03); -webkit-backdrop-filter: saturate(1.1) brightness(1.03); }
-.fg-sense[data-v="touch"]::before, .fg-sense[data-v="touch"]::after { inset: auto; left: 50%; top: 55%; width: 32cqw; height: 32cqw; border-radius: 50%;
-  transform: translate(-50%, -50%); background: radial-gradient(circle, transparent 30%, rgba(255, 232, 214, .55) 52%, rgba(255, 190, 178, .22) 60%, transparent 70%); animation: fg-touch-ripple 3.2s ease-out infinite; }
-.fg-sense[data-v="touch"]::after { animation-delay: 1.6s; }
-.fg-sense[data-v="heat"] { background: radial-gradient(110% 90% at 50% 50%, rgba(255, 120, 80, .1) 30%, rgba(220, 50, 40, .36)); backdrop-filter: saturate(1.25) contrast(1.04) sepia(.15); -webkit-backdrop-filter: saturate(1.25) contrast(1.04) sepia(.15); }
-.fg-sense[data-v="heat"]::before { backdrop-filter: blur(1px); -webkit-backdrop-filter: blur(1px); -webkit-mask-image: linear-gradient(180deg, transparent, rgba(0, 0, 0, .7) 50%, transparent); mask-image: linear-gradient(180deg, transparent, rgba(0, 0, 0, .7) 50%, transparent);
-  -webkit-mask-size: 100% 3.6cqw; mask-size: 100% 3.6cqw; animation: fg-heat-rise 1.8s linear infinite; }
-.fg-sense[data-v="heat"]::after { background: radial-gradient(70% 40% at 50% 100%, rgba(255, 140, 90, .3), transparent 70%); animation: fg-blind-breathe 2.8s ease-in-out infinite; }
-.fg-sense[data-v="cold"] { background: linear-gradient(180deg, rgba(150, 190, 255, .2), rgba(90, 130, 210, .26)); backdrop-filter: saturate(.6) brightness(.96); -webkit-backdrop-filter: saturate(.6) brightness(.96); }
-.fg-sense[data-v="cold"]::before { background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(225, 240, 255, .5) 85%, rgba(242, 249, 255, .78)); filter: blur(.3cqw); }
-.fg-sense[data-v="cold"]::after { background: radial-gradient(60% 22% at 30% 100%, rgba(230, 242, 255, .3), transparent 70%), radial-gradient(50% 18% at 75% 100%, rgba(230, 242, 255, .24), transparent 70%); animation: fg-scent-drift 8s ease-in-out infinite alternate; }
-.fg-sense[data-v="scent"] { background: radial-gradient(110% 90% at 50% 45%, rgba(255, 244, 236, .12) 30%, rgba(255, 214, 236, .34)); backdrop-filter: brightness(1.07) saturate(1.08) contrast(.94) blur(.5px); -webkit-backdrop-filter: brightness(1.07) saturate(1.08) contrast(.94) blur(.5px); }
-.fg-sense[data-v="scent"]::before { bottom: -100%; background:
-    radial-gradient(circle at 14% 70%, rgba(255, 248, 232, .85) 0 .35cqw, transparent .9cqw), radial-gradient(circle at 33% 22%, rgba(255, 238, 248, .8) 0 .3cqw, transparent .8cqw),
-    radial-gradient(circle at 52% 84%, rgba(255, 248, 232, .8) 0 .4cqw, transparent 1cqw), radial-gradient(circle at 71% 40%, rgba(255, 238, 248, .8) 0 .32cqw, transparent .85cqw),
-    radial-gradient(circle at 88% 12%, rgba(255, 248, 232, .75) 0 .38cqw, transparent .95cqw), radial-gradient(circle at 23% 46%, rgba(255, 238, 248, .7) 0 .25cqw, transparent .7cqw),
-    radial-gradient(circle at 62% 6%, rgba(255, 248, 232, .7) 0 .28cqw, transparent .75cqw), radial-gradient(circle at 80% 76%, rgba(255, 238, 248, .7) 0 .3cqw, transparent .8cqw);
-  background-size: 100% 50%; animation: fg-bokeh-rise 30s linear infinite, fg-bokeh-twinkle 3s ease-in-out infinite alternate; }
-.fg-sense[data-v="scent"]::after { background: radial-gradient(46% 18% at 30% 66%, rgba(255, 240, 248, .42), transparent 70%), radial-gradient(40% 16% at 70% 38%, rgba(255, 244, 232, .38), transparent 70%), radial-gradient(34% 12% at 52% 14%, rgba(255, 240, 248, .3), transparent 70%); filter: blur(.6cqw); animation: fg-scent-drift 9s ease-in-out infinite alternate; }
-.fg-sense[data-v="breath"] { backdrop-filter: saturate(.75); -webkit-backdrop-filter: saturate(.75); }
-.fg-sense[data-v="breath"]::before { background: radial-gradient(70% 60% at 50% 44%, transparent 30%, rgba(0, 0, 0, .62) 72%, rgba(0, 0, 0, .9)); animation: fg-breath-close 1.8s cubic-bezier(.2, .7, .2, 1) both; }
-.fg-world-in[data-sense="breath"] :is(.fg-actor-body, .fg-down-mist i) { animation-play-state: paused !important; }
-.fg-sense[data-v="daze"] { background: radial-gradient(100% 80% at 50% 50%, rgba(255, 255, 255, .05) 30%, rgba(228, 222, 255, .24)); backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); -webkit-backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); }
-.fg-world-in[data-sense="daze"] .fg-cast { filter: drop-shadow(1.4cqw 0 0 rgba(255, 120, 160, .26)) drop-shadow(-1.4cqw 0 0 rgba(120, 200, 255, .26)); animation: fg-daze-sway 6s ease-in-out infinite; }
-@keyframes fg-blind-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
-@keyframes fg-ear-breath { 0%, 100% { opacity: .55; transform: scale(.96); } 45% { opacity: 1; transform: scale(1.04); } }
-@keyframes fg-touch-ripple { from { transform: translate(-50%, -50%) scale(.3); opacity: .9; } to { transform: translate(-50%, -50%) scale(2.4); opacity: 0; } }
-@keyframes fg-heat-rise { to { -webkit-mask-position: 0 -3.6cqw; mask-position: 0 -3.6cqw; } }
-@keyframes fg-scent-drift { from { transform: translateX(-3%); } to { transform: translateX(3%); } }
-@keyframes fg-breath-close { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes fg-daze-sway { 0%, 100% { translate: -.8% 0; rotate: -.5deg; } 50% { translate: .8% .4%; rotate: .5deg; } }
-
-/* 电影黑边：严肃的一段一直挂着上下黑边（在镜头外面，推镜头时不动），收起时慢慢退出去。左上角的地点、右上角的按钮压在黑边上。 */
-.fg-bars { position: absolute; inset: 0; z-index: 12; pointer-events: none; }
-.fg-bars::before, .fg-bars::after { content: ""; position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height 1.2s cubic-bezier(.6, 0, .2, 1); }
-.fg-bars::before { top: 0; }
-.fg-bars::after { bottom: 0; }
-.fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 10.5%; }
-
-/* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。 */
-.fg-world[data-fx="sway"] { animation: fg-fx-sway 7s ease-in-out infinite; }
-.fg-world[data-fx="ride"] { animation: fg-fx-ride 1.7s ease-in-out infinite; }
-.fg-world[data-fx="handheld"] { animation: fg-fx-handheld 6.5s ease-in-out infinite; }
-.fg-world[data-fx="drift"] { animation: fg-fx-drift 26s ease-in-out infinite alternate; }
-.fg-world[data-fx="woozy"] { animation: fg-fx-woozy 5.5s ease-in-out infinite; }
-.fg-world[data-fx="heat"] { animation: fg-fx-heat 2.6s ease-in-out infinite; }
-.fg-world[data-fx="underwater"] { animation: fg-fx-water 6s ease-in-out infinite; }
-.fg-world[data-fx="rumble"] { animation: fg-fx-rumble .16s linear infinite; }
-.fg-world[data-fx="heartbeat"] { animation: fg-fx-beat 1.05s ease-out infinite; }
-/* 慢动作：画面极慢地推近，粒子几乎停住（见 Particles 的 speed）；时间停止：画面褪成灰、一切静止（立绘不呼吸、插画不动） */
-.fg-world { transition: filter .9s ease; }
-.fg-world[data-fx="slowmo"] { animation: fg-fx-slowmo 10s ease-in-out infinite alternate; }
-.fg-world[data-fx="timestop"] { filter: grayscale(.92) contrast(1.18) brightness(.9); }
-.fg-world[data-fx="timestop"] :is(.fg-actor-body, .fg-cg-img, .fg-cg-pan, .fg-cg-art, .fg-down-mist i) { animation-play-state: paused !important; }
-/* 褪成回忆：一幕的结尾，十来秒里画面慢慢推近、泛黄、褪色，四周发白发虚、起颗粒（.fg-fxlayer），像眼前这一幕正在变成回忆；停在最后的样子，一般接黑场 */
-.fg-world[data-fx="fading"] { animation: fg-fx-fading 11s cubic-bezier(.35, 0, .3, 1) both; }
-@keyframes fg-fx-fading { from { transform: none; filter: none; } to { transform: scale(1.13); filter: sepia(.58) saturate(.74) contrast(.93) brightness(1.03); } }
-@keyframes fg-fx-slowmo { from { transform: scale(1.01); } to { transform: scale(1.05) translateY(-.4%); } }
-@keyframes fg-fx-sway { 0%, 100% { transform: scale(1.05) rotate(-.7deg) translateY(-.5%); } 50% { transform: scale(1.05) rotate(.7deg) translateY(.5%); } }
-@keyframes fg-fx-ride { 0%, 100% { transform: scale(1.03) translateY(0); } 18% { transform: scale(1.03) translateY(-.35%); } 30% { transform: scale(1.03) translateY(.1%); } 62% { transform: scale(1.03) translateY(-.15%); } 74% { transform: scale(1.03) translateY(.12%); } }
-@keyframes fg-fx-handheld { 0%, 100% { transform: scale(1.045) translate(0, 0) rotate(0); } 20% { transform: scale(1.045) translate(-.5%, .3%) rotate(-.25deg); } 45% { transform: scale(1.045) translate(.4%, -.35%) rotate(.2deg); } 70% { transform: scale(1.045) translate(-.25%, -.2%) rotate(-.1deg); } 85% { transform: scale(1.045) translate(.3%, .3%) rotate(.15deg); } }
-@keyframes fg-fx-drift { from { transform: scale(1); } to { transform: scale(1.09); } }
-@keyframes fg-fx-woozy { 0%, 100% { transform: scale(1.05) rotate(-1deg); filter: blur(.4px); } 35% { transform: scale(1.07) rotate(.8deg) translateX(.6%); filter: blur(1.8px) saturate(1.2); } 65% { transform: scale(1.05) rotate(-.4deg) translateX(-.5%); filter: blur(.8px); } }
-@keyframes fg-fx-heat { 0%, 100% { transform: scale(1.02) skewX(0); } 25% { transform: scale(1.02) skewX(.35deg) scaleY(1.004); } 75% { transform: scale(1.02) skewX(-.35deg); } }
-@keyframes fg-fx-water { 0%, 100% { transform: scale(1.05) skewX(-.6deg) translateY(.4%); } 50% { transform: scale(1.05) skewX(.6deg) translateY(-.4%); } }
-@keyframes fg-fx-rumble { 0% { transform: scale(1.03) translate(.25%, -.2%); } 25% { transform: scale(1.03) translate(-.3%, .15%); } 50% { transform: scale(1.03) translate(.2%, .25%); } 75% { transform: scale(1.03) translate(-.15%, -.25%); } 100% { transform: scale(1.03) translate(.25%, -.2%); } }
-@keyframes fg-fx-beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.022); } 24% { transform: scale(1.004); } 36% { transform: scale(1.014); } 60% { transform: scale(1); } }
-.fg-fxlayer { z-index: 8; }
-.fg-fxlayer[data-v="slowmo"] { background: radial-gradient(100% 85% at 50% 50%, transparent 45%, rgba(10, 24, 48, .5)); backdrop-filter: saturate(.72) contrast(1.06); -webkit-backdrop-filter: saturate(.72) contrast(1.06); }
-.fg-fxlayer[data-v="slowmo"]::before { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); -webkit-mask-image: radial-gradient(75% 65% at 50% 50%, transparent 50%, #000 95%); mask-image: radial-gradient(75% 65% at 50% 50%, transparent 50%, #000 95%); }
-.fg-fxlayer[data-v="slowmo"]::after { background: repeating-radial-gradient(circle at 50% 50%, transparent 0 9cqw, rgba(200, 230, 255, .1) 9cqw 9.3cqw, transparent 9.3cqw 18cqw); mix-blend-mode: screen; animation: fg-slowmo-rings 7s linear infinite; }
-@keyframes fg-slowmo-rings { from { transform: scale(1); opacity: .9; } to { transform: scale(1.6); opacity: .3; } }
-/* 时间停止：进入时一圈反色的冲击波扩散开，之后四周泛紫、正中一圈表盘刻度 */
-.fg-fxlayer[data-v="timestop"] { background: radial-gradient(100% 85% at 50% 50%, rgba(120, 90, 255, .08) 30%, rgba(40, 16, 90, .55)); }
-.fg-fxlayer[data-v="timestop"]::before { backdrop-filter: invert(1) hue-rotate(180deg); -webkit-backdrop-filter: invert(1) hue-rotate(180deg); clip-path: circle(0% at 50% 48%); animation: fg-timestop-wave 1.3s cubic-bezier(.2, .6, .3, 1) both; }
-@keyframes fg-timestop-wave { 0% { clip-path: circle(0% at 50% 48%); opacity: 1; } 45% { clip-path: circle(80% at 50% 48%); opacity: 1; } 100% { clip-path: circle(90% at 50% 48%); opacity: 0; } }
-.fg-fxlayer[data-v="timestop"]::after { inset: auto; left: 50%; top: 48%; width: 46cqw; height: 46cqw; transform: translate(-50%, -50%); border-radius: 50%;
-  background: radial-gradient(circle, transparent 63.3%, rgba(220, 210, 255, .5) 63.6%, transparent 64%), repeating-conic-gradient(from -1deg, rgba(220, 210, 255, .55) 0 2deg, transparent 2deg 30deg);
-  -webkit-mask-image: radial-gradient(circle, transparent 60%, #000 61%, #000 66%, transparent 67%); mask-image: radial-gradient(circle, transparent 60%, #000 61%, #000 66%, transparent 67%);
-  box-shadow: 0 0 0 1px rgba(220, 210, 255, .18); opacity: .55; animation: fg-fade-in 1.4s .5s ease both; }
-.fg-fxlayer[data-v="speed"] { background: repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 3.4deg, rgba(255, 255, 255, .5) 3.4deg 3.9deg, transparent 3.9deg 7.1deg, rgba(255, 255, 255, .28) 7.1deg 7.4deg);
-  -webkit-mask-image: radial-gradient(42% 46% at 50% 50%, transparent 55%, #000 100%); mask-image: radial-gradient(42% 46% at 50% 50%, transparent 55%, #000 100%); }
-.fg-fxlayer[data-v="speed"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-speedlines .24s steps(3) infinite; }
-@keyframes fg-speedlines { 0% { transform: rotate(0); } 100% { transform: rotate(6deg); } }
-.fg-fxlayer[data-v="underwater"] { background: linear-gradient(180deg, rgba(40, 170, 200, .35), rgba(10, 40, 90, .55)); mix-blend-mode: multiply; }
-.fg-fxlayer[data-v="underwater"]::before { inset: -20%; background: radial-gradient(14% 9% at 30% 30%, rgba(200, 255, 255, .5), transparent 70%), radial-gradient(10% 7% at 70% 20%, rgba(200, 255, 255, .45), transparent 70%), radial-gradient(18% 10% at 55% 60%, rgba(200, 255, 255, .35), transparent 70%), radial-gradient(12% 8% at 15% 75%, rgba(200, 255, 255, .35), transparent 70%); background-size: 50% 50%; mix-blend-mode: screen; animation: fg-caustics 9s ease-in-out infinite alternate; }
-.fg-fxlayer[data-v="underwater"]::after { background: linear-gradient(170deg, rgba(220, 255, 255, .3), transparent 40%); clip-path: polygon(20% 0, 30% 0, 50% 100%, 35% 100%, 55% 0, 62% 0, 80% 100%, 70% 100%); mix-blend-mode: screen; opacity: .6; animation: fg-breathe-light 6s ease-in-out infinite; }
-@keyframes fg-caustics { from { transform: translate(0, 0) rotate(0); } to { transform: translate(6%, 4%) rotate(4deg); } }
-.fg-fxlayer[data-v="heat"] { background: linear-gradient(0deg, rgba(255, 140, 40, .22), transparent 55%); mix-blend-mode: screen; }
-.fg-fxlayer[data-v="heat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-breathe-light 2.6s ease-in-out infinite; }
-.fg-fxlayer[data-v="woozy"] { backdrop-filter: blur(.5px); -webkit-backdrop-filter: blur(.5px); background: radial-gradient(100% 80% at 50% 50%, transparent 40%, rgba(80, 40, 90, .35)); }
-.fg-fxlayer[data-v="heartbeat"] { background: radial-gradient(95% 80% at 50% 48%, transparent 38%, rgba(140, 0, 24, .5) 75%, rgba(90, 0, 14, .85)); }
-.fg-fxlayer[data-v="heartbeat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-beat-vignette 1.05s ease-out infinite; }
-@keyframes fg-beat-vignette { 0%, 60%, 100% { opacity: .45; } 12% { opacity: 1; } 24% { opacity: .6; } 36% { opacity: .85; } }
-.fg-fxlayer[data-v="rumble"] { background: radial-gradient(110% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, .35)); }
-.fg-fxlayer[data-v="drift"], .fg-fxlayer[data-v="sway"], .fg-fxlayer[data-v="ride"], .fg-fxlayer[data-v="handheld"] { display: none; }
-.fg-fxlayer[data-v="fading"] { background: radial-gradient(115% 85% at 50% 45%, transparent 50%, rgba(255, 236, 205, .42)), radial-gradient(150% 120% at 50% 50%, transparent 62%, rgba(40, 24, 10, .3)); }
-.fg-fxlayer[data-v="fading"]:not(.is-leave) { animation-duration: 9s; animation-timing-function: cubic-bezier(.4, 0, .6, 1); }
-.fg-fxlayer[data-v="fading"]::before { backdrop-filter: blur(2.5px); -webkit-backdrop-filter: blur(2.5px); -webkit-mask-image: radial-gradient(85% 75% at 50% 45%, transparent 52%, #000 100%); mask-image: radial-gradient(85% 75% at 50% 45%, transparent 52%, #000 100%);
-  animation: fg-layer-in 10s ease-in both; }
-.fg-fxlayer[data-v="fading"]::after { background-image: var(--fg-noise); opacity: .18; mix-blend-mode: overlay; animation: fg-grain .5s steps(4) infinite, fg-layer-in 10s ease-in both; }
-
-/* 特殊段落：回忆、梦境、幻觉、想象、主观视角、内心世界、画面里、故事中、预见、虚拟世界。盖住插画在内的整个画面。 */
-.fg-mode { z-index: 9; }
-.fg-mode[data-v="memory"] { backdrop-filter: sepia(.8) saturate(.7) contrast(.9) brightness(1.08); -webkit-backdrop-filter: sepia(.8) saturate(.7) contrast(.9) brightness(1.08); background: radial-gradient(115% 85% at 50% 45%, transparent 48%, rgba(255, 240, 214, .55)), linear-gradient(rgba(255, 210, 150, .1), rgba(255, 210, 150, .1)); }
-.fg-mode[data-v="memory"]::before { backdrop-filter: blur(2.5px); -webkit-backdrop-filter: blur(2.5px); -webkit-mask-image: radial-gradient(85% 75% at 50% 45%, transparent 55%, #000 100%); mask-image: radial-gradient(85% 75% at 50% 45%, transparent 55%, #000 100%); }
-.fg-mode[data-v="memory"]::after, .fg-mode[data-v="tale"]::after { background-image: var(--fg-noise); opacity: .16; mix-blend-mode: overlay; animation: fg-grain .5s steps(4) infinite; }
-@keyframes fg-grain { 0% { transform: translate(0, 0); } 25% { transform: translate(-2%, 1%); } 50% { transform: translate(1%, -2%); } 75% { transform: translate(2%, 2%); } 100% { transform: translate(0, 0); } }
-.fg-mode[data-v="dream"] { backdrop-filter: saturate(1.2) brightness(1.08) contrast(.9) hue-rotate(-12deg); -webkit-backdrop-filter: saturate(1.2) brightness(1.08) contrast(.9) hue-rotate(-12deg); background: radial-gradient(110% 85% at 50% 45%, transparent 42%, rgba(235, 215, 255, .6)), linear-gradient(160deg, rgba(255, 190, 230, .12), rgba(160, 200, 255, .14)); }
-.fg-mode[data-v="dream"]::before { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); -webkit-mask-image: radial-gradient(80% 70% at 50% 45%, transparent 45%, #000 95%); mask-image: radial-gradient(80% 70% at 50% 45%, transparent 45%, #000 95%); }
-.fg-mode[data-v="dream"]::after { inset: -10%; background: radial-gradient(30% 22% at 20% 30%, rgba(255, 255, 255, .28), transparent 70%), radial-gradient(26% 20% at 78% 64%, rgba(255, 230, 255, .24), transparent 70%), radial-gradient(22% 18% at 60% 18%, rgba(220, 240, 255, .22), transparent 70%); mix-blend-mode: screen; animation: fg-haze 14s ease-in-out infinite alternate; }
-@keyframes fg-haze { from { transform: translate(-3%, 2%) scale(1); } to { transform: translate(3%, -2%) scale(1.08); } }
-.fg-mode[data-v="illusion"] { background: linear-gradient(90deg, rgba(255, 0, 120, .16), transparent 25%, transparent 75%, rgba(0, 255, 200, .16)); }
-.fg-mode[data-v="illusion"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-hueshift 7s ease-in-out infinite; }
-@keyframes fg-hueshift { 0%, 100% { backdrop-filter: saturate(1.5) contrast(1.1) hue-rotate(0deg); -webkit-backdrop-filter: saturate(1.5) contrast(1.1) hue-rotate(0deg); } 33% { backdrop-filter: saturate(1.7) contrast(1.15) hue-rotate(45deg); -webkit-backdrop-filter: saturate(1.7) contrast(1.15) hue-rotate(45deg); } 66% { backdrop-filter: saturate(1.4) contrast(1.05) hue-rotate(-35deg); -webkit-backdrop-filter: saturate(1.4) contrast(1.05) hue-rotate(-35deg); } }
-.fg-mode[data-v="illusion"]::before { background: radial-gradient(100% 80% at 50% 50%, transparent 45%, rgba(40, 0, 60, .55)); animation: fg-breathe-light 2.4s ease-in-out infinite; }
-.fg-mode[data-v="imagine"] { backdrop-filter: saturate(1.4) brightness(1.1); -webkit-backdrop-filter: saturate(1.4) brightness(1.1); background: radial-gradient(76% 70% at 50% 46%, transparent 72%, rgba(255, 255, 255, .92) 88%); }
-.fg-mode[data-v="imagine"]::after { background: radial-gradient(1.2% 1.6% at 18% 22%, #fff, transparent), radial-gradient(1% 1.4% at 82% 30%, #fff, transparent), radial-gradient(.8% 1.1% at 70% 78%, #fff, transparent), radial-gradient(1.1% 1.5% at 26% 70%, #fff, transparent), radial-gradient(.7% 1% at 50% 12%, #fff, transparent); animation: fg-breathe-light 2.2s ease-in-out infinite; }
-.fg-mode[data-v="pov"] { background: radial-gradient(92% 68% at 50% 50%, transparent 52%, rgba(0, 0, 0, .55) 80%, rgba(0, 0, 0, .95) 100%); }
-.fg-mode[data-v="pov"]::before { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); -webkit-mask-image: radial-gradient(85% 65% at 50% 50%, transparent 55%, #000 95%); mask-image: radial-gradient(85% 65% at 50% 50%, transparent 55%, #000 95%); }
-.fg-mode[data-v="inner"] { backdrop-filter: grayscale(.55) brightness(.58) contrast(1.12); -webkit-backdrop-filter: grayscale(.55) brightness(.58) contrast(1.12); background: radial-gradient(42% 58% at 50% 56%, rgba(130, 150, 255, .1), rgba(2, 2, 16, .78) 100%); }
-.fg-mode[data-v="screen"] { backdrop-filter: contrast(1.12) saturate(.75) brightness(1.04); -webkit-backdrop-filter: contrast(1.12) saturate(.75) brightness(1.04); background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .2) 0 1px, transparent 1px 3px), radial-gradient(110% 100% at 50% 50%, transparent 60%, rgba(0, 0, 0, .6)); }
-.fg-mode[data-v="screen"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-screenflick 4s steps(1) infinite; }
-@keyframes fg-screenflick { 0%, 100% { opacity: 1; } 40% { opacity: .93; } 41% { opacity: 1; } 77% { opacity: .96; } }
-.fg-mode[data-v="screen"]::before { content: "● REC"; inset: auto auto auto auto; left: 4%; top: 5%; font: 700 1.7cqw/1 var(--font-latin); letter-spacing: .2em; color: #ff3b3b; text-shadow: 0 0 .6cqw rgba(255, 0, 0, .7); animation: fg-pulse 1.4s steps(1) infinite; }
-.fg-mode[data-v="screen"]::after { inset: 3%; background:
-  linear-gradient(#fff, #fff) top left / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) top left / 2px 3cqw no-repeat,
-  linear-gradient(#fff, #fff) top right / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) top right / 2px 3cqw no-repeat,
-  linear-gradient(#fff, #fff) bottom left / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) bottom left / 2px 3cqw no-repeat,
-  linear-gradient(#fff, #fff) bottom right / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) bottom right / 2px 3cqw no-repeat; opacity: .7; }
-.fg-mode[data-v="tale"] { backdrop-filter: sepia(.4) saturate(.8) contrast(1.06); -webkit-backdrop-filter: sepia(.4) saturate(.8) contrast(1.06); background: radial-gradient(100% 85% at 50% 48%, transparent 50%, rgba(70, 40, 10, .62)); box-shadow: inset 0 0 0 1.2cqw rgba(40, 24, 8, .35), inset 0 0 0 1.4cqw rgba(220, 190, 140, .35); }
-.fg-mode[data-v="vision"] { backdrop-filter: grayscale(.7) brightness(1.1) contrast(1.22); -webkit-backdrop-filter: grayscale(.7) brightness(1.1) contrast(1.22); background: radial-gradient(110% 90% at 50% 50%, rgba(140, 240, 255, .14) 40%, rgba(220, 255, 255, .55)); }
-.fg-mode[data-v="vision"]::after { background: repeating-linear-gradient(0deg, transparent 0 22px, rgba(180, 255, 255, .25) 22px 23px); animation: fg-scan 3s linear infinite; }
-@keyframes fg-scan { from { background-position: 0 0; } to { background-position: 0 92px; } }
-.fg-mode[data-v="digital"] { backdrop-filter: saturate(1.3) contrast(1.08) hue-rotate(-12deg); -webkit-backdrop-filter: saturate(1.3) contrast(1.08) hue-rotate(-12deg); background: linear-gradient(rgba(0, 255, 230, .2) 1px, transparent 1px) 0 0 / 100% 6%, linear-gradient(90deg, rgba(0, 255, 230, .2) 1px, transparent 1px) 0 0 / 4% 100%, radial-gradient(110% 90% at 50% 50%, transparent 55%, rgba(0, 30, 50, .55)); }
-.fg-mode[data-v="digital"]::after { background: linear-gradient(180deg, transparent 0, rgba(120, 255, 240, .22) 50%, transparent 100%) 0 0 / 100% 18% no-repeat; animation: fg-sweep 4s linear infinite; }
-@keyframes fg-sweep { from { background-position: 0 -20%; } to { background-position: 0 120%; } }
-/* 段落里整个画面也跟着动：梦里轻飘、幻觉里扭曲、主观视角随呼吸起伏 */
-.fg-world-in[data-mode="dream"] { animation: fg-mode-float 9s ease-in-out infinite; }
-.fg-world-in[data-mode="illusion"] { animation: fg-mode-warp 4.4s ease-in-out infinite; }
-.fg-world-in[data-mode="pov"] { animation: fg-mode-breath 4.2s ease-in-out infinite; }
-@keyframes fg-mode-float { 0%, 100% { transform: scale(1.04) translateY(-.4%); } 50% { transform: scale(1.04) translateY(.5%); } }
-@keyframes fg-mode-warp { 0%, 100% { transform: scale(1.05) skew(0, 0); } 25% { transform: scale(1.07) skew(1.2deg, -.4deg); } 50% { transform: scale(1.05) skew(-.6deg, .6deg); } 75% { transform: scale(1.06) skew(-1deg, -.3deg); } }
-@keyframes fg-mode-breath { 0%, 100% { transform: scale(1.035) translateY(0); } 50% { transform: scale(1.035) translateY(-.45%); } }
-@media (prefers-reduced-motion: reduce) {
-  .fg-world, .fg-world-in, .fg-fxlayer, .fg-mode, .fg-light { animation: none !important; }
-  .fg-world[data-fx="fading"] { filter: sepia(.58) saturate(.74) contrast(.93) brightness(1.03); } /* 不推近，直接是褪色后的样子 */
-}
-
-/* 转场：慢慢变过去（时间流逝）、闭眼睁眼、画面撕裂、旋转入梦。 */
-@keyframes fg-fade-slow { from { opacity: 0; } to { opacity: 1; } }
-@keyframes fg-blink-in { 0%, 42% { opacity: 0; } 50%, 100% { opacity: 1; } }
-@keyframes fg-glitch-in { 0% { opacity: 0; transform: translateX(3%); filter: hue-rotate(90deg) contrast(2); } 20% { opacity: 1; transform: translateX(-2%); } 40% { transform: translateX(1.5%) skewX(4deg); filter: hue-rotate(-60deg) contrast(1.6); } 60% { transform: translateX(-.8%); } 80% { transform: none; filter: hue-rotate(20deg); } 100% { filter: none; } }
-@keyframes fg-swirl-in { from { opacity: 0; transform: rotate(-14deg) scale(1.45); filter: blur(16px) brightness(1.4); } to { opacity: 1; transform: none; filter: none; } }
-.fg-flash.is-blink { background: none; animation: fg-eye-blink-blur 1.5s ease-in-out both; -webkit-backdrop-filter: blur(var(--eye-blur)); backdrop-filter: blur(var(--eye-blur)); }
-.fg-flash.is-blink::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 72% var(--eye) at 50% var(--eye-y), transparent 70%, rgba(0, 0, 0, .6) 84%, #000 100%); animation: fg-eye-blink 1.5s ease-in-out both; }
-@keyframes fg-eye-blink { 0% { --eye: 95%; --eye-y: 50%; } 30%, 45% { --eye: 0%; --eye-y: 60%; } 62% { --eye: 30%; --eye-y: 55%; } 72% { --eye: 16%; --eye-y: 57%; } 100% { --eye: 95%; --eye-y: 50%; } }
-@keyframes fg-eye-blink-blur { 0% { --eye-blur: 0px; } 30%, 45% { --eye-blur: 6px; } 62% { --eye-blur: 9px; } 100% { --eye-blur: 0px; } }
-.fg-flash.is-glitch { background: linear-gradient(transparent 0 22%, rgba(255, 0, 90, .5) 22% 25%, transparent 25% 51%, rgba(0, 255, 220, .45) 51% 53%, transparent 53% 78%, rgba(255, 255, 255, .6) 78% 79.5%, transparent 79.5%); mix-blend-mode: screen; animation: fg-glitch .7s steps(6) both; }
-@keyframes fg-glitch { 0% { opacity: 1; transform: translate(0, 0); } 30% { transform: translate(-4%, 8%); } 60% { transform: translate(5%, -12%); opacity: .8; } 100% { opacity: 0; transform: translate(0, 20%); } }
-
-/* 过场字卡：时间跳跃、日期、章节、与此同时。 */
-.fg-cut { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: #05040c; animation: fg-cut-in .5s ease both; pointer-events: none; }
-.fg-cut.is-out { animation: fg-cut-out .6s ease both; }
-.fg-cut[data-kind="meanwhile"] { background: linear-gradient(100deg, rgba(5, 4, 12, .96) 0 58%, rgba(5, 4, 12, .9)); }
-.fg-cut-inner { text-align: center; animation: fg-cut-text 2.3s ease both; }
-.fg-cut-kicker { display: flex; align-items: center; justify-content: center; gap: 1.2cqw; font-family: var(--font-latin); font-size: 1.15cqw; letter-spacing: .6em; text-transform: uppercase; color: rgba(255, 255, 255, .6); }
-.fg-cut-kicker i { width: 6cqw; height: 1px; background: linear-gradient(90deg, transparent, var(--accent2)); }
-.fg-cut-kicker i:last-child { background: linear-gradient(270deg, transparent, var(--accent2)); }
-.fg-cut-text { margin-top: 1.4cqw; font-family: var(--font-display); font-size: 3.6cqw; font-weight: 700; letter-spacing: .3em; color: var(--ink); text-shadow: 0 0 3cqw rgba(155, 123, 255, .45); }
-.fg-cut[data-kind="chapter"] .fg-cut-text { font-size: 4.4cqw; }
-.fg-cut[data-kind="date"] .fg-cut-text { font-family: var(--font-latin), var(--font-display); letter-spacing: .18em; }
-.fg-cut[data-kind="meanwhile"] .fg-cut-inner { text-align: left; transform: translateX(-12%); }
-@keyframes fg-cut-in { from { opacity: 0; } }
-@keyframes fg-cut-out { to { opacity: 0; } }
-@keyframes fg-cut-text { 0% { opacity: 0; transform: translateY(.8cqw); letter-spacing: .5em; } 30% { opacity: 1; transform: none; } 100% { letter-spacing: .3em; } }
-.fg-hud-mode { color: var(--accent); }
-
-/* ── 地点标题卡 ── */
-.fg-titlecard { position: absolute; left: 6%; top: 34%; z-index: 25; pointer-events: none; animation: fg-titlecard 3.2s ease both; }
-.fg-titlecard-line { width: 26cqw; height: 1px; background: linear-gradient(90deg, var(--accent), var(--accent2), transparent); transform-origin: left; animation: fg-line 1s .1s cubic-bezier(.6, 0, .2, 1) both; }
-.fg-titlecard-name { font-family: var(--font-display); font-size: 4.6cqw; font-weight: 700; letter-spacing: .32em; margin: .8cqw 0 .4cqw; text-shadow: 0 0 2cqw rgba(0, 0, 0, .8), 0 0 4cqw var(--accent2); }
-.fg-titlecard-sub { font-family: var(--font-latin); font-size: 1.3cqw; letter-spacing: .5em; color: rgba(255, 255, 255, .75); text-transform: uppercase; }
-@keyframes fg-titlecard { 0% { opacity: 0; transform: translateX(-2%); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(1%); } }
-@keyframes fg-line { from { transform: scaleX(0); } }
-
-/* ── HUD ── */
-.fg-hud { position: absolute; left: 2.2%; top: 3.2%; z-index: 20; display: flex; align-items: stretch; gap: .9cqw; transition: opacity .3s; }
-.fg-hud-bar { width: .28cqw; border-radius: 9px; background: linear-gradient(180deg, var(--accent), var(--accent2)); box-shadow: 0 0 1cqw var(--accent); }
-.fg-hud-place { font-family: var(--font-display); font-size: 1.55cqw; font-weight: 700; letter-spacing: .14em; text-shadow: 0 1px 6px rgba(0, 0, 0, .7); }
-.fg-hud-meta { margin-top: .25cqw; font-size: .95cqw; letter-spacing: .14em; color: var(--ink-dim); text-shadow: 0 1px 4px rgba(0, 0, 0, .7); display: flex; gap: .8cqw; }
-.fg-hud-meta.is-alone { margin-top: 0; } /* 地点关掉、只显示标签时 */
-.fg-topright { position: absolute; right: 2%; top: 3%; z-index: 22; display: flex; gap: .6cqw; align-items: center; }
-.fg-pill { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1cqw; border-radius: 99px; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: .95cqw; letter-spacing: .08em; color: var(--ink); transition: opacity 1.2s; }
-.fg-pill.is-busy::before { content: ""; width: .7cqw; height: .7cqw; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: fg-spin .8s linear infinite; }
-.fg-iconbtn { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; display: grid; place-items: center; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: 1.2cqw; transition: transform .2s, background .2s; }
-.fg-iconbtn:hover { transform: rotate(90deg); background: rgba(255, 255, 255, .14); }
-
-/* ── 对话框 ── */
-/* 高度、字号、字体可以在设置里改（Theater.jsx 的 dialogVars）：--fg-dlg-h 横屏高度、--fg-dlg-h-p 竖屏高度、--fg-text-scale / --fg-name-scale 字号倍数、--fg-text-font / --fg-name-font 字体。
-   --fg-dlg-ref 是皮肤原来的高度（cqh：舞台高的百分之几）。对话框比它高时，正文、底下那排按钮离框边的距离停在原来的样子（min / clamp 封顶），多出来的地方都给正文；
-   比它矮时照旧按比例缩。默认高度下和以前一模一样 */
-.fg-dialog { position: absolute; left: 4%; right: 4%; bottom: 3.6%; height: var(--fg-dlg-h, 27%); --fg-dlg-ref: 27cqh; z-index: 20; transition: opacity .3s, transform .3s; }
-.fg-ui-hidden .fg-dialog, .fg-ui-hidden .fg-hud, .fg-ui-hidden .fg-topright, .fg-ui-hidden .fg-quick { opacity: 0; pointer-events: none; }
-/* 插画出现时对话框先让开（淡出、往下沉一点），画面出来后再回来 */
-.fg-dialog.is-away { opacity: 0; transform: translateY(1.2cqw); pointer-events: none; }
-.fg-box { position: absolute; inset: 0; border-radius: var(--box-radius); background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); -webkit-backdrop-filter: var(--box-blur); box-shadow: 0 1.4cqw 4cqw rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .08); overflow: hidden; }
-.fg-box::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), var(--accent3), transparent); background-size: 200% 100%; animation: fg-shimmer 6s linear infinite; opacity: .9; }
-.fg-box::after { content: ""; position: absolute; right: -6cqw; bottom: -10cqw; width: 26cqw; height: 26cqw; border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--speaker, var(--accent)) 28%, transparent), transparent 65%); pointer-events: none; transition: background .6s; }
-@keyframes fg-shimmer { from { background-position: 200% 0; } to { background-position: 0 0; } }
-/* 名牌字号是整块按底边缩放（scale 不占位置）：调大时往上长，不压到正文 */
-.fg-name { position: absolute; left: 3.2%; top: -2.3cqw; z-index: 2; display: flex; align-items: flex-end; gap: .8cqw; transform-origin: 0 100%; scale: var(--fg-name-scale, 1); animation: fg-name-in .35s cubic-bezier(.2, .8, .2, 1) both; }
-.fg-name-plate { position: relative; padding: .5cqw 2.4cqw .55cqw 1.6cqw; font-family: var(--fg-name-font, var(--font-display)); font-weight: 700; font-size: 1.75cqw; letter-spacing: .2em; color: var(--name-ink);
-  background: linear-gradient(100deg, var(--speaker, var(--accent)), color-mix(in oklab, var(--speaker, var(--accent)) 55%, var(--accent2)));
-  clip-path: polygon(0 0, 100% 0, calc(100% - 1.2cqw) 100%, 0 100%); box-shadow: 0 .4cqw 1.6cqw rgba(0, 0, 0, .35); text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
-.fg-name-plate::after { content: ""; position: absolute; left: 1.6cqw; right: 2.4cqw; bottom: .3cqw; height: 1px; background: rgba(255, 255, 255, .55); }
-.fg-name-sub { font-family: var(--font-latin); font-size: 1cqw; letter-spacing: .32em; color: var(--ink-dim); padding-bottom: .4cqw; text-transform: uppercase; }
-@keyframes fg-name-in { from { opacity: 0; transform: translateX(-1.2cqw); } }
-/* 声音的样子：名牌旁的小标（三根跳动的音量条 + 字），对话框和字跟着换样子 */
-.fg-voice-chip { display: flex; align-items: center; gap: .25cqw; margin-bottom: .3cqw; padding: .35cqw .9cqw .35cqw .7cqw; border-radius: 99px; font-size: 1.15cqw; font-weight: 600; letter-spacing: .18em; color: #fff; background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .25); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.fg-voice-chip span { margin-left: .4cqw; }
-.fg-voice-chip i { width: .25cqw; height: 1.05cqw; border-radius: 1px; background: currentColor; transform-origin: 50% 100%; animation: fg-voice-bar .7s ease-in-out infinite alternate; }
-.fg-voice-chip i:nth-child(2) { animation-delay: -.25s; } .fg-voice-chip i:nth-child(3) { animation-delay: -.5s; }
-@keyframes fg-voice-bar { from { transform: scaleY(.3); } to { transform: scaleY(1); } }
-.fg-voice-chip[data-voice="phone"] { color: #9fe8ff; border-color: rgba(120, 220, 255, .45); }
-.fg-voice-chip[data-voice="radio"] { color: #ffd27a; border-color: rgba(255, 200, 100, .45); }
-.fg-voice-chip[data-voice="telepathy"] { color: #e0b8ff; border-color: rgba(210, 160, 255, .55); box-shadow: 0 0 1cqw rgba(190, 120, 255, .45); }
-.fg-voice-chip[data-voice="chorus"] { color: #ffe6f2; border-color: rgba(255, 190, 220, .45); }
-.fg-voice-chip[data-voice="offscreen"] { color: rgba(255, 255, 255, .75); border-style: dashed; }
-.fg-voice-chip[data-voice="echo"] { color: #c6e0ff; border-color: rgba(170, 210, 255, .4); }
-.fg-voice-chip[data-voice="memory"] { color: #f2dcb4; border-color: rgba(240, 210, 160, .4); }
-.fg-voice-chip[data-voice="machine"] { color: #7dffd8; border-color: rgba(90, 255, 200, .5); border-radius: .2cqw; font-family: ui-monospace, Menlo, Consolas, monospace; }
-.fg-voice-chip[data-voice="machine"] i { animation-timing-function: steps(3); }
-/* 电话：字偏冷、对话框里一道道细横纹，像隔着听筒 */
-.fg-dialog[data-voice="phone"] .fg-text { color: color-mix(in oklab, var(--ink) 80%, #9fe8ff); }
-.fg-dialog[data-voice="phone"] .fg-box { background: repeating-linear-gradient(0deg, rgba(160, 230, 255, .05) 0 2px, transparent 2px 5px), var(--box-bg); }
-/* 广播 / 对讲机：字微微闪、带一点颗粒 */
-.fg-dialog[data-voice="radio"] .fg-text { color: color-mix(in oklab, var(--ink) 82%, #ffd27a); animation: fg-voice-radio 2.4s steps(1) infinite; }
-.fg-dialog[data-voice="radio"] .fg-box { background: repeating-linear-gradient(0deg, rgba(255, 220, 140, .06) 0 1px, transparent 1px 3px), var(--box-bg); }
-@keyframes fg-voice-radio { 0%, 100% { opacity: 1; } 31% { opacity: .82; } 32% { opacity: 1; } 67% { opacity: .9; } 68% { opacity: 1; } }
-/* 心灵感应：字发光、轻轻浮动，对话框边缘泛紫 */
-.fg-dialog[data-voice="telepathy"] .fg-text { color: color-mix(in oklab, var(--ink) 72%, #b070ff); text-shadow: 0 0 .7cqw rgba(200, 140, 255, .85), 0 0 1.8cqw rgba(160, 100, 255, .45); }
-.fg-dialog[data-voice="telepathy"] .fg-line { display: inline-block; animation: fg-voice-float 3.2s ease-in-out infinite; }
-.fg-dialog[data-voice="telepathy"] .fg-box { box-shadow: 0 1.4cqw 4cqw rgba(0, 0, 0, .45), inset 0 0 3cqw rgba(170, 110, 255, .35); border-color: rgba(200, 150, 255, .5); }
-@keyframes fg-voice-float { 0%, 100% { transform: translateY(0); filter: blur(0); } 50% { transform: translateY(-.25cqw); filter: blur(.3px); } }
-/* 齐声：字叠着两层错开的影子，像几个人同时开口 */
-.fg-dialog[data-voice="chorus"] .fg-text { text-shadow: .14cqw .1cqw 0 rgba(255, 190, 220, .4), -.14cqw -.08cqw 0 rgba(170, 210, 255, .4), 0 1px 2px rgba(0, 0, 0, .45); font-weight: 600; }
-/* 画外音：人不在画面里，字淡一点、名牌虚线框 */
-.fg-dialog[data-voice="offscreen"] .fg-text { opacity: .86; }
-.fg-dialog[data-voice="offscreen"] .fg-name-plate { outline: 1px dashed rgba(255, 255, 255, .5); outline-offset: .2cqw; opacity: .85; }
-/* 回声：每个字后面拖着两层渐远的影子 */
-.fg-dialog[data-voice="echo"] .fg-text { text-shadow: .35cqw 0 0 rgba(255, 255, 255, .2), .75cqw 0 .1cqw rgba(255, 255, 255, .1), 0 1px 2px rgba(0, 0, 0, .45); }
-/* 回忆：字泛旧纸的暖色，外面一圈很淡的光晕，像隔着一层时间 */
-.fg-dialog[data-voice="memory"] .fg-text { color: color-mix(in oklab, var(--ink) 74%, #f0d2a0); text-shadow: 0 0 .9cqw rgba(255, 220, 170, .3), 0 1px 2px rgba(0, 0, 0, .45); }
-/* 机械音：等宽字、青色、扫描线 */
-.fg-dialog[data-voice="machine"] .fg-text { font-family: ui-monospace, Menlo, Consolas, monospace; color: color-mix(in oklab, var(--ink) 55%, #10d0a0); letter-spacing: .08em; text-shadow: 0 0 .5cqw rgba(60, 255, 200, .5); }
-.fg-dialog[data-voice="machine"] .fg-box { background: repeating-linear-gradient(0deg, rgba(80, 255, 200, .07) 0 1px, transparent 1px 3px), var(--box-bg); }
-/* ── 短闪回里的对话框（data-recall 是基调，Dialog.jsx 的 DialogBox）：不加头像、不贴「回忆」标签，对话框自己换个样子 ──
-   共通：框染上基调的颜色（用整块的内阴影，换进换出能慢慢过渡）、左右两头化开、顶上那道彩色细线收起，字慢慢洇出来。
-   名牌默认模糊压暗：认得出是谁，又像隔着一层看不清（data-recall-name="blur"；hide 时不渲染名牌）。
-   前面加 .fg-theater 是为了压过皮肤里的同名规则；字的出场（.fg-char）不加，好让后面的「打完」「等着」和台词演法照常压过它 */
-@property --fg-feather { syntax: '<percentage>'; inherits: false; initial-value: 0%; }
-.fg-box { transition: box-shadow .8s ease, border-color .8s ease, --fg-feather .8s ease; }
-.fg-box::before { transition: opacity .8s ease; }
-.fg-theater .fg-dialog[data-recall] .fg-box { --fg-feather: 9%; --tint: rgba(110, 72, 28, .34); border-color: rgba(240, 210, 160, .3);
-  box-shadow: 0 1.4cqw 4cqw rgba(0, 0, 0, .4), inset 0 0 0 100vmax var(--tint), inset 0 0 3cqw rgba(0, 0, 0, .35);
-  --fade-x: linear-gradient(90deg, transparent, #000 var(--fg-feather), #000 calc(100% - var(--fg-feather)), transparent);
-  --fade-y: linear-gradient(180deg, transparent, #000 calc(var(--fg-feather) * 1.6), #000 calc(100% - var(--fg-feather) * .8), transparent);
-  -webkit-mask-image: var(--fade-x), var(--fade-y); -webkit-mask-composite: source-in; mask-image: var(--fade-x), var(--fade-y); mask-composite: intersect; }
-.fg-theater .fg-dialog[data-recall] .fg-box::before { opacity: 0; }
-.fg-theater .fg-dialog[data-recall] .fg-box::after { background: radial-gradient(circle, rgba(255, 206, 140, .2), transparent 65%); }
-.fg-theater .fg-dialog[data-recall] .fg-text { color: color-mix(in oklab, var(--ink) 70%, #f0d2a0); text-shadow: 0 0 .9cqw rgba(255, 214, 160, .35), 0 1px 2px rgba(0, 0, 0, .5); }
-.fg-dialog[data-recall] .fg-char { animation-name: fg-char-recall; animation-duration: .6s; }
-@keyframes fg-char-recall { from { opacity: 0; filter: blur(4px); } to { opacity: 1; filter: none; } }
-.fg-theater .fg-dialog[data-recall-name="blur"] .fg-name-plate { background: color-mix(in oklab, var(--speaker, var(--accent)) 22%, rgba(16, 12, 8, .82)); color: rgba(255, 255, 255, .7);
-  box-shadow: none; text-shadow: none; filter: blur(.13cqw); opacity: .74; animation: fg-name-recall 4.6s ease-in-out infinite; }
-.fg-theater .fg-dialog[data-recall-name="blur"] .fg-name-plate::after { opacity: .25; }
-@keyframes fg-name-recall { 0%, 100% { filter: blur(.1cqw); opacity: .78; } 50% { filter: blur(.2cqw); opacity: .62; } }
-/* 甜蜜：泛粉，框里几点光斑慢慢飘，字带一圈粉色的光 */
-.fg-theater .fg-dialog[data-recall="sweet"] .fg-box { --tint: rgba(140, 48, 90, .3); border-color: rgba(255, 190, 215, .35); }
-.fg-theater .fg-dialog[data-recall="sweet"] .fg-box::after { display: block; inset: -10%; width: auto; height: auto; border-radius: 0; filter: blur(.35cqw); animation: fg-bokeh 8s ease-in-out infinite alternate;
-  background: radial-gradient(circle at 12% 30%, rgba(255, 190, 220, .22) 0 .6cqw, transparent 1cqw), radial-gradient(circle at 38% 78%, rgba(255, 180, 214, .18) 0 .4cqw, transparent .7cqw),
-    radial-gradient(circle at 70% 22%, rgba(255, 200, 226, .2) 0 .8cqw, transparent 1.2cqw), radial-gradient(circle at 90% 70%, rgba(255, 186, 218, .22) 0 .5cqw, transparent .8cqw); }
-.fg-theater .fg-dialog[data-recall="sweet"] .fg-text { color: color-mix(in oklab, var(--ink) 72%, #ffd0e2); text-shadow: 0 0 1cqw rgba(255, 170, 205, .5), 0 1px 2px rgba(0, 0, 0, .45); }
-/* 伤感：冷灰泛蓝，字褪色、出得慢 */
-.fg-theater .fg-dialog[data-recall="sad"] .fg-box { --tint: rgba(18, 30, 50, .52); border-color: rgba(160, 180, 210, .2); }
-.fg-theater .fg-dialog[data-recall="sad"] .fg-box::after { background: radial-gradient(circle, rgba(140, 170, 220, .14), transparent 65%); }
-.fg-theater .fg-dialog[data-recall="sad"] .fg-text { color: color-mix(in oklab, var(--ink) 60%, #aebdd2); text-shadow: 0 1px 2px rgba(0, 0, 0, .5); }
-.fg-dialog[data-recall="sad"] .fg-char { animation-name: fg-char-fade; animation-duration: 1s; }
-@keyframes fg-char-fade { from { opacity: 0; filter: blur(1.5px); } to { opacity: 1; filter: none; } }
-/* 不安：暗红，框的四边像心跳一样一暗一暗（跟画面四角的节奏一样），字带红青两层错开的影子，时不时抖一下 */
-.fg-theater .fg-dialog[data-recall="dread"] .fg-box { --tint: rgba(28, 0, 6, .6); border-color: rgba(200, 30, 45, .45); transition-duration: .25s; }
-.fg-theater .fg-dialog[data-recall="dread"] .fg-box::after { display: block; inset: 0; width: auto; height: auto; border-radius: 0; filter: none;
-  background: radial-gradient(120% 140% at 50% 50%, transparent 45%, rgba(150, 0, 18, .5)); animation: fg-dread-pulse 1.2s ease-in-out infinite; }
-.fg-theater .fg-dialog[data-recall="dread"] .fg-text { color: color-mix(in oklab, var(--ink) 82%, #ffd2d2); text-shadow: .09cqw 0 0 rgba(255, 40, 64, .55), -.09cqw 0 0 rgba(70, 200, 255, .3), 0 1px 2px rgba(0, 0, 0, .6); }
-.fg-theater .fg-dialog[data-recall="dread"] .fg-line { display: inline-block; animation: fg-line-jitter 3.4s steps(1) infinite; }
-.fg-dialog[data-recall="dread"] .fg-char { animation-name: fg-char-flicker; animation-duration: .32s; animation-timing-function: steps(4); }
-@keyframes fg-line-jitter { 0%, 90%, 100% { transform: none; } 91% { transform: translate(.2cqw, -.08cqw); } 93% { transform: translate(-.16cqw, .06cqw); } 95% { transform: translate(.08cqw, 0); } }
-@keyframes fg-char-flicker { 0% { opacity: 0; } 25% { opacity: .9; } 50% { opacity: .2; } 75%, 100% { opacity: 1; } }
-/* 猛然想起：白边、亮一下，字很清楚，后面拖一层白色残影 */
-.fg-theater .fg-dialog[data-recall="flash"] .fg-box { --fg-feather: 4%; --tint: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .7); transition-duration: .2s; animation: fg-box-snap .6s ease-out; }
-.fg-theater .fg-dialog[data-recall="flash"] .fg-box::after { background: radial-gradient(circle, rgba(255, 255, 255, .16), transparent 65%); }
-@keyframes fg-box-snap { from { box-shadow: 0 0 3cqw rgba(255, 255, 255, .6), inset 0 0 0 100vmax rgba(255, 255, 255, .55); } }
-.fg-theater .fg-dialog[data-recall="flash"] .fg-text { color: #fff; text-shadow: .3cqw 0 .05cqw rgba(255, 255, 255, .22), 0 1px 2px rgba(0, 0, 0, .55); }
-.fg-dialog[data-recall="flash"] .fg-char { animation-name: fg-char-snap; animation-duration: .3s; }
-@keyframes fg-char-snap { from { opacity: 0; text-shadow: 0 0 1cqw #fff, 0 0 2cqw #fff; } }
-/* 朦胧如梦：框几乎化开成一团雾，字发着光、慢慢浮出来，整行轻轻失焦又对上焦 */
-.fg-theater .fg-dialog[data-recall="haze"] .fg-box { --tint: rgba(255, 248, 236, .14); border-color: transparent; box-shadow: inset 0 0 0 100vmax var(--tint);
-  -webkit-mask-image: radial-gradient(62% 110% at 50% 50%, #000 45%, transparent 100%); mask-image: radial-gradient(62% 110% at 50% 50%, #000 45%, transparent 100%); }
-.fg-theater .fg-dialog[data-recall="haze"] .fg-box::after { background: radial-gradient(circle, rgba(255, 250, 240, .22), transparent 65%); }
-.fg-theater .fg-dialog[data-recall="haze"] .fg-text { color: color-mix(in oklab, var(--ink) 80%, #fff6e6); text-shadow: 0 0 1.2cqw rgba(255, 248, 232, .6), 0 1px 2px rgba(0, 0, 0, .35); }
-.fg-theater .fg-dialog[data-recall="haze"] .fg-line { display: inline-block; animation: fg-line-haze 5s ease-in-out infinite; }
-.fg-dialog[data-recall="haze"] .fg-char { animation-name: fg-char-mist; animation-duration: 1.1s; }
-@keyframes fg-line-haze { 0%, 100% { filter: none; } 50% { filter: blur(.5px); } }
-@keyframes fg-char-mist { from { opacity: 0; filter: blur(7px); } to { opacity: 1; filter: none; } }
-.fg-text { position: absolute; left: 4.2%; right: 5%; top: clamp(1.6cqw, 23%, calc(.23 * var(--fg-dlg-ref))); bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-family: var(--fg-text-font, var(--font-body)); font-size: calc(1.95cqw * var(--fg-text-scale, 1)); line-height: 1.78; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0, 0, 0, .45); overflow: hidden; }
-.fg-text.is-narration { color: color-mix(in oklab, var(--ink) 92%, var(--accent3)); }
-.fg-text.is-thought { font-style: italic; color: color-mix(in oklab, var(--ink) 70%, var(--accent2)); }
-.fg-text.is-cardhint { color: var(--ink-dim); font-size: calc(1.3cqw * var(--fg-text-scale, 1)); letter-spacing: .4em; text-align: center; }
-.fg-text.is-thought .fg-line::before { content: "（"; } .fg-text.is-thought .fg-line::after { content: "）"; }
-/* 双语对照：像注音一样，上方小字原文，下方是打出来的翻译；原文的字跟着翻译的进度一起出（Dialog.jsx 的 origChars） */
-.fg-orig { font-size: .62em; line-height: 1.45; letter-spacing: .02em; opacity: .72; margin-bottom: .2em; font-style: normal; font-weight: normal; }
-.fg-char { opacity: 0; animation: fg-char-in .22s ease forwards; animation-delay: var(--d); display: inline; }
-.fg-text.is-done .fg-char { animation: none; opacity: 1; }
-.fg-text.is-wait .fg-char { animation: none; }
-@keyframes fg-char-in { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: none; } }
-/* ── 台词演法与重音（lib/typing.js）：字的样子。要做位移、缩放的字改成 inline-block，空格照样占位 ── */
-.fg-text[class*="say-"] .fg-char, .fg-char.is-stress { display: inline-block; white-space: pre; }
-.fg-text.say-menace .fg-char { animation-name: fg-char-stamp; animation-duration: .2s; }
-.fg-text.say-excited .fg-char { animation-name: fg-char-hop; animation-duration: .14s; }
-.fg-text.say-shout .fg-char { animation-name: fg-char-pop; animation-duration: .28s; font-size: 1.16em; font-weight: 700; }
-.fg-text.say-hesitant .fg-char { animation-duration: .32s; }
-.fg-text.say-whisper { opacity: .8; }
-.fg-text.say-whisper .fg-char { font-size: .9em; animation-duration: .45s; }
-.fg-text.say-breakdown .fg-char { color: color-mix(in oklab, var(--ink) 72%, #ff3b5c); animation: fg-char-in .12s ease forwards var(--d), fg-char-quake .2s linear infinite var(--d); }
-.fg-char.is-stress { color: var(--stress, #ff4d5e); font-weight: 700; font-size: 1.1em; text-shadow: 0 0 .6cqw rgba(255, 60, 80, .45); animation-name: fg-char-stamp; animation-duration: .24s; }
-/* 点一下打完 / 等字体时：和普通台词一样立刻全显示、或先不动（要比上面的演法规则更具体才压得住） */
-.fg-text.is-done[class*="say-"] .fg-char, .fg-text.is-done .fg-char.is-stress { animation: none; opacity: 1; }
-.fg-text.is-wait[class*="say-"] .fg-char, .fg-text.is-wait .fg-char.is-stress { animation: none; }
-.fg-text.is-done.say-breakdown .fg-char { animation: fg-char-quake .2s linear infinite; opacity: 1; }
-@keyframes fg-char-stamp { from { opacity: 0; transform: translateY(-.35em) scale(1.4); } 60% { opacity: 1; transform: translateY(0) scale(.95); } to { opacity: 1; transform: none; } }
-@keyframes fg-char-pop { from { opacity: 0; transform: scale(1.9); } 55% { opacity: 1; transform: scale(.92); } to { opacity: 1; transform: none; } }
-@keyframes fg-char-hop { from { opacity: 0; transform: translateY(.3em); } to { opacity: 1; transform: none; } }
-@keyframes fg-char-quake { 0%, 100% { opacity: 1; transform: translate(0, 0); } 25% { opacity: 1; transform: translate(.05em, -.04em); } 50% { opacity: 1; transform: translate(-.04em, .05em); } 75% { opacity: 1; transform: translate(.04em, .03em); } }
-/* ── 句中文字效果（导演 textfx，节奏和打字音在 lib/typing.js 的 TEXT_STYLES）：某几个字的样子。
-   比台词演法（.fg-text.say-*）更具体，同一句里两者都有时以这几个字为准；字号变大的把行高收紧，免得一行被撑高、对话框装不下；越说越大 / 越小按 --k（这段走到几成）变，波浪按 --i（第几个字）错开 ── */
-.fg-text .fg-char[class*="tx-"] { display: inline-block; white-space: pre; }
-.fg-text .fg-char.tx-shake { animation: fg-char-in .22s ease forwards var(--d), fg-tx-shake .16s steps(2) infinite var(--d); }
-.fg-text .fg-char.tx-wave { animation: fg-char-in .3s ease forwards var(--d), fg-tx-wave 1.3s ease-in-out infinite calc(var(--i) * -.13s); }
-.fg-text .fg-char.tx-big { font-size: 1.32em; font-weight: 700; line-height: 1.1; animation-name: fg-char-pop; animation-duration: .26s; }
-.fg-text .fg-char.tx-roar { font-size: 1.62em; font-weight: 900; line-height: 1; letter-spacing: -.02em; color: color-mix(in oklab, currentColor 80%, #ff5a4a); text-shadow: .06em .06em 0 rgba(0, 0, 0, .55), 0 0 .5em rgba(255, 70, 50, .45); animation-name: fg-tx-slam; animation-duration: .3s; }
-.fg-text .fg-char.tx-grow { font-size: calc(1em + var(--k) * .6em); font-weight: calc(500 + var(--k) * 400); line-height: 1; animation-name: fg-char-pop; animation-duration: .22s; }
-.fg-text .fg-char.tx-dwindle { font-size: calc(1em - var(--k) * .34em); color: color-mix(in oklab, currentColor calc(100% - var(--k) * 62%), transparent); animation-duration: .45s; }
-.fg-text .fg-char.tx-small { font-size: .8em; color: color-mix(in oklab, currentColor 72%, transparent); }
-.fg-text .fg-char.tx-faint { color: color-mix(in oklab, currentColor 50%, transparent); letter-spacing: .08em; text-shadow: 0 0 .35em rgba(255, 255, 255, .35); animation-duration: .7s; }
-.fg-text .fg-char.tx-glow { color: color-mix(in oklab, var(--accent) 40%, #fff6d8); font-weight: 700; text-shadow: 0 0 .45em color-mix(in oklab, var(--accent) 70%, transparent), 0 0 1em color-mix(in oklab, var(--accent) 40%, transparent); animation: fg-char-in .3s ease forwards var(--d), fg-tx-glow 2.4s ease-in-out infinite calc(var(--d) + var(--i) * .08s); }
-/* 打完之后：别的不再重放，发抖、波浪、发光接着动；等字体时先不动 */
-.fg-text.is-done .fg-char[class*="tx-"] { animation: none; opacity: 1; }
-.fg-text.is-done .fg-char.tx-shake { animation: fg-tx-shake .16s steps(2) infinite; }
-.fg-text.is-done .fg-char.tx-wave { animation: fg-tx-wave 1.3s ease-in-out infinite calc(var(--i) * -.13s); }
-.fg-text.is-done .fg-char.tx-glow { animation: fg-tx-glow 2.4s ease-in-out infinite calc(var(--i) * .08s); }
-.fg-text.is-wait .fg-char[class*="tx-"] { animation: none; }
-@keyframes fg-tx-shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(.045em, -.035em) rotate(-1deg); } 50% { transform: translate(-.04em, .04em) rotate(.8deg); } 75% { transform: translate(.035em, .03em); } }
-@keyframes fg-tx-wave { 0%, 100% { transform: translateY(.1em); } 50% { transform: translateY(-.16em); } }
-@keyframes fg-tx-slam { from { opacity: 0; transform: scale(2.6) rotate(-4deg); } 50% { opacity: 1; transform: scale(.88); } 75% { opacity: 1; transform: scale(1.06); } to { opacity: 1; transform: none; } }
-@keyframes fg-tx-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
-.fg-wait { position: absolute; right: 2.6%; bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }
-.fg-wait::before { content: var(--wait-glyph); }
-@keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }
-.fg-quick { position: absolute; right: 2.4%; bottom: min(7%, calc(.07 * var(--fg-dlg-ref))); display: flex; gap: 1.5cqw; font-family: var(--font-latin); font-size: .98cqw; font-weight: 600; letter-spacing: .2em; z-index: 3; }
-.fg-quick button { color: var(--ink-dim); transition: color .2s, text-shadow .2s; position: relative; }
-.fg-quick button:hover, .fg-quick button.is-on { color: var(--ink); text-shadow: 0 0 .8cqw var(--accent); }
-.fg-quick button.is-on::after { content: ""; position: absolute; left: 0; right: .2em; bottom: -.3cqw; height: 1px; background: var(--accent); }
-.fg-progress { position: absolute; left: 4.2%; right: 30%; bottom: min(8.6%, calc(.086 * var(--fg-dlg-ref))); height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; }
-.fg-progress i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); box-shadow: 0 0 6px var(--accent); transition: width .4s ease; }
-.fg-status { position: absolute; left: 4.2%; bottom: min(7%, calc(.07 * var(--fg-dlg-ref))); font-size: .9cqw; letter-spacing: .1em; color: var(--ink-dim); display: flex; align-items: center; gap: .5cqw; }
-.fg-status::before { content: ""; width: .6cqw; height: .6cqw; border-radius: 50%; background: var(--accent3); box-shadow: 0 0 .6cqw var(--accent3); animation: fg-pulse 1.4s ease-in-out infinite; }
-
-/* ── 情境卡片（短信、信件……） ── */
-.fg-card { position: absolute; left: 50%; top: 42%; z-index: 21; width: 40cqw; transform: translate(-50%, -50%); animation: fg-card-in .7s cubic-bezier(.2, .8, .2, 1) both; font-size: 1.6cqw; line-height: 1.7; }
-@keyframes fg-card-in { from { opacity: 0; transform: translate(-50%, -42%) rotateX(35deg) scale(.9); } }
-.fg-card[data-card="sms"] { padding: 1.6cqw; border-radius: 2cqw; background: rgba(250, 250, 255, .94); color: #1b1d2a; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .5); }
-.fg-card[data-card="sms"] .fg-card-head { font-size: 1cqw; color: #6b7280; text-align: center; margin-bottom: 1cqw; letter-spacing: .1em; }
-.fg-card[data-card="sms"] .fg-card-body { display: inline-block; max-width: 90%; padding: 1cqw 1.4cqw; border-radius: 1.6cqw 1.6cqw 1.6cqw .4cqw; background: #e8ebf4; }
-.fg-card[data-card="letter"], .fg-card[data-card="diary"] { padding: 3cqw 3.4cqw; background: repeating-linear-gradient(180deg, #fbf5e6 0 2.6cqw, #e9dcc0 2.6cqw calc(2.6cqw + 1px)), #fbf5e6; color: #4a3626; font-family: var(--font-display); box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); transform-origin: 50% 0; transform: translate(-50%, -50%) rotate(-1.2deg); }
-.fg-card[data-card="note"] { width: 28cqw; padding: 2.4cqw; background: #fff59d; color: #3b3200; font-family: var(--font-display); box-shadow: 0 1.4cqw 3cqw rgba(0, 0, 0, .45); transform: translate(-50%, -50%) rotate(2deg); }
-.fg-card[data-card="note"]::before { content: ""; position: absolute; left: 38%; top: -1cqw; width: 8cqw; height: 2cqw; background: rgba(255, 255, 255, .55); transform: rotate(-3deg); }
-.fg-card[data-card="news"] { padding: 2.4cqw; background: #f3f0e8; color: #111; font-family: var(--font-display); border-top: .6cqw double #111; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); }
-.fg-card[data-card="news"] .fg-card-head { font-size: 2.6cqw; font-weight: 900; letter-spacing: .3em; border-bottom: 1px solid #111; margin-bottom: 1cqw; }
-.fg-card[data-card="terminal"] { padding: 2cqw; border-radius: .8cqw; background: rgba(4, 16, 8, .92); color: #67ff9a; font-family: "JetBrains Mono", "Cascadia Code", monospace; box-shadow: 0 0 3cqw rgba(60, 255, 140, .25), inset 0 0 2cqw rgba(60, 255, 140, .08); text-shadow: 0 0 .6cqw rgba(60, 255, 140, .7); }
-.fg-card[data-card="terminal"] .fg-card-body::after { content: "▌"; animation: fg-pulse 1s steps(2) infinite; }
-.fg-card[data-card="notice"], .fg-card[data-card="scroll"] { padding: 3cqw; background: linear-gradient(90deg, #c9a46a, #f1dcae 8%, #f6e7c4 50%, #f1dcae 92%, #c9a46a); color: #3a2410; font-family: var(--font-display); text-align: center; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); }
-.fg-card[data-card="notice"]::after { content: "印"; position: absolute; right: 2cqw; bottom: 1.4cqw; width: 4cqw; height: 4cqw; border: .25cqw solid #b3261e; color: #b3261e; display: grid; place-items: center; font-size: 2cqw; transform: rotate(-12deg); animation: fg-stamp .4s .5s cubic-bezier(.3, 1.6, .5, 1) both; }
-@keyframes fg-stamp { from { opacity: 0; transform: scale(2.2) rotate(-12deg); } }
-
-/* ── 选项 ── */
-.fg-choices { position: absolute; inset: 0; z-index: 26; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.3cqw; background: radial-gradient(70% 60% at 50% 45%, rgba(0, 0, 0, .25), rgba(0, 0, 0, .6)); animation: fg-fade-in .4s ease both; }
-.fg-choices-title { font-family: var(--font-latin); letter-spacing: .6em; font-size: 1.05cqw; color: var(--ink-dim); margin-bottom: .6cqw; }
-.fg-choice { position: relative; width: 46cqw; padding: 1.25cqw 2.4cqw 1.25cqw 6cqw; text-align: left; font-family: var(--fg-text-font, var(--font-body)); font-size: 1.7cqw; letter-spacing: .08em; border-radius: 99px; background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .35); transition: transform .25s cubic-bezier(.2, .8, .2, 1), border-color .25s, box-shadow .25s; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); overflow: hidden; }
-.fg-choice::before { content: attr(data-n); position: absolute; left: 2.2cqw; top: 50%; transform: translateY(-50%); font-family: var(--font-latin); font-size: 1.5cqw; font-weight: 700; color: var(--accent); letter-spacing: .1em; }
-.fg-choice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .16) 50%, transparent 70%); transform: translateX(-100%); transition: transform .6s ease; }
-.fg-choice:hover { transform: translateX(1.2cqw) scale(1.02); border-color: var(--accent); box-shadow: 0 0 2.4cqw color-mix(in oklab, var(--accent) 45%, transparent); }
-.fg-choice:hover::after { transform: translateX(100%); }
-@keyframes fg-choice-in { from { opacity: 0; transform: translateY(1.4cqw); } }
-.fg-free { display: flex; gap: .8cqw; width: 46cqw; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); }
-.fg-free input { flex: 1; min-width: 0; padding: 1cqw 1.8cqw; font: inherit; font-family: var(--fg-text-font, var(--font-body)); font-size: 1.45cqw; color: var(--ink); border-radius: 99px; border: 1px dashed var(--box-border); background: rgba(0, 0, 0, .35); outline: none; user-select: text; }
-.fg-free input:focus { border-color: var(--accent); border-style: solid; }
-.fg-free button { padding: 0 2cqw; border-radius: 99px; background: linear-gradient(100deg, var(--accent), var(--accent2)); font-size: 1.4cqw; font-weight: 700; letter-spacing: .2em; color: #fff; }
-
-/* ── 标题画面 ── */
-.fg-title { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; justify-content: center; padding-left: 8%; background: linear-gradient(90deg, rgba(4, 4, 14, .86) 0%, rgba(4, 4, 14, .55) 42%, transparent 75%); animation: fg-fade-in 1s ease both; }
-.fg-title-kicker { font-family: var(--font-latin); font-size: 1.1cqw; letter-spacing: .7em; color: var(--accent3); text-transform: uppercase; animation: fg-slide-in 1s .2s ease both; }
-.fg-title-logo { font-family: var(--font-display); font-weight: 900; font-size: 6cqw; line-height: 1.15; letter-spacing: .12em; margin: 1cqw 0 .6cqw; background: linear-gradient(100deg, #fff 10%, var(--accent) 45%, var(--accent2) 70%, var(--accent3)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 2.4cqw color-mix(in oklab, var(--accent2) 60%, transparent)); animation: fg-logo-in 1.4s .3s cubic-bezier(.2, .8, .2, 1) both; max-width: 60cqw; }
-.fg-title-sub { font-size: 1.2cqw; letter-spacing: .3em; color: var(--ink-dim); margin-bottom: 3.4cqw; animation: fg-slide-in 1s .6s ease both; }
-.fg-title-menu { display: flex; flex-direction: column; gap: .4cqw; align-items: flex-start; }
-.fg-title-menu button { font-family: var(--font-display); font-size: 1.75cqw; letter-spacing: .3em; padding: .45cqw 0; color: var(--ink-dim); position: relative; transition: color .2s, letter-spacing .3s, padding .3s; animation: fg-slide-in .8s ease both; animation-delay: calc(var(--i) * 80ms + 800ms); }
-.fg-title-menu button span { font-family: var(--font-latin); font-size: .9cqw; letter-spacing: .4em; margin-left: 1.2cqw; opacity: .55; }
-.fg-title-menu button.is-new { color: var(--ink); }
-.fg-title-menu button.is-new::after { content: "NEW"; position: absolute; top: .2cqw; right: -3.4cqw; padding: .1cqw .5cqw; border-radius: 99px; font-family: var(--font-latin); font-size: .7cqw; letter-spacing: .12em; color: #fff; background: linear-gradient(100deg, var(--accent), var(--accent2)); animation: fg-pulse 1.6s ease-in-out infinite; }
-.fg-title-menu button:hover { color: #fff; letter-spacing: .42em; padding-left: 1.6cqw; }
-.fg-title-menu button:hover::before { content: ""; position: absolute; left: 0; top: 50%; width: .9cqw; height: .9cqw; transform: translateY(-50%) rotate(45deg); background: var(--accent); box-shadow: 0 0 1cqw var(--accent); }
-.fg-title-foot { position: absolute; left: 8%; bottom: 5%; font-size: .85cqw; letter-spacing: .2em; color: rgba(255, 255, 255, .35); }
-@keyframes fg-logo-in { from { opacity: 0; letter-spacing: .5em; filter: blur(10px); } }
-@keyframes fg-slide-in { from { opacity: 0; transform: translateX(-1.6cqw); } }
-
-/* ── 面板（回想 / 鉴赏 / 人物志 / 设置） ── */
-.fg-panel { position: absolute; inset: 0; z-index: 60; display: flex; flex-direction: column; background: linear-gradient(135deg, rgba(8, 6, 22, .94), rgba(16, 10, 34, .92)); backdrop-filter: blur(16px); animation: fg-panel-in .35s cubic-bezier(.2, .8, .2, 1) both; user-select: text; }
-@keyframes fg-panel-in { from { opacity: 0; transform: scale(1.02); } }
-.fg-panel-head { display: flex; align-items: center; gap: 1.4cqw; padding: 2.2cqw 3cqw 1.2cqw; }
-.fg-panel-title { font-family: var(--font-display); font-size: 2.4cqw; font-weight: 700; letter-spacing: .24em; }
-.fg-panel-en { font-family: var(--font-latin); font-size: 1cqw; letter-spacing: .5em; color: var(--accent); text-transform: uppercase; }
-.fg-panel-head .fg-spacer { flex: 1; }
-.fg-panel-body { position: relative; flex: 1; overflow: auto; padding: 0 3cqw 2.4cqw; scrollbar-width: thin; scrollbar-color: var(--accent2) transparent; }
-.fg-tabs { display: flex; gap: .4cqw; padding: 0 3cqw 1cqw; flex-wrap: wrap; }
-.fg-tab { padding: .55cqw 1.4cqw; border-radius: 99px; font-size: 1.05cqw; letter-spacing: .12em; color: var(--ink-dim); border: 1px solid transparent; }
-.fg-tab.is-on { color: #fff; border-color: var(--box-border); background: linear-gradient(100deg, color-mix(in oklab, var(--accent) 35%, transparent), color-mix(in oklab, var(--accent2) 35%, transparent)); }
-
-.fg-log-item { display: grid; grid-template-columns: 9cqw 1fr; gap: 1.4cqw; padding: 1cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .06); cursor: pointer; font-size: 1.35cqw; line-height: 1.7; }
-.fg-log-item:hover { background: linear-gradient(90deg, rgba(255, 255, 255, .04), transparent); }
-.fg-log-text { font-family: var(--fg-text-font, var(--font-body)); }
-.fg-log-name { font-family: var(--fg-name-font, var(--font-display)); font-weight: 700; text-align: right; letter-spacing: .1em; }
-.fg-log-turn { grid-column: 1 / -1; font-family: var(--font-latin); font-size: .95cqw; letter-spacing: .5em; color: var(--accent); padding-top: 1.4cqw; }
-.fg-log-scene { grid-column: 1 / -1; display: flex; align-items: center; gap: 1cqw; font-size: .9cqw; letter-spacing: .3em; color: var(--ink-dim); padding: .6cqw 0 .2cqw; }
-.fg-log-scene::before, .fg-log-scene::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .18), transparent); }
-
-/* 导演日志：左边历次记录，右边详情（实时输出 / 整理结果 / 原始输出 / 提示词）。两栏各自滚动。 */
-.fg-dlog { display: grid; grid-template-columns: 22cqw minmax(0, 1fr); gap: 2cqw; height: 100%; }
-.fg-dlog-side, .fg-dlog-detail { min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--accent2) transparent; }
-.fg-dlog-side { display: flex; flex-direction: column; gap: .6cqw; padding-right: .4cqw; }
-.fg-dlog-detail { padding-right: .6cqw; }
-.fg-dlog-row { display: block; width: 100%; flex: none; text-align: left; padding: 1cqw 1.2cqw; border-radius: .8cqw; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .03); transition: background .2s, border-color .2s; }
-.fg-dlog-row:hover { background: rgba(255, 255, 255, .07); }
-.fg-dlog-row.is-on { border-color: var(--accent); background: linear-gradient(100deg, color-mix(in oklab, var(--accent) 18%, transparent), color-mix(in oklab, var(--accent2) 8%, transparent)); }
-.fg-dlog-row-head { display: flex; align-items: center; justify-content: space-between; gap: .6cqw; font-size: 1.15cqw; letter-spacing: .08em; }
-.fg-dlog-row-meta { margin-top: .3cqw; font-size: .85cqw; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fg-dlog-row-sum { margin-top: .4cqw; font-size: .95cqw; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.fg-dlog-status { padding: .1cqw .7cqw; border-radius: 99px; border: 1px solid currentColor; font-size: .8cqw; letter-spacing: .1em; white-space: nowrap; }
-.fg-dlog-status.is-running { color: var(--accent); animation: fg-pulse 1.4s ease-in-out infinite; }
-.fg-dlog-status.is-ok { color: #6ef0a8; }
-.fg-dlog-status.is-failed { color: #ff8a8a; }
-.fg-dlog-status.is-cancelled { color: var(--ink-dim); }
-.fg-dlog-head { padding: 1.2cqw 1.4cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }
-.fg-dlog-title { display: flex; align-items: center; gap: 1cqw; margin-bottom: .8cqw; font-family: var(--font-display); font-size: 1.7cqw; letter-spacing: .16em; }
-.fg-dlog-title .fg-spacer, .fg-dlog-label .fg-spacer { flex: 1; }
-.fg-dlog-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(30cqw, 1fr)); gap: .3cqw 2cqw; font-size: 1cqw; line-height: 1.6; }
-.fg-dlog-facts i { margin-right: .8cqw; font-style: normal; color: var(--ink-dim); letter-spacing: .08em; }
-.fg-dlog-notice { margin-top: .6cqw; font-size: .95cqw; color: #ffd27a; }
-.fg-dlog-error { margin: .6cqw 0; font-size: 1cqw; white-space: pre-wrap; word-break: break-word; }
-.fg-dlog-tabs { padding: 1.2cqw 0 .4cqw; }
-.fg-dlog-block { margin: 1cqw 0; }
-.fg-dlog-label { display: flex; align-items: center; gap: .8cqw; margin-bottom: .5cqw; font-size: .95cqw; letter-spacing: .12em; color: var(--accent); }
-.fg-btn.is-mini { padding: .2cqw .9cqw; font-size: .85cqw; white-space: nowrap; }
-.fg-dlog-pre { margin: 0; max-height: 34cqw; overflow: auto; padding: 1cqw 1.2cqw; border-radius: .8cqw; background: rgba(0, 0, 0, .42); border: 1px solid var(--box-border); font-family: "JetBrains Mono", Consolas, monospace; font-size: .95cqw; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: var(--ink); scrollbar-width: thin; }
-.fg-dlog-pre.has-cursor::after { content: "▍"; color: var(--accent); animation: fg-pulse 1s steps(2) infinite; }
-.fg-dlog-meter { display: flex; align-items: center; gap: .8cqw; margin: .4cqw 0; font-size: 1cqw; color: var(--ink-dim); }
-.fg-dlog-dot { width: .8cqw; height: .8cqw; border-radius: 50%; background: var(--accent); box-shadow: 0 0 1cqw var(--accent); animation: fg-pulse 1s ease-in-out infinite; }
-.fg-dlog-think summary { margin: .4cqw 0; cursor: pointer; font-size: .95cqw; color: var(--ink-dim); }
-.fg-dlog-chips { display: flex; flex-wrap: wrap; gap: .5cqw; }
-.fg-dlog-chip { display: inline-flex; align-items: center; gap: .5cqw; padding: .2cqw .8cqw; border-radius: 99px; font-size: .9cqw; background: rgba(255, 255, 255, .06); border: 1px solid var(--box-border); }
-.fg-dlog-chip i { font-style: normal; font-size: .8cqw; color: var(--ink-dim); }
-.fg-dlog-lines { border-radius: .8cqw; border: 1px solid var(--box-border); overflow: hidden; }
-.fg-dlog-line { display: grid; grid-template-columns: 4cqw minmax(0, 1fr) minmax(0, 24cqw); gap: 1.2cqw; align-items: start; padding: .7cqw 1cqw; border-bottom: 1px solid rgba(255, 255, 255, .06); font-size: 1cqw; line-height: 1.6; }
-.fg-dlog-line:last-child { border-bottom: 0; }
-.fg-dlog-line.is-plain { opacity: .6; }
-.fg-dlog-line.is-skipped { opacity: .42; }
-.fg-dlog-line.is-skipped .fg-dlog-utext { text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, .35); }
-.fg-dlog-uid { padding-top: .15cqw; font-family: var(--font-latin); font-size: .85cqw; letter-spacing: .1em; color: var(--accent); }
-.fg-dlog-card { margin-bottom: .6cqw; padding: .8cqw 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); font-size: 1cqw; line-height: 1.6; }
-.fg-dlog-mono { margin-top: .4cqw; font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; word-break: break-word; }
-.fg-dlog-k { display: inline-block; margin-right: .6cqw; padding: 0 .5cqw; border-radius: .3cqw; font-style: normal; font-family: var(--font-body); font-size: .8cqw; letter-spacing: .08em; color: var(--ink-dim); border: 1px solid var(--box-border); }
-.fg-dlog-cgchar { margin-top: .4cqw; padding-left: .8cqw; border-left: 2px solid var(--box-border); }
-.fg-dlog-list-plain { margin: 0; padding-left: 2cqw; font-size: 1.05cqw; line-height: 1.8; }
-.fg-pill.is-link { cursor: pointer; transition: border-color .2s, opacity 1.2s; }
-/* 配乐留白：曲名暗下去，回来时再亮 */
-.fg-pill.is-hushed { opacity: .35; transition-duration: .5s; }
-.fg-pill.is-nsfw { color: #ff8fb1; border-color: rgba(255, 110, 160, .55); font-weight: 600; }
-.fg-pill.is-link:hover { border-color: var(--accent); }
-
-.fg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20cqw, 1fr)); gap: 1.4cqw; }
-.fg-thumb { position: relative; aspect-ratio: 16 / 10; border-radius: 1cqw; overflow: hidden; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); cursor: zoom-in; transition: transform .25s, box-shadow .25s; }
-.fg-thumb:hover { transform: translateY(-.4cqw); box-shadow: 0 1cqw 3cqw rgba(0, 0, 0, .5), 0 0 0 1px var(--accent); }
-.fg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.fg-thumb-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 2cqw 1cqw .7cqw; font-size: 1cqw; letter-spacing: .1em; background: linear-gradient(transparent, rgba(0, 0, 0, .75)); }
-.fg-thumb.is-locked { cursor: default; display: grid; place-items: center; color: var(--ink-dim); font-size: 1cqw; background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .03) 0 1cqw, transparent 1cqw 2cqw); }
-
-.fg-person { display: grid; grid-template-columns: 13cqw 1fr; gap: 2cqw; padding: 1.6cqw; margin-bottom: 1.4cqw; border-radius: 1.2cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }
-.fg-track-desc { min-height: 4.6cqw; font-family: var(--font-body); font-size: 1.05cqw; }
-/* 曲库、音效库、环境音库的整理界面（LibBrowser）：左边分类树，右边一行一条（点名字展开编辑），勾选后底部浮着一条批量操作。 */
-.fg-lib { display: grid; grid-template-columns: 15cqw minmax(0, 1fr); gap: 1.4cqw; align-items: start; margin-top: 1cqw; }
-.fg-lib-tree { position: sticky; top: .6cqw; display: flex; flex-direction: column; gap: .15cqw; max-height: 44cqw; overflow-y: auto; padding: .6cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); scrollbar-width: thin; }
-.fg-libcat { display: flex; align-items: center; gap: .6cqw; width: 100%; padding: .35cqw .8cqw; border: 0; border-radius: .6cqw; background: none; color: inherit; font: inherit; font-size: 1cqw; text-align: left; cursor: pointer; }
-.fg-libcat span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.fg-libcat i { font-style: normal; font-size: .85cqw; opacity: .55; }
-.fg-libcat:hover { background: rgba(255, 255, 255, .06); }
-.fg-libcat.is-sub { padding-left: 2cqw; font-size: .95cqw; }
-.fg-libcat.is-on { background: color-mix(in oklab, var(--accent) 22%, transparent); color: var(--accent); }
-.fg-lib-main { min-width: 0; }
-.fg-lib-tools { margin-bottom: .6cqw; }
-.fg-lib-search { flex: 1; width: auto; min-width: 14cqw; }
-.fg-lib-cathead { padding: .5cqw .9cqw; margin-bottom: .6cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
-.fg-lib-count { gap: .6cqw; padding: .2cqw .9cqw .4cqw; }
-.fg-lib-count label { gap: .5cqw; cursor: pointer; }
-.fg-lib-count input, .fg-librow input[type="checkbox"] { width: 1.2cqw; height: 1.2cqw; margin: 0; accent-color: var(--accent); cursor: pointer; }
-.fg-lib-empty { margin: 1cqw 0; }
-.fg-librow { display: grid; grid-template-columns: auto 2.6cqw minmax(0, 1fr) auto 5cqw; align-items: center; gap: .8cqw; padding: .45cqw .9cqw; border-radius: .7cqw; border: 1px solid transparent; }
-.fg-librow:hover { background: rgba(255, 255, 255, .04); }
-.fg-librow.is-picked { background: color-mix(in oklab, var(--accent) 10%, transparent); border-color: color-mix(in oklab, var(--accent) 35%, transparent); }
-.fg-librow.is-open { background: rgba(255, 255, 255, .06); border-color: var(--box-border); border-radius: .7cqw .7cqw 0 0; }
-.fg-librow-play { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink); font-size: .9cqw; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s; }
-.fg-librow-play:hover { border-color: var(--accent); }
-.fg-librow-play.is-on { background: var(--accent); border-color: var(--accent); color: #111; box-shadow: 0 0 1.2cqw color-mix(in oklab, var(--accent) 55%, transparent); }
-.fg-librow-main { display: grid; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.fg-librow-main b, .fg-librow-main span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.fg-librow-main b { font-size: 1.05cqw; font-weight: 600; }
-.fg-librow-main span { font-size: .85cqw; color: var(--ink-dim); }
-.fg-librow-main:hover b { color: var(--accent); }
-.fg-libchip { max-width: 14cqw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: .15cqw .8cqw; border-radius: 99px; border: 1px solid color-mix(in oklab, var(--accent2) 50%, transparent); background: color-mix(in oklab, var(--accent2) 14%, transparent); color: inherit; font: inherit; font-size: .85cqw; cursor: pointer; }
-.fg-libchip.is-none { border-style: dashed; border-color: var(--box-border); background: none; opacity: .6; }
-.fg-librow-size { font-size: .85cqw; color: var(--ink-dim); text-align: right; }
-.fg-libedit { display: grid; gap: .6cqw; padding: .8cqw 1.2cqw 1cqw; margin-bottom: .6cqw; border: 1px solid var(--box-border); border-top: 0; border-radius: 0 0 .8cqw .8cqw; background: rgba(255, 255, 255, .06); }
-.fg-lib-more { margin: .8cqw 0; }
-.fg-lib-bar { position: sticky; bottom: 0; z-index: 3; display: grid; gap: .5cqw; margin-top: 1cqw; padding: .9cqw 1.2cqw; border-radius: 1cqw; background: rgb(20, 14, 40); border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent); box-shadow: 0 -.6cqw 1.4cqw rgba(0, 0, 0, .45); }
-.fg-lib-bar .fg-row { flex-wrap: nowrap; }
-/* 声音页：一键套用音效库里标了用途的声音；给落字音效 / 界面音从音效库挑一个 */
-.fg-libpreset { display: flex; flex-wrap: wrap; align-items: center; gap: .6cqw; padding: .8cqw 1.2cqw; margin-bottom: 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
-.fg-libpicker { margin-top: .6cqw; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }
-.fg-libpicker-list { max-height: 24cqw; overflow-y: auto; margin-top: .6cqw; }
-.fg-libpicker-item { gap: .6cqw; padding: .3cqw 0; }
-.fg-libpicker-item.is-on .fg-libpicker-name { color: var(--accent); }
-.fg-libpicker-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.fg-libpicker-name small { margin-left: .6cqw; opacity: .6; }
-.fg-person-art { position: relative; height: 19cqw; border-radius: .8cqw; overflow: hidden; background: radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--c) 40%, transparent), rgba(0, 0, 0, .3)); }
-.fg-person-art img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
-.fg-person-art .fg-silhouette { height: 100%; }
-.fg-person h3 { margin: 0 0 .6cqw; font-family: var(--font-display); font-size: 2cqw; letter-spacing: .2em; display: flex; align-items: center; gap: 1cqw; }
-.fg-person h3 small { font-family: var(--font-body); font-size: .9cqw; letter-spacing: .1em; padding: .2cqw .7cqw; border-radius: 99px; border: 1px solid var(--box-border); color: var(--ink-dim); }
-.fg-emos { display: flex; flex-wrap: wrap; gap: .5cqw; margin: .8cqw 0; }
-.fg-emo { position: relative; width: 5.4cqw; height: 6.6cqw; border-radius: .6cqw; overflow: hidden; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); font-size: .78cqw; color: var(--ink-dim); cursor: pointer; transition: border-color .2s, transform .2s; }
-.fg-emo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
-.fg-emo span { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.4cqw .2cqw .3cqw; line-height: 1.2; text-align: center; text-shadow: 0 1px 3px #000; background: linear-gradient(transparent, rgba(0, 0, 0, .78) 70%); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.fg-emo.is-busy::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .25), transparent 80%); background-size: 200% 100%; animation: fg-skeleton 1.2s linear infinite; }
-.fg-emo:hover { border-color: var(--accent); transform: translateY(-.2cqw); }
-.fg-emo.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 1.2cqw color-mix(in oklab, var(--accent) 45%, transparent); }
-.fg-emo.is-custom { border-style: dashed; }
-.fg-emo.is-custom span { color: var(--ink); }
-.fg-person-main { min-width: 0; }
-.fg-person-tags { font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; color: var(--ink-dim); line-height: 1.5; margin-bottom: .6cqw; word-break: break-word; }
-.fg-person-folds .fg-btn.is-on, .fg-btn.is-on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 22%, transparent); }
-.fg-person-form { margin: .8cqw 0; padding: 1cqw 1.2cqw; border-radius: .9cqw; background: rgba(0, 0, 0, .22); border: 1px solid var(--box-border); }
-.fg-person-form .fg-field { grid-template-columns: 9cqw 1fr; }
-.fg-textarea.is-short { min-height: 4cqw; }
-/* 固定外貌按字段：两列格子，「其他」占一整行；人物卡片上每个字段一个小标签 */
-.fg-look-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6cqw .9cqw; }
-.fg-look-field { display: flex; flex-direction: column; gap: .25cqw; }
-.fg-look-field > span { font-size: .85cqw; color: var(--ink-dim); letter-spacing: .08em; }
-.fg-look-field.is-wide { grid-column: 1 / -1; }
-.fg-look-chip { display: inline-flex; gap: .35em; margin: 0 .35cqw .35cqw 0; padding: .1cqw .55cqw; border-radius: 99px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .1); }
-.fg-look-chip i { font-style: normal; opacity: .55; }
-.fg-cg-chars { display: grid; gap: .9cqw; margin: .9cqw 0 .9cqw 15.2cqw; }
-.fg-cg-char { display: grid; gap: .6cqw; padding: 1cqw; border-radius: .9cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .18); }
-.fg-sent { user-select: text; margin-top: .4cqw; display: grid; gap: .3cqw; word-break: break-word; }
-.fg-wardrobe { display: grid; gap: .5cqw; margin-bottom: .6cqw; }
-.fg-outfit { display: grid; grid-template-columns: 8cqw 1fr auto auto; gap: .7cqw; align-items: center; padding: .4cqw .6cqw; border-radius: .7cqw; border: 1px solid transparent; }
-.fg-outfit b { font-size: 1.1cqw; letter-spacing: .1em; }
-.fg-outfit.is-on { border-color: color-mix(in oklab, var(--accent) 60%, transparent); background: color-mix(in oklab, var(--accent) 10%, transparent); }
-.fg-outfit.is-new { grid-template-columns: 8cqw 1fr auto; }
-.fg-state { display: inline-flex; align-items: center; gap: .4cqw; padding: .3cqw .5cqw .3cqw .9cqw; border-radius: 99px; font-size: 1cqw; background: color-mix(in oklab, var(--accent2) 22%, transparent); border: 1px solid color-mix(in oklab, var(--accent2) 55%, transparent); }
-.fg-state button { width: 1.5cqw; height: 1.5cqw; border-radius: 50%; font-size: .8cqw; color: var(--ink-dim); }
-.fg-state button:hover { color: #fff; background: rgba(255, 255, 255, .15); }
-.fg-spans { display: flex; flex-direction: column; gap: .5cqw; }
-.fg-span { display: flex; align-items: center; gap: .6cqw; font-size: 1cqw; color: var(--ink-dim); }
-.fg-span b { min-width: 9cqw; color: var(--ink); font-weight: 600; }
-.fg-span .fg-input { text-align: center; padding-inline: .4cqw; }
-.fg-looks { display: flex; flex-wrap: wrap; align-items: center; gap: .5cqw; margin-top: 1cqw; }
-.fg-look { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1.1cqw; border-radius: 99px; font-size: 1cqw; letter-spacing: .08em; border: 1px solid var(--box-border); color: var(--ink-dim); background: rgba(255, 255, 255, .04); }
-.fg-look i { font-style: normal; font-size: .8cqw; padding: .05cqw .5cqw; border-radius: 99px; background: var(--accent); color: #111; }
-.fg-look.is-on { color: #fff; border-color: var(--accent); background: color-mix(in oklab, var(--accent) 22%, transparent); }
-.fg-variant { display: grid; grid-template-columns: 11cqw 1fr; gap: 1.4cqw; margin: .4cqw 0 1cqw; padding: 1cqw; border-radius: .9cqw; background: rgba(0, 0, 0, .25); border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--box-border)); animation: fg-pop .25s ease-out; }
-.fg-variant-art { height: 15cqw; border-radius: .7cqw; overflow: hidden; display: grid; place-items: center; font-size: 1cqw; color: var(--ink-dim); background: repeating-conic-gradient(rgba(255, 255, 255, .05) 0 25%, transparent 0 50%) 0 0 / 1.4cqw 1.4cqw; }
-.fg-variant-art img { width: 100%; height: 100%; object-fit: contain; object-position: top; }
-.fg-row > .fg-spacer, .fg-looks > .fg-spacer { flex: 1; }
-/* 管理立绘：格子多选、批量删除 */
-.fg-manage { margin: .4cqw 0; padding: .6cqw 1cqw; border-radius: .8cqw; background: rgba(0, 0, 0, .25); border: 1px dashed var(--box-border); }
-.fg-emo.is-picked { border-color: #ff6b6b; box-shadow: 0 0 0 2px #ff6b6b; }
-.fg-emo.is-picked::before { content: "✓"; position: absolute; top: .3cqw; right: .3cqw; z-index: 1; width: 1.4cqw; height: 1.4cqw; border-radius: 50%; background: #ff6b6b; color: #111; font-size: .9cqw; line-height: 1.4cqw; text-align: center; }
-.fg-emo:disabled { opacity: .35; cursor: default; transform: none; }
-/* 让 AI 加动作、设计时写的要求；画一张差分「不按动作库」时绑到哪：一块虚线框 */
-.fg-askbox { display: grid; gap: .5cqw; margin: .5cqw 0; padding: .8cqw 1cqw; border-radius: .8cqw; border: 1px dashed color-mix(in oklab, var(--accent) 45%, var(--box-border)); background: rgba(255, 255, 255, .03); }
-.fg-askbox .fg-field { margin: 0; }
-.fg-askbox > .fg-row:first-child b { letter-spacing: .08em; }
-.fg-ticks { display: flex; flex-wrap: wrap; gap: .4cqw; align-items: center; }
-.fg-tick { display: inline-flex; align-items: center; gap: .35em; padding: .25cqw .8cqw; border-radius: 99px; border: 1px solid var(--box-border); font-size: .95cqw; cursor: pointer; }
-.fg-tick.is-on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 18%, transparent); }
-.fg-tick input { margin: 0; accent-color: var(--accent); }
-.fg-tick small { font-size: .8cqw; opacity: .6; }
-.fg-textarea.fg-askline { font-family: var(--font-body); }
-.fg-askbox .fg-count { width: 10cqw; } .fg-askbox .fg-posename { width: 16cqw; }
-.fg-row .fg-input.fg-seedinput { width: 12cqw; flex: none; }
-.fg-btn.fg-danger:not(:disabled) { border-color: #ff6b6b; color: #ffb3b3; }
-/* 逆转式立绘工作台：左边勾差分，右边框眼睛和嘴、看效果 */
-.fg-aa-bench { padding: 1.4cqw; border-radius: 1.2cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }
-.fg-aa-grid { display: grid; grid-template-columns: 24cqw 1fr; gap: 1.6cqw; margin-top: 1cqw; }
-.fg-aa-list { display: flex; flex-direction: column; gap: .5cqw; max-height: 44cqw; overflow: auto; padding-right: .4cqw; scrollbar-width: thin; }
-.fg-aa-item { display: grid; grid-template-columns: auto 4cqw 1fr; align-items: center; gap: .7cqw; padding: .4cqw .6cqw; border-radius: .7cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .22); cursor: pointer; }
-.fg-aa-item.is-on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 16%, rgba(0, 0, 0, .3)); }
-.fg-aa-item img { width: 4cqw; height: 5cqw; object-fit: cover; object-position: top; border-radius: .4cqw; }
-.fg-aa-item b { display: block; font-size: 1cqw; }
-.fg-aa-item small { display: block; font-size: .8cqw; color: var(--ink-dim); }
-.fg-aa-stage { min-width: 0; display: flex; flex-direction: column; gap: .7cqw; }
-.fg-aa-frame, .fg-aa-play { position: relative; width: 100%; height: 34cqw; border-radius: .8cqw; overflow: hidden; background: repeating-conic-gradient(rgba(255, 255, 255, .06) 0 25%, transparent 0 50%) 0 0 / 1.4cqw 1.4cqw; }
-.fg-aa-frame { touch-action: none; user-select: none; }
-.fg-aa-box rect { fill: rgba(255, 255, 255, .1); stroke: currentColor; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: move; }
-.fg-aa-box rect.fg-aa-handle { fill: currentColor; cursor: nwse-resize; }
-.fg-aa-box.is-eyes { color: #5fd3ff; }
-.fg-aa-box.is-mouth { color: #ff8ad8; }
-.fg-aa-box.is-face { color: #ffd166; }
-.fg-face-info { gap: .6cqw; margin: .4cqw 0; } .fg-face-info:not(.fg-row) { display: grid; }
-.fg-face-editor { margin: .6cqw 0; }
-/* 换脸每次画的脸：一排小图，在用的那次描边，没过的压暗一点；点开放大能换 */
-.fg-face-tries { display: flex; flex-wrap: wrap; gap: .6cqw; }
-.fg-face-try { display: grid; gap: .2cqw; width: 9cqw; min-width: 64px; padding: .25cqw; border: 1px solid var(--box-border); border-radius: .6cqw; background: rgba(255, 255, 255, .04); color: inherit; font: inherit; font-size: .78em; cursor: zoom-in; }
-.fg-face-try img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: .4cqw; background: rgba(255, 255, 255, .06); }
-.fg-face-try.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.fg-face-try.is-flat:not(.is-on), .fg-face-try.is-drift:not(.is-on) { opacity: .78; }
-.fg-lightbox.is-face img { width: min(88vw, 104dvh); height: auto; max-height: 78%; image-rendering: auto; }
-.fg-face-editor .fg-aa-frame { height: 28cqw; }
-/* 动作与表情设计：一个动作一块，块里每个情绪一行（名字、归哪个动作、他的这种表情） */
-.fg-acting { display: grid; gap: .7cqw; }
-.fg-acting .fg-field { grid-template-columns: 9cqw 1fr; }
-/* 「动作 × 情绪」的表（PoseMatrix.jsx）：上面一排动作卡片，下面一列一个动作、一行一个情绪；横着放不下时表自己左右滑，情绪名那一列钉在左边 */
-.fg-pm { display: grid; gap: .8cqw; min-width: 0; }
-.fg-pm .fg-input { padding: .45cqw .8cqw; font-size: 1cqw; }
-.fg-pm-poses { display: grid; grid-template-columns: repeat(auto-fill, minmax(21cqw, 1fr)); gap: .7cqw; }
-.fg-pm-pose { display: grid; gap: .4cqw; align-content: start; padding: .7cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
-.fg-pm-pose > .fg-row { flex-wrap: nowrap; gap: .5cqw; }
-.fg-pm-id { font-family: var(--font-latin); font-size: .85cqw; opacity: .55; min-width: 2.4cqw; }
-.fg-pm-label { flex: 1; font-weight: 600; letter-spacing: .04em; }
-.fg-pm-add { min-height: 8cqw; border-radius: .8cqw; border: 1px dashed var(--box-border); background: none; color: var(--ink-dim); font: inherit; font-size: 1.1cqw; letter-spacing: .1em; cursor: pointer; }
-.fg-pm-add:hover { border-color: var(--accent); color: var(--ink); }
-.fg-pm-scroll { max-width: 100%; max-height: 62cqh; overflow: auto; border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); }
-.fg-pm-table { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: 1cqw; }
-.fg-pm-table th, .fg-pm-table td { padding: .35cqw .6cqw; border-bottom: 1px solid rgba(255, 255, 255, .05); text-align: center; vertical-align: middle; }
-.fg-pm-table thead th { position: sticky; top: 0; z-index: 2; background: rgb(18, 15, 38); font-weight: 600; white-space: nowrap; }
-.fg-pm-table thead th.fg-pm-corner { left: 0; z-index: 3; text-align: left; color: var(--ink-dim); font-weight: 400; }
-.fg-pm-head { display: flex; align-items: center; justify-content: center; gap: .4cqw; }
-.fg-pm-head b { max-width: 9cqw; overflow: hidden; text-overflow: ellipsis; letter-spacing: .04em; }
-.fg-pm-emo { position: sticky; left: 0; z-index: 1; background: rgb(15, 12, 33); text-align: left !important; white-space: nowrap; }
-.fg-pm-emo > * + * { margin-left: .4cqw; }
-.fg-pm-name { padding: 0; font: inherit; font-weight: 600; letter-spacing: .04em; color: inherit; background: none; border: 0; cursor: pointer; }
-button.fg-pm-name:hover { color: var(--accent); }
-.fg-pm-emo small { font-size: .8cqw; opacity: .55; }
-.fg-pm-row.is-loose .fg-pm-name { opacity: .6; }
-.fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 10%, rgb(15, 12, 33)); }
-.fg-pm-cat td { position: sticky; left: 0; text-align: left !important; background: rgba(0, 0, 0, .25); }
-.fg-pm-cat button { display: inline-flex; align-items: baseline; gap: .8cqw; padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
-.fg-pm-cat b { font-family: var(--font-display); font-size: 1.15cqw; letter-spacing: .16em; color: var(--accent); }
-.fg-pm-cell { white-space: nowrap; }
-.fg-pm-cell > * { vertical-align: middle; }
-.fg-pm-cell.is-on { background: rgba(255, 255, 255, .03); }
-.fg-pm-cell.is-anchor { background: color-mix(in oklab, var(--accent) 14%, transparent); }
-.fg-pm-cell input { width: 1.2cqw; height: 1.2cqw; margin: 0; accent-color: var(--accent); cursor: pointer; }
-.fg-pm-star { padding: 0 .2cqw; font-size: 1.15cqw; line-height: 1; color: var(--accent); background: none; border: 0; cursor: pointer; }
-.fg-pm-star[disabled] { cursor: default; opacity: 1; }
-.fg-pm-cell:not(.is-anchor) .fg-pm-star { opacity: .45; } .fg-pm-cell:not(.is-anchor) .fg-pm-star:hover:not([disabled]) { opacity: 1; }
-.fg-pm-thumb { display: inline-grid; place-items: center; width: 2.8cqw; height: 3.6cqw; margin-left: .3cqw; padding: 0; overflow: hidden; border-radius: .4cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink-dim); font-size: .9cqw; cursor: pointer; }
-.fg-pm-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
-.fg-pm-thumb:hover { border-color: var(--accent); }
-/* 本性 / 处境、前提、靠的长期状态、收起放回（lib/pose-life.js）；此刻收起了的动作那一列和卡片暗下来 */
-.fg-pm-pose.is-off { border-style: dashed; background: rgba(255, 255, 255, .02); }
-.fg-pm-pose.is-off .fg-pm-label { opacity: .6; }
-.fg-pm-table th.is-off, .fg-pm-cell.is-off { opacity: .45; }
-.fg-pm-offtag { padding: 0 .4cqw; border-radius: .3cqw; font-size: .8cqw; font-weight: 400; color: var(--ink-dim); border: 1px solid var(--box-border); }
-.fg-pm-situ { display: grid; gap: .35cqw; padding-top: .4cqw; border-top: 1px dashed rgba(255, 255, 255, .08); }
-.fg-pm-situ > .fg-row { flex-wrap: wrap; gap: .4cqw; }
-.fg-pm-kind { display: inline-flex; gap: .3cqw; }
-.fg-pm-status { font-size: .9cqw; color: var(--ink-dim); }
-.fg-pm-status.is-off { color: var(--accent); }
-.fg-pm-needs { display: flex; flex-wrap: wrap; gap: .3cqw; align-items: center; }
-.fg-pm-life { display: grid; gap: .2cqw; margin: 0; padding: 0; list-style: none; font-size: .85cqw; color: var(--ink-dim); }
-.fg-pm-life li { display: flex; gap: .4cqw; align-items: baseline; }
-.fg-pm-life li.is-dropped > span { text-decoration: line-through; opacity: .6; }
-.fg-acting-situ { display: flex; flex-wrap: wrap; gap: .5cqw; align-items: center; }
-.fg-pm-thumb.is-busy { border-color: var(--accent2); animation: fg-pulse 1.4s ease-in-out infinite; }
-.fg-pm-thumb.is-failed { border-color: #ff6b6b; color: #ff9b9b; }
-.fg-pm-open td { text-align: left !important; background: color-mix(in oklab, var(--accent) 6%, transparent); }
-.fg-pm-face { position: sticky; left: .6cqw; display: grid; grid-template-columns: auto 1fr 1fr; gap: .6cqw; align-items: center; max-width: 70cqw; }
-.fg-pose-groups { display: grid; gap: .6cqw; min-width: 0; }
-.fg-face-levels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4cqw 2cqw; }
-.fg-face-levels > label { gap: .8em; } .fg-face-levels b { min-width: 1.6em; }
-.fg-dial input[type=range] { width: 14cqw; }
-.fg-pm-level { display: flex; align-items: center; gap: .6em; flex-wrap: wrap; }
-.fg-field:has(.fg-pose-groups) { align-items: start; } .fg-field:has(.fg-pose-groups) > div { min-width: 0; }
-.fg-aa-box text { fill: currentColor; paint-order: stroke; stroke: rgba(0, 0, 0, .75); stroke-width: 3px; pointer-events: none; }
-.fg-aa-play > canvas, .fg-aa-play > img { position: absolute; left: 50%; top: 0; height: 100%; width: auto; transform: translateX(-50%); }
-.fg-aa-play.is-close { width: 34cqw; height: auto; aspect-ratio: 1; align-self: center; }
-.fg-aa-play.is-close canvas, .fg-aa-play.is-close img { display: block; width: 100%; height: auto; }
-.fg-aa-states { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8cqw; }
-.fg-aa-state { display: flex; flex-direction: column; align-items: center; gap: .3cqw; font-size: .9cqw; }
-.fg-aa-thumb { width: 100%; height: auto; border-radius: .5cqw; background: repeating-conic-gradient(rgba(255, 255, 255, .06) 0 25%, transparent 0 50%) 0 0 / 1cqw 1cqw; }
-.fg-aa-actions { margin-top: 1.2cqw; }
-/* 自动框：认脸模型条、列表里的结果标记 */
-.fg-aa-vision { display: grid; gap: .5cqw; margin-top: .9cqw; padding: .7cqw 1cqw; border-radius: .8cqw; background: rgba(0, 0, 0, .2); border: 1px solid var(--box-border); font-size: .95cqw; }
-.fg-aa-vision select { font: inherit; color: var(--ink); background: rgba(0, 0, 0, .35); border: 1px solid var(--box-border); border-radius: .4cqw; padding: .1cqw .4cqw; }
-.fg-aa-vision progress { flex: 1; min-width: 10cqw; height: .7cqw; accent-color: var(--accent); }
-.fg-aa-vision .fg-check { display: inline-flex; align-items: center; gap: .4cqw; cursor: pointer; }
-.fg-aa-badge { margin-left: .5cqw; padding: 0 .5cqw; border-radius: 99px; font-style: normal; font-size: .75cqw; font-weight: normal; vertical-align: middle; }
-.fg-aa-badge.is-ok { background: rgba(110, 240, 168, .2); color: #6ef0a8; }
-.fg-aa-badge.is-warn { background: rgba(255, 210, 110, .2); color: #ffd26e; }
-.fg-aa-badge.is-bad { background: rgba(255, 138, 138, .2); color: #ff8a8a; }
-/* 人物志里的立绘小图：做过逆转式动态的直接动；点一下放大 */
-.fg-sprite-art { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
-.fg-sprite-art img, .fg-sprite-art canvas { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
-.fg-variant-art .fg-sprite-art img, .fg-variant-art .fg-sprite-art canvas { object-fit: contain; }
-.fg-sprite-art i { position: absolute; top: .4cqw; left: .4cqw; padding: .05cqw .5cqw; border-radius: 99px; font-style: normal; font-size: .8cqw; background: var(--accent); color: #111; }
-.fg-sprite-art span { position: absolute; right: .4cqw; bottom: .4cqw; font-size: 1cqw; opacity: 0; transition: opacity .2s; text-shadow: 0 1px 3px #000; }
-.fg-sprite-art:hover span { opacity: 1; }
-/* 放大看立绘 */
-.fg-viewer-stage { display: flex; align-items: center; justify-content: center; max-width: 92%; height: min(46cqw, 76cqh); }
-.fg-viewer-stage > img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 0 6cqw rgba(0, 0, 0, .8); }
-.fg-aa-play.is-big { width: 60cqw; height: min(46cqw, 76cqh); background: none; }
-.fg-aa-play.is-big.is-close { width: min(46cqw, 76cqh); height: auto; aspect-ratio: 1; }
-.fg-variant-body { display: grid; gap: .6cqw; align-content: start; min-width: 0; }
-.fg-variant-body b { font-size: 1.15cqw; letter-spacing: .08em; }
-/* 情绪库（EmotionLibrary.jsx）：按类别分组的一行一种情绪 */
-.fg-emo-lib { display: grid; gap: .6cqw; }
-.fg-emo-lib .fg-input, .fg-emo-lib .fg-select { padding: .45cqw .8cqw; font-size: 1cqw; }
-.fg-emo-sticky { position: sticky; top: 0; z-index: 3; display: grid; gap: .5cqw; padding: .6cqw 0; background: rgb(13, 10, 30); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(0, 0, 0, .5); }
-.fg-emo-batch { margin: 0; }
-.fg-emo-add { display: grid; grid-template-columns: 1fr 8cqw 12cqw auto; gap: .8cqw; align-items: center; }
-.fg-emo-group { border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); }
-.fg-emo-group-head { display: flex; align-items: center; gap: .6cqw; padding: .5cqw .9cqw; }
-.fg-emo-group-head > button { flex: 1; display: flex; align-items: baseline; gap: .8cqw; padding: 0; font: inherit; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
-.fg-emo-group-head b { font-family: var(--font-display); font-size: 1.3cqw; letter-spacing: .16em; color: var(--accent); }
-.fg-emo-caret { width: 1em; color: var(--ink-dim); }
-.fg-emo-empty { padding: 0 1cqw .7cqw 3.4cqw; }
-.fg-emo-row { display: grid; grid-template-columns: auto 11cqw 7cqw 12cqw 1fr auto; gap: .7cqw; align-items: center; padding: .45cqw .9cqw; border-top: 1px solid rgba(255, 255, 255, .05); }
-.fg-emo-row.is-off .fg-emo-name input { opacity: .5; text-decoration: line-through; }
-.fg-emo-row.is-picked { background: color-mix(in oklab, var(--accent) 12%, transparent); }
-.fg-emo-name { display: flex; align-items: center; gap: .4cqw; min-width: 0; }
-.fg-emo-name input { font-weight: 600; letter-spacing: .04em; }
-.fg-emo-name small { font-size: .8cqw; opacity: .5; font-family: var(--font-latin); }
-.fg-emo-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.fg-emo-acts { display: flex; gap: .4cqw; flex-wrap: wrap; justify-content: flex-end; }
-.fg-emo-prompts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1cqw; padding: .4cqw 0 .6cqw 2.4cqw; }
-.fg-emo-prompt { display: grid; gap: .4cqw; align-content: start; }
-.fg-emo-prompts.is-words { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-bottom: 0; }
-.fg-emo-prompt b { font-size: 1cqw; }
-.fg-emo-cats { display: grid; gap: .5cqw; }
-.fg-emo-cat { display: grid; grid-template-columns: 9cqw 14cqw 1fr auto; gap: .7cqw; align-items: center; }
-.fg-emo-restore { cursor: pointer; font: inherit; color: inherit; }
-.fg-chip small { margin-left: .3em; opacity: .55; font-size: .85em; }
-.fg-chip-x { margin-left: .2em; padding: 0 .3em; border: 0; border-radius: 99px; background: transparent; color: inherit; font: inherit; opacity: .6; cursor: pointer; }
-.fg-chip-x:hover { opacity: 1; background: rgba(255, 255, 255, .12); }
-.fg-chip-x:disabled { opacity: .3; cursor: default; }
-.fg-dlog-chip small { margin-left: .3em; opacity: .6; font-size: .85em; }
-
-/* 设置 →「提示词」（PromptBook.jsx）：按导演、几位设计师、共用、出图固定词、过滤规则分组，每段全文、变量、对照 */
-.fg-pb { display: grid; gap: .8cqw; }
-.fg-pb .fg-note .fg-btn.is-mini { margin: 0 .4cqw; }
-.fg-pb-flow { display: grid; grid-template-columns: 13cqw 1fr; gap: .6cqw 1.2cqw; align-items: center; padding: .8cqw 1cqw; border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); }
-.fg-pb-flow label { display: flex; align-items: center; gap: .7cqw; font-size: 1.05cqw; }
-.fg-pb-sticky { position: sticky; top: 0; z-index: 3; display: grid; gap: .5cqw; padding: .6cqw 0; background: rgb(13, 10, 30); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(0, 0, 0, .5); }
-.fg-pb-sticky .fg-row { flex-wrap: nowrap; }
-.fg-pb-sticky .fg-input { flex: 1; }
-.fg-pb-sticky .fg-select { width: auto; }
-.fg-pb-alert { font-size: .95cqw; color: #ffd27a; display: flex; align-items: center; gap: .6cqw; }
-.fg-pb-group { border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); padding-bottom: .4cqw; }
-.fg-pb-gdesc { padding: 0 1cqw .4cqw 3.2cqw; }
-.fg-pb-section { padding: .2cqw 1cqw .6cqw; }
-.fg-pb-stitle { margin: .6cqw 0 .4cqw; font-size: 1.05cqw; letter-spacing: .12em; color: var(--accent3); }
-.fg-pb-item { display: grid; gap: .45cqw; padding: .8cqw 1cqw; margin: .5cqw 0; border-radius: .7cqw; border: 1px solid rgba(255, 255, 255, .07); background: rgba(255, 255, 255, .02); }
-.fg-pb-item.is-edited { border-color: color-mix(in oklab, var(--accent) 45%, transparent); }
-.fg-pb-item.is-stale { border-color: rgba(255, 196, 92, .6); }
-.fg-pb-head { display: flex; align-items: center; flex-wrap: wrap; gap: .6cqw; font-size: 1.05cqw; }
-.fg-pb-head code { font-size: .8cqw; opacity: .5; font-family: var(--font-latin); }
-.fg-pb-badge { padding: .1cqw .7cqw; border-radius: 99px; font-size: .8cqw; background: color-mix(in oklab, var(--accent) 30%, transparent); color: #fff; }
-.fg-pb-badge.is-new { background: rgba(255, 196, 92, .32); color: #ffe2a8; }
-.fg-pb-badge.is-old { background: rgba(255, 255, 255, .1); color: var(--ink-dim); }
-.fg-pb-badge.is-dirty { background: rgba(94, 231, 255, .2); color: #bff6ff; }
-.fg-pb-text { min-height: 3cqw; max-height: 60cqw; tab-size: 2; }
-.fg-pb-foot { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .6cqw; }
-.fg-pb-vars { display: flex; flex-wrap: wrap; gap: .4cqw; flex-basis: 100%; }
-.fg-pb-var { display: inline-flex; align-items: baseline; gap: .4cqw; padding: .2cqw .7cqw; border-radius: .5cqw; font-size: .85cqw; color: var(--ink-dim); background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .06); }
-.fg-pb-var code { color: var(--accent3); font-size: .85cqw; }
-.fg-pb-var small { opacity: .6; }
-.fg-pb-var.is-unused { opacity: .55; }
-.fg-pb-var.is-unknown { border-color: #ff6b6b; color: #ffb3b3; }
-.fg-pb-last, .fg-pb-diff, .fg-pb-out { display: grid; gap: .4cqw; }
-.fg-pb-last summary { cursor: pointer; font-size: .9cqw; color: var(--ink-dim); }
-.fg-pb-last pre, .fg-pb-diff pre, .fg-pb-out pre { margin: 0; max-height: 36cqw; overflow: auto; padding: .7cqw 1cqw; border-radius: .6cqw; background: rgba(0, 0, 0, .35); font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-.fg-pb-del { color: #ff9c9c; background: rgba(255, 90, 90, .08); }
-.fg-pb-add { color: #9df0b4; background: rgba(90, 220, 140, .08); }
-.fg-pb-diff pre > div { display: grid; grid-template-columns: 1.6cqw 1fr; }
-.fg-pb-diff pre i { font-style: normal; opacity: .8; user-select: none; }
-.fg-pb-diff mark { color: inherit; background: color-mix(in oklab, currentColor 30%, transparent); border-radius: .2cqw; }
-.fg-pb-skip { color: var(--ink-dim); font-style: italic; }
-.fg-pb-stale { display: grid; gap: .6cqw; padding: .7cqw 1cqw; border-radius: .6cqw; background: rgba(255, 196, 92, .07); font-size: .95cqw; }
-.fg-pb-preview { display: grid; gap: .6cqw; padding: .8cqw 1cqw; border: 1px dashed var(--box-border); border-radius: .8cqw; }
-.fg-pb-preview .fg-select { width: auto; }
-
-/* 表单 */
-.fg-field { display: grid; grid-template-columns: 14cqw 1fr; gap: 1.2cqw; align-items: center; margin: .9cqw 0; font-size: 1.1cqw; }
-.fg-field > label { color: var(--ink-dim); letter-spacing: .08em; }
-.fg-field small { grid-column: 2; color: var(--ink-dim); font-size: .9cqw; margin-top: -.6cqw; }
-.fg-input, .fg-select, .fg-textarea { width: 100%; padding: .7cqw 1cqw; font: inherit; font-size: 1.1cqw; color: var(--ink); background: rgba(0, 0, 0, .35); border: 1px solid var(--box-border); border-radius: .6cqw; outline: none; }
-.fg-select option { background: #14122a; }
-.fg-textarea { min-height: 7cqw; resize: vertical; line-height: 1.5; font-family: "JetBrains Mono", Consolas, monospace; font-size: 1cqw; }
-.fg-input:focus, .fg-select:focus, .fg-textarea:focus { border-color: var(--accent); }
-.fg-btn { display: inline-flex; align-items: center; gap: .5cqw; padding: .6cqw 1.4cqw; border-radius: 99px; font-size: 1.05cqw; letter-spacing: .1em; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .05); transition: background .2s, border-color .2s; }
-.fg-btn:hover { background: rgba(255, 255, 255, .12); border-color: var(--accent); }
-.fg-btn.is-primary { background: linear-gradient(100deg, var(--accent), var(--accent2)); border-color: transparent; color: #fff; font-weight: 700; }
-.fg-btn[disabled] { opacity: .45; pointer-events: none; }
-.fg-row { display: flex; gap: .8cqw; flex-wrap: wrap; align-items: center; }
-.fg-switch { position: relative; flex: none; width: 3.4cqw; height: 1.9cqw; border-radius: 99px; background: rgba(255, 255, 255, .14); transition: background .2s; }
-.fg-switch::after { content: ""; position: absolute; left: .25cqw; top: .25cqw; width: 1.4cqw; height: 1.4cqw; border-radius: 50%; background: #fff; transition: transform .25s cubic-bezier(.3, 1.4, .5, 1); }
-.fg-switch.is-on { background: linear-gradient(100deg, var(--accent), var(--accent2)); }
-.fg-switch.is-on::after { transform: translateX(1.5cqw); }
-.fg-switch:disabled { opacity: .45; cursor: not-allowed; }
-.fg-note { font-size: .95cqw; color: var(--ink-dim); line-height: 1.6; }
-.fg-ok { color: #6ef0a8; } .fg-err { color: #ff8a8a; }
-/* 设置 → 对话框：缩小版的舞台（自己是 stage 容器，里面的 cqw 按它的宽算），对话框跟剧场里一模一样；百分比滑块；上传的字体清单 */
-.fg-dlg-preview { position: relative; container-type: size; container-name: stage; width: min(100%, 44cqw); aspect-ratio: var(--stage-ar, 1.4615); margin: .4cqw auto 0; border-radius: .8cqw; overflow: hidden; border: 1px solid var(--box-border); pointer-events: none;
-  background: radial-gradient(60% 50% at 30% 30%, rgba(255, 190, 170, .45), transparent 70%), radial-gradient(50% 60% at 78% 40%, rgba(150, 120, 255, .35), transparent 70%), linear-gradient(180deg, #2b2140, #8a4058 62%, #2a1830); }
-.fg-pct input[type=range] { width: 18cqw; }
-.fg-pct .fg-input { width: 6.4cqw; }
-.fg-fontlist { display: grid; gap: .3cqw; }
-.fg-fontitem { padding: .4cqw .2cqw; border-bottom: 1px solid rgba(255, 255, 255, .06); flex-wrap: nowrap; }
-.fg-fontname { font-size: 1.3cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.fg-section { margin: 1.6cqw 0 .6cqw; font-family: var(--font-display); font-size: 1.4cqw; letter-spacing: .2em; display: flex; align-items: center; gap: .8cqw; }
-.fg-section::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--box-border), transparent); }
-/* 设置 → 特效：每组一个标题行（名字、开着几个、总开关），下面一排排小开关 */
-.fg-fx-top { display: flex; align-items: center; gap: 1cqw; margin: .4cqw 0 .6cqw; }
-.fg-fx-top .fg-note { flex: 1; }
-.fg-fx-group { margin: 1.4cqw 0 0; padding: 1cqw 1.2cqw 1.2cqw; border-radius: 1cqw; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .03); }
-.fg-fx-head { display: flex; align-items: center; gap: .8cqw; margin-bottom: .3cqw; }
-.fg-fx-head > .fg-spacer { flex: 1; }
-.fg-fx-head b { font-family: var(--font-display); font-size: 1.3cqw; letter-spacing: .16em; }
-.fg-fx-count { font-size: .9cqw; letter-spacing: .08em; color: var(--ink-dim); }
-.fg-fx-count.is-part { color: var(--accent); }
-.fg-fx-items { display: flex; flex-wrap: wrap; gap: .5cqw; margin-top: .8cqw; }
-.fg-fx-chip { display: inline-flex; align-items: center; gap: .5cqw; padding: .4cqw 1cqw .4cqw .7cqw; border-radius: 99px; font-size: 1cqw; letter-spacing: .06em; color: var(--ink-dim);
-  border: 1px solid var(--box-border); background: rgba(0, 0, 0, .25); transition: color .2s, border-color .2s, background .2s; }
-.fg-fx-chip i { width: .8cqw; height: .8cqw; border-radius: 50%; border: 1px solid currentColor; opacity: .6; transition: background .2s, box-shadow .2s, opacity .2s; }
-.fg-fx-chip:hover { border-color: var(--accent); }
-.fg-fx-chip.is-on { color: var(--ink); border-color: color-mix(in oklab, var(--accent) 55%, transparent); background: color-mix(in oklab, var(--accent) 14%, transparent); }
-.fg-fx-chip.is-on i { opacity: 1; border-color: transparent; background: linear-gradient(100deg, var(--accent), var(--accent2)); box-shadow: 0 0 .5cqw var(--accent); }
-.fg-fx-chip:not(.is-on) { text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, .3); }
-.fg-skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(15cqw, 1fr)); gap: 1cqw; }
-.fg-skin { padding: 1cqw; border-radius: 1cqw; border: 1px solid var(--box-border); text-align: left; transition: transform .2s; }
-.fg-skin:hover { transform: translateY(-.3cqw); }
-.fg-skin.is-on { box-shadow: 0 0 0 2px var(--accent); }
-.fg-skin-swatch { height: 4cqw; border-radius: .6cqw; margin-bottom: .6cqw; }
-.fg-skin b { display: block; font-size: 1.1cqw; letter-spacing: .1em; } .fg-skin span { font-size: .85cqw; color: var(--ink-dim); }
-.fg-style { display: flex; flex-direction: column; min-width: 0; }
-.fg-style > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all; }
-.fg-styles { grid-template-columns: repeat(auto-fill, minmax(12cqw, 1fr)); }
-/* 样图是竖版（试画按竖版尺寸画），卡片封面也竖着放。 */
-.fg-style-cover { display: grid; place-items: center; aspect-ratio: 832 / 1216; margin-bottom: .6cqw; border-radius: .6cqw; background: linear-gradient(160deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .02)) center top / cover no-repeat; font-size: .85cqw; color: var(--ink-dim); }
-.fg-style-cover span { font-size: inherit; color: inherit; }
-.fg-style.is-new .fg-style-cover { font-size: 3cqw; border: 1px dashed var(--box-border); background: none; }
-.fg-sent i { opacity: .7; }
-
-.fg-update-done { margin: .8cqw 0; padding: .9cqw 1.2cqw; border-radius: .8cqw; font-size: 1.05cqw; line-height: 1.6; color: #6ef0a8; background: rgba(110, 240, 168, .08); border: 1px solid rgba(110, 240, 168, .3); }
-/* 文件更新了、DSH 还没重启：网页新、后台旧，提醒重启 */
-.fg-restart { margin: 0 3cqw .8cqw; padding: .7cqw 1.1cqw; border-radius: .8cqw; font-size: 1cqw; line-height: 1.55; color: #ffd59a; background: rgba(217, 130, 43, .14); border: 1px solid rgba(217, 130, 43, .55); }
-.fg-restart b { color: #fff0d6; }
-.fg-restart.is-floating { position: absolute; top: 1.2cqw; left: 50%; transform: translateX(-50%); z-index: 40; width: max-content; max-width: 70cqw; margin: 0; background: rgba(40, 24, 8, .86); backdrop-filter: blur(6px); }
-.fg-changes { margin: .4cqw 0 0 15.2cqw; border-radius: .8cqw; border: 1px solid var(--box-border); overflow: hidden; }
-.fg-changes > div { display: grid; grid-template-columns: 6cqw 1fr auto; gap: 1cqw; padding: .6cqw 1cqw; font-size: 1cqw; line-height: 1.5; border-bottom: 1px solid rgba(255, 255, 255, .06); }
-.fg-changes > div:last-child { border-bottom: 0; }
-.fg-changes code, .fg-note code { font-family: "JetBrains Mono", Consolas, monospace; color: var(--accent); }
-.fg-changes small { color: var(--ink-dim); white-space: nowrap; }
-
-.fg-lightbox { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2cqw; background: rgba(0, 0, 0, .9); animation: fg-fade-in .25s ease both; cursor: zoom-out; }
-.fg-lightbox img { max-width: 92%; max-height: 82%; object-fit: contain; box-shadow: 0 0 6cqw rgba(0, 0, 0, .8); cursor: default; }
-.fg-lightbox .fg-row { cursor: default; }
-
-@keyframes fg-fade-in { from { opacity: 0; } }
-@keyframes fg-fade-out { to { opacity: 0; } }
-@keyframes fg-spin { to { transform: rotate(360deg); } }
-@keyframes fg-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
-@keyframes fg-skeleton { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-@keyframes fg-pop { from { opacity: 0; transform: translateY(-.4cqw); } to { opacity: 1; transform: none; } }
-
-@media (prefers-reduced-motion: reduce) {
-  .fg-bg-art, .fg-cg-img, .fg-cg-art, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-down-mist i { animation: none !important; }
-  /* 换背景还是淡入淡出（只是不推拉、不模糊、不旋转），不会一下子跳过去 */
-  .fg-bg.is-enter { animation: fg-fade-slow var(--enter-dur, 1.1s) ease both !important; }
-  .fg-cover[data-cover="lids"]::before { display: none; }
-  .fg-cover[data-cover="lids"] { background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }
-  .fg-cover[data-cover="lids"][data-state="up"] { animation: fg-cover-up var(--ms) ease both; }
-  .fg-cover[data-cover="lids"][data-state="down"] { animation: fg-cover-down var(--ms) ease both; }
-  .fg-cover[data-cover="lids"][data-state="off"], .fg-cover[data-cover="lids"][data-state="idle"] { opacity: 0; }
-  .fg-recall::after, .fg-recall-face { animation: none !important; } /* 闪回里的光斑漂移、心跳脉动、小头像错位 */
-  .fg-romance::before, .fg-romance::after, .fg-sense::after, .fg-world-in[data-sense] .fg-cast { animation: none !important; } /* 光斑漂移、心跳暗角、耳边的呼吸、触碰的涟漪、失神的晃 */
-  .fg-sense[data-v="heat"]::before, .fg-sense[data-v="touch"]::before, .fg-sense[data-v="scent"]::before { animation: none !important; }
-  .fg-phone-card, .fg-phone-ripple, .fg-phone-key.is-accept, .fg-notify-wave i { animation: none !important; } /* 手机一震一震、声波跳 */
-  .fg-dialog[data-recall] .fg-box, .fg-dialog[data-recall] .fg-box::after, .fg-dialog[data-recall] .fg-line, .fg-dialog[data-recall] .fg-name-plate { animation: none !important; } /* 闪回对话框里的光斑、脉动、抖动、名牌忽隐忽现 */
-  .fg-dialog[data-recall] .fg-char { animation-name: fg-char-in !important; }
-  .fg-flash.is-dread { animation: fg-bloom .6s ease-out both !important; } /* 撕裂闪烁换成淡入淡出 */
-  .fg-cg-pan { animation: none !important; transform: scale(var(--r)); }
-  .fg-cg:not(.is-leaving) { animation: fg-cg-fade-in .6s ease both !important; }
-  .fg-cg.is-leaving { animation: fg-cg-fade-out .6s ease both !important; }
-  .fg-cg::before { display: none; }
-  .fg-camera[data-cam="whip"] { animation: none !important; }
-  .fg-photo, .fg-cup, .fg-moment-card { animation: fg-fade-in .2s ease both !important; } /* 小瞬间：不飞、不弹，只淡入 */
-  .fg-touch-ring, .fg-clink, .fg-fw-trail, .fg-fw-burst, .fg-steam i { animation: none !important; opacity: 0; }
-  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */
-  .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }
-  .fg-text.is-wait .fg-char { animation: none !important; }
-}
-@container stage (max-aspect-ratio: 4/5) {
-  .fg-face-levels { grid-template-columns: minmax(0, 1fr); } .fg-dial input[type=range], .fg-pct input[type=range] { width: 30cqw; }
-  .fg-face-try { width: 22cqw; }
-  .fg-pct .fg-input { width: 14cqw; } .fg-dlg-preview { width: 100%; } .fg-fontname { font-size: 3.2cqw; }
-  .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }
-  .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }
-  .fg-dialog { left: 3%; right: 3%; height: var(--fg-dlg-h-p, 22%); --fg-dlg-ref: 22cqh; }
-  .fg-recall-face { width: 17cqw; }
-  .fg-phone { top: 16%; } .fg-phone-card { width: 34cqw; padding: 3cqw 2.6cqw; border-radius: 4cqw; }
-  .fg-phone-label { font-size: 2.4cqw; } .fg-phone-label svg { width: 2.6cqw; height: 2.6cqw; }
-  .fg-phone-avatar { width: 15cqw; height: 15cqw; margin: 2.4cqw auto 1.6cqw; } .fg-phone-face { font-size: 6.4cqw; }
-  .fg-phone-name { font-size: 4.2cqw; } .fg-phone-keys { gap: 7cqw; margin-top: 2.6cqw; } .fg-phone-key { width: 8cqw; height: 8cqw; }
-  .fg-phone-result { font-size: 2.8cqw; } .fg-phone-result i { width: 4cqw; height: 4cqw; }
-  .fg-call-chip svg { width: 2.6cqw; height: 2.6cqw; } .fg-call-dot { width: 1.4cqw; height: 1.4cqw; }
-  .fg-pip { width: 24cqw; top: 9%; border-radius: 2.4cqw; } .fg-pip-name { font-size: 2.4cqw; left: 1.6cqw; bottom: 1.4cqw; } .fg-pip-name i { width: 1.2cqw; height: 1.2cqw; }
-  .fg-notify { width: 88cqw; top: 2.4%; padding: 2.2cqw 2.8cqw; gap: 2.2cqw; border-radius: 3.4cqw; }
-  .fg-notify-icon { width: 8cqw; height: 8cqw; border-radius: 2cqw; font-size: 4cqw; }
-  .fg-notify-head { font-size: 2.8cqw; } .fg-notify-head span { font-size: 2.4cqw; } .fg-notify-text { font-size: 3.2cqw; }
-  .fg-notify-wave { height: 4.4cqw; gap: .5cqw; } .fg-notify-wave i { width: .5cqw; }
-  .fg-text { font-size: calc(4.6cqw * var(--fg-text-scale, 1)); top: clamp(3cqw, 18%, calc(.18 * var(--fg-dlg-ref))); bottom: min(26%, calc(.26 * var(--fg-dlg-ref))); }
-  .fg-progress { bottom: min(12%, calc(.12 * var(--fg-dlg-ref))); right: 4.2%; }
-  .fg-quick { bottom: min(5%, calc(.05 * var(--fg-dlg-ref))); left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }
-  .fg-wait { bottom: min(28%, calc(.28 * var(--fg-dlg-ref))); }
-  .fg-status { display: none; }
-  .fg-name-plate { font-size: 4cqw; } .fg-name { top: -5cqw; } .fg-name-sub { font-size: 2.4cqw; } /* 情绪小字：以前沿用横屏的 1cqw，手机上只有 4px */
-  .fg-iconbtn { width: 9cqw; height: 9cqw; font-size: 4cqw; }
-  .fg-hud-place { font-size: 4cqw; } .fg-hud-meta { font-size: 2.6cqw; }
-  .fg-choice, .fg-free { width: 88cqw; font-size: 4cqw; }
-  .fg-title-logo { font-size: 11cqw; max-width: 90cqw; } .fg-title-menu button { font-size: 4.4cqw; }
-  .fg-dlog { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
-  .fg-dlog-side { flex-direction: row; overflow-x: auto; padding: 0 0 1cqw; }
-  .fg-dlog-row { width: 46cqw; }
-  .fg-dlog-row-head, .fg-dlog-title { font-size: 3.6cqw; }
-  .fg-dlog-row-meta, .fg-dlog-row-sum, .fg-dlog-status, .fg-dlog-label, .fg-dlog-meter, .fg-dlog-think summary, .fg-dlog-chip, .fg-dlog-chip i, .fg-btn.is-mini { font-size: 2.8cqw; }
-  .fg-dlog-facts, .fg-dlog-notice, .fg-dlog-error, .fg-dlog-pre, .fg-dlog-line, .fg-dlog-card, .fg-dlog-mono, .fg-dlog-list-plain { font-size: 3cqw; }
-  .fg-dlog-facts { grid-template-columns: 1fr; }
-  .fg-dlog-pre { max-height: 90cqw; }
-  .fg-dlog-line { grid-template-columns: 9cqw minmax(0, 1fr); }
-  .fg-dlog-line > .fg-dlog-chips { grid-column: 2; }
-  .fg-dlog .fg-note, .fg-dlog-uid { font-size: 2.6cqw; }
-  .fg-dlog-list-plain { padding-left: 6cqw; }
-  .fg-panel-title { font-size: 6cqw; } .fg-panel-en { font-size: 2.2cqw; }
-  .fg-tab { padding: 1.2cqw 3cqw; font-size: 3.2cqw; }
-  .fg-pill { padding: .8cqw 2.2cqw; font-size: 2.6cqw; }
-  .fg-person { grid-template-columns: 1fr; }
-  .fg-person-art { height: 50cqw; }
-  .fg-person h3 { font-size: 5cqw; flex-wrap: wrap; } .fg-person h3 small { font-size: 2.6cqw; }
-  .fg-person-tags, .fg-note { font-size: 2.8cqw; }
-  .fg-look-grid { grid-template-columns: 1fr; } .fg-look-field > span { font-size: 2.6cqw; }
-  .fg-btn, .fg-look, .fg-state { font-size: 3cqw; padding: 1cqw 2.4cqw; }
-  .fg-emo { width: 15cqw; height: 18cqw; font-size: 2.4cqw; }
-  .fg-field, .fg-person-form .fg-field { grid-template-columns: 1fr; font-size: 3cqw; }
-  .fg-fx-top { flex-wrap: wrap; } .fg-fx-top .fg-note { flex-basis: 100%; }
-  .fg-fx-group { padding: 2cqw 2.4cqw 2.4cqw; border-radius: 2cqw; }
-  .fg-fx-head b { font-size: 3.4cqw; } .fg-fx-count { font-size: 2.6cqw; }
-  .fg-switch { width: 8.4cqw; height: 4.6cqw; } .fg-switch::after { left: .6cqw; top: .6cqw; width: 3.4cqw; height: 3.4cqw; } .fg-switch.is-on::after { transform: translateX(3.8cqw); }
-  .fg-fx-items { gap: 1.2cqw; }
-  .fg-fx-chip { font-size: 2.8cqw; padding: .9cqw 2cqw .9cqw 1.4cqw; gap: 1cqw; } .fg-fx-chip i { width: 1.8cqw; height: 1.8cqw; }
-  .fg-input, .fg-select, .fg-textarea { font-size: 3cqw; }
-  .fg-outfit, .fg-outfit.is-new { grid-template-columns: 1fr; }
-  .fg-emo-lib .fg-input, .fg-emo-lib .fg-select { font-size: 3cqw; padding: 1cqw 1.6cqw; }
-  .fg-emo-add, .fg-emo-cat, .fg-emo-prompts { grid-template-columns: 1fr; }
-  .fg-emo-row { grid-template-columns: auto 1fr 1fr; } .fg-emo-row > .fg-select, .fg-emo-row > .fg-note:not(.fg-emo-meta) { grid-column: 2 / -1; } .fg-emo-name { grid-column: 2 / -1; }
-  .fg-emo-meta, .fg-emo-acts { grid-column: 1 / -1; } .fg-emo-acts { justify-content: flex-start; }
-  .fg-emo-group-head b { font-size: 3.4cqw; } .fg-emo-name small { font-size: 2.4cqw; } .fg-emo-prompt b { font-size: 3cqw; }
-  .fg-pb-flow { grid-template-columns: 1fr; padding: 2cqw; border-radius: 2cqw; } .fg-pb-flow label { font-size: 3.2cqw; gap: 2cqw; }
-  .fg-pb-sticky .fg-row { flex-wrap: wrap; } .fg-pb-sticky .fg-input { flex-basis: 100%; }
-  .fg-pb-alert, .fg-pb-stale { font-size: 2.8cqw; }
-  .fg-pb-gdesc { padding: 0 2cqw 1cqw 6cqw; } .fg-pb-section { padding: .4cqw 2cqw 1.2cqw; }
-  .fg-pb-stitle, .fg-pb-head { font-size: 3.2cqw; } .fg-pb-head code, .fg-pb-badge { font-size: 2.4cqw; }
-  .fg-pb-item { padding: 2cqw; gap: 1.2cqw; border-radius: 2cqw; } .fg-pb-badge { padding: .3cqw 1.6cqw; }
-  .fg-pb-var, .fg-pb-var code, .fg-pb-last summary { font-size: 2.6cqw; } .fg-pb-var { padding: .5cqw 1.6cqw; border-radius: 1.2cqw; }
-  .fg-pb-last pre, .fg-pb-diff pre, .fg-pb-out pre { font-size: 2.6cqw; max-height: 100cqw; padding: 1.6cqw 2cqw; }
-  .fg-pb-diff pre > div { grid-template-columns: 4cqw 1fr; } .fg-pb-text { max-height: 150cqw; }
-  .fg-pb-preview { padding: 2cqw; border-radius: 2cqw; } .fg-pb-preview .fg-row { flex-wrap: wrap; }
-  .fg-dlog-chip small { font-size: 2.4cqw; }
-  .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }
-  .fg-askbox { padding: 2cqw; gap: 1.4cqw; border-radius: 2cqw; } .fg-ticks { gap: 1.2cqw; }
-  .fg-tick { font-size: 2.8cqw; padding: .8cqw 2.2cqw; } .fg-tick small { font-size: 2.3cqw; }
-  .fg-askbox .fg-count { width: 24cqw; } .fg-askbox .fg-posename { flex: 1; width: auto; min-width: 30cqw; }
-  .fg-variant-body b { font-size: 3.4cqw; }
-  .fg-row .fg-input.fg-seedinput { width: 26cqw; }
-  .fg-aa-grid { grid-template-columns: 1fr; } .fg-aa-list { max-height: 50cqw; }
-  .fg-aa-vision { font-size: 2.6cqw; } .fg-aa-badge { font-size: 2.2cqw; } .fg-aa-vision progress { height: 1.6cqw; }
-  .fg-acting .fg-field { grid-template-columns: 1fr; }
-  .fg-pm .fg-input { font-size: 3cqw; padding: 1cqw 1.6cqw; }
-  .fg-pm-poses { grid-template-columns: 1fr; gap: 1.6cqw; } .fg-pm-pose { padding: 1.8cqw; gap: 1cqw; border-radius: 2cqw; }
-  .fg-pm-id { font-size: 2.4cqw; min-width: 5cqw; } .fg-pm-add { min-height: 10cqw; font-size: 3cqw; border-radius: 2cqw; }
-  .fg-pm-scroll { max-height: 120cqw; border-radius: 2cqw; }
-  .fg-pm-table { font-size: 3cqw; } .fg-pm-table th, .fg-pm-table td { padding: 1cqw 1.4cqw; }
-  .fg-pm-head b { max-width: 22cqw; } .fg-pm-emo small { font-size: 2.4cqw; } .fg-pm-cat b { font-size: 3.2cqw; }
-  .fg-pm-offtag { font-size: 2.2cqw; } .fg-pm-status { font-size: 2.6cqw; } .fg-pm-life { font-size: 2.4cqw; } .fg-pm-situ { gap: 1cqw; padding-top: 1cqw; }
-  .fg-pm-cell input { width: 3.6cqw; height: 3.6cqw; } .fg-pm-star { font-size: 3.6cqw; padding: 0 .6cqw; }
-  .fg-pm-thumb { width: 7cqw; height: 9cqw; font-size: 2.6cqw; border-radius: 1cqw; }
-  .fg-pm-face { grid-template-columns: 1fr; max-width: 80cqw; }
-  .fg-face-editor .fg-aa-frame { height: 80cqw; }
-  .fg-aa-frame, .fg-aa-play { height: 90cqw; } .fg-aa-play.is-close { width: 90cqw; }
-  .fg-aa-item img { width: 9cqw; height: 11cqw; } .fg-aa-item { grid-template-columns: auto 9cqw 1fr; }
-  .fg-track-desc { min-height: 12cqw; font-size: 3cqw; }
-  .fg-lib { grid-template-columns: 1fr; }
-  .fg-lib-tree { position: static; flex-direction: row; flex-wrap: wrap; gap: 1cqw; max-height: 40cqw; padding: 1.2cqw; border-radius: 2cqw; }
-  .fg-libcat { width: auto; max-width: 100%; gap: 1cqw; padding: .8cqw 1.8cqw; border: 1px solid var(--box-border); border-radius: 99px; font-size: 2.6cqw; }
-  .fg-libcat.is-sub { padding-left: 1.8cqw; font-size: 2.4cqw; border-style: dashed; }
-  .fg-libcat i { font-size: 2.2cqw; }
-  .fg-lib-search { flex-basis: 100%; }
-  .fg-lib-cathead, .fg-lib-count { padding: 1cqw 1.6cqw; border-radius: 1.6cqw; }
-  .fg-lib-count input, .fg-librow input[type="checkbox"] { width: 3.6cqw; height: 3.6cqw; }
-  .fg-librow { grid-template-columns: auto 7cqw minmax(0, 1fr) auto; gap: 1.6cqw; padding: 1.2cqw 1.6cqw; border-radius: 1.6cqw; }
-  .fg-librow.is-open { border-radius: 1.6cqw 1.6cqw 0 0; }
-  .fg-librow-size { display: none; }
-  .fg-librow-play { width: 7cqw; height: 7cqw; font-size: 2.4cqw; }
-  .fg-librow-main b { font-size: 3cqw; } .fg-librow-main span { font-size: 2.4cqw; }
-  .fg-libchip { max-width: 22cqw; padding: .4cqw 1.4cqw; font-size: 2.4cqw; }
-  .fg-libedit { gap: 1.2cqw; padding: 1.6cqw 2cqw; border-radius: 0 0 1.6cqw 1.6cqw; }
-  .fg-lib-bar { gap: 1.2cqw; padding: 1.6cqw 2cqw; border-radius: 2cqw; }
-  .fg-lib-bar .fg-row { flex-wrap: wrap; }
-}
-
-/* 亲密场面（lib/eros.js、Eros.jsx）：潮红 .fg-eros（scene.eros，节奏越快越深，余韵时转成一层暖雾）、触手的影子 .fg-tentacle（scene.tentacle）、
-   高潮那一下的白光 .fg-peak。不出字、不出爱心和漫画符号，只动光和影。潮红和影子在插画上面一层（z-index 7），只压画面边上一圈，不挡脸；
-   白光在对话框下面（z-index 15），字照样读得到。镜头跟着节奏的一送一落、高潮时的一涌是 Eros.jsx 用 Web Animations 动的。 */
-.fg-eros, .fg-tentacle { position: absolute; inset: 0; z-index: 7; pointer-events: none; animation: fg-layer-in var(--fade, 1.2s) ease both; }
-.fg-eros.is-leave, .fg-tentacle.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }
-.fg-eros::before, .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
-.fg-eros { --flush: rgba(205, 72, 98, .4); --glow: 4.2s; background: radial-gradient(118% 92% at 50% 46%, rgba(255, 180, 170, .06) 30%, var(--flush)); backdrop-filter: saturate(1.08); -webkit-backdrop-filter: saturate(1.08); }
-.fg-eros::after { background: radial-gradient(85% 55% at 50% 104%, rgba(255, 168, 150, .2), transparent 70%), radial-gradient(70% 40% at 50% -6%, rgba(255, 190, 200, .12), transparent 70%); animation: fg-eros-glow var(--glow) ease-in-out infinite; }
-.fg-eros[data-v="tease"] { --flush: rgba(225, 112, 124, .28); --glow: 5s; }
-.fg-eros[data-v="fast"] { --flush: rgba(200, 62, 92, .48); --glow: 2.6s; backdrop-filter: saturate(1.12) contrast(1.02); -webkit-backdrop-filter: saturate(1.12) contrast(1.02); }
-.fg-eros[data-v="frantic"] { --flush: rgba(190, 46, 84, .56); --glow: 1.5s; backdrop-filter: saturate(1.18) contrast(1.05); -webkit-backdrop-filter: saturate(1.18) contrast(1.05); }
-.fg-eros[data-v="afterglow"] { --glow: 7s; background: radial-gradient(120% 95% at 50% 46%, rgba(255, 236, 226, .1) 30%, rgba(222, 150, 150, .24)); backdrop-filter: brightness(1.04) contrast(.93) saturate(.95); -webkit-backdrop-filter: brightness(1.04) contrast(.93) saturate(.95); }
-.fg-eros[data-v="afterglow"]::before { background: radial-gradient(60% 55% at 50% 44%, rgba(255, 250, 246, .16), transparent 72%); filter: blur(1cqw); }
-@keyframes fg-eros-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-
-/* 触手：画面两边和角落里暗紫的触手剪影往里探、慢慢地扭（像镜头前景里没对上焦的东西），身上一道湿亮的反光；
-   潜伏（idle）时缩在画面外沿、淡一些，蠕动（writhe）时探进来、扭得快。形状是两张 SVG：剪影一张、反光一张，跟着同一个动画走。 */
-.fg-tentacle { --sway: 9s; background: radial-gradient(112% 92% at 50% 42%, transparent 52%, rgba(16, 4, 26, .42));
-  --tentacle-shape: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-160 -80 1920 1160' preserveAspectRatio='none'><path fill='%2310051a' fill-opacity='.9' d='M-33,1103 -10,1066 10,1030 26,994 40,959 51,925 60,891 66,858 71,826 74,795 77,764 78,734 78,704 78,675 78,647 77,619 77,591 78,563 79,535 81,508 84,480 89,452 95,424 103,395 114,366 127,337 142,307 144,302 144,297 142,292 137,288 132,286 127,286 122,288 118,293 99,323 83,352 69,382 56,411 46,441 37,470 29,499 23,528 17,557 12,585 8,614 4,642 -0,670 -5,697 -10,725 -15,752 -22,779 -29,805 -38,832 -47,858 -59,884 -72,910 -87,936 -105,963 -125,990 -147,1017ZM-128,708 -97,704 -68,699 -41,692 -16,683 7,674 29,663 48,652 67,640 84,628 99,615 114,602 127,589 140,575 152,562 163,550 174,537 185,525 196,513 207,502 219,491 231,481 243,471 256,462 271,454 286,447 303,441 307,439 310,436 312,432 311,427 309,423 306,420 302,418 297,419 278,423 260,429 243,435 226,442 211,450 195,459 181,468 166,478 152,488 139,498 125,508 111,517 98,527 84,536 70,545 56,553 41,561 26,567 10,573 -7,579 -24,583 -43,587 -63,590 -84,591 -107,592 -132,592ZM-123,-23 -101,-14 -80,-4 -62,7 -46,17 -32,27 -19,37 -7,48 4,59 14,70 23,81 32,92 40,104 48,116 57,128 65,139 73,151 82,163 91,174 102,185 113,195 125,204 139,213 154,221 170,228 188,234 207,240 211,240 215,239 218,237 220,233 220,229 219,225 217,222 213,220 195,213 180,206 167,198 156,189 146,180 138,170 131,160 125,150 119,139 114,127 109,115 104,103 99,89 94,75 88,61 81,46 73,30 64,14 53,-2 41,-19 27,-35 11,-52 -8,-68 -28,-85 -51,-101 -77,-117ZM288,1070 289,1052 291,1035 293,1018 296,1003 300,987 304,973 309,958 314,943 319,929 325,914 330,900 336,885 342,870 348,854 353,839 359,822 363,806 367,788 371,770 374,752 376,732 377,712 377,690 376,668 374,644 372,619 370,615 367,611 363,609 359,608 355,610 351,613 349,617 348,621 349,645 348,668 346,689 344,708 340,726 335,743 330,759 323,774 317,788 310,802 302,815 294,828 285,840 277,853 268,865 258,878 249,891 239,905 230,920 220,935 211,951 202,969 194,987 186,1007 179,1028 172,1050ZM1754,1015 1731,986 1711,958 1694,929 1679,901 1665,873 1654,845 1644,816 1635,788 1628,759 1622,731 1616,701 1611,672 1607,643 1603,613 1598,583 1594,553 1589,523 1583,493 1576,463 1568,432 1559,402 1548,372 1534,342 1519,312 1502,282 1482,252 1478,248 1473,246 1467,246 1462,248 1458,252 1456,257 1456,263 1458,268 1475,298 1488,327 1499,356 1508,386 1514,414 1519,443 1522,472 1524,500 1525,529 1525,558 1525,588 1524,617 1523,647 1522,678 1522,709 1522,741 1524,774 1526,808 1531,842 1537,877 1545,913 1555,950 1568,988 1584,1026 1604,1065 1626,1105ZM1745,202 1722,205 1701,208 1681,209 1663,209 1645,209 1629,207 1613,205 1598,202 1583,198 1569,194 1556,189 1542,183 1529,177 1515,170 1502,163 1489,156 1476,149 1462,142 1449,135 1435,128 1421,122 1406,116 1391,110 1375,106 1359,102 1342,99 1338,98 1334,100 1330,103 1329,108 1328,112 1330,116 1333,120 1338,121 1352,126 1366,132 1379,138 1391,146 1403,153 1414,162 1425,171 1436,180 1447,190 1458,200 1470,210 1482,220 1494,231 1507,241 1521,251 1536,261 1551,271 1568,280 1587,288 1606,296 1627,303 1650,308 1674,313 1699,316 1726,318 1755,318ZM1457,1046 1449,1026 1440,1006 1431,988 1422,972 1412,956 1401,941 1391,926 1381,912 1371,899 1360,886 1351,874 1341,862 1332,849 1323,837 1314,824 1306,812 1299,798 1292,785 1286,770 1281,755 1277,739 1273,722 1271,704 1270,684 1270,664 1272,642 1271,637 1269,633 1266,630 1262,628 1257,629 1253,631 1250,634 1248,638 1245,661 1242,683 1240,704 1240,725 1241,744 1242,763 1245,781 1249,799 1253,816 1258,833 1263,849 1269,865 1276,881 1282,896 1289,911 1296,926 1302,940 1309,955 1315,970 1321,984 1326,999 1331,1013 1335,1028 1338,1043 1341,1058 1343,1074ZM1737,725 1717,723 1699,721 1682,718 1666,715 1651,711 1637,707 1624,703 1611,698 1599,693 1588,688 1577,682 1567,676 1557,670 1547,664 1537,658 1527,652 1518,646 1508,640 1498,634 1488,628 1478,622 1468,617 1457,612 1446,608 1435,605 1423,601 1419,601 1416,602 1413,604 1411,607 1411,611 1412,614 1414,617 1417,619 1428,623 1437,628 1446,633 1455,639 1463,646 1471,653 1478,660 1486,667 1493,675 1501,684 1509,692 1517,701 1526,710 1535,719 1545,728 1556,737 1567,746 1580,755 1594,764 1608,772 1624,781 1641,789 1659,796 1679,803 1700,809 1723,815Z'/></svg>");
-  --tentacle-sheen: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-160 -80 1920 1160' preserveAspectRatio='none'><path fill='%23c496ff' fill-opacity='.42' d='M-15,969 1,934 13,900 23,866 31,833 37,800 41,768 44,736 47,704 49,673 50,642 52,611 53,580 56,550 60,519 64,488 71,457 79,425 89,394 89,394 80,426 73,457 68,489 65,520 63,550 62,581 62,612 62,643 61,674 60,706 58,737 54,770 49,802 41,835 31,868 19,902 4,935 -15,969ZM-46,653 -21,646 2,637 23,628 43,618 61,607 79,595 95,583 110,570 124,557 138,544 151,532 164,519 178,507 191,495 205,483 219,472 234,462 250,453 250,453 234,463 220,474 207,486 194,498 182,511 169,524 157,538 144,551 131,565 116,578 101,591 85,604 67,615 47,626 26,635 4,642 -21,648 -46,653ZM-26,-39 -7,-23 9,-7 24,8 36,24 47,40 57,55 65,70 73,85 80,99 87,113 94,127 100,140 108,152 116,164 125,175 135,186 147,196 160,205 160,205 147,195 136,185 127,173 119,161 112,149 106,136 100,123 94,109 88,95 81,80 74,65 65,50 54,35 42,19 29,4 13,-11 -6,-25 -26,-39ZM257,1005 262,986 269,969 275,952 283,936 290,920 298,905 305,890 313,874 321,859 328,843 335,827 342,810 348,793 353,775 358,756 361,736 364,715 365,692 365,692 365,715 363,736 361,757 358,776 353,795 349,813 343,830 337,847 330,863 323,879 315,895 307,910 299,925 290,940 282,955 273,971 265,987 257,1005ZM1614,962 1599,924 1587,888 1577,851 1570,816 1564,781 1561,746 1558,712 1556,679 1555,646 1553,613 1552,580 1550,548 1548,515 1545,483 1540,451 1533,419 1525,387 1514,355 1514,355 1523,387 1531,420 1536,452 1539,484 1540,516 1541,548 1541,581 1541,613 1541,646 1542,680 1543,714 1547,748 1551,783 1558,818 1568,854 1580,890 1595,926 1614,962ZM1674,274 1650,271 1628,266 1607,260 1588,254 1570,246 1553,238 1537,229 1521,220 1507,210 1493,201 1480,191 1466,181 1453,171 1440,162 1427,153 1413,144 1400,136 1385,129 1385,129 1399,137 1412,146 1425,155 1438,165 1450,176 1462,187 1475,198 1488,208 1501,219 1516,229 1531,239 1548,248 1566,256 1585,262 1605,267 1627,271 1650,273 1674,274ZM1370,1011 1363,994 1356,978 1348,962 1340,946 1331,930 1322,915 1314,900 1305,884 1297,869 1289,853 1281,837 1274,820 1268,803 1263,786 1258,767 1255,748 1253,728 1252,706 1252,706 1252,728 1253,748 1255,768 1258,787 1263,805 1268,823 1274,841 1280,858 1288,874 1296,890 1304,905 1313,921 1323,936 1332,950 1342,965 1351,980 1361,995 1370,1011ZM1666,766 1647,760 1629,753 1613,745 1598,737 1584,729 1571,721 1559,712 1548,704 1537,695 1527,686 1518,678 1508,669 1499,661 1490,654 1481,646 1471,639 1462,632 1452,626 1452,626 1461,633 1471,640 1479,648 1488,656 1496,665 1505,674 1513,683 1523,692 1532,701 1543,710 1554,719 1567,728 1580,736 1595,743 1611,750 1628,756 1646,762 1666,766Z'/></svg>"); }
-/* 两张 SVG 比画面四周各大出一圈（inset 负值，viewBox 也多出同样一圈），扭的时候不露出图的边 */
-.fg-tentacle::before, .fg-tentacle::after { inset: -8% -10%; background: var(--tentacle-shape) 0 0 / 100% 100% no-repeat; transform-origin: 50% 92%; animation: fg-tentacle-sway var(--sway) ease-in-out infinite alternate; }
-.fg-tentacle::before { filter: blur(.45cqw); }
-.fg-tentacle::after { background-image: var(--tentacle-sheen); mix-blend-mode: screen; filter: blur(.25cqw); animation: fg-tentacle-sway var(--sway) ease-in-out infinite alternate, fg-tentacle-glint calc(var(--sway) * .7) ease-in-out infinite; }
-.fg-tentacle[data-v="idle"] { opacity: .72; }
-.fg-tentacle[data-v="idle"]::before, .fg-tentacle[data-v="idle"]::after { scale: 1.12; }
-.fg-tentacle[data-v="writhe"] { --sway: 2.6s; background: radial-gradient(108% 88% at 50% 42%, transparent 44%, rgba(16, 4, 26, .55)); }
-.fg-tentacle[data-v="writhe"]::before, .fg-tentacle[data-v="writhe"]::after { animation-name: fg-tentacle-writhe; }
-.fg-tentacle[data-v="writhe"]::after { animation-name: fg-tentacle-writhe, fg-tentacle-glint; }
-@keyframes fg-tentacle-sway { 0% { transform: skewX(-1.5deg) scaleY(.97); } 50% { transform: skewX(1deg) scaleY(1.02); } 100% { transform: skewX(2deg) scaleY(.99) translateY(-.6%); } }
-@keyframes fg-tentacle-writhe { 0% { transform: skewX(-3.5deg) scale(1.01, .97); } 40% { transform: skewX(2.5deg) scale(.985, 1.05) translateY(-1.2%); } 100% { transform: skewX(4deg) scale(1, 1.01); } }
-@keyframes fg-tentacle-glint { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
-
-/* 高潮：画面柔和地白起来、带一点虚，再慢慢回来；射精：跟着声音一下一下地亮，一下比一下弱。 */
-.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
-.fg-peak.is-climax, .fg-peak.is-both { background: radial-gradient(78% 72% at 50% 48%, rgba(255, 253, 250, .94), rgba(255, 238, 242, .62) 55%, rgba(255, 222, 232, .28)); backdrop-filter: blur(3px) brightness(1.15); -webkit-backdrop-filter: blur(3px) brightness(1.15); animation: fg-peak-bloom 2.6s cubic-bezier(.3, 0, .2, 1) both; }
-.fg-peak i { position: absolute; inset: 0; opacity: 0; background: radial-gradient(90% 80% at 50% 56%, rgba(255, 250, 246, .9), rgba(255, 236, 240, .36) 58%, transparent 92%); animation: fg-peak-pulse .55s ease-out var(--at, 0ms) both; }
-@keyframes fg-peak-bloom { 0% { opacity: 0; } 22% { opacity: .84; } 42% { opacity: .7; } 100% { opacity: 0; } }
-@keyframes fg-peak-pulse { 0% { opacity: 0; } 14% { opacity: calc(.6 * var(--k, 1)); } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */
-}
-
-/* 设置 → 声音：音色一览按男女分组；自己做音色的编辑器；自动分配的音色组 */
-.fg-voice-group { margin: .8cqw 0 .3cqw; color: var(--ink-dim); letter-spacing: .1em; }
-.fg-linkbtn { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
-.fg-linkbtn:hover { color: var(--accent); }
-.fg-vm-list { display: flex; flex-direction: column; gap: .5cqw; margin-top: .6cqw; }
-.fg-vm-item { padding: .6cqw .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }
-.fg-vm-item b { letter-spacing: .08em; }
-.fg-vm-editor { display: flex; flex-direction: column; gap: .6cqw; margin: .6cqw 0; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }
-.fg-vm-parts { display: flex; flex-direction: column; gap: .4cqw; }
-.fg-vm-part { display: flex; flex-wrap: wrap; align-items: center; gap: .4cqw .6cqw; padding: .4cqw .6cqw; border-radius: .6cqw; background: rgba(0, 0, 0, .18); }
-.fg-vm-part label { display: inline-flex; align-items: center; gap: .3cqw; font-size: .85cqw; color: var(--ink-dim); white-space: nowrap; }
-.fg-vm-part .fg-input { padding: .2cqw .4cqw; }
-.fg-vm-idx { min-width: 1.4cqw; color: var(--accent); font-weight: 600; }
-.fg-vm-tools { flex-wrap: wrap; gap: .4cqw; }
-.fg-vm-pools { display: flex; flex-direction: column; gap: .3cqw; margin-top: .4cqw; }
-.fg-vm-pool { flex-wrap: wrap; gap: .2cqw; }
-.fg-vm-pool .fg-look-chip { margin: 0; align-items: center; }
-.fg-vm-pool-label { min-width: 5cqw; color: var(--ink-dim); }
-@media (max-width: 700px), (orientation: portrait) {
-  .fg-vm-part label, .fg-vm-pool-label { font-size: 2.8cqw; }
-  .fg-vm-part .fg-input { width: 12cqw !important; }
-}
+var theater_default = `/* ───────────── 沉浸式 Galgame · 剧场 ─────────────\r
+   所有类名以 fg- 开头；皮肤只改 data-skin 上的变量与少量装饰。\r
+   舞台是 16:9 的容器（container-type:size），字号用 cqw 随舞台缩放。 */\r
+\r
+.fg-theater {\r
+  --accent: #ff7eb6; --accent2: #9b7bff; --accent3: #5ee7ff;\r
+  --ink: #f5f3ff; --ink-dim: rgba(235, 232, 255, .62);\r
+  --box-bg: linear-gradient(180deg, rgba(18, 16, 40, .66), rgba(8, 8, 24, .86));\r
+  --box-border: rgba(255, 255, 255, .14);\r
+  --box-radius: 1.4cqw;\r
+  --box-blur: blur(18px) saturate(1.5);\r
+  --name-ink: #fff;\r
+  --panel-bg: rgba(10, 10, 26, .82);\r
+  --chip-bg: rgba(10, 10, 28, .5);\r
+  --font-body: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;\r
+  --font-display: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", serif;\r
+  --font-latin: "Cormorant Garamond", "Playfair Display", Georgia, serif;\r
+  --wait-glyph: "◆";\r
+  /* 宽高写死成视口大小：酒馆给 <html> 加了 transform，fixed 层的「inset: 0」会跟着 html（高 0）算 */\r
+  position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 2147483000; overflow: hidden; overflow: clip;\r
+  display: flex; align-items: center; justify-content: center;\r
+  background: #05040c; color: var(--ink);\r
+  font-family: var(--font-body);\r
+  -webkit-font-smoothing: antialiased;\r
+  user-select: none; -webkit-user-select: none;\r
+  animation: fg-fade-in .5s ease both;\r
+}\r
+.fg-theater *, .fg-theater *::before, .fg-theater *::after { box-sizing: border-box; }\r
+:where(.fg-theater) button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }\r
+.fg-theater.is-closing { animation: fg-fade-out .35s ease both; }\r
+\r
+.fg-stage {\r
+  position: relative; overflow: hidden; overflow: clip;\r
+  /* 宽高比由剧场根节点的 --stage-ar 给（默认跟横版插画一样，NovelAI 的 1216×832）。 */\r
+  width: min(100vw, calc(100vh * var(--stage-ar, 1.4615))); height: min(100vh, calc(100vw / var(--stage-ar, 1.4615)));\r
+  container-type: size; container-name: stage;\r
+  background: #000;\r
+  box-shadow: 0 0 120px rgba(0, 0, 0, .8);\r
+}\r
+@media (max-aspect-ratio: 4/5) {\r
+  /* 竖屏手机：舞台铺满，立绘居中放大，对话框加高。 */\r
+  .fg-stage { width: 100vw; height: 100vh; }\r
+}\r
+.fg-camera { position: absolute; inset: 0; transform-origin: 50% 50%; }\r
+\r
+/* ── 背景层 ── */\r
+/* 外层管进出场的转场，里层（.fg-bg-art）画图、慢慢推拉；新层盖在旧层上面演转场，旧层不动，演完才移除（不先淡出，中途不会露出底下的黑） */\r
+.fg-bg { position: absolute; inset: -3%; will-change: transform, opacity; }\r
+.fg-bg-art { position: absolute; inset: 0; background-size: cover; background-position: center 42%; }\r
+.fg-bg.is-image > .fg-bg-art { animation: fg-kenburns 38s ease-in-out infinite alternate; }\r
+.fg-theater[data-off~="kenburns"] .fg-bg.is-image > .fg-bg-art { animation: none; }\r
+.fg-bg.is-enter { animation: var(--enter-anim, fg-dissolve) var(--enter-dur, 1.1s) cubic-bezier(.45, 0, .55, 1) both; }\r
+.fg-bg.is-leave { animation: none; }\r
+@keyframes fg-kenburns { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.1) translate(-1.6%, -1.2%); } }\r
+@keyframes fg-dissolve { from { opacity: 0; filter: blur(8px) brightness(1.3); } to { opacity: 1; filter: none; } }\r
+@keyframes fg-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }\r
+@keyframes fg-iris { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(80% at 50% 50%); } }\r
+@keyframes fg-cinematic { 0% { clip-path: inset(50% 0 50% 0); filter: brightness(2); } 60% { clip-path: inset(8% 0 8% 0); } 100% { clip-path: inset(0 0 0 0); filter: none; } }\r
+@keyframes fg-strips { from { -webkit-mask-size: 100% 0%; mask-size: 100% 0%; } to { -webkit-mask-size: 100% 100%; mask-size: 100% 100%; } }\r
+.fg-bg.is-enter[data-tr="strips"] { -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 8%, transparent 8% 8.0001%); mask-image: linear-gradient(#000, #000); -webkit-mask-repeat: no-repeat; }\r
+@keyframes fg-flash-in { 0% { opacity: 0; filter: brightness(4); } 30% { opacity: 1; filter: brightness(3); } 100% { filter: none; } }\r
+@keyframes fg-black-in { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }\r
+/* 起雾（进出回忆）：旧画面失焦、泛白着退下去，新画面从一片朦胧里慢慢清晰过来；配合 .fg-flash.is-haze 的白雾 */\r
+@keyframes fg-haze-in { 0% { opacity: 0; filter: blur(18px) brightness(1.5) saturate(.6); } 40% { opacity: 1; filter: blur(10px) brightness(1.3) saturate(.75); } 100% { opacity: 1; filter: none; } }\r
+.fg-bg.is-leave[data-out="haze"] { animation: fg-haze-out 1.4s ease-in both; }\r
+@keyframes fg-haze-out { to { opacity: 0; filter: blur(14px) brightness(1.4) saturate(.7); } }\r
+/* 起雾的那一句：新上台的人等雾起来了再慢慢浮出来，不在旧画面上先冒出来 */\r
+.fg-world-in[data-tr="haze"] .fg-actor:not(.is-leaving) { animation-duration: 1.3s; animation-delay: .8s; }\r
+.fg-world-in[data-tr="haze"] .fg-actor.is-leaving { animation-duration: .9s; }\r
+/* 从回忆里醒过来：换画面时已经白透了，回忆的背景和人直接撤掉（不在白雾散开时又露出来），现在的画面在雾后面从朦胧里清晰过来 */\r
+.fg-bg.is-leave[data-out="wake"], .fg-world-in[data-tr="wake"] .fg-actor.is-leaving, .fg-world-in[data-tr="wake"] .fg-cg.is-leaving { animation: none; opacity: 0; }\r
+.fg-world-in[data-tr="wake"] .fg-actor:not(.is-leaving) { animation-duration: 1.4s; animation-delay: .3s; }\r
+\r
+/* 没有背景图时的程序化舞台：天色渐变 + 远景剪影 + 光斑。 */\r
+.fg-sky { position: absolute; inset: 0; transition: background 1.6s ease; }\r
+.fg-sky::before { content: ""; position: absolute; left: -10%; right: -10%; bottom: 0; height: 46%;\r
+  background:\r
+    radial-gradient(60% 120% at 20% 100%, rgba(0, 0, 0, .55), transparent 70%),\r
+    radial-gradient(50% 90% at 78% 100%, rgba(0, 0, 0, .5), transparent 70%);\r
+}\r
+.fg-sky::after { content: ""; position: absolute; inset: 0;\r
+  background: radial-gradient(40% 30% at var(--sun-x, 70%) var(--sun-y, 30%), var(--sun, rgba(255, 220, 180, .55)), transparent 70%);\r
+  mix-blend-mode: screen; animation: fg-breathe-light 9s ease-in-out infinite;\r
+}\r
+.fg-skyline { position: absolute; left: 0; right: 0; bottom: 0; height: 38%; opacity: .9; }\r
+@keyframes fg-breathe-light { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }\r
+\r
+/* 时段调色：叠一层渐变，混合模式按时段变化。 */\r
+.fg-grade { position: absolute; inset: 0; pointer-events: none; transition: background 1.4s ease, opacity 1.4s ease; mix-blend-mode: soft-light; }\r
+.fg-grade[data-time="dawn"] { background: linear-gradient(180deg, rgba(255, 170, 200, .55), rgba(120, 140, 255, .35)); }\r
+.fg-grade[data-time="morning"] { background: linear-gradient(180deg, rgba(255, 245, 220, .35), rgba(255, 255, 255, 0)); }\r
+.fg-grade[data-time="noon"] { opacity: 0; }\r
+.fg-grade[data-time="afternoon"] { background: linear-gradient(180deg, rgba(255, 220, 160, .35), rgba(255, 200, 120, .15)); }\r
+.fg-grade[data-time="dusk"] { background: linear-gradient(180deg, rgba(255, 120, 60, .7), rgba(140, 40, 120, .55)); mix-blend-mode: overlay; }\r
+.fg-grade[data-time="evening"] { background: linear-gradient(180deg, rgba(90, 60, 200, .6), rgba(255, 110, 120, .35)); mix-blend-mode: overlay; }\r
+.fg-grade[data-time="night"] { background: linear-gradient(180deg, rgba(10, 20, 80, .78), rgba(20, 10, 60, .7)); mix-blend-mode: multiply; }\r
+.fg-grade[data-time="midnight"] { background: linear-gradient(180deg, rgba(4, 6, 40, .86), rgba(10, 4, 30, .8)); mix-blend-mode: multiply; }\r
+/* 画好的背景本来就按日 / 黄昏 / 夜画过（出图时带着时段）：只在同一档里轻轻推一下，不再压一遍（夜景再压一层夜色就黑透了） */\r
+.fg-grade.is-drawn:is([data-time="dusk"], [data-time="evening"], [data-time="night"]) { opacity: .3; }\r
+.fg-grade.is-drawn[data-time="midnight"] { opacity: .45; }\r
+.fg-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, .55)); }\r
+.fg-letterbox::before, .fg-letterbox::after { content: ""; position: absolute; left: 0; right: 0; height: 9%; background: #000; z-index: 30; animation: fg-bars .8s cubic-bezier(.6, 0, .2, 1) both; }\r
+.fg-letterbox::before { top: 0; transform-origin: top; } .fg-letterbox::after { bottom: 0; transform-origin: bottom; }\r
+@keyframes fg-bars { from { transform: scaleY(0); } }\r
+\r
+.fg-particles { position: absolute; inset: -3%; width: 106%; height: 106%; pointer-events: none; z-index: 8; }\r
+/* 鼠标视差（parallax.js 给 --px / --py，-1～1）：背景动得最少、人多一点、天气粒子最多，按远近错开。粒子画布四边各多出 3%，挪开时边上不空。 */\r
+.fg-bg { translate: calc(var(--px, 0) * -.5cqw) calc(var(--py, 0) * -.3cqw); }\r
+.fg-cast { translate: calc(var(--px, 0) * -1.1cqw) calc(var(--py, 0) * -.55cqw); }\r
+.fg-particles { translate: calc(var(--px, 0) * -2cqw) calc(var(--py, 0) * -1.1cqw); }\r
+\r
+/* ── 立绘 ── */\r
+.fg-cast { position: absolute; inset: 0; z-index: 5; pointer-events: none; transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1), filter 1.2s ease; }\r
+.fg-cast[data-split] { right: 34%; }\r
+.fg-cast[data-veil] { opacity: 0; } /* 亲密场面里立绘退下（Stage.jsx 的 Cast） */\r
+/* 分屏：右边斜切的一格，另一头的地点和人；白色斜边，滑进滑出；有插画时让开 */\r
+.fg-split { position: absolute; top: 0; bottom: 0; right: 0; width: 42%; z-index: 8; pointer-events: none; animation: fg-split-in .7s cubic-bezier(.2, .8, .2, 1) both; transition: opacity .6s ease; }\r
+.fg-split.is-leaving { animation: fg-split-out .6s cubic-bezier(.6, 0, .8, .3) both; }\r
+.fg-split.is-under { opacity: 0; }\r
+.fg-split::before { content: ""; position: absolute; inset: 0; z-index: 2; background: rgba(255, 255, 255, .92); clip-path: polygon(15.2% 0, 16.4% 0, 1.2% 100%, 0 100%); filter: drop-shadow(0 0 .6cqw rgba(255, 255, 255, .6)); }\r
+.fg-split-inner { position: absolute; inset: 0; overflow: hidden; clip-path: polygon(16% 0, 100% 0, 100% 100%, .8% 100%); background: #0b0d1a; }\r
+.fg-split-bg { position: absolute; inset: 0; background-size: cover; background-position: center; filter: brightness(.82) saturate(.92); }\r
+.fg-split-inner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10, 20, 50, .35), transparent 35%), radial-gradient(110% 90% at 60% 50%, transparent 55%, rgba(0, 0, 0, .45)); pointer-events: none; }\r
+.fg-split-cast { position: absolute; top: 0; bottom: 0; left: 6%; right: 0; }\r
+.fg-split-label { position: absolute; right: 5%; top: 11%; z-index: 3; display: flex; align-items: center; gap: .7cqw; font-family: var(--font-display); font-size: 1.35cqw; letter-spacing: .22em; color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, .7); }\r
+.fg-split-label i { width: 3cqw; height: 1px; background: linear-gradient(90deg, transparent, #fff); }\r
+@keyframes fg-split-in { from { transform: translateX(105%); } }\r
+@keyframes fg-split-out { to { transform: translateX(105%); } }\r
+.fg-actor {\r
+  position: absolute; bottom: calc(-2% + var(--db, 0%)); height: calc(92% * var(--s, 1) * var(--d, 1)); width: calc(34% * var(--s, 1) * var(--d, 1));\r
+  left: var(--x, 50%); transform: translateX(-50%);\r
+  transition: left .55s cubic-bezier(.4, .1, .2, 1), height .55s cubic-bezier(.4, .1, .2, 1), width .55s cubic-bezier(.4, .1, .2, 1), bottom .55s cubic-bezier(.4, .1, .2, 1), filter .4s ease, opacity .45s ease;\r
+  filter: brightness(.7) saturate(.78);\r
+  animation: fg-actor-in .6s cubic-bezier(.2, .7, .2, 1) both;\r
+}\r
+/* 谁挡在谁前面由 Stage.jsx 按 stackLayers 写进 z-index（说话的人在最前，说完也留在前面）；这里的 z-index 只给分屏、闪回里的人用 */\r
+.fg-actor.is-speaking { filter: brightness(1.04) saturate(1.05) drop-shadow(0 0 1.4cqw rgba(255, 255, 255, .18)); z-index: 2; }\r
+.fg-actor.is-leaving { animation: fg-actor-out .45s ease both; }\r
+/* 没在说话、但对这句有反应的人：比旁边站着的人亮一点（说话的人更亮） */\r
+.fg-actor.is-reacting { filter: brightness(.9) saturate(.92); }\r
+/* 走位：上前一步的站到前面；背过身：不翻面，身子往外一侧一晃（Stage.jsx 的 TURN_FRAMES），一边糊一下一边暗成一道背影；探头：站在舞台边上，身子往里探；\r
+   躲到谁身后：缩在他背后，从他肩旁往外探出半个身子（站位、图层在 lib/blocking.js） */\r
+.fg-actor[data-depth="-1"] { filter: brightness(.62) saturate(.72); }\r
+.fg-actor-turn, .fg-actor-react { position: absolute; inset: 0; transform-origin: 50% 100%; }\r
+.fg-actor-turn { transform: translateY(var(--drop, 0%)) rotate(var(--lean, 0deg)); transition: transform .5s cubic-bezier(.45, .05, .3, 1), filter .7s ease; }\r
+/* 没有背面的立绘：转过去以后压成一道微微糊开的背影（看不清脸），边上留一圈淡淡的轮廓光；转回来时从影子里亮回来 */\r
+.fg-actor.is-away .fg-actor-turn { filter: brightness(.12) saturate(.25) blur(.12cqw) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .28)); }\r
+.fg-actor.is-peek[data-peek="left"] .fg-actor-turn { --lean: 5deg; }\r
+.fg-actor.is-peek[data-peek="right"] .fg-actor-turn { --lean: -5deg; }\r
+.fg-actor.is-hiding:not(.is-down) .fg-actor-turn { --drop: 2%; }\r
+.fg-actor.is-hiding[data-hide="left"]:not(.is-down) .fg-actor-turn { --lean: -3deg; }\r
+.fg-actor.is-hiding[data-hide="right"]:not(.is-down) .fg-actor-turn { --lean: 3deg; }\r
+/* 被击倒：歪倒、往下沉、暗成一道影子（打中那一下之后才倒），上半身沉进一团黑雾里看不清脸；到他再开口、自己走位或被治疗时站起来、雾散掉。\r
+   雾在 .fg-actor-turn 里，跟着人一起歪倒；不倒的时候 visibility: hidden 不画 */\r
+.fg-actor.is-down .fg-actor-turn { --lean: -11deg; --drop: 14%; filter: brightness(.4) saturate(.35) grayscale(.4); transition-delay: .5s; }\r
+.fg-down-mist { position: absolute; left: 50%; top: calc(var(--head, 9%) - 8%); width: 100%; height: 62%; transform: translateX(-50%); pointer-events: none; visibility: hidden; opacity: 0;\r
+  background: radial-gradient(ellipse 42% 40% at 50% 38%, rgba(5, 3, 9, .98) 0 50%, rgba(5, 3, 9, .85) 68%, transparent 100%); transition: opacity .8s ease, visibility 0s linear .8s; }\r
+.fg-actor.is-down .fg-down-mist { visibility: visible; opacity: 1; transition: opacity 1.4s ease .55s, visibility 0s; }\r
+.fg-down-mist i { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(8, 5, 14, .92), rgba(8, 5, 14, .5) 46%, transparent 70%); filter: blur(.7cqw); animation: fg-mist-drift 7s ease-in-out infinite; }\r
+.fg-down-mist i:nth-child(1) { left: 4%; top: 18%; width: 54%; height: 60%; }\r
+.fg-down-mist i:nth-child(2) { left: 42%; top: 8%; width: 54%; height: 64%; animation-duration: 8.5s; animation-delay: -3s; }\r
+.fg-down-mist i:nth-child(3) { left: 20%; top: 44%; width: 62%; height: 56%; animation-duration: 6.2s; animation-delay: -1.5s; }\r
+.fg-down-mist i:nth-child(4) { left: 28%; top: -6%; width: 44%; height: 44%; animation: fg-mist-rise 5.6s ease-in infinite; }\r
+@keyframes fg-mist-drift { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(5%, -7%) scale(1.08); } }\r
+@keyframes fg-mist-rise { 0% { opacity: 0; transform: translateY(24%) scale(.8); } 30% { opacity: .85; } 100% { opacity: 0; transform: translateY(-46%) scale(1.35); } }\r
+/* 打中时身上的一下：命中、暴击是一道斩痕，格挡是一圈光；不写字。在打中那一刻（--impact）出来 */\r
+.fg-hit-mark { position: absolute; left: 50%; top: calc(var(--head, 9%) + 14%); width: 0; height: 0; z-index: 5; pointer-events: none; }\r
+.fg-hit-mark::before { content: ""; position: absolute; left: -9cqw; top: -.25cqw; width: 18cqw; height: .5cqw; border-radius: 1cqw; background: linear-gradient(90deg, transparent, #fff 30%, #fff 70%, transparent); box-shadow: 0 0 1.2cqw rgba(255, 255, 255, .9);\r
+  transform: rotate(-28deg) scaleX(0); opacity: 0; animation: fg-hit-slash .38s cubic-bezier(.2, .9, .3, 1) var(--impact, .4s) both; }\r
+.fg-hit-mark[data-effect="crit"]::before { height: .8cqw; background: linear-gradient(90deg, transparent, #fff 25%, #ff5a5a 50%, #fff 75%, transparent); box-shadow: 0 0 1.6cqw rgba(255, 60, 60, .9); }\r
+.fg-hit-mark:not([data-effect="hit"]):not([data-effect="crit"])::before { display: none; }\r
+.fg-hit-mark[data-effect="block"]::after { content: ""; position: absolute; left: -6cqw; top: -6cqw; width: 12cqw; height: 12cqw; border-radius: 50%; border: .35cqw solid rgba(150, 210, 255, .95); box-shadow: 0 0 2cqw rgba(80, 160, 255, .8), inset 0 0 2cqw rgba(80, 160, 255, .5);\r
+  opacity: 0; animation: fg-hit-ring .5s ease-out var(--impact, .4s) both; }\r
+@keyframes fg-hit-slash { 0% { opacity: 1; transform: rotate(-28deg) scaleX(0); } 45% { opacity: 1; transform: rotate(-28deg) scaleX(1); } 100% { opacity: 0; transform: rotate(-28deg) scaleX(1.1); } }\r
+@keyframes fg-hit-ring { 0% { opacity: 1; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.3); } }\r
+/* 进来的样子：跑进来（从远一点的地方冲进来、刹一下）、慢慢走进来、探头（从边上探出来） */\r
+.fg-actor[data-enter="run"] { animation: fg-actor-run-in .5s cubic-bezier(.2, .8, .3, 1.15) both; }\r
+.fg-actor[data-enter="slow"] { animation: fg-actor-in 1.6s cubic-bezier(.3, .4, .3, 1) both; }\r
+.fg-actor[data-enter="peek"] { animation: fg-actor-peek-in .9s cubic-bezier(.2, .7, .2, 1) both; }\r
+/* 走的样子：甩头离开（一下暗成背影、快步走掉，不翻面）、跑开、慢慢走远（缩小、淡掉）；时长对上 Stage.jsx 的 EXIT_MS */\r
+.fg-actor.is-leaving[data-exit="storm"] { animation: fg-actor-storm .65s cubic-bezier(.5, 0, .8, .4) both; }\r
+.fg-actor.is-leaving[data-exit="storm"] .fg-actor-turn { filter: brightness(.22) saturate(.35) drop-shadow(0 0 .5cqw rgba(255, 255, 255, .2)); transition-duration: .2s; }\r
+.fg-actor.is-leaving[data-exit="run"] { animation: fg-actor-run-out .42s cubic-bezier(.5, 0, .9, .5) both; }\r
+.fg-actor.is-leaving[data-exit="slow"] { animation: fg-actor-slow-out 1.3s ease-in both; }\r
+/* --edge：离这个人近的那一边（站在中间的按他在左半边还是右半边），跑进跑出、探头都从那边来、往那边去 */\r
+@keyframes fg-actor-run-in { 0% { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.6)); } 55% { opacity: 1; } 82% { transform: translateX(calc(-50% - var(--edge, 40%) * .05)); } 100% { transform: translateX(-50%); } }\r
+@keyframes fg-actor-peek-in { from { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * .5)); } }\r
+@keyframes fg-actor-storm { 0%, 22% { opacity: 1; transform: translateX(-50%); } 100% { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.3)); } }\r
+@keyframes fg-actor-run-out { to { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * 1.6)); } }\r
+@keyframes fg-actor-slow-out { to { opacity: 0; transform: translateX(calc(-50% + var(--edge, 40%) * .35)) scale(.92); } }\r
+.fg-actor-body { position: absolute; inset: 0; transform-origin: 50% 100%; animation: fg-breathe 4.8s ease-in-out infinite; }\r
+.fg-actor.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1), fg-breathe 4.8s ease-in-out .42s infinite; }\r
+/* 逆转式立绘自带一顿一顿的呼吸，去掉平滑呼吸，只留说话时的轻跳 */\r
+.fg-actor.is-aa .fg-actor-body { animation: none; }\r
+.fg-actor.is-aa.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }\r
+/* 特效开关（Theater 在 .fg-theater 上写 data-off）：关掉呼吸只留开口时的轻跳，关掉轻跳只留呼吸 */\r
+.fg-theater[data-off~="breathe"] .fg-actor .fg-actor-body { animation: none; }\r
+.fg-theater[data-off~="breathe"] .fg-actor.is-speaking .fg-actor-body { animation: fg-speak-hop .42s cubic-bezier(.3, 1.6, .5, 1); }\r
+.fg-theater[data-off~="hop"] .fg-actor.is-speaking .fg-actor-body { animation: fg-breathe 4.8s ease-in-out infinite; }\r
+.fg-theater[data-off~="hop"] .fg-actor.is-aa.is-speaking .fg-actor-body,\r
+.fg-theater[data-off~="hop"][data-off~="breathe"] .fg-actor.is-speaking .fg-actor-body { animation: none; }\r
+/* 浅景深：有人在说话时，旁边没说话也没反应的人微微虚一点，退后一步的更虚（Stage.jsx 的 Cast 写 data-talk；旁白时谁都不虚） */\r
+.fg-actor-body { transition: filter .8s ease; }\r
+.fg-cast[data-talk] .fg-actor:not(.is-speaking, .is-reacting, .is-leaving) .fg-actor-body { filter: blur(.1cqw); }\r
+.fg-cast[data-talk] .fg-actor[data-depth="-1"]:not(.is-speaking, .is-reacting, .is-leaving) .fg-actor-body { filter: blur(.2cqw); }\r
+/* --k 按脸框缩放（头一样大），--lift 按身高抬高或压低（lib/stature.js）；都按立绘框的高度算。每张图带着自己的（Stage.jsx 写在 img 上），\r
+   换图时新图从第一帧起就是自己的大小；过渡只在同一张图后来才量好脸框、改了身高时缓过去 */\r
+.fg-actor img, .fg-actor .fg-aa { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: calc(var(--k, 1) * 100%); width: auto; max-width: none; transform: translateX(-50%);\r
+  transition: height .4s ease, bottom .4s ease;\r
+  -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 99%), radial-gradient(120% 100% at 50% 40%, #000 62%, transparent 82%);\r
+  -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, #000 78%, transparent 99%); }\r
+.fg-actor.is-upload img, .fg-actor.is-upload .fg-aa { -webkit-mask-image: none; mask-image: none; }\r
+/* 换立绘（换表情、换动作）：新图盖在旧图上淡入，旧图过了一小半才开始淡出，两张重叠的地方不透出背景。时长对上 Stage.jsx 的 SWAP_MS */\r
+.fg-actor img.is-in { animation: fg-sprite-in .28s ease-out both; }\r
+.fg-actor img.is-out { animation: fg-sprite-out .28s ease-in both; }\r
+/* 登场从靠近的一侧滑进来，退场往同一侧淡出（--side 由站位决定）。 */\r
+@keyframes fg-actor-in { from { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(3%); } }\r
+@keyframes fg-actor-out { to { opacity: 0; transform: translateX(calc(-50% + var(--side, 0%))) translateY(2%); } }\r
+@keyframes fg-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.008) translateY(-.25%); } }\r
+@keyframes fg-speak-hop { 0% { transform: translateY(0); } 40% { transform: translateY(-1.6%); } 100% { transform: translateY(0); } }\r
+@keyframes fg-sprite-in { from { opacity: 0; } }\r
+@keyframes fg-sprite-out { 0%, 40% { opacity: 1; } 100% { opacity: 0; } }\r
+\r
+/* 没有立绘时的剪影立绘：角色色渐变 + 轮廓光。 */\r
+.fg-silhouette { position: absolute; left: 50%; bottom: calc(var(--lift, 0) * 100%); height: 94%; aspect-ratio: 0.52; transform: translateX(-50%); }\r
+.fg-silhouette svg { width: 100%; height: 100%; overflow: visible; }\r
+.fg-silhouette .sil-rim { fill: none; stroke: color-mix(in oklab, var(--c) 55%, #fff); stroke-width: 2.4; opacity: .85; filter: drop-shadow(0 0 5px var(--c)) drop-shadow(0 0 14px var(--c)); stroke-dasharray: 1400; animation: fg-rim-draw 2.4s cubic-bezier(.4, 0, .2, 1) both; }\r
+@keyframes fg-rim-draw { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }\r
+.fg-silhouette-name { position: absolute; left: 50%; top: 50%; transform: translateX(-50%); font-family: var(--font-display); font-size: 5.4cqw; font-weight: 900; letter-spacing: .25em; color: transparent; -webkit-text-stroke: 1px color-mix(in oklab, var(--c) 40%, #fff); opacity: .5; writing-mode: vertical-rl; white-space: nowrap; }\r
+.fg-silhouette-tag { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); font-family: var(--font-latin); font-size: .75cqw; letter-spacing: .5em; white-space: nowrap; color: rgba(255, 255, 255, .55); }\r
+\r
+/* ── CG ── */\r
+/* 一张插画：照 galgame 的做法，默认溶入 → 静止 → 溶回场景；导演只在这一刻的分量、节奏特别时换（data-in / data-out / data-motion）。\r
+   出现时对话框先让开、等画面出来再回来（Theater.jsx）；时长跟 Stage.jsx 的 CG_IN_MS / CG_OUT_MS 对上。 */\r
+.fg-cg { position: absolute; inset: 0; z-index: 6; overflow: hidden; }\r
+.fg-cg:not(.is-leaving) { animation: var(--cg-in, fg-cg-fade-in) var(--cg-in-dur, .8s) var(--cg-in-ease, ease-in-out) both; }\r
+.fg-cg.is-leaving { pointer-events: none; animation: var(--cg-out, fg-cg-fade-out) var(--cg-out-dur, .8s) var(--cg-out-ease, ease-in-out) both; }\r
+.fg-cg-art { position: absolute; inset: 0; }\r
+.fg-cg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 62%, rgba(0, 0, 0, .4)); pointer-events: none; }\r
+.fg-cg-img { position: absolute; inset: 0; background-size: cover; background-position: center; }\r
+/* 竖版插画：模糊的同图垫底，前景铺满宽度；停在顶上 → 慢慢看到底 → 拉远停在全貌，只看一遍（等出现演完再开始）。 */\r
+.fg-cg.is-tall { background: #000; }\r
+.fg-cg-back { position: absolute; inset: -6%; background-size: cover; background-position: center; filter: blur(2.4cqw) brightness(.5) saturate(1.15); }\r
+.fg-cg-pan { position: absolute; left: 0; top: 0; width: 100%; height: auto; transform-origin: 50% 0; box-shadow: 0 0 5cqw rgba(0, 0, 0, .65); animation: fg-cg-pan var(--pan, 26s) cubic-bezier(.45, 0, .55, 1) var(--cg-in-dur, 1s) both; will-change: transform; user-select: none; }\r
+@keyframes fg-cg-pan {\r
+  0%, 12% { transform: translateY(0) scale(1); }\r
+  60%, 68% { transform: translateY(calc((var(--r) - 1) * 100%)) scale(1); }\r
+  100% { transform: translateY(0) scale(var(--r)); }\r
+}\r
+/* 出现：溶入（默认，按基调分快 / 正常 / 慢）、暗场后浮现、白闪、由虚到实、直接切入、冲击 */\r
+.fg-cg[data-in="quick"] { --cg-in-dur: .4s; }\r
+.fg-cg[data-in="slow"] { --cg-in-dur: 1.5s; }\r
+.fg-cg[data-in="black"] { --cg-in: fg-cg-black-in; --cg-in-dur: 1.8s; }\r
+.fg-cg[data-in="flash"] { --cg-in: none; --cg-in-dur: .6s; }\r
+.fg-cg[data-in="focus"] { --cg-in: fg-cg-focus-in; --cg-in-dur: 1.5s; --cg-in-ease: ease-out; }\r
+.fg-cg[data-in="cut"] { --cg-in: none; }\r
+.fg-cg[data-in="impact"] { --cg-in: fg-cg-impact-in; --cg-in-dur: .6s; --cg-in-ease: linear; }\r
+@keyframes fg-cg-fade-in { from { opacity: 0; } to { opacity: 1; } }\r
+/* 暗场：先把画面压成全黑（约半秒）、停一下，再从黑里亮出这张画 */\r
+@keyframes fg-cg-black-in { 0% { opacity: 0; filter: brightness(0); } 28% { opacity: 1; filter: brightness(0); } 45% { filter: brightness(0); } 100% { opacity: 1; filter: brightness(1); } }\r
+/* 白闪：整个画面先白掉，插画从白里显出来。白的那层是 ::before，所以插画本身不淡入，只让画和底部压暗晚一点出现 */\r
+.fg-cg[data-in="flash"]:not(.is-leaving) > .fg-cg-art, .fg-cg[data-in="flash"]:not(.is-leaving)::after { animation: fg-cg-flash-in .6s linear both; }\r
+@keyframes fg-cg-flash-in { 0%, 16% { opacity: 0; } 17%, 100% { opacity: 1; } }\r
+.fg-cg[data-in="flash"]:not(.is-leaving)::before, .fg-cg[data-in="impact"]:not(.is-leaving)::before { content: ""; position: absolute; inset: 0; z-index: 2; background: #fff; pointer-events: none; animation: fg-cg-white var(--cg-in-dur, 1s) ease-out both; }\r
+/* 白闪：0.1 秒白掉，半秒退回来（Ren'Py 的「相机闪光」也是这个节奏）；一秒里最多闪一次 */\r
+@keyframes fg-cg-white { 0% { opacity: 0; } 17% { opacity: 1; } 100% { opacity: 0; } }\r
+@keyframes fg-cg-focus-in { 0% { opacity: 0; filter: blur(24px); transform: scale(1.03); } 35% { opacity: 1; } 100% { opacity: 1; filter: blur(0); transform: none; } }\r
+/* 冲击：白闪一下，画面跟着震几下、越震越小（幅度约画面的 1.5%，跟大厂脚本里的 quake 差不多） */\r
+@keyframes fg-cg-impact-in {\r
+  0% { opacity: 1; transform: none; }\r
+  14% { transform: translate(-1.5%, 1%); }\r
+  28% { transform: translate(1.3%, -.8%); }\r
+  42% { transform: translate(-.9%, .5%); }\r
+  58% { transform: translate(.5%, -.3%); }\r
+  76% { transform: translate(-.2%, .1%); }\r
+  100% { opacity: 1; transform: none; }\r
+}\r
+/* 收起：溶回场景（默认，按基调分快 / 正常 / 慢）、暗下去、白闪；直接切掉（cut）不演 */\r
+.fg-cg[data-out="quick"] { --cg-out-dur: .4s; }\r
+.fg-cg[data-out="slow"] { --cg-out-dur: 1.5s; }\r
+.fg-cg[data-out="black"] { --cg-out: fg-cg-black-out; --cg-out-dur: 1.5s; }\r
+.fg-cg[data-out="flash"] { --cg-out: none; --cg-out-dur: .6s; }\r
+@keyframes fg-cg-fade-out { from { opacity: 1; } to { opacity: 0; } }\r
+/* 暗下去：插画先暗成全黑，再从黑里溶回场景 */\r
+@keyframes fg-cg-black-out { 0% { opacity: 1; filter: brightness(1); } 50% { opacity: 1; filter: brightness(0); } 100% { opacity: 0; filter: brightness(0); } }\r
+/* 白闪消失：画面白掉的那一刻插画没了，白再慢慢退掉露出场景（同样只让画和底部压暗消失，白层 ::before 留到最后） */\r
+.fg-cg.is-leaving[data-out="flash"] > .fg-cg-art, .fg-cg.is-leaving[data-out="flash"]::after { animation: fg-cg-flash-out .6s linear both; }\r
+@keyframes fg-cg-flash-out { 0%, 16% { opacity: 1; } 17%, 100% { opacity: 0; } }\r
+.fg-cg.is-leaving[data-out="flash"]::before { content: ""; position: absolute; inset: 0; z-index: 2; background: #fff; pointer-events: none; animation: fg-cg-white .6s ease-out both; }\r
+\r
+/* 停留：静止（默认）、极慢地推近、慢慢横移一遍；都只走一遍，停在最后的样子（竖版插画自己看一遍，不看这个） */\r
+.fg-cg[data-motion="push"] .fg-cg-img { animation: fg-cg-push 24s cubic-bezier(.4, 0, .6, 1) var(--cg-in-dur, 1s) both; }\r
+.fg-cg[data-motion="pan"] .fg-cg-img { animation: fg-cg-panx 24s cubic-bezier(.45, 0, .55, 1) var(--cg-in-dur, 1s) both; }\r
+@keyframes fg-cg-push { from { transform: scale(1); } to { transform: scale(1.08); } }\r
+@keyframes fg-cg-panx { from { transform: scale(1.1) translateX(-4%); } to { transform: scale(1.1) translateX(4%); } }\r
+.fg-cg-wait { position: absolute; right: 2.4%; top: 12%; z-index: 20; display: flex; align-items: center; gap: .6cqw; font-size: 1cqw; padding: .5cqw 1cqw; border-radius: 99px; background: var(--chip-bg); backdrop-filter: blur(8px); color: var(--ink-dim); }\r
+.fg-cg-wait i { width: .7cqw; height: .7cqw; border-radius: 50%; background: var(--accent); animation: fg-pulse 1.2s ease-in-out infinite; }\r
+\r
+/* ── 镜头 ──\r
+   推近、特写、仰拍、缓推、背景虚化、倾斜、下沉、升起、空镜、希区柯克变焦：过渡到那个样子停住，下一拍（data-cam 没了）缓回来。\r
+   对准人的那几种由 Stage.jsx 的 aimCamera 给 --zs 放大倍数、--tx / --ty 平移（脸停在画面中上，不推出框）。震动、甩镜、拉远、平移、虚焦演一下就完。 */\r
+.fg-camera { transition: transform 1s cubic-bezier(.4, 0, .2, 1); }\r
+.fg-camera[data-cam="zoom"], .fg-camera[data-cam="closeup"], .fg-camera[data-cam="slowpush"], .fg-camera[data-cam="focus"] { transform: scale(var(--zs, 1.12)) translate(var(--tx, 0%), var(--ty, 0%)); }\r
+.fg-camera[data-cam="zoom"] { transition: transform 1.6s cubic-bezier(.2, .7, .2, 1); }\r
+.fg-camera[data-cam="closeup"] { transition: transform .9s cubic-bezier(.2, .8, .2, 1); }\r
+.fg-camera[data-cam="slowpush"] { transition: transform 7s cubic-bezier(.3, 0, .4, 1); }\r
+.fg-camera[data-cam="focus"] { transition: transform 1.4s ease; }\r
+.fg-camera[data-cam="lowangle"] { transform: perspective(80cqw) rotateX(4deg) scale(var(--zs, 1.24)) translate(var(--tx, 0%), var(--ty, 0%)); transition: transform 1.3s cubic-bezier(.2, .7, .2, 1); }\r
+.fg-camera[data-cam="tilt"] { transform: rotate(-1.6deg) scale(1.05); transition: transform 1.2s ease; }\r
+.fg-camera[data-cam="sink"] { transform: translateY(-5%) scale(1.07); transition: transform 1.6s cubic-bezier(.4, 0, .2, 1); }\r
+.fg-camera[data-cam="rise"] { transform: translateY(5%) scale(1.07); transition: transform 1.6s cubic-bezier(.4, 0, .2, 1); }\r
+.fg-camera[data-cam="empty"] { transform: scale(1.04); transition: transform 3s ease; }\r
+/* 背景虚化只糊背景、人清楚；特写时背景也轻轻糊一点；空镜时人淡出、只剩背景；希区柯克变焦背景往前涌、人不动 */\r
+.fg-bg { transition: filter 1s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }\r
+.fg-camera[data-cam="focus"] .fg-bg { filter: blur(6px) brightness(.86); }\r
+.fg-camera[data-cam="closeup"] .fg-bg { filter: blur(2.5px); }\r
+.fg-camera[data-cam="empty"] .fg-cast { opacity: 0; }\r
+.fg-camera[data-cam="dolly"] .fg-bg { scale: 1.28; }\r
+.fg-camera[data-cam="dolly"] .fg-cast { scale: .96; }\r
+.fg-camera[data-cam="shake"] { animation: fg-shake .5s linear; }\r
+.fg-camera[data-cam="whip"] { animation: fg-whip .55s cubic-bezier(.6, 0, .3, 1); }\r
+.fg-camera[data-cam="zoomout"] { animation: fg-zoomout 1.6s cubic-bezier(.2, .7, .2, 1) both; }\r
+.fg-camera[data-cam="pan"] { animation: fg-pan 3s ease-in-out both; }\r
+.fg-camera[data-cam="blur"] { animation: fg-blur 2.2s ease both; }\r
+/* 移焦：先对着人（背景慢慢糊开），停一下，焦点再慢慢移到背景：人糊开、暗一点，景清楚；镜头同时极慢地往前靠一点。下一拍缓回来。\r
+   --rack-bg / --rack-cast 是注册过的数字，能平滑地动；不支持 @property 的浏览器里会在中途一下子切过去。 */\r
+@property --rack-bg { syntax: '<number>'; inherits: true; initial-value: 0; }\r
+@property --rack-cast { syntax: '<number>'; inherits: true; initial-value: 0; }\r
+.fg-camera[data-cam="rackfocus"] { transform: scale(1.03); transition: transform 3.6s cubic-bezier(.3, 0, .3, 1); animation: fg-rack 3.6s cubic-bezier(.45, 0, .3, 1) both; }\r
+.fg-camera[data-cam="rackfocus"] .fg-bg { filter: blur(calc(var(--rack-bg) * 6px)) brightness(calc(1 - var(--rack-bg) * .1)); transition: scale 2.6s cubic-bezier(.4, 0, .2, 1); }\r
+.fg-camera[data-cam="rackfocus"] .fg-cast { filter: blur(calc(var(--rack-cast) * .45cqw)) brightness(calc(1 - var(--rack-cast) * .18)); transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }\r
+@keyframes fg-rack { 0% { --rack-bg: 0; --rack-cast: 0; } 26%, 36% { --rack-bg: 1; --rack-cast: 0; } 100% { --rack-bg: 0; --rack-cast: 1; } }\r
+@keyframes fg-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-1.2%, .6%); } 30% { transform: translate(1%, -.8%); } 45% { transform: translate(-.8%, .4%); } 60% { transform: translate(.6%, .6%); } 80% { transform: translate(-.3%, -.2%); } }\r
+@keyframes fg-whip { 0% { transform: none; filter: none; } 35% { transform: translateX(-9%) scale(1.04); filter: blur(10px); } 60% { transform: translateX(2.5%) scale(1.02); filter: blur(3px); } 100% { transform: none; filter: none; } }\r
+@keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }\r
+@keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }\r
+@keyframes fg-blur { 0% { filter: blur(0); } 30% { filter: blur(6px); } 100% { filter: blur(0); } }\r
+/* 小瞬间：拍照、触碰、干杯、卡片。都在对话框下面，演完淡出（--hold 之后）。 */\r
+.fg-moment { position: absolute; inset: 0; z-index: 18; pointer-events: none; animation: fg-fade-out .45s ease var(--hold, 2s) forwards; }\r
+.fg-touch-ring { position: absolute; left: 50%; top: 44%; width: 26cqw; height: 26cqw; border-radius: 50%; transform: translate(-50%, -50%) scale(.2); opacity: 0;\r
+  background: radial-gradient(circle, transparent 46%, rgba(255, 190, 215, .55) 56%, rgba(255, 150, 190, .2) 62%, transparent 70%); animation: fg-touch-ripple-in 1.8s ease-out both; }\r
+@keyframes fg-touch-ripple-in { 0% { opacity: .95; transform: translate(-50%, -50%) scale(.2); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(2.2); } }\r
+/* 拍照：白闪一下，拍立得的白框框住这一刻（框外压暗），下面写题字；最后像存进相册一样往右上角飞走 */\r
+.fg-photo-flash { position: absolute; inset: 0; background: #fff; opacity: 0; animation: fg-photo-flash .5s ease-out both; }\r
+.fg-photo { position: absolute; left: 50%; top: 40%; width: 54%; height: 56%; box-sizing: border-box; border: 1.2cqw solid #fbf8f1; border-bottom-width: 5.2cqw; border-radius: .3cqw;\r
+  box-shadow: 0 0 0 300cqw rgba(8, 6, 14, .5), 0 1.4cqw 3cqw rgba(0, 0, 0, .55), inset 0 0 .6cqw rgba(0, 0, 0, .35);\r
+  transform: translate(-50%, -50%) rotate(-2.4deg); animation: fg-photo-snap .5s cubic-bezier(.2, .9, .3, 1.2) .12s both, fg-photo-away .5s cubic-bezier(.6, 0, .8, .4) calc(var(--hold, 2s) - 150ms) forwards; }\r
+.fg-photo-caption { position: absolute; left: 0; right: 0; bottom: -4.4cqw; text-align: center; font-family: var(--font-display); font-size: 1.7cqw; letter-spacing: .14em; color: #4a3a42; transform: rotate(-.6deg); }\r
+@keyframes fg-photo-flash { 0% { opacity: 0; } 18% { opacity: .95; } 100% { opacity: 0; } }\r
+@keyframes fg-photo-snap { from { opacity: 0; transform: translate(-50%, -50%) rotate(-2.4deg) scale(1.14); } to { opacity: 1; transform: translate(-50%, -50%) rotate(-2.4deg); } }\r
+@keyframes fg-photo-away { to { opacity: 0; transform: translate(10%, -120%) rotate(8deg) scale(.3); box-shadow: 0 0 0 300cqw rgba(8, 6, 14, 0), 0 1.4cqw 3cqw rgba(0, 0, 0, 0); } }\r
+/* 干杯：两只杯子从两边碰到一起，碰上那一刻一闪 */\r
+.fg-cup { position: absolute; top: 34%; width: 6cqw; height: 9.6cqw; filter: drop-shadow(0 .4cqw .8cqw rgba(0, 0, 0, .4)); }\r
+.fg-cup svg { width: 100%; height: 100%; display: block; }\r
+.fg-cup.is-left { left: calc(50% - 6.4cqw); transform-origin: 50% 90%; animation: fg-cup-left var(--clink, .5s) cubic-bezier(.3, .6, .4, 1) both, fg-cup-back-l .5s ease-out var(--clink, .5s) both; }\r
+.fg-cup.is-right { left: calc(50% + .4cqw); transform-origin: 50% 90%; animation: fg-cup-right var(--clink, .5s) cubic-bezier(.3, .6, .4, 1) both, fg-cup-back-r .5s ease-out var(--clink, .5s) both; }\r
+.fg-cup.is-right svg { transform: scaleX(-1); }\r
+.fg-clink { position: absolute; left: 50%; top: 36%; width: 9cqw; height: 9cqw; transform: translate(-50%, -50%) scale(0); opacity: 0;\r
+  background: repeating-conic-gradient(rgba(255, 246, 200, .95) 0 6deg, transparent 6deg 30deg); -webkit-mask-image: radial-gradient(circle, transparent 22%, #000 26%, #000 46%, transparent 50%); mask-image: radial-gradient(circle, transparent 22%, #000 26%, #000 46%, transparent 50%);\r
+  animation: fg-clink .45s ease-out var(--clink, .5s) both; }\r
+@keyframes fg-cup-left { from { opacity: 0; transform: translateX(-22cqw) rotate(-18deg); } to { opacity: 1; transform: rotate(14deg); } }\r
+@keyframes fg-cup-right { from { opacity: 0; transform: translateX(22cqw) rotate(18deg); } to { opacity: 1; transform: rotate(-14deg); } }\r
+@keyframes fg-cup-back-l { from { transform: rotate(14deg); } 30% { transform: translateX(-.8cqw) rotate(6deg); } to { transform: translateX(-.4cqw) rotate(8deg); } }\r
+@keyframes fg-cup-back-r { from { transform: rotate(-14deg); } 30% { transform: translateX(.8cqw) rotate(-6deg); } to { transform: translateX(.4cqw) rotate(-8deg); } }\r
+@keyframes fg-clink { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.3); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); } }\r
+/* 卡片：做好一道菜、新称呼、约定、交换联系方式。纸一样的小卡片从上面落下来，停一会儿淡出 */\r
+.fg-moment-card { position: absolute; left: 50%; top: 13%; min-width: 22cqw; max-width: 46cqw; box-sizing: border-box; padding: 1.4cqw 2.6cqw 1.6cqw; text-align: center; color: #3b2a33;\r
+  background: linear-gradient(180deg, #fffdf8, #fbf3e8); border-radius: .7cqw; border-top: .45cqw solid var(--who, #ff8fb4); box-shadow: 0 1.2cqw 3cqw rgba(0, 0, 0, .45);\r
+  transform: translateX(-50%) rotate(-1.4deg); animation: fg-moment-card .6s cubic-bezier(.2, .9, .3, 1.15) both; }\r
+.fg-moment-kicker { font-family: var(--font-latin); font-size: 1cqw; letter-spacing: .5em; padding-left: .5em; color: var(--who, #e0789c); opacity: .9; }\r
+.fg-moment-main { font-family: var(--font-display); font-size: 3cqw; font-weight: 800; letter-spacing: .08em; line-height: 1.25; margin: .3cqw 0; }\r
+.fg-moment-sub { font-size: 1.3cqw; letter-spacing: .3em; color: rgba(59, 42, 51, .7); }\r
+.fg-moment-place { margin-top: .4cqw; font-size: 1.5cqw; letter-spacing: .14em; color: rgba(59, 42, 51, .85); }\r
+.fg-moment-place::before { content: ""; display: inline-block; width: .9cqw; height: .9cqw; margin-right: .6cqw; vertical-align: -.05cqw; border-radius: 50% 50% 50% 0; background: var(--who, #ff8fb4); transform: rotate(-45deg); }\r
+.fg-moment[data-kind="cook"] .fg-moment-card { border-top-color: #f5a742; }\r
+.fg-moment[data-kind="cook"] .fg-moment-kicker { color: #e08a2c; }\r
+.fg-moment[data-kind="promise"] .fg-moment-card { border-top-color: #7fb6ff; background: linear-gradient(180deg, #fbfdff, #eef4ff); }\r
+.fg-moment[data-kind="promise"] .fg-moment-kicker { color: #5a8fe0; }\r
+.fg-moment[data-kind="nickname"] .fg-moment-main { color: #d4467a; }\r
+.fg-steam { position: absolute; left: 50%; top: -3.2cqw; width: 6cqw; height: 3.2cqw; transform: translateX(-50%); display: flex; justify-content: space-between; }\r
+.fg-steam i { width: .5cqw; height: 100%; border-radius: 1cqw; background: linear-gradient(0deg, rgba(255, 255, 255, .8), transparent); filter: blur(.12cqw); animation: fg-steam 1.6s ease-in-out infinite; }\r
+.fg-steam i:nth-child(2) { animation-delay: .4s; height: 120%; margin-top: -20%; }\r
+.fg-steam i:nth-child(3) { animation-delay: .8s; }\r
+.fg-contact { display: flex; align-items: center; gap: 1.2cqw; text-align: left; margin-top: .6cqw; }\r
+.fg-contact-face { display: grid; place-items: center; width: 4cqw; height: 4cqw; border-radius: 50%; background: var(--who, #ff8fb4); color: #fff; font-style: normal; font-size: 1.9cqw; font-weight: 700; box-shadow: 0 0 0 .3cqw #fff, 0 .3cqw .8cqw rgba(0, 0, 0, .25); }\r
+.fg-contact .fg-moment-main { font-size: 2.2cqw; margin: 0; }\r
+@keyframes fg-moment-card { from { opacity: 0; transform: translateX(-50%) translateY(-3cqw) rotate(-5deg); } to { opacity: 1; transform: translateX(-50%) rotate(-1.4deg); } }\r
+@keyframes fg-steam { 0% { opacity: 0; transform: translateY(.6cqw) scaleY(.6); } 40% { opacity: .9; } 100% { opacity: 0; transform: translateY(-1.2cqw) translateX(.3cqw) scaleY(1.1); } }\r
+/* 烟花：在背景和立绘之间，天上错开炸开三朵；升空的细线、炸开的光芒、天跟着亮一下 */\r
+.fg-fireworks { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }\r
+.fg-firework i { position: absolute; display: block; }\r
+.fg-fw-trail { left: var(--x); top: var(--y); width: .25cqw; height: 8cqw; transform: translateX(-50%); background: linear-gradient(0deg, transparent, hsl(var(--hue) 100% 85%)); opacity: 0; animation: fg-fw-rise var(--rise, .7s) cubic-bezier(.2, .6, .4, 1) var(--at) both; }\r
+.fg-fw-burst { left: var(--x); top: var(--y); width: 30cqw; height: 30cqw; border-radius: 50%; transform: translate(-50%, -50%) scale(.1); opacity: 0;\r
+  background: repeating-conic-gradient(hsl(var(--hue) 100% 75%) 0 2.5deg, transparent 2.5deg 12deg); -webkit-mask-image: radial-gradient(circle, transparent 18%, #000 30%, rgba(0, 0, 0, .8) 46%, transparent 50%); mask-image: radial-gradient(circle, transparent 18%, #000 30%, rgba(0, 0, 0, .8) 46%, transparent 50%);\r
+  filter: drop-shadow(0 0 .6cqw hsl(var(--hue) 100% 70%)); animation: fg-fw-burst 1.7s cubic-bezier(.1, .7, .3, 1) calc(var(--at) + var(--rise, .7s)) both; }\r
+.fg-fw-burst.is-inner { width: 16cqw; height: 16cqw; background: repeating-conic-gradient(from 6deg, hsl(calc(var(--hue) + 40) 100% 82%) 0 3deg, transparent 3deg 18deg); animation-duration: 1.3s; }\r
+.fg-fw-glow { left: var(--x); top: var(--y); width: 90cqw; height: 90cqw; border-radius: 50%; transform: translate(-50%, -50%); opacity: 0; background: radial-gradient(circle, hsl(var(--hue) 100% 70% / .3), transparent 60%); animation: fg-fw-glow 1.4s ease-out calc(var(--at) + var(--rise, .7s)) both; }\r
+@keyframes fg-fw-rise { 0% { opacity: 1; top: 100%; } 85% { opacity: 1; } 100% { opacity: 0; top: var(--y); } }\r
+@keyframes fg-fw-burst { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.1); } 60% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -40%) scale(1); } }\r
+@keyframes fg-fw-glow { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }\r
+/* 手机：来电 / 拨出时右边滑进来一部响着的手机，接通后收成右上角的「通话中」；挂断的小卡；视频通话的小窗；通知横幅 */\r
+.fg-phone { position: absolute; right: 4.5%; top: 13%; z-index: 18; pointer-events: none; animation: fg-phone-in .5s cubic-bezier(.2, .9, .3, 1.1) both; }\r
+.fg-phone-card { width: 17cqw; box-sizing: border-box; padding: 1.5cqw 1.4cqw 1.6cqw; border-radius: 2cqw; text-align: center; color: #fff;\r
+  background: linear-gradient(180deg, rgba(40, 44, 58, .86), rgba(18, 20, 28, .9)); border: 1px solid rgba(255, 255, 255, .16); box-shadow: 0 1.4cqw 3.4cqw rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .12);\r
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }\r
+.fg-phone[data-side="left"] { right: auto; left: 4.5%; } /* 分屏在右边开着时 */\r
+.fg-phone[data-dir="in"] .fg-phone-card { animation: fg-phone-buzz .78s ease-in-out .1s 2; }\r
+.fg-phone-label { display: flex; align-items: center; justify-content: center; gap: .4cqw; font-size: 1.05cqw; letter-spacing: .24em; color: rgba(255, 255, 255, .72); }\r
+.fg-phone-label svg { width: 1.2cqw; height: 1.2cqw; }\r
+.fg-phone-avatar { position: relative; width: 7.4cqw; height: 7.4cqw; margin: 1.2cqw auto .8cqw; }\r
+.fg-phone-face, .fg-pip-face, .fg-notify-icon { position: relative; overflow: hidden; display: grid; place-items: center; color: #fff; font-weight: 700; background: radial-gradient(circle at 50% 35%, color-mix(in oklab, var(--who, #8aa4ff) 70%, #fff), var(--who, #8aa4ff)); }\r
+.fg-phone-face img, .fg-pip-face img, .fg-notify-icon img { position: absolute; max-width: none; height: auto; }\r
+.fg-phone-face { width: 100%; height: 100%; border-radius: 50%; font-size: 3.2cqw; box-shadow: 0 0 0 .25cqw rgba(255, 255, 255, .85), 0 .5cqw 1.4cqw rgba(0, 0, 0, .4); }\r
+.fg-phone-ripple { position: absolute; inset: 0; border-radius: 50%; border: .2cqw solid rgba(140, 255, 190, .8); opacity: 0; animation: fg-phone-ripple 1.2s ease-out infinite; }\r
+.fg-phone-name { font-family: var(--font-display); font-size: 2cqw; font-weight: 700; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\r
+.fg-phone-keys { display: flex; justify-content: center; gap: 3.4cqw; margin-top: 1.4cqw; }\r
+.fg-phone-key { display: grid; place-items: center; width: 3.6cqw; height: 3.6cqw; border-radius: 50%; color: #fff; background: #f2484f; box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35); }\r
+.fg-phone-key svg { width: 55%; height: 55%; }\r
+.fg-phone-key.is-decline svg { transform: rotate(135deg); }\r
+.fg-phone-key.is-accept { background: #34c759; animation: fg-phone-accept 1.1s ease-in-out infinite; }\r
+.fg-phone[data-dir="out"] .fg-phone-label::after { content: ""; display: inline-block; width: 1.6cqw; height: .3cqw; margin-left: .3cqw; background: radial-gradient(circle, currentColor 40%, transparent 45%) 0 50% / .55cqw .3cqw repeat-x; animation: fg-phone-dots 1.2s steps(4) infinite; }\r
+.fg-phone.is-end { animation: fg-phone-in .4s cubic-bezier(.2, .9, .3, 1.1) both, fg-fade-out .45s ease var(--hold, 2s) forwards; }\r
+.fg-phone.is-end .fg-phone-face { filter: grayscale(.6) brightness(.85); }\r
+.fg-phone-result { display: flex; align-items: center; justify-content: center; gap: .5cqw; margin-top: .6cqw; font-size: 1.3cqw; letter-spacing: .12em; color: rgba(255, 255, 255, .8); font-variant-numeric: tabular-nums; }\r
+.fg-phone-result i { display: grid; place-items: center; width: 1.9cqw; height: 1.9cqw; border-radius: 50%; background: #f2484f; }\r
+.fg-phone-result svg { width: 60%; height: 60%; transform: rotate(135deg); color: #fff; }\r
+.fg-phone.is-end[data-result="missed"] .fg-phone-result, .fg-phone.is-end[data-result="declined"] .fg-phone-result, .fg-phone.is-end[data-result="hungup"] .fg-phone-result { color: #ff8a8f; }\r
+@keyframes fg-phone-in { from { opacity: 0; transform: translateX(6cqw) scale(.94); } to { opacity: 1; transform: none; } }\r
+@keyframes fg-phone-buzz { 0%, 46%, 100% { transform: none; } 6%, 18%, 30% { transform: translateX(-.3cqw) rotate(-1.5deg); } 12%, 24%, 36% { transform: translateX(.3cqw) rotate(1.5deg); } }\r
+@keyframes fg-phone-ripple { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.55); } }\r
+@keyframes fg-phone-accept { 0%, 100% { transform: none; box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35), 0 0 0 0 rgba(52, 199, 89, .6); } 50% { transform: translateY(-.25cqw); box-shadow: 0 .4cqw 1cqw rgba(0, 0, 0, .35), 0 0 0 .8cqw rgba(52, 199, 89, 0); } }\r
+@keyframes fg-phone-dots { from { width: 0; } to { width: 1.65cqw; } }\r
+.fg-call-chip { color: #b8ffd0; border-color: rgba(52, 199, 89, .55); background: rgba(10, 40, 22, .62); animation: fg-call-chip .45s cubic-bezier(.2, .9, .3, 1.2) both; }\r
+.fg-call-chip svg { width: 1.05cqw; height: 1.05cqw; }\r
+.fg-call-chip b { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .06em; color: #fff; }\r
+.fg-call-dot { width: .6cqw; height: .6cqw; border-radius: 50%; background: #34c759; box-shadow: 0 0 .6cqw #34c759; animation: fg-call-dot 1.4s ease-in-out infinite; }\r
+@keyframes fg-call-chip { from { opacity: 0; transform: translateX(3cqw) scale(.8); } to { opacity: 1; transform: none; } }\r
+@keyframes fg-call-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }\r
+.fg-pip { position: absolute; right: 2.2%; top: 10%; z-index: 17; width: 12cqw; aspect-ratio: 3 / 4; border-radius: 1.2cqw; overflow: hidden; pointer-events: none;\r
+  border: .2cqw solid rgba(255, 255, 255, .75); box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .5); background: #111; animation: fg-phone-in .5s cubic-bezier(.2, .9, .3, 1.1) both; transition: border-color .3s, box-shadow .3s; }\r
+.fg-pip.is-talking { border-color: #34c759; box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .5), 0 0 1.4cqw rgba(52, 199, 89, .6); }\r
+.fg-pip-face { position: absolute; inset: 0; font-size: 4cqw; }\r
+.fg-pip-face img { filter: saturate(1.05) contrast(1.03); }\r
+.fg-pip-face::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .03) 0 1px, transparent 1px 3px), linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, .55)); }\r
+.fg-pip-name { position: absolute; left: .8cqw; right: .8cqw; bottom: .7cqw; display: flex; align-items: center; gap: .4cqw; font-size: 1.05cqw; letter-spacing: .1em; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\r
+.fg-pip-name i { flex: none; width: .55cqw; height: .55cqw; border-radius: 50%; background: #ff453a; animation: fg-call-dot 1.4s ease-in-out infinite; }\r
+.fg-notify { position: absolute; left: 50%; top: 3%; z-index: 23; display: flex; gap: 1cqw; align-items: flex-start; width: 36cqw; box-sizing: border-box; padding: 1cqw 1.3cqw; border-radius: 1.6cqw; pointer-events: none; color: #fff;\r
+  background: rgba(30, 32, 40, .78); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 1cqw 2.6cqw rgba(0, 0, 0, .45); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);\r
+  transform: translateX(-50%); animation: fg-notify-in .5s cubic-bezier(.2, .9, .3, 1.15) both, fg-notify-out .4s cubic-bezier(.6, 0, .8, .4) var(--hold, 3s) forwards; }\r
+.fg-notify-icon { flex: none; width: 3.4cqw; height: 3.4cqw; border-radius: .9cqw; font-size: 1.7cqw; }\r
+.fg-notify-body { flex: 1; min-width: 0; }\r
+.fg-notify-head { display: flex; justify-content: space-between; gap: 1cqw; font-size: 1.15cqw; }\r
+.fg-notify-head b { font-weight: 700; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\r
+.fg-notify-head span { flex: none; color: rgba(255, 255, 255, .55); font-size: 1cqw; }\r
+.fg-notify-text { margin-top: .2cqw; font-size: 1.3cqw; line-height: 1.45; color: rgba(255, 255, 255, .9); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }\r
+.fg-notify-wave { display: flex; align-items: center; gap: .22cqw; height: 2cqw; margin-top: .4cqw; }\r
+.fg-notify-wave i { width: .22cqw; height: var(--h, 50%); border-radius: 1px; background: rgba(255, 255, 255, .75); transform-origin: 50% 50%; animation: fg-notify-wave .9s ease-in-out infinite alternate; }\r
+.fg-notify-wave .fg-notify-play { width: 0; height: 0; margin-right: .6cqw; border-radius: 0; background: none; border-left: .9cqw solid #34c759; border-top: .55cqw solid transparent; border-bottom: .55cqw solid transparent; animation: none; }\r
+.fg-notify[data-kind="voicemail"] .fg-notify-head b { color: #b8ffd0; }\r
+@keyframes fg-notify-in { from { opacity: 0; transform: translateX(-50%) translateY(-120%); } to { opacity: 1; transform: translateX(-50%); } }\r
+@keyframes fg-notify-out { to { opacity: 0; transform: translateX(-50%) translateY(-120%); } }\r
+@keyframes fg-notify-wave { from { transform: scaleY(.35); } to { transform: scaleY(1); } }\r
+/* 被打的不在台上（主角、画外的人）：整个画面替他挨这一下 */\r
+.fg-hurt { position: absolute; inset: 0; z-index: 17; pointer-events: none; animation: fg-hurt .7s ease-out both; background: radial-gradient(ellipse at center, transparent 45%, rgba(220, 20, 40, .55)); }\r
+.fg-hurt[data-effect="crit"] { background: radial-gradient(ellipse at center, rgba(255, 40, 40, .12) 30%, rgba(230, 10, 30, .75)); animation-duration: 1s; }\r
+.fg-hurt[data-effect="down"] { background: radial-gradient(ellipse at center, rgba(0, 0, 0, .3) 30%, rgba(120, 0, 20, .85)); animation: fg-hurt-down 2.2s ease-out both; }\r
+.fg-hurt[data-effect="block"] { background: radial-gradient(ellipse at center, transparent 50%, rgba(80, 160, 255, .5)); }\r
+.fg-hurt[data-effect="heal"] { background: radial-gradient(ellipse at center, rgba(120, 255, 170, .1) 30%, rgba(60, 230, 140, .45)); animation-duration: 1.6s; }\r
+@keyframes fg-hurt { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }\r
+@keyframes fg-hurt-down { 0% { opacity: 0; } 10% { opacity: 1; } 70% { opacity: .85; } 100% { opacity: 0; } }\r
+.fg-hud-romance { color: #ff9ec4; }\r
+.fg-hud-sense { color: #c9b8ff; }\r
+.fg-flash { position: absolute; inset: 0; z-index: 40; pointer-events: none; background: #fff; animation: fg-flash .7s ease-out both; }\r
+.fg-flash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .2), rgba(160, 0, 20, .75)); }\r
+.fg-flash.is-black { background: #000; animation: fg-black 1.6s ease both; }\r
+/* 起雾：整个画面慢慢起一层白雾、失焦，再散开（进出回忆）；薄雾是短闪回进出时的淡一层。都在对话框下面 */\r
+.fg-flash.is-haze, .fg-flash.is-mist { z-index: 15; background: radial-gradient(100% 90% at 50% 45%, rgba(255, 251, 242, .95), rgba(255, 238, 214, .75));\r
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: fg-haze-veil 2.6s ease-in-out both; }\r
+.fg-flash.is-mist { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); animation: fg-mist 1.5s ease-in-out both; }\r
+@keyframes fg-haze-veil { 0% { opacity: 0; } 38% { opacity: .92; } 55% { opacity: .8; } 100% { opacity: 0; } }\r
+@keyframes fg-mist { 0% { opacity: 0; } 40% { opacity: .38; } 100% { opacity: 0; } }\r
+/* 从回忆里醒过来：回忆的画面慢慢褪成一片暖白（这时舞台上还是回忆）；白透了才换成现在，停一下，再慢慢散开（时长见 playback.js 的 WAKE_MS） */\r
+.fg-flash.is-wake { z-index: 15; background: radial-gradient(100% 90% at 50% 45%, rgba(255, 252, 246, .98), rgba(248, 236, 216, .94));\r
+  backdrop-filter: blur(12px) sepia(.35); -webkit-backdrop-filter: blur(12px) sepia(.35); animation: fg-wake-clear var(--clear, 1.9s) ease-in-out both; }\r
+.fg-flash.is-wake.is-rising { animation: fg-wake-rise var(--rise, 1.7s) cubic-bezier(.45, 0, .7, 1) both; }\r
+@keyframes fg-wake-rise { from { opacity: 0; } to { opacity: 1; } }\r
+@keyframes fg-wake-clear { 0%, 22% { opacity: 1; } 100% { opacity: 0; } }\r
+/* 短闪回：现在的画面压暗、褪色、模糊，闪回里开口的人半透明浮在前面 */\r
+/* 滤镜写在这一层自己身上（子元素的 backdrop-filter 会被这一层的淡入淡出截住，滤不到下面的画面），浮出来的人是子元素，不被滤到 */\r
+.fg-recall { position: absolute; inset: 0; z-index: 9; pointer-events: none; animation: fg-layer-in var(--fade, .5s) ease both;\r
+  backdrop-filter: sepia(.65) saturate(.55) brightness(.5) blur(4px); -webkit-backdrop-filter: sepia(.65) saturate(.55) brightness(.5) blur(4px);\r
+  background: radial-gradient(110% 85% at 50% 42%, rgba(255, 236, 205, .12), rgba(24, 14, 4, .5)); }\r
+.fg-recall.is-leave { animation: fg-layer-out var(--fade, .5s) ease both; }\r
+.fg-recall-veil { position: absolute; inset: 0; background-image: var(--fg-noise); opacity: .12; mix-blend-mode: overlay; }\r
+.fg-recall .fg-actor { filter: sepia(.5) brightness(.8) saturate(.8); opacity: .72; }\r
+/* 闪回里的人等画面暗下去了再慢慢浮出来 */\r
+.fg-recall .fg-actor { animation: fg-ghost-in 1.1s .45s ease-out both; }\r
+@keyframes fg-ghost-in { from { opacity: 0; transform: translateX(-50%) translateY(1.5%); } }\r
+.fg-recall .fg-actor.is-speaking { filter: sepia(.32) brightness(1.04) drop-shadow(0 0 2cqw rgba(255, 238, 210, .55)); opacity: .95; }\r
+/* 短闪回（轻的演法）：画面不动，只是四角泛黄、起一点颗粒 */\r
+.fg-recall.is-light { backdrop-filter: none; -webkit-backdrop-filter: none; background: radial-gradient(120% 95% at 50% 45%, transparent 50%, rgba(130, 88, 36, .4)); }\r
+/* 短闪回的小头像：对话框右上角，泛黄，换人时重新浮出来 */\r
+.fg-recall-face { position: absolute; right: 3.2%; bottom: calc(100% - 1.4cqw); z-index: 2; width: 11cqw; aspect-ratio: 1; border-radius: 1.2cqw; overflow: hidden;\r
+  background: radial-gradient(circle at 50% 40%, rgba(120, 86, 46, .5), rgba(30, 20, 10, .75)); border: 1px solid rgba(240, 210, 160, .55);\r
+  box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .45), 0 0 2cqw rgba(255, 226, 180, .22), inset 0 0 0 2px color-mix(in oklab, var(--speaker, #f0d2a0) 35%, transparent); animation: fg-face-in .45s ease-out both; }\r
+.fg-recall-face img { position: absolute; max-width: none; height: auto; filter: sepia(.45) saturate(.85) brightness(1.03); }\r
+@keyframes fg-face-in { from { opacity: 0; transform: translateY(.8cqw); } }\r
+/* 短闪回的基调（data-tone）：上面的泛黄是 warm（温暖怀念）。轻的演法换四角的色调，压暗画面的演法换整个画面的滤镜，小头像换色调和出现的样子 */\r
+/* 甜蜜：四角泛粉，几点光斑慢慢飘 */\r
+.fg-recall.is-light[data-tone="sweet"] { background: radial-gradient(120% 95% at 50% 45%, transparent 48%, rgba(255, 150, 190, .36)); }\r
+.fg-recall[data-tone="sweet"]::after { content: ""; position: absolute; inset: -4%; pointer-events: none; filter: blur(.5cqw); opacity: .8; animation: fg-bokeh 9s ease-in-out infinite alternate;\r
+  background: radial-gradient(circle at 16% 26%, rgba(255, 224, 236, .5) 0 1.1cqw, transparent 1.5cqw), radial-gradient(circle at 84% 20%, rgba(255, 214, 232, .42) 0 .8cqw, transparent 1.1cqw),\r
+    radial-gradient(circle at 78% 66%, rgba(255, 232, 242, .36) 0 1.5cqw, transparent 1.9cqw), radial-gradient(circle at 24% 72%, rgba(255, 204, 226, .4) 0 .6cqw, transparent .9cqw),\r
+    radial-gradient(circle at 92% 46%, rgba(255, 236, 244, .3) 0 1cqw, transparent 1.3cqw); }\r
+@keyframes fg-bokeh { to { transform: translate(1.5%, -2%); } }\r
+/* 伤感：四周褪成冷灰、泛一点蓝，正中照旧 */\r
+.fg-recall.is-light[data-tone="sad"] { background: rgba(40, 62, 98, .34); backdrop-filter: grayscale(.85) brightness(.85); -webkit-backdrop-filter: grayscale(.85) brightness(.85);\r
+  -webkit-mask-image: radial-gradient(85% 75% at 50% 45%, transparent 28%, #000 85%); mask-image: radial-gradient(85% 75% at 50% 45%, transparent 28%, #000 85%); }\r
+/* 不安：四角暗红，像心跳一样一暗一暗，颗粒重一点 */\r
+.fg-recall.is-light[data-tone="dread"] { background: none; }\r
+.fg-recall[data-tone="dread"]::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(110% 90% at 50% 45%, transparent 36%, rgba(96, 0, 14, .66)); animation: fg-dread-pulse 1.2s ease-in-out infinite; }\r
+.fg-recall[data-tone="dread"] .fg-recall-veil { opacity: .3; }\r
+@keyframes fg-dread-pulse { 0%, 100% { opacity: .75; } 10% { opacity: 1; } 22% { opacity: .55; } 34% { opacity: .95; } }\r
+/* 猛然想起：四周一圈白、对比强一点 */\r
+.fg-recall.is-light[data-tone="flash"] { background: radial-gradient(120% 95% at 50% 45%, transparent 55%, rgba(255, 255, 255, .26)); backdrop-filter: contrast(1.12) saturate(.88); -webkit-backdrop-filter: contrast(1.12) saturate(.88); }\r
+/* 朦胧如梦：四周起白雾、失焦 */\r
+.fg-recall.is-light[data-tone="haze"] { background: rgba(255, 250, 240, .26); backdrop-filter: blur(3px) brightness(1.06); -webkit-backdrop-filter: blur(3px) brightness(1.06);\r
+  -webkit-mask-image: radial-gradient(90% 80% at 50% 45%, transparent 18%, #000 100%); mask-image: radial-gradient(90% 80% at 50% 45%, transparent 18%, #000 100%); }\r
+/* 压暗画面的演法：整个画面的滤镜和浮出来的人跟着基调换 */\r
+.fg-recall:not(.is-light)[data-tone="sweet"] { backdrop-filter: sepia(.3) saturate(.75) brightness(.58) blur(4px); -webkit-backdrop-filter: sepia(.3) saturate(.75) brightness(.58) blur(4px); background: radial-gradient(110% 85% at 50% 42%, rgba(255, 200, 225, .16), rgba(60, 10, 30, .45)); }\r
+.fg-recall:not(.is-light)[data-tone="sad"] { backdrop-filter: grayscale(.9) brightness(.45) blur(4px); -webkit-backdrop-filter: grayscale(.9) brightness(.45) blur(4px); background: radial-gradient(110% 85% at 50% 42%, rgba(150, 175, 215, .1), rgba(8, 14, 28, .55)); }\r
+.fg-recall:not(.is-light)[data-tone="sad"] .fg-actor { filter: grayscale(.75) brightness(.85); }\r
+.fg-recall:not(.is-light)[data-tone="dread"] { backdrop-filter: grayscale(.5) contrast(1.2) brightness(.35) blur(3px); -webkit-backdrop-filter: grayscale(.5) contrast(1.2) brightness(.35) blur(3px); background: none; }\r
+.fg-recall:not(.is-light)[data-tone="dread"] .fg-actor { filter: grayscale(.6) contrast(1.2) brightness(.8); }\r
+.fg-recall:not(.is-light)[data-tone="flash"] { backdrop-filter: brightness(.7) contrast(1.3) blur(2px); -webkit-backdrop-filter: brightness(.7) contrast(1.3) blur(2px); background: radial-gradient(110% 85% at 50% 42%, rgba(255, 255, 255, .12), rgba(0, 0, 0, .35)); }\r
+.fg-recall:not(.is-light)[data-tone="haze"] { backdrop-filter: brightness(.9) saturate(.7) blur(9px); -webkit-backdrop-filter: brightness(.9) saturate(.7) blur(9px); background: rgba(255, 248, 236, .28); }\r
+/* 小头像：甜蜜粉边柔光；伤感冷灰；不安暗红边、带噪点，时不时错位一下；猛然想起白边、弹出来；朦胧如梦边缘化开、慢慢浮现 */\r
+.fg-recall-face[data-tone="sweet"] { border-color: rgba(255, 182, 212, .75); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .4), 0 0 2.6cqw rgba(255, 170, 210, .45); background: radial-gradient(circle at 50% 40%, rgba(255, 190, 215, .45), rgba(60, 20, 36, .7)); }\r
+.fg-recall-face[data-tone="sweet"] img { filter: sepia(.12) saturate(1.05) brightness(1.06); }\r
+.fg-recall-face[data-tone="sad"] { border-color: rgba(172, 192, 222, .55); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .5); background: radial-gradient(circle at 50% 40%, rgba(70, 90, 122, .5), rgba(12, 18, 30, .8)); animation-duration: .9s; }\r
+.fg-recall-face[data-tone="sad"] img { filter: grayscale(.85) brightness(.92) contrast(.95); }\r
+.fg-recall-face[data-tone="sad"]::after { content: ""; position: absolute; inset: 0; background: rgba(80, 110, 160, .22); mix-blend-mode: soft-light; }\r
+.fg-recall-face[data-tone="dread"] { border-color: rgba(205, 42, 54, .75); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .55), 0 0 2cqw rgba(200, 20, 32, .42); background: #12060a; animation: fg-face-in .2s ease-out both, fg-face-jitter 2.6s steps(1) .4s infinite; }\r
+.fg-recall-face[data-tone="dread"] img { filter: grayscale(.55) contrast(1.25) brightness(.9); }\r
+.fg-recall-face[data-tone="dread"]::after { content: ""; position: absolute; inset: 0; background-image: var(--fg-noise); opacity: .35; mix-blend-mode: overlay; }\r
+@keyframes fg-face-jitter { 0%, 86%, 100% { transform: none; } 88% { transform: translate(.35cqw, -.15cqw); } 91% { transform: translate(-.3cqw, .12cqw); } 94% { transform: translate(.15cqw, 0); } }\r
+.fg-recall-face[data-tone="flash"] { border-color: rgba(255, 255, 255, .85); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .45), 0 0 2.4cqw rgba(255, 255, 255, .4); animation: fg-face-snap .35s cubic-bezier(.2, 1.6, .4, 1) both; }\r
+.fg-recall-face[data-tone="flash"] img { filter: contrast(1.15) saturate(.9); }\r
+@keyframes fg-face-snap { from { opacity: 0; transform: scale(.7); } }\r
+.fg-recall-face[data-tone="haze"] { border-color: rgba(255, 250, 240, .35); background: rgba(250, 244, 232, .35); box-shadow: 0 0 3cqw rgba(255, 250, 240, .35); animation-duration: 1.1s; }\r
+.fg-recall-face[data-tone="haze"] img { filter: blur(.6px) brightness(1.1) saturate(.8); -webkit-mask-image: radial-gradient(circle at 50% 48%, #000 45%, transparent 78%); mask-image: radial-gradient(circle at 50% 48%, #000 45%, transparent 78%); }\r
+/* 进短闪回的那一下：甜蜜泛起粉光、不安画面撕裂泛红闪两下、猛然想起白闪一下（都在对话框下面） */\r
+.fg-flash.is-bloom { z-index: 15; background: radial-gradient(90% 80% at 50% 45%, rgba(255, 222, 236, .72), rgba(255, 160, 200, .34)); animation: fg-bloom .9s ease-out both; }\r
+@keyframes fg-bloom { 0% { opacity: 0; } 30% { opacity: .85; } 100% { opacity: 0; } }\r
+.fg-flash.is-dread { z-index: 15; background: linear-gradient(transparent 0 18%, rgba(255, 30, 60, .45) 18% 21%, transparent 21% 57%, rgba(255, 255, 255, .35) 57% 58.5%, transparent 58.5%), radial-gradient(circle, rgba(120, 0, 15, .25), rgba(60, 0, 8, .88)); animation: fg-dread-in .6s steps(5) both; }\r
+@keyframes fg-dread-in { 0% { opacity: 0; } 20% { opacity: 1; } 40% { opacity: .2; } 60% { opacity: .9; transform: translateX(-.6%); } 80% { opacity: .3; transform: translateX(.5%); } 100% { opacity: 0; } }\r
+.fg-flash.is-snap { z-index: 15; animation: fg-flash .35s ease-out both; }\r
+@keyframes fg-flash { from { opacity: .95; } to { opacity: 0; } }\r
+/* 落字特效的闪光层：平时透明，由演出计划在某个字上点亮（Stage.jsx 的 useHits） */\r
+.fg-hitflash { position: absolute; inset: 0; z-index: 41; pointer-events: none; opacity: 0; background: #fff; }\r
+.fg-hitflash.is-red { background: radial-gradient(circle, rgba(255, 40, 60, .25), rgba(160, 0, 20, .8)); }\r
+@keyframes fg-black { 0% { opacity: 0; } 35%, 60% { opacity: 1; } 100% { opacity: 0; } }\r
+\r
+/* ── 换场（playback.js 的 changePlan，Theater 按时间线切 data-change）──\r
+   清场：台上的人先退下去，对话框、左上角的地点也让开；盖住画面的那一层盖满时下面才换成新地方，揭开后人再上来、出地点标题 */\r
+.fg-stage[data-change] .fg-cast { transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .45s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }\r
+.fg-stage[data-clearing] .fg-cast { opacity: 0; transition-duration: .65s, .35s, 2.6s; }\r
+.fg-stage[data-change] .fg-hud { opacity: 0; transition: opacity .35s ease; }\r
+.fg-cover { position: absolute; inset: 0; z-index: 19; pointer-events: none; opacity: 0; transition: opacity .25s ease; }\r
+.fg-cover[data-cover="black"] { background: #000; }\r
+.fg-cover[data-cover="white"] { background: #fff; }\r
+.fg-cover[data-cover="swirl"] { background: radial-gradient(120% 100% at 50% 50%, rgba(255, 250, 255, .98), rgba(226, 206, 255, .96) 55%, rgba(120, 96, 200, .94)); }\r
+.fg-cover[data-cover="glitch"] { background: #05040c; }\r
+.fg-cover[data-state="up"] { animation: fg-cover-up var(--ms) cubic-bezier(.4, 0, .6, 1) both; }\r
+.fg-cover[data-state="full"] { opacity: 1; transition: none; }\r
+.fg-cover[data-state="down"] { animation: fg-cover-down var(--ms) cubic-bezier(.35, 0, .4, 1) both; }\r
+@keyframes fg-cover-up { from { opacity: 0; } to { opacity: 1; } }\r
+@keyframes fg-cover-down { from { opacity: 1; } to { opacity: 0; } }\r
+/* 白闪：一下子白透，再慢慢退回来 */\r
+.fg-cover[data-cover="white"][data-state="up"] { animation-timing-function: ease-out; }\r
+/* 闭眼睁眼：像真的眼皮。上眼皮往下走得多、下眼皮只抬一点（眼缝的中线慢慢往下移）；眼皮边缘软、是黑的（不带暗红）；\r
+   合上前眼皮发沉、挣扎着又睁开一点才合上，合着时是黑的；睁开时先睁一条缝、又合上，再睁开一半、眨一下才完全睁开，\r
+   画面一开始是糊的，睁开以后才慢慢对上焦。--eye 是眼缝的高度（95% 全睁开），--eye-y 是眼缝中线的位置，--eye-blur 是看出去有多糊 */\r
+@property --eye { syntax: '<percentage>'; inherits: false; initial-value: 95%; }\r
+@property --eye-y { syntax: '<percentage>'; inherits: false; initial-value: 50%; }\r
+@property --eye-blur { syntax: '<length>'; inherits: false; initial-value: 0px; }\r
+.fg-cover[data-cover="lids"] { opacity: 1; background: none; --eye-blur: 0px; -webkit-backdrop-filter: blur(var(--eye-blur)); backdrop-filter: blur(var(--eye-blur)); }\r
+.fg-cover[data-cover="lids"][data-state] { animation: none; }\r
+.fg-cover[data-cover="lids"][data-state="idle"], .fg-cover[data-cover="lids"][data-state="off"] { opacity: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }\r
+.fg-cover[data-cover="lids"]::before { content: ""; position: absolute; inset: 0; --eye: 95%; --eye-y: 50%; background: radial-gradient(ellipse 72% var(--eye) at 50% var(--eye-y), transparent 70%, rgba(0, 0, 0, .6) 84%, #000 100%); }\r
+.fg-cover[data-cover="lids"][data-state="up"] { animation: fg-eye-blur-in var(--ms) ease-in both; }\r
+.fg-cover[data-cover="lids"][data-state="up"]::before { animation: fg-eye-shut var(--ms) ease-in-out both; }\r
+.fg-cover[data-cover="lids"][data-state="full"]::before { background: #000; }\r
+.fg-cover[data-cover="lids"][data-state="down"] { animation: fg-eye-blur-out var(--ms) ease-out both; }\r
+.fg-cover[data-cover="lids"][data-state="down"]::before { animation: fg-eye-open var(--ms) ease-in-out both; }\r
+@keyframes fg-eye-shut { 0% { --eye: 95%; --eye-y: 50%; } 30% { --eye: 44%; --eye-y: 52%; } 45% { --eye: 56%; --eye-y: 51%; } 75% { --eye: 14%; --eye-y: 57%; } 100% { --eye: 0%; --eye-y: 60%; } }\r
+@keyframes fg-eye-open { 0% { --eye: 0%; --eye-y: 60%; } 18% { --eye: 22%; --eye-y: 56%; } 30% { --eye: 3%; --eye-y: 59%; } 55% { --eye: 50%; --eye-y: 52%; } 66% { --eye: 38%; --eye-y: 53%; } 100% { --eye: 95%; --eye-y: 50%; } }\r
+@keyframes fg-eye-blur-in { from { --eye-blur: 0px; } to { --eye-blur: 6px; } }\r
+@keyframes fg-eye-blur-out { 0% { --eye-blur: 12px; } 55% { --eye-blur: 7px; } 100% { --eye-blur: 0px; } }\r
+/* 画面撕裂：几道色带闪过去，中间一下全黑换画面 */\r
+.fg-cover[data-cover="glitch"][data-state="up"] { animation: fg-cover-glitch var(--ms) steps(4) both; }\r
+.fg-cover[data-cover="glitch"][data-state="down"] { animation: fg-cover-glitch var(--ms) steps(4) reverse both; }\r
+@keyframes fg-cover-glitch {\r
+  0% { opacity: 0; background: linear-gradient(transparent 0 22%, rgba(255, 0, 90, .6) 22% 25%, transparent 25% 51%, rgba(0, 255, 220, .5) 51% 53%, transparent 53%); }\r
+  50% { opacity: .85; background: linear-gradient(#05040c 0 40%, rgba(255, 255, 255, .7) 40% 42%, #05040c 42%); }\r
+  100% { opacity: 1; background: #05040c; }\r
+}\r
+\r
+/* ───────────── 气氛：逐句可变 ─────────────\r
+   层次（都在 .fg-world-in 里）：背景 → 时段调色 → 立绘 → 基调色调 .fg-tone → 光线 .fg-light → 亲密氛围 .fg-romance → 插画 → 天气粒子\r
+   → 画面效果叠层 .fg-fxlayer → 暗角；感官 .fg-sense、特殊段落滤镜 .fg-mode 在镜头外面（推镜头时不跟着放大）。每层由 FadeLayer 换值时淡入淡出（--fade）。 */\r
+.fg-world, .fg-world-in { position: absolute; inset: 0; transform-origin: 50% 50%; }\r
+.fg-tone, .fg-light, .fg-romance, .fg-fxlayer, .fg-sense, .fg-mode { position: absolute; inset: 0; pointer-events: none; animation: fg-layer-in var(--fade, 1.2s) ease both; }\r
+.fg-tone.is-leave, .fg-light.is-leave, .fg-romance.is-leave, .fg-fxlayer.is-leave, .fg-sense.is-leave, .fg-mode.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }\r
+.fg-tone::before, .fg-tone::after, .fg-light::before, .fg-light::after, .fg-romance::before, .fg-romance::after, .fg-fxlayer::before, .fg-fxlayer::after, .fg-sense::before, .fg-sense::after, .fg-mode::before, .fg-mode::after { content: ""; position: absolute; inset: 0; pointer-events: none; }\r
+@keyframes fg-layer-in { from { opacity: 0; } }\r
+@keyframes fg-layer-out { to { opacity: 0; } }\r
+.fg-theater { --fg-noise: url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27><filter id=%27n%27><feTurbulence type=%27fractalNoise%27 baseFrequency=%27.85%27 numOctaves=%272%27 stitchTiles=%27stitch%27/><feColorMatrix values=%270 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .9 0%27/></filter><rect width=%27100%%27 height=%27100%%27 filter=%27url(%23n)%27/></svg>"); }\r
+\r
+/* 基调色调：很淡的一层，让「甜」「悲」「诡异」看得出来，不抢戏。立绘也在下面。 */\r
+.fg-tone { z-index: 5; }\r
+.fg-tone[data-v="cheerful"] { backdrop-filter: saturate(1.12) brightness(1.04); -webkit-backdrop-filter: saturate(1.12) brightness(1.04); }\r
+.fg-tone[data-v="comic"] { backdrop-filter: saturate(1.28) brightness(1.06) contrast(1.05); -webkit-backdrop-filter: saturate(1.28) brightness(1.06) contrast(1.05); }\r
+.fg-tone[data-v="sweet"] { backdrop-filter: saturate(1.1) brightness(1.04); -webkit-backdrop-filter: saturate(1.1) brightness(1.04); background: radial-gradient(110% 90% at 50% 45%, rgba(255, 190, 220, .06) 40%, rgba(255, 150, 200, .42)); }\r
+.fg-tone[data-v="touching"] { backdrop-filter: saturate(1.05); -webkit-backdrop-filter: saturate(1.05); background: radial-gradient(80% 70% at 50% 25%, rgba(255, 226, 180, .32), rgba(255, 200, 150, .14) 60%, rgba(120, 70, 40, .22)); }\r
+.fg-tone[data-v="calm"] { backdrop-filter: saturate(.92); -webkit-backdrop-filter: saturate(.92); background: linear-gradient(180deg, rgba(190, 215, 255, .2), rgba(160, 190, 230, .08) 70%); }\r
+.fg-tone[data-v="solemn"] { backdrop-filter: saturate(.82) contrast(1.06); -webkit-backdrop-filter: saturate(.82) contrast(1.06); background: linear-gradient(180deg, rgba(255, 236, 190, .22), transparent 55%); }\r
+.fg-tone[data-v="sad"] { backdrop-filter: saturate(.68) brightness(.95); -webkit-backdrop-filter: saturate(.68) brightness(.95); background: linear-gradient(180deg, rgba(60, 90, 150, .22), rgba(30, 40, 80, .18)); mix-blend-mode: multiply; }\r
+.fg-tone[data-v="despair"] { backdrop-filter: saturate(.4) brightness(.82) contrast(1.12); -webkit-backdrop-filter: saturate(.4) brightness(.82) contrast(1.12); background: radial-gradient(100% 80% at 50% 45%, transparent 35%, rgba(0, 0, 0, .62)); }\r
+.fg-tone[data-v="tense"] { backdrop-filter: saturate(.8) contrast(1.15); -webkit-backdrop-filter: saturate(.8) contrast(1.15); background: radial-gradient(90% 75% at 50% 45%, transparent 35%, rgba(20, 4, 4, .45) 75%, rgba(10, 0, 0, .75)); }\r
+.fg-tone[data-v="mystery"] { backdrop-filter: saturate(.8) brightness(.9); -webkit-backdrop-filter: saturate(.8) brightness(.9); background: radial-gradient(110% 85% at 50% 45%, rgba(70, 50, 140, .12) 30%, rgba(20, 10, 50, .55)); }\r
+.fg-tone[data-v="eerie"] { backdrop-filter: saturate(.55) contrast(1.08); -webkit-backdrop-filter: saturate(.55) contrast(1.08); background: radial-gradient(100% 80% at 50% 45%, rgba(40, 110, 90, .16) 30%, rgba(0, 18, 12, .6)); }\r
+.fg-tone[data-v="battle"] { backdrop-filter: contrast(1.18) saturate(1.18); -webkit-backdrop-filter: contrast(1.18) saturate(1.18); background: radial-gradient(100% 85% at 50% 50%, transparent 40%, rgba(220, 50, 10, .32) 80%, rgba(120, 10, 0, .55)); }\r
+.fg-tone[data-v="heroic"] { backdrop-filter: contrast(1.1) saturate(1.15) brightness(1.04); -webkit-backdrop-filter: contrast(1.1) saturate(1.15) brightness(1.04); background: linear-gradient(0deg, rgba(255, 160, 50, .34), rgba(255, 200, 120, .08) 55%, transparent); }\r
+.fg-tone[data-v="silence"] { backdrop-filter: saturate(.5) brightness(.94); -webkit-backdrop-filter: saturate(.5) brightness(.94); }\r
+\r
+/* 光线：关灯、停电、烛光、手电……压在背景和立绘上，插画不受影响。 */\r
+.fg-light { z-index: 5; }\r
+.fg-light[data-v="dim"] { background: rgba(20, 22, 50, .22); mix-blend-mode: multiply; }\r
+.fg-light[data-v="dark"] { background: rgba(8, 12, 40, .74); mix-blend-mode: multiply; backdrop-filter: saturate(.6); -webkit-backdrop-filter: saturate(.6); }\r
+.fg-light[data-v="black"] { background: #000; opacity: .93; }\r
+.fg-light[data-v="black"]::after { background: radial-gradient(40% 30% at 50% 60%, rgba(40, 40, 70, .25), transparent 70%); }\r
+/* 烛光、篝火：人脸被火映成暖色、看得清，暗下去的是画面四角 */\r
+.fg-light[data-v="candle"] { background: radial-gradient(80% 90% at 50% 70%, rgb(255, 234, 204), rgb(232, 168, 112) 55%, rgb(110, 62, 34) 100%); mix-blend-mode: multiply; }\r
+.fg-light[data-v="candle"]::after { background: radial-gradient(34% 40% at 50% 82%, rgba(255, 150, 50, .42), transparent 72%); mix-blend-mode: screen; transform-origin: 50% 82%; animation: fg-candle 2.6s ease-in-out infinite; }\r
+@keyframes fg-candle { 0%, 100% { opacity: .85; transform: scale(1); } 22% { opacity: 1; transform: scale(1.03); } 41% { opacity: .78; } 63% { opacity: .95; transform: scale(.99); } 80% { opacity: .82; } }\r
+.fg-light[data-v="spot"] { background: radial-gradient(30% 62% at 50% 52%, transparent 30%, rgba(0, 0, 0, .55) 70%, rgba(0, 0, 0, .92) 100%); }\r
+.fg-light[data-v="spot"]::after { background: linear-gradient(180deg, rgba(255, 250, 225, .22), rgba(255, 250, 225, 0) 80%); clip-path: polygon(44% 0, 56% 0, 72% 100%, 28% 100%); mix-blend-mode: screen; }\r
+.fg-light[data-v="neon"] { background: rgba(10, 6, 40, .55); mix-blend-mode: multiply; }\r
+.fg-light[data-v="neon"]::after { background: linear-gradient(115deg, rgba(255, 40, 200, .45), transparent 45%, transparent 55%, rgba(30, 220, 255, .45)); mix-blend-mode: screen; animation: fg-breathe-light 5s ease-in-out infinite; }\r
+.fg-light[data-v="screen"] { background: rgba(4, 8, 30, .78); mix-blend-mode: multiply; }\r
+.fg-light[data-v="screen"]::after { background: radial-gradient(45% 55% at 50% 85%, rgba(120, 180, 255, .55), transparent 75%); mix-blend-mode: screen; animation: fg-screenglow 3.2s steps(1) infinite; }\r
+@keyframes fg-screenglow { 0%, 100% { opacity: .9; } 30% { opacity: .75; } 31% { opacity: 1; } 70% { opacity: .82; } }\r
+.fg-light[data-v="alarm"] { background: rgba(20, 0, 0, .55); mix-blend-mode: multiply; }\r
+.fg-light[data-v="alarm"]::after { background: radial-gradient(120% 90% at 50% 0%, rgba(255, 30, 30, .6), rgba(160, 0, 0, .25) 70%); mix-blend-mode: screen; animation: fg-alarm 1.3s ease-in-out infinite; }\r
+@keyframes fg-alarm { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }\r
+.fg-light[data-v="moon"] { background: linear-gradient(180deg, rgba(40, 60, 150, .55), rgba(10, 20, 70, .7)); mix-blend-mode: multiply; }\r
+.fg-light[data-v="moon"]::after { background: radial-gradient(60% 50% at 70% 15%, rgba(190, 210, 255, .35), transparent 70%); mix-blend-mode: screen; }\r
+.fg-light[data-v="warm"] { background: linear-gradient(180deg, rgb(255, 214, 160), rgb(255, 176, 110)); mix-blend-mode: multiply; opacity: .55; }\r
+.fg-light[data-v="warm"]::after { background: radial-gradient(60% 55% at 35% 30%, rgba(255, 190, 110, .35), transparent 70%); mix-blend-mode: screen; }\r
+.fg-light[data-v="cold"] { background: linear-gradient(180deg, rgb(170, 200, 255), rgb(130, 160, 230)); mix-blend-mode: multiply; opacity: .6; backdrop-filter: saturate(.75); -webkit-backdrop-filter: saturate(.75); }\r
+.fg-light[data-v="glare"] { background: radial-gradient(70% 60% at 50% 40%, rgba(255, 255, 255, .75), rgba(255, 255, 255, .15) 80%); mix-blend-mode: screen; backdrop-filter: brightness(1.15) contrast(.9); -webkit-backdrop-filter: brightness(1.15) contrast(.9); }\r
+.fg-light[data-v="flicker"] { background: rgba(6, 8, 24, .78); mix-blend-mode: multiply; }\r
+.fg-light[data-v="flicker"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-flicker 4.5s steps(1) infinite; }\r
+/* 窗光：窗外斜射进来的几道光柱，从左上往右下，边缘柔、往下渐渐散掉；两组光柱各自极慢地挪、明暗起伏（配 weather dust 像光里的浮尘） */\r
+.fg-light[data-v="sunbeam"] { mix-blend-mode: screen; background: linear-gradient(150deg, rgba(255, 226, 180, .2), rgba(255, 226, 180, .05) 45%, transparent 70%); }\r
+.fg-light[data-v="sunbeam"]::before, .fg-light[data-v="sunbeam"]::after { inset: -10%; transform-origin: 6% -18%; filter: blur(.9cqw);\r
+  -webkit-mask-image: linear-gradient(160deg, #000 20%, transparent 88%); mask-image: linear-gradient(160deg, #000 20%, transparent 88%); }\r
+.fg-light[data-v="sunbeam"]::before { animation: fg-beam-a 17s ease-in-out infinite alternate;\r
+  background: conic-gradient(from 122deg at 6% -18%, transparent 0deg 4deg, rgba(255, 240, 210, .34) 6deg, transparent 9.5deg 13deg, rgba(255, 240, 210, .22) 14.5deg 17deg, transparent 20.5deg 25deg,\r
+    rgba(255, 240, 210, .38) 27deg, transparent 30.5deg 34deg, rgba(255, 240, 210, .2) 37deg, transparent 42deg); }\r
+.fg-light[data-v="sunbeam"]::after { animation: fg-beam-b 11s ease-in-out infinite alternate;\r
+  background: conic-gradient(from 124deg at 6% -18%, transparent 0deg 9deg, rgba(255, 248, 225, .22) 10.5deg, transparent 12deg 21deg, rgba(255, 248, 225, .26) 22.5deg, transparent 24.5deg 31deg,\r
+    rgba(255, 248, 225, .18) 32deg, transparent 34deg); }\r
+@keyframes fg-beam-a { from { transform: rotate(-1.2deg); opacity: .75; } to { transform: rotate(1deg); opacity: 1; } }\r
+@keyframes fg-beam-b { 0% { transform: rotate(1.4deg); opacity: .45; } 50% { opacity: 1; } 100% { transform: rotate(-.8deg); opacity: .6; } }\r
+/* 漏光：胶片边上渗进来的暖橘色光（红橙到琥珀），从右上慢慢涌进来又退回去，左下角也泛一点（回忆、夕阳、告白） */\r
+.fg-light[data-v="leak"] { mix-blend-mode: screen; background: linear-gradient(235deg, rgba(255, 140, 40, .62), rgba(255, 70, 20, .3) 26%, rgba(255, 60, 20, .08) 48%, transparent 62%); }\r
+.fg-light[data-v="leak"]::before { background: radial-gradient(42% 66% at 100% 22%, rgba(255, 214, 140, .8), rgba(255, 110, 36, .42) 45%, transparent 75%); filter: blur(1.5cqw); animation: fg-leak 9s ease-in-out infinite alternate; }\r
+.fg-light[data-v="leak"]::after { background: radial-gradient(45% 55% at 0% 100%, rgba(255, 80, 40, .38), transparent 70%), radial-gradient(14% 30% at 93% 6%, rgba(255, 250, 230, .5), transparent 70%); animation: fg-leak-b 13s ease-in-out infinite alternate; }\r
+@keyframes fg-leak { from { opacity: .5; transform: translateX(3%) scale(.96); } to { opacity: 1; transform: translateX(-2%) scale(1.08); } }\r
+@keyframes fg-leak-b { 0% { opacity: .3; } 60% { opacity: .9; } 100% { opacity: .55; } }\r
+/* 逆光：迎着右上方的光，亮的光心、一圈光晕、一道横向的蓝白光条，对角线上几个彩色的光斑（鬼影）；光斑随鼠标微微挪动，像镜头在动 */\r
+.fg-light[data-v="flare"] { mix-blend-mode: screen; background:\r
+  radial-gradient(circle at 80% 16%, rgba(255, 252, 240, .95) 0, rgba(255, 240, 205, .75) 1.2cqw, rgba(255, 214, 150, .28) 5cqw, rgba(255, 190, 120, .1) 14cqw, transparent 30cqw),\r
+  radial-gradient(circle at 80% 16%, transparent 9cqw, rgba(255, 222, 180, .1) 9.6cqw, transparent 11cqw),\r
+  radial-gradient(130% 110% at 80% 16%, rgba(255, 220, 170, .2), transparent 55%); }\r
+.fg-light[data-v="flare"]::before { inset: auto; left: 20%; width: 120%; top: calc(16% - .25cqw); height: .5cqw; background: linear-gradient(90deg, transparent, rgba(170, 210, 255, .55) 50%, transparent);\r
+  filter: blur(.12cqw); animation: fg-flare-streak 7s ease-in-out infinite; }\r
+.fg-light[data-v="flare"]::after { filter: blur(.1cqw); translate: calc(var(--px, 0) * 2.2cqw) calc(var(--py, 0) * 1.6cqw); animation: fg-flare-ghost 9s ease-in-out infinite alternate; background:\r
+  radial-gradient(circle at 63.5% 34.7%, rgba(255, 214, 150, .32) 0 .5cqw, transparent .75cqw),\r
+  radial-gradient(circle at 42.5% 58.5%, rgba(140, 190, 255, .14) 0 2.2cqw, rgba(140, 190, 255, .24) 2.6cqw, transparent 2.9cqw),\r
+  radial-gradient(circle at 32% 70.4%, rgba(255, 140, 200, .12) 0 4cqw, transparent 4.6cqw),\r
+  radial-gradient(circle at 21.5% 82.3%, transparent 3cqw, rgba(150, 255, 220, .2) 3.3cqw, transparent 4cqw); }\r
+@keyframes fg-flare-streak { 0%, 100% { opacity: .75; transform: scaleX(.94); } 50% { opacity: 1; transform: scaleX(1.04); } }\r
+@keyframes fg-flare-ghost { from { opacity: .7; transform: translate(.6%, -.6%); } to { opacity: 1; transform: translate(-.6%, .7%); } }\r
+@keyframes fg-flicker { 0%, 100% { opacity: 1; } 8% { opacity: .25; } 9% { opacity: 1; } 11% { opacity: .35; } 12% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .15; } 50% { opacity: .9; } 51% { opacity: .3; } 53% { opacity: 1; } 78% { opacity: .45; } 79% { opacity: 1; } }\r
+\r
+/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密更暖，人离得更近一点，四角像心跳一样一明一暗。压在背景和立绘上，插画不受影响。 */\r
+.fg-romance { z-index: 5; }\r
+.fg-romance[data-v="ambiguous"] { background: radial-gradient(120% 95% at 50% 40%, rgba(255, 215, 235, .05) 35%, rgba(255, 150, 195, .3)); backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); -webkit-backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); }\r
+.fg-romance[data-v="ambiguous"]::before { bottom: -100%; background:\r
+    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .5) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .42) 0 .8cqw, transparent 1.6cqw),\r
+    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .32) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .45) 0 1.1cqw, transparent 2cqw),\r
+    radial-gradient(circle at 80% 54%, rgba(255, 195, 222, .38) 0 1.6cqw, transparent 2.6cqw), radial-gradient(circle at 93% 90%, rgba(255, 236, 246, .4) 0 .9cqw, transparent 1.7cqw);\r
+  background-size: 100% 50%; filter: blur(.2cqw); animation: fg-bokeh-rise 24s linear infinite, fg-bokeh-twinkle 4.5s ease-in-out infinite alternate; }\r
+.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .28), transparent 72%); }\r
+.fg-romance[data-v="intimate"] { background: radial-gradient(110% 90% at 50% 45%, rgba(255, 190, 150, .14) 25%, rgba(235, 95, 125, .42)); backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); -webkit-backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); }\r
+.fg-romance[data-v="intimate"]::after { background: radial-gradient(90% 76% at 50% 46%, transparent 40%, rgba(110, 0, 40, .5) 78%, rgba(80, 0, 30, .72)); animation: fg-romance-beat 1.15s ease-out infinite; }\r
+[data-romance="intimate"] .fg-cast { scale: 1.035; }\r
+@keyframes fg-bokeh-rise { to { transform: translateY(-50%); } }\r
+@keyframes fg-bokeh-twinkle { from { opacity: .55; } to { opacity: .95; } }\r
+@keyframes fg-romance-beat { 0%, 100% { opacity: .55; } 12% { opacity: 1; } 24% { opacity: .7; } 36% { opacity: .9; } 62% { opacity: .55; } }\r
+/* 感官主导的一段：蒙眼、耳边、触碰、发烫、发凉、香气、屏息、失神。在镜头外面（特写时不跟着放大），叠在插画和天气上面（眼睛被蒙住时什么都看不见），对话框不受影响。 */\r
+.fg-sense { z-index: 9; }\r
+.fg-sense[data-v="blind"] { background: #050307; opacity: .95; }\r
+.fg-sense[data-v="blind"]::before { background: radial-gradient(46% 12% at 50% 70%, rgba(255, 222, 192, .16), transparent 70%), radial-gradient(48% 10% at 50% 0%, rgba(255, 222, 192, .1), transparent 70%); animation: fg-blind-breathe 4.8s ease-in-out infinite; }\r
+.fg-sense[data-v="blind"]::after { background-image: var(--fg-noise); opacity: .05; }\r
+.fg-sense[data-v^="ear"]::before { backdrop-filter: blur(3px) brightness(.85); -webkit-backdrop-filter: blur(3px) brightness(.85); -webkit-mask-image: linear-gradient(90deg, #000 8%, transparent 62%); mask-image: linear-gradient(90deg, #000 8%, transparent 62%); }\r
+.fg-sense[data-v^="ear"]::after { background: repeating-radial-gradient(circle at 100% 45%, transparent 0 4.4cqw, rgba(255, 214, 226, .14) 4.6cqw 4.9cqw, transparent 5.1cqw 6.2cqw), radial-gradient(55% 75% at 100% 45%, rgba(255, 172, 192, .6), rgba(255, 150, 172, .18) 55%, transparent 75%);\r
+  -webkit-mask-image: linear-gradient(270deg, #000 15%, transparent 55%); mask-image: linear-gradient(270deg, #000 15%, transparent 55%); transform-origin: 100% 45%; animation: fg-ear-breath 3.6s ease-in-out infinite; }\r
+.fg-sense[data-v="ear-left"]::before { -webkit-mask-image: linear-gradient(270deg, #000 8%, transparent 62%); mask-image: linear-gradient(270deg, #000 8%, transparent 62%); }\r
+.fg-sense[data-v="ear-left"]::after { background: repeating-radial-gradient(circle at 0% 45%, transparent 0 4.4cqw, rgba(255, 214, 226, .14) 4.6cqw 4.9cqw, transparent 5.1cqw 6.2cqw), radial-gradient(55% 75% at 0% 45%, rgba(255, 172, 192, .6), rgba(255, 150, 172, .18) 55%, transparent 75%); transform-origin: 0 45%;\r
+  -webkit-mask-image: linear-gradient(90deg, #000 15%, transparent 55%); mask-image: linear-gradient(90deg, #000 15%, transparent 55%); }\r
+.fg-sense[data-v="touch"] { background: radial-gradient(40% 36% at 50% 55%, rgba(255, 226, 210, .22), transparent 70%), radial-gradient(100% 85% at 50% 50%, transparent 50%, rgba(255, 170, 160, .26)); backdrop-filter: saturate(1.1) brightness(1.03); -webkit-backdrop-filter: saturate(1.1) brightness(1.03); }\r
+.fg-sense[data-v="touch"]::before, .fg-sense[data-v="touch"]::after { inset: auto; left: 50%; top: 55%; width: 32cqw; height: 32cqw; border-radius: 50%;\r
+  transform: translate(-50%, -50%); background: radial-gradient(circle, transparent 30%, rgba(255, 232, 214, .55) 52%, rgba(255, 190, 178, .22) 60%, transparent 70%); animation: fg-touch-ripple 3.2s ease-out infinite; }\r
+.fg-sense[data-v="touch"]::after { animation-delay: 1.6s; }\r
+.fg-sense[data-v="heat"] { background: radial-gradient(110% 90% at 50% 50%, rgba(255, 120, 80, .1) 30%, rgba(220, 50, 40, .36)); backdrop-filter: saturate(1.25) contrast(1.04) sepia(.15); -webkit-backdrop-filter: saturate(1.25) contrast(1.04) sepia(.15); }\r
+.fg-sense[data-v="heat"]::before { backdrop-filter: blur(1px); -webkit-backdrop-filter: blur(1px); -webkit-mask-image: linear-gradient(180deg, transparent, rgba(0, 0, 0, .7) 50%, transparent); mask-image: linear-gradient(180deg, transparent, rgba(0, 0, 0, .7) 50%, transparent);\r
+  -webkit-mask-size: 100% 3.6cqw; mask-size: 100% 3.6cqw; animation: fg-heat-rise 1.8s linear infinite; }\r
+.fg-sense[data-v="heat"]::after { background: radial-gradient(70% 40% at 50% 100%, rgba(255, 140, 90, .3), transparent 70%); animation: fg-blind-breathe 2.8s ease-in-out infinite; }\r
+.fg-sense[data-v="cold"] { background: linear-gradient(180deg, rgba(150, 190, 255, .2), rgba(90, 130, 210, .26)); backdrop-filter: saturate(.6) brightness(.96); -webkit-backdrop-filter: saturate(.6) brightness(.96); }\r
+.fg-sense[data-v="cold"]::before { background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(225, 240, 255, .5) 85%, rgba(242, 249, 255, .78)); filter: blur(.3cqw); }\r
+.fg-sense[data-v="cold"]::after { background: radial-gradient(60% 22% at 30% 100%, rgba(230, 242, 255, .3), transparent 70%), radial-gradient(50% 18% at 75% 100%, rgba(230, 242, 255, .24), transparent 70%); animation: fg-scent-drift 8s ease-in-out infinite alternate; }\r
+.fg-sense[data-v="scent"] { background: radial-gradient(110% 90% at 50% 45%, rgba(255, 244, 236, .12) 30%, rgba(255, 214, 236, .34)); backdrop-filter: brightness(1.07) saturate(1.08) contrast(.94) blur(.5px); -webkit-backdrop-filter: brightness(1.07) saturate(1.08) contrast(.94) blur(.5px); }\r
+.fg-sense[data-v="scent"]::before { bottom: -100%; background:\r
+    radial-gradient(circle at 14% 70%, rgba(255, 248, 232, .85) 0 .35cqw, transparent .9cqw), radial-gradient(circle at 33% 22%, rgba(255, 238, 248, .8) 0 .3cqw, transparent .8cqw),\r
+    radial-gradient(circle at 52% 84%, rgba(255, 248, 232, .8) 0 .4cqw, transparent 1cqw), radial-gradient(circle at 71% 40%, rgba(255, 238, 248, .8) 0 .32cqw, transparent .85cqw),\r
+    radial-gradient(circle at 88% 12%, rgba(255, 248, 232, .75) 0 .38cqw, transparent .95cqw), radial-gradient(circle at 23% 46%, rgba(255, 238, 248, .7) 0 .25cqw, transparent .7cqw),\r
+    radial-gradient(circle at 62% 6%, rgba(255, 248, 232, .7) 0 .28cqw, transparent .75cqw), radial-gradient(circle at 80% 76%, rgba(255, 238, 248, .7) 0 .3cqw, transparent .8cqw);\r
+  background-size: 100% 50%; animation: fg-bokeh-rise 30s linear infinite, fg-bokeh-twinkle 3s ease-in-out infinite alternate; }\r
+.fg-sense[data-v="scent"]::after { background: radial-gradient(46% 18% at 30% 66%, rgba(255, 240, 248, .42), transparent 70%), radial-gradient(40% 16% at 70% 38%, rgba(255, 244, 232, .38), transparent 70%), radial-gradient(34% 12% at 52% 14%, rgba(255, 240, 248, .3), transparent 70%); filter: blur(.6cqw); animation: fg-scent-drift 9s ease-in-out infinite alternate; }\r
+.fg-sense[data-v="breath"] { backdrop-filter: saturate(.75); -webkit-backdrop-filter: saturate(.75); }\r
+.fg-sense[data-v="breath"]::before { background: radial-gradient(70% 60% at 50% 44%, transparent 30%, rgba(0, 0, 0, .62) 72%, rgba(0, 0, 0, .9)); animation: fg-breath-close 1.8s cubic-bezier(.2, .7, .2, 1) both; }\r
+.fg-world-in[data-sense="breath"] :is(.fg-actor-body, .fg-down-mist i) { animation-play-state: paused !important; }\r
+.fg-sense[data-v="daze"] { background: radial-gradient(100% 80% at 50% 50%, rgba(255, 255, 255, .05) 30%, rgba(228, 222, 255, .24)); backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); -webkit-backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); }\r
+.fg-world-in[data-sense="daze"] .fg-cast { filter: drop-shadow(1.4cqw 0 0 rgba(255, 120, 160, .26)) drop-shadow(-1.4cqw 0 0 rgba(120, 200, 255, .26)); animation: fg-daze-sway 6s ease-in-out infinite; }\r
+@keyframes fg-blind-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }\r
+@keyframes fg-ear-breath { 0%, 100% { opacity: .55; transform: scale(.96); } 45% { opacity: 1; transform: scale(1.04); } }\r
+@keyframes fg-touch-ripple { from { transform: translate(-50%, -50%) scale(.3); opacity: .9; } to { transform: translate(-50%, -50%) scale(2.4); opacity: 0; } }\r
+@keyframes fg-heat-rise { to { -webkit-mask-position: 0 -3.6cqw; mask-position: 0 -3.6cqw; } }\r
+@keyframes fg-scent-drift { from { transform: translateX(-3%); } to { transform: translateX(3%); } }\r
+@keyframes fg-breath-close { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }\r
+@keyframes fg-daze-sway { 0%, 100% { translate: -.8% 0; rotate: -.5deg; } 50% { translate: .8% .4%; rotate: .5deg; } }\r
+\r
+/* 电影黑边：严肃的一段一直挂着上下黑边（在镜头外面，推镜头时不动），收起时慢慢退出去。左上角的地点、右上角的按钮压在黑边上。 */\r
+.fg-bars { position: absolute; inset: 0; z-index: 12; pointer-events: none; }\r
+.fg-bars::before, .fg-bars::after { content: ""; position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height 1.2s cubic-bezier(.6, 0, .2, 1); }\r
+.fg-bars::before { top: 0; }\r
+.fg-bars::after { bottom: 0; }\r
+.fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 10.5%; }\r
+\r
+/* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。 */\r
+.fg-world[data-fx="sway"] { animation: fg-fx-sway 7s ease-in-out infinite; }\r
+.fg-world[data-fx="ride"] { animation: fg-fx-ride 1.7s ease-in-out infinite; }\r
+.fg-world[data-fx="handheld"] { animation: fg-fx-handheld 6.5s ease-in-out infinite; }\r
+.fg-world[data-fx="drift"] { animation: fg-fx-drift 26s ease-in-out infinite alternate; }\r
+.fg-world[data-fx="woozy"] { animation: fg-fx-woozy 5.5s ease-in-out infinite; }\r
+.fg-world[data-fx="heat"] { animation: fg-fx-heat 2.6s ease-in-out infinite; }\r
+.fg-world[data-fx="underwater"] { animation: fg-fx-water 6s ease-in-out infinite; }\r
+.fg-world[data-fx="rumble"] { animation: fg-fx-rumble .16s linear infinite; }\r
+.fg-world[data-fx="heartbeat"] { animation: fg-fx-beat 1.05s ease-out infinite; }\r
+/* 慢动作：画面极慢地推近，粒子几乎停住（见 Particles 的 speed）；时间停止：画面褪成灰、一切静止（立绘不呼吸、插画不动） */\r
+.fg-world { transition: filter .9s ease; }\r
+.fg-world[data-fx="slowmo"] { animation: fg-fx-slowmo 10s ease-in-out infinite alternate; }\r
+.fg-world[data-fx="timestop"] { filter: grayscale(.92) contrast(1.18) brightness(.9); }\r
+.fg-world[data-fx="timestop"] :is(.fg-actor-body, .fg-cg-img, .fg-cg-pan, .fg-cg-art, .fg-down-mist i) { animation-play-state: paused !important; }\r
+/* 褪成回忆：一幕的结尾，十来秒里画面慢慢推近、泛黄、褪色，四周发白发虚、起颗粒（.fg-fxlayer），像眼前这一幕正在变成回忆；停在最后的样子，一般接黑场 */\r
+.fg-world[data-fx="fading"] { animation: fg-fx-fading 11s cubic-bezier(.35, 0, .3, 1) both; }\r
+@keyframes fg-fx-fading { from { transform: none; filter: none; } to { transform: scale(1.13); filter: sepia(.58) saturate(.74) contrast(.93) brightness(1.03); } }\r
+@keyframes fg-fx-slowmo { from { transform: scale(1.01); } to { transform: scale(1.05) translateY(-.4%); } }\r
+@keyframes fg-fx-sway { 0%, 100% { transform: scale(1.05) rotate(-.7deg) translateY(-.5%); } 50% { transform: scale(1.05) rotate(.7deg) translateY(.5%); } }\r
+@keyframes fg-fx-ride { 0%, 100% { transform: scale(1.03) translateY(0); } 18% { transform: scale(1.03) translateY(-.35%); } 30% { transform: scale(1.03) translateY(.1%); } 62% { transform: scale(1.03) translateY(-.15%); } 74% { transform: scale(1.03) translateY(.12%); } }\r
+@keyframes fg-fx-handheld { 0%, 100% { transform: scale(1.045) translate(0, 0) rotate(0); } 20% { transform: scale(1.045) translate(-.5%, .3%) rotate(-.25deg); } 45% { transform: scale(1.045) translate(.4%, -.35%) rotate(.2deg); } 70% { transform: scale(1.045) translate(-.25%, -.2%) rotate(-.1deg); } 85% { transform: scale(1.045) translate(.3%, .3%) rotate(.15deg); } }\r
+@keyframes fg-fx-drift { from { transform: scale(1); } to { transform: scale(1.09); } }\r
+@keyframes fg-fx-woozy { 0%, 100% { transform: scale(1.05) rotate(-1deg); filter: blur(.4px); } 35% { transform: scale(1.07) rotate(.8deg) translateX(.6%); filter: blur(1.8px) saturate(1.2); } 65% { transform: scale(1.05) rotate(-.4deg) translateX(-.5%); filter: blur(.8px); } }\r
+@keyframes fg-fx-heat { 0%, 100% { transform: scale(1.02) skewX(0); } 25% { transform: scale(1.02) skewX(.35deg) scaleY(1.004); } 75% { transform: scale(1.02) skewX(-.35deg); } }\r
+@keyframes fg-fx-water { 0%, 100% { transform: scale(1.05) skewX(-.6deg) translateY(.4%); } 50% { transform: scale(1.05) skewX(.6deg) translateY(-.4%); } }\r
+@keyframes fg-fx-rumble { 0% { transform: scale(1.03) translate(.25%, -.2%); } 25% { transform: scale(1.03) translate(-.3%, .15%); } 50% { transform: scale(1.03) translate(.2%, .25%); } 75% { transform: scale(1.03) translate(-.15%, -.25%); } 100% { transform: scale(1.03) translate(.25%, -.2%); } }\r
+@keyframes fg-fx-beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.022); } 24% { transform: scale(1.004); } 36% { transform: scale(1.014); } 60% { transform: scale(1); } }\r
+.fg-fxlayer { z-index: 8; }\r
+.fg-fxlayer[data-v="slowmo"] { background: radial-gradient(100% 85% at 50% 50%, transparent 45%, rgba(10, 24, 48, .5)); backdrop-filter: saturate(.72) contrast(1.06); -webkit-backdrop-filter: saturate(.72) contrast(1.06); }\r
+.fg-fxlayer[data-v="slowmo"]::before { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); -webkit-mask-image: radial-gradient(75% 65% at 50% 50%, transparent 50%, #000 95%); mask-image: radial-gradient(75% 65% at 50% 50%, transparent 50%, #000 95%); }\r
+.fg-fxlayer[data-v="slowmo"]::after { background: repeating-radial-gradient(circle at 50% 50%, transparent 0 9cqw, rgba(200, 230, 255, .1) 9cqw 9.3cqw, transparent 9.3cqw 18cqw); mix-blend-mode: screen; animation: fg-slowmo-rings 7s linear infinite; }\r
+@keyframes fg-slowmo-rings { from { transform: scale(1); opacity: .9; } to { transform: scale(1.6); opacity: .3; } }\r
+/* 时间停止：进入时一圈反色的冲击波扩散开，之后四周泛紫、正中一圈表盘刻度 */\r
+.fg-fxlayer[data-v="timestop"] { background: radial-gradient(100% 85% at 50% 50%, rgba(120, 90, 255, .08) 30%, rgba(40, 16, 90, .55)); }\r
+.fg-fxlayer[data-v="timestop"]::before { backdrop-filter: invert(1) hue-rotate(180deg); -webkit-backdrop-filter: invert(1) hue-rotate(180deg); clip-path: circle(0% at 50% 48%); animation: fg-timestop-wave 1.3s cubic-bezier(.2, .6, .3, 1) both; }\r
+@keyframes fg-timestop-wave { 0% { clip-path: circle(0% at 50% 48%); opacity: 1; } 45% { clip-path: circle(80% at 50% 48%); opacity: 1; } 100% { clip-path: circle(90% at 50% 48%); opacity: 0; } }\r
+.fg-fxlayer[data-v="timestop"]::after { inset: auto; left: 50%; top: 48%; width: 46cqw; height: 46cqw; transform: translate(-50%, -50%); border-radius: 50%;\r
+  background: radial-gradient(circle, transparent 63.3%, rgba(220, 210, 255, .5) 63.6%, transparent 64%), repeating-conic-gradient(from -1deg, rgba(220, 210, 255, .55) 0 2deg, transparent 2deg 30deg);\r
+  -webkit-mask-image: radial-gradient(circle, transparent 60%, #000 61%, #000 66%, transparent 67%); mask-image: radial-gradient(circle, transparent 60%, #000 61%, #000 66%, transparent 67%);\r
+  box-shadow: 0 0 0 1px rgba(220, 210, 255, .18); opacity: .55; animation: fg-fade-in 1.4s .5s ease both; }\r
+.fg-fxlayer[data-v="speed"] { background: repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 3.4deg, rgba(255, 255, 255, .5) 3.4deg 3.9deg, transparent 3.9deg 7.1deg, rgba(255, 255, 255, .28) 7.1deg 7.4deg);\r
+  -webkit-mask-image: radial-gradient(42% 46% at 50% 50%, transparent 55%, #000 100%); mask-image: radial-gradient(42% 46% at 50% 50%, transparent 55%, #000 100%); }\r
+.fg-fxlayer[data-v="speed"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-speedlines .24s steps(3) infinite; }\r
+@keyframes fg-speedlines { 0% { transform: rotate(0); } 100% { transform: rotate(6deg); } }\r
+.fg-fxlayer[data-v="underwater"] { background: linear-gradient(180deg, rgba(40, 170, 200, .35), rgba(10, 40, 90, .55)); mix-blend-mode: multiply; }\r
+.fg-fxlayer[data-v="underwater"]::before { inset: -20%; background: radial-gradient(14% 9% at 30% 30%, rgba(200, 255, 255, .5), transparent 70%), radial-gradient(10% 7% at 70% 20%, rgba(200, 255, 255, .45), transparent 70%), radial-gradient(18% 10% at 55% 60%, rgba(200, 255, 255, .35), transparent 70%), radial-gradient(12% 8% at 15% 75%, rgba(200, 255, 255, .35), transparent 70%); background-size: 50% 50%; mix-blend-mode: screen; animation: fg-caustics 9s ease-in-out infinite alternate; }\r
+.fg-fxlayer[data-v="underwater"]::after { background: linear-gradient(170deg, rgba(220, 255, 255, .3), transparent 40%); clip-path: polygon(20% 0, 30% 0, 50% 100%, 35% 100%, 55% 0, 62% 0, 80% 100%, 70% 100%); mix-blend-mode: screen; opacity: .6; animation: fg-breathe-light 6s ease-in-out infinite; }\r
+@keyframes fg-caustics { from { transform: translate(0, 0) rotate(0); } to { transform: translate(6%, 4%) rotate(4deg); } }\r
+.fg-fxlayer[data-v="heat"] { background: linear-gradient(0deg, rgba(255, 140, 40, .22), transparent 55%); mix-blend-mode: screen; }\r
+.fg-fxlayer[data-v="heat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-breathe-light 2.6s ease-in-out infinite; }\r
+.fg-fxlayer[data-v="woozy"] { backdrop-filter: blur(.5px); -webkit-backdrop-filter: blur(.5px); background: radial-gradient(100% 80% at 50% 50%, transparent 40%, rgba(80, 40, 90, .35)); }\r
+.fg-fxlayer[data-v="heartbeat"] { background: radial-gradient(95% 80% at 50% 48%, transparent 38%, rgba(140, 0, 24, .5) 75%, rgba(90, 0, 14, .85)); }\r
+.fg-fxlayer[data-v="heartbeat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-beat-vignette 1.05s ease-out infinite; }\r
+@keyframes fg-beat-vignette { 0%, 60%, 100% { opacity: .45; } 12% { opacity: 1; } 24% { opacity: .6; } 36% { opacity: .85; } }\r
+.fg-fxlayer[data-v="rumble"] { background: radial-gradient(110% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, .35)); }\r
+.fg-fxlayer[data-v="drift"], .fg-fxlayer[data-v="sway"], .fg-fxlayer[data-v="ride"], .fg-fxlayer[data-v="handheld"] { display: none; }\r
+.fg-fxlayer[data-v="fading"] { background: radial-gradient(115% 85% at 50% 45%, transparent 50%, rgba(255, 236, 205, .42)), radial-gradient(150% 120% at 50% 50%, transparent 62%, rgba(40, 24, 10, .3)); }\r
+.fg-fxlayer[data-v="fading"]:not(.is-leave) { animation-duration: 9s; animation-timing-function: cubic-bezier(.4, 0, .6, 1); }\r
+.fg-fxlayer[data-v="fading"]::before { backdrop-filter: blur(2.5px); -webkit-backdrop-filter: blur(2.5px); -webkit-mask-image: radial-gradient(85% 75% at 50% 45%, transparent 52%, #000 100%); mask-image: radial-gradient(85% 75% at 50% 45%, transparent 52%, #000 100%);\r
+  animation: fg-layer-in 10s ease-in both; }\r
+.fg-fxlayer[data-v="fading"]::after { background-image: var(--fg-noise); opacity: .18; mix-blend-mode: overlay; animation: fg-grain .5s steps(4) infinite, fg-layer-in 10s ease-in both; }\r
+\r
+/* 特殊段落：回忆、梦境、幻觉、想象、主观视角、内心世界、画面里、故事中、预见、虚拟世界。盖住插画在内的整个画面。 */\r
+.fg-mode { z-index: 9; }\r
+.fg-mode[data-v="memory"] { backdrop-filter: sepia(.8) saturate(.7) contrast(.9) brightness(1.08); -webkit-backdrop-filter: sepia(.8) saturate(.7) contrast(.9) brightness(1.08); background: radial-gradient(115% 85% at 50% 45%, transparent 48%, rgba(255, 240, 214, .55)), linear-gradient(rgba(255, 210, 150, .1), rgba(255, 210, 150, .1)); }\r
+.fg-mode[data-v="memory"]::before { backdrop-filter: blur(2.5px); -webkit-backdrop-filter: blur(2.5px); -webkit-mask-image: radial-gradient(85% 75% at 50% 45%, transparent 55%, #000 100%); mask-image: radial-gradient(85% 75% at 50% 45%, transparent 55%, #000 100%); }\r
+.fg-mode[data-v="memory"]::after, .fg-mode[data-v="tale"]::after { background-image: var(--fg-noise); opacity: .16; mix-blend-mode: overlay; animation: fg-grain .5s steps(4) infinite; }\r
+@keyframes fg-grain { 0% { transform: translate(0, 0); } 25% { transform: translate(-2%, 1%); } 50% { transform: translate(1%, -2%); } 75% { transform: translate(2%, 2%); } 100% { transform: translate(0, 0); } }\r
+.fg-mode[data-v="dream"] { backdrop-filter: saturate(1.2) brightness(1.08) contrast(.9) hue-rotate(-12deg); -webkit-backdrop-filter: saturate(1.2) brightness(1.08) contrast(.9) hue-rotate(-12deg); background: radial-gradient(110% 85% at 50% 45%, transparent 42%, rgba(235, 215, 255, .6)), linear-gradient(160deg, rgba(255, 190, 230, .12), rgba(160, 200, 255, .14)); }\r
+.fg-mode[data-v="dream"]::before { backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); -webkit-mask-image: radial-gradient(80% 70% at 50% 45%, transparent 45%, #000 95%); mask-image: radial-gradient(80% 70% at 50% 45%, transparent 45%, #000 95%); }\r
+.fg-mode[data-v="dream"]::after { inset: -10%; background: radial-gradient(30% 22% at 20% 30%, rgba(255, 255, 255, .28), transparent 70%), radial-gradient(26% 20% at 78% 64%, rgba(255, 230, 255, .24), transparent 70%), radial-gradient(22% 18% at 60% 18%, rgba(220, 240, 255, .22), transparent 70%); mix-blend-mode: screen; animation: fg-haze 14s ease-in-out infinite alternate; }\r
+@keyframes fg-haze { from { transform: translate(-3%, 2%) scale(1); } to { transform: translate(3%, -2%) scale(1.08); } }\r
+.fg-mode[data-v="illusion"] { background: linear-gradient(90deg, rgba(255, 0, 120, .16), transparent 25%, transparent 75%, rgba(0, 255, 200, .16)); }\r
+.fg-mode[data-v="illusion"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-hueshift 7s ease-in-out infinite; }\r
+@keyframes fg-hueshift { 0%, 100% { backdrop-filter: saturate(1.5) contrast(1.1) hue-rotate(0deg); -webkit-backdrop-filter: saturate(1.5) contrast(1.1) hue-rotate(0deg); } 33% { backdrop-filter: saturate(1.7) contrast(1.15) hue-rotate(45deg); -webkit-backdrop-filter: saturate(1.7) contrast(1.15) hue-rotate(45deg); } 66% { backdrop-filter: saturate(1.4) contrast(1.05) hue-rotate(-35deg); -webkit-backdrop-filter: saturate(1.4) contrast(1.05) hue-rotate(-35deg); } }\r
+.fg-mode[data-v="illusion"]::before { background: radial-gradient(100% 80% at 50% 50%, transparent 45%, rgba(40, 0, 60, .55)); animation: fg-breathe-light 2.4s ease-in-out infinite; }\r
+.fg-mode[data-v="imagine"] { backdrop-filter: saturate(1.4) brightness(1.1); -webkit-backdrop-filter: saturate(1.4) brightness(1.1); background: radial-gradient(76% 70% at 50% 46%, transparent 72%, rgba(255, 255, 255, .92) 88%); }\r
+.fg-mode[data-v="imagine"]::after { background: radial-gradient(1.2% 1.6% at 18% 22%, #fff, transparent), radial-gradient(1% 1.4% at 82% 30%, #fff, transparent), radial-gradient(.8% 1.1% at 70% 78%, #fff, transparent), radial-gradient(1.1% 1.5% at 26% 70%, #fff, transparent), radial-gradient(.7% 1% at 50% 12%, #fff, transparent); animation: fg-breathe-light 2.2s ease-in-out infinite; }\r
+.fg-mode[data-v="pov"] { background: radial-gradient(92% 68% at 50% 50%, transparent 52%, rgba(0, 0, 0, .55) 80%, rgba(0, 0, 0, .95) 100%); }\r
+.fg-mode[data-v="pov"]::before { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); -webkit-mask-image: radial-gradient(85% 65% at 50% 50%, transparent 55%, #000 95%); mask-image: radial-gradient(85% 65% at 50% 50%, transparent 55%, #000 95%); }\r
+.fg-mode[data-v="inner"] { backdrop-filter: grayscale(.55) brightness(.58) contrast(1.12); -webkit-backdrop-filter: grayscale(.55) brightness(.58) contrast(1.12); background: radial-gradient(42% 58% at 50% 56%, rgba(130, 150, 255, .1), rgba(2, 2, 16, .78) 100%); }\r
+.fg-mode[data-v="screen"] { backdrop-filter: contrast(1.12) saturate(.75) brightness(1.04); -webkit-backdrop-filter: contrast(1.12) saturate(.75) brightness(1.04); background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .2) 0 1px, transparent 1px 3px), radial-gradient(110% 100% at 50% 50%, transparent 60%, rgba(0, 0, 0, .6)); }\r
+.fg-mode[data-v="screen"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-screenflick 4s steps(1) infinite; }\r
+@keyframes fg-screenflick { 0%, 100% { opacity: 1; } 40% { opacity: .93; } 41% { opacity: 1; } 77% { opacity: .96; } }\r
+.fg-mode[data-v="screen"]::before { content: "● REC"; inset: auto auto auto auto; left: 4%; top: 5%; font: 700 1.7cqw/1 var(--font-latin); letter-spacing: .2em; color: #ff3b3b; text-shadow: 0 0 .6cqw rgba(255, 0, 0, .7); animation: fg-pulse 1.4s steps(1) infinite; }\r
+.fg-mode[data-v="screen"]::after { inset: 3%; background:\r
+  linear-gradient(#fff, #fff) top left / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) top left / 2px 3cqw no-repeat,\r
+  linear-gradient(#fff, #fff) top right / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) top right / 2px 3cqw no-repeat,\r
+  linear-gradient(#fff, #fff) bottom left / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) bottom left / 2px 3cqw no-repeat,\r
+  linear-gradient(#fff, #fff) bottom right / 3cqw 2px no-repeat, linear-gradient(#fff, #fff) bottom right / 2px 3cqw no-repeat; opacity: .7; }\r
+.fg-mode[data-v="tale"] { backdrop-filter: sepia(.4) saturate(.8) contrast(1.06); -webkit-backdrop-filter: sepia(.4) saturate(.8) contrast(1.06); background: radial-gradient(100% 85% at 50% 48%, transparent 50%, rgba(70, 40, 10, .62)); box-shadow: inset 0 0 0 1.2cqw rgba(40, 24, 8, .35), inset 0 0 0 1.4cqw rgba(220, 190, 140, .35); }\r
+.fg-mode[data-v="vision"] { backdrop-filter: grayscale(.7) brightness(1.1) contrast(1.22); -webkit-backdrop-filter: grayscale(.7) brightness(1.1) contrast(1.22); background: radial-gradient(110% 90% at 50% 50%, rgba(140, 240, 255, .14) 40%, rgba(220, 255, 255, .55)); }\r
+.fg-mode[data-v="vision"]::after { background: repeating-linear-gradient(0deg, transparent 0 22px, rgba(180, 255, 255, .25) 22px 23px); animation: fg-scan 3s linear infinite; }\r
+@keyframes fg-scan { from { background-position: 0 0; } to { background-position: 0 92px; } }\r
+.fg-mode[data-v="digital"] { backdrop-filter: saturate(1.3) contrast(1.08) hue-rotate(-12deg); -webkit-backdrop-filter: saturate(1.3) contrast(1.08) hue-rotate(-12deg); background: linear-gradient(rgba(0, 255, 230, .2) 1px, transparent 1px) 0 0 / 100% 6%, linear-gradient(90deg, rgba(0, 255, 230, .2) 1px, transparent 1px) 0 0 / 4% 100%, radial-gradient(110% 90% at 50% 50%, transparent 55%, rgba(0, 30, 50, .55)); }\r
+.fg-mode[data-v="digital"]::after { background: linear-gradient(180deg, transparent 0, rgba(120, 255, 240, .22) 50%, transparent 100%) 0 0 / 100% 18% no-repeat; animation: fg-sweep 4s linear infinite; }\r
+@keyframes fg-sweep { from { background-position: 0 -20%; } to { background-position: 0 120%; } }\r
+/* 段落里整个画面也跟着动：梦里轻飘、幻觉里扭曲、主观视角随呼吸起伏 */\r
+.fg-world-in[data-mode="dream"] { animation: fg-mode-float 9s ease-in-out infinite; }\r
+.fg-world-in[data-mode="illusion"] { animation: fg-mode-warp 4.4s ease-in-out infinite; }\r
+.fg-world-in[data-mode="pov"] { animation: fg-mode-breath 4.2s ease-in-out infinite; }\r
+@keyframes fg-mode-float { 0%, 100% { transform: scale(1.04) translateY(-.4%); } 50% { transform: scale(1.04) translateY(.5%); } }\r
+@keyframes fg-mode-warp { 0%, 100% { transform: scale(1.05) skew(0, 0); } 25% { transform: scale(1.07) skew(1.2deg, -.4deg); } 50% { transform: scale(1.05) skew(-.6deg, .6deg); } 75% { transform: scale(1.06) skew(-1deg, -.3deg); } }\r
+@keyframes fg-mode-breath { 0%, 100% { transform: scale(1.035) translateY(0); } 50% { transform: scale(1.035) translateY(-.45%); } }\r
+@media (prefers-reduced-motion: reduce) {\r
+  .fg-world, .fg-world-in, .fg-fxlayer, .fg-mode, .fg-light { animation: none !important; }\r
+  .fg-world[data-fx="fading"] { filter: sepia(.58) saturate(.74) contrast(.93) brightness(1.03); } /* 不推近，直接是褪色后的样子 */\r
+}\r
+\r
+/* 转场：慢慢变过去（时间流逝）、闭眼睁眼、画面撕裂、旋转入梦。 */\r
+@keyframes fg-fade-slow { from { opacity: 0; } to { opacity: 1; } }\r
+@keyframes fg-blink-in { 0%, 42% { opacity: 0; } 50%, 100% { opacity: 1; } }\r
+@keyframes fg-glitch-in { 0% { opacity: 0; transform: translateX(3%); filter: hue-rotate(90deg) contrast(2); } 20% { opacity: 1; transform: translateX(-2%); } 40% { transform: translateX(1.5%) skewX(4deg); filter: hue-rotate(-60deg) contrast(1.6); } 60% { transform: translateX(-.8%); } 80% { transform: none; filter: hue-rotate(20deg); } 100% { filter: none; } }\r
+@keyframes fg-swirl-in { from { opacity: 0; transform: rotate(-14deg) scale(1.45); filter: blur(16px) brightness(1.4); } to { opacity: 1; transform: none; filter: none; } }\r
+.fg-flash.is-blink { background: none; animation: fg-eye-blink-blur 1.5s ease-in-out both; -webkit-backdrop-filter: blur(var(--eye-blur)); backdrop-filter: blur(var(--eye-blur)); }\r
+.fg-flash.is-blink::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 72% var(--eye) at 50% var(--eye-y), transparent 70%, rgba(0, 0, 0, .6) 84%, #000 100%); animation: fg-eye-blink 1.5s ease-in-out both; }\r
+@keyframes fg-eye-blink { 0% { --eye: 95%; --eye-y: 50%; } 30%, 45% { --eye: 0%; --eye-y: 60%; } 62% { --eye: 30%; --eye-y: 55%; } 72% { --eye: 16%; --eye-y: 57%; } 100% { --eye: 95%; --eye-y: 50%; } }\r
+@keyframes fg-eye-blink-blur { 0% { --eye-blur: 0px; } 30%, 45% { --eye-blur: 6px; } 62% { --eye-blur: 9px; } 100% { --eye-blur: 0px; } }\r
+.fg-flash.is-glitch { background: linear-gradient(transparent 0 22%, rgba(255, 0, 90, .5) 22% 25%, transparent 25% 51%, rgba(0, 255, 220, .45) 51% 53%, transparent 53% 78%, rgba(255, 255, 255, .6) 78% 79.5%, transparent 79.5%); mix-blend-mode: screen; animation: fg-glitch .7s steps(6) both; }\r
+@keyframes fg-glitch { 0% { opacity: 1; transform: translate(0, 0); } 30% { transform: translate(-4%, 8%); } 60% { transform: translate(5%, -12%); opacity: .8; } 100% { opacity: 0; transform: translate(0, 20%); } }\r
+\r
+/* 过场字卡：时间跳跃、日期、章节、与此同时。 */\r
+.fg-cut { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: #05040c; animation: fg-cut-in .5s ease both; pointer-events: none; }\r
+.fg-cut.is-out { animation: fg-cut-out .6s ease both; }\r
+.fg-cut[data-kind="meanwhile"] { background: linear-gradient(100deg, rgba(5, 4, 12, .96) 0 58%, rgba(5, 4, 12, .9)); }\r
+.fg-cut-inner { text-align: center; animation: fg-cut-text 2.3s ease both; }\r
+.fg-cut-kicker { display: flex; align-items: center; justify-content: center; gap: 1.2cqw; font-family: var(--font-latin); font-size: 1.15cqw; letter-spacing: .6em; text-transform: uppercase; color: rgba(255, 255, 255, .6); }\r
+.fg-cut-kicker i { width: 6cqw; height: 1px; background: linear-gradient(90deg, transparent, var(--accent2)); }\r
+.fg-cut-kicker i:last-child { background: linear-gradient(270deg, transparent, var(--accent2)); }\r
+.fg-cut-text { margin-top: 1.4cqw; font-family: var(--font-display); font-size: 3.6cqw; font-weight: 700; letter-spacing: .3em; color: var(--ink); text-shadow: 0 0 3cqw rgba(155, 123, 255, .45); }\r
+.fg-cut[data-kind="chapter"] .fg-cut-text { font-size: 4.4cqw; }\r
+.fg-cut[data-kind="date"] .fg-cut-text { font-family: var(--font-latin), var(--font-display); letter-spacing: .18em; }\r
+.fg-cut[data-kind="meanwhile"] .fg-cut-inner { text-align: left; transform: translateX(-12%); }\r
+@keyframes fg-cut-in { from { opacity: 0; } }\r
+@keyframes fg-cut-out { to { opacity: 0; } }\r
+@keyframes fg-cut-text { 0% { opacity: 0; transform: translateY(.8cqw); letter-spacing: .5em; } 30% { opacity: 1; transform: none; } 100% { letter-spacing: .3em; } }\r
+.fg-hud-mode { color: var(--accent); }\r
+\r
+/* ── 地点标题卡 ── */\r
+.fg-titlecard { position: absolute; left: 6%; top: 34%; z-index: 25; pointer-events: none; animation: fg-titlecard 3.2s ease both; }\r
+.fg-titlecard-line { width: 26cqw; height: 1px; background: linear-gradient(90deg, var(--accent), var(--accent2), transparent); transform-origin: left; animation: fg-line 1s .1s cubic-bezier(.6, 0, .2, 1) both; }\r
+.fg-titlecard-name { font-family: var(--font-display); font-size: 4.6cqw; font-weight: 700; letter-spacing: .32em; margin: .8cqw 0 .4cqw; text-shadow: 0 0 2cqw rgba(0, 0, 0, .8), 0 0 4cqw var(--accent2); }\r
+.fg-titlecard-sub { font-family: var(--font-latin); font-size: 1.3cqw; letter-spacing: .5em; color: rgba(255, 255, 255, .75); text-transform: uppercase; }\r
+@keyframes fg-titlecard { 0% { opacity: 0; transform: translateX(-2%); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(1%); } }\r
+@keyframes fg-line { from { transform: scaleX(0); } }\r
+\r
+/* ── HUD ── */\r
+.fg-hud { position: absolute; left: 2.2%; top: 3.2%; z-index: 20; display: flex; align-items: stretch; gap: .9cqw; transition: opacity .3s; }\r
+.fg-hud-bar { width: .28cqw; border-radius: 9px; background: linear-gradient(180deg, var(--accent), var(--accent2)); box-shadow: 0 0 1cqw var(--accent); }\r
+.fg-hud-place { font-family: var(--font-display); font-size: 1.55cqw; font-weight: 700; letter-spacing: .14em; text-shadow: 0 1px 6px rgba(0, 0, 0, .7); }\r
+.fg-hud-meta { margin-top: .25cqw; font-size: .95cqw; letter-spacing: .14em; color: var(--ink-dim); text-shadow: 0 1px 4px rgba(0, 0, 0, .7); display: flex; gap: .8cqw; }\r
+.fg-hud-meta.is-alone { margin-top: 0; } /* 地点关掉、只显示标签时 */\r
+.fg-topright { position: absolute; right: 2%; top: 3%; z-index: 22; display: flex; gap: .6cqw; align-items: center; }\r
+.fg-pill { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1cqw; border-radius: 99px; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: .95cqw; letter-spacing: .08em; color: var(--ink); transition: opacity 1.2s; }\r
+.fg-pill.is-busy::before { content: ""; width: .7cqw; height: .7cqw; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: fg-spin .8s linear infinite; }\r
+.fg-iconbtn { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; display: grid; place-items: center; background: var(--chip-bg); border: 1px solid var(--box-border); backdrop-filter: blur(10px); font-size: 1.2cqw; transition: transform .2s, background .2s; }\r
+.fg-iconbtn:hover { transform: rotate(90deg); background: rgba(255, 255, 255, .14); }\r
+\r
+/* ── 对话框 ── */\r
+/* 高度、字号、字体可以在设置里改（Theater.jsx 的 dialogVars）：--fg-dlg-h 横屏高度、--fg-dlg-h-p 竖屏高度、--fg-text-scale / --fg-name-scale 字号倍数、--fg-text-font / --fg-name-font 字体。\r
+   --fg-dlg-ref 是皮肤原来的高度（cqh：舞台高的百分之几）。对话框比它高时，正文、底下那排按钮离框边的距离停在原来的样子（min / clamp 封顶），多出来的地方都给正文；\r
+   比它矮时照旧按比例缩。默认高度下和以前一模一样 */\r
+.fg-dialog { position: absolute; left: 4%; right: 4%; bottom: 3.6%; height: var(--fg-dlg-h, 27%); --fg-dlg-ref: 27cqh; z-index: 20; transition: opacity .3s, transform .3s; }\r
+.fg-ui-hidden .fg-dialog, .fg-ui-hidden .fg-hud, .fg-ui-hidden .fg-topright, .fg-ui-hidden .fg-quick { opacity: 0; pointer-events: none; }\r
+/* 插画出现时对话框先让开（淡出、往下沉一点），画面出来后再回来 */\r
+.fg-dialog.is-away { opacity: 0; transform: translateY(1.2cqw); pointer-events: none; }\r
+.fg-box { position: absolute; inset: 0; border-radius: var(--box-radius); background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); -webkit-backdrop-filter: var(--box-blur); box-shadow: 0 1.4cqw 4cqw rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .08); overflow: hidden; }\r
+.fg-box::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), var(--accent3), transparent); background-size: 200% 100%; animation: fg-shimmer 6s linear infinite; opacity: .9; }\r
+.fg-box::after { content: ""; position: absolute; right: -6cqw; bottom: -10cqw; width: 26cqw; height: 26cqw; border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--speaker, var(--accent)) 28%, transparent), transparent 65%); pointer-events: none; transition: background .6s; }\r
+@keyframes fg-shimmer { from { background-position: 200% 0; } to { background-position: 0 0; } }\r
+/* 名牌字号是整块按底边缩放（scale 不占位置）：调大时往上长，不压到正文 */\r
+.fg-name { position: absolute; left: 3.2%; top: -2.3cqw; z-index: 2; display: flex; align-items: flex-end; gap: .8cqw; transform-origin: 0 100%; scale: var(--fg-name-scale, 1); animation: fg-name-in .35s cubic-bezier(.2, .8, .2, 1) both; }\r
+.fg-name-plate { position: relative; padding: .5cqw 2.4cqw .55cqw 1.6cqw; font-family: var(--fg-name-font, var(--font-display)); font-weight: 700; font-size: 1.75cqw; letter-spacing: .2em; color: var(--name-ink);\r
+  background: linear-gradient(100deg, var(--speaker, var(--accent)), color-mix(in oklab, var(--speaker, var(--accent)) 55%, var(--accent2)));\r
+  clip-path: polygon(0 0, 100% 0, calc(100% - 1.2cqw) 100%, 0 100%); box-shadow: 0 .4cqw 1.6cqw rgba(0, 0, 0, .35); text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }\r
+.fg-name-plate::after { content: ""; position: absolute; left: 1.6cqw; right: 2.4cqw; bottom: .3cqw; height: 1px; background: rgba(255, 255, 255, .55); }\r
+.fg-name-sub { font-family: var(--font-latin); font-size: 1cqw; letter-spacing: .32em; color: var(--ink-dim); padding-bottom: .4cqw; text-transform: uppercase; }\r
+@keyframes fg-name-in { from { opacity: 0; transform: translateX(-1.2cqw); } }\r
+/* 声音的样子：名牌旁的小标（三根跳动的音量条 + 字），对话框和字跟着换样子 */\r
+.fg-voice-chip { display: flex; align-items: center; gap: .25cqw; margin-bottom: .3cqw; padding: .35cqw .9cqw .35cqw .7cqw; border-radius: 99px; font-size: 1.15cqw; font-weight: 600; letter-spacing: .18em; color: #fff; background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .25); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }\r
+.fg-voice-chip span { margin-left: .4cqw; }\r
+.fg-voice-chip i { width: .25cqw; height: 1.05cqw; border-radius: 1px; background: currentColor; transform-origin: 50% 100%; animation: fg-voice-bar .7s ease-in-out infinite alternate; }\r
+.fg-voice-chip i:nth-child(2) { animation-delay: -.25s; } .fg-voice-chip i:nth-child(3) { animation-delay: -.5s; }\r
+@keyframes fg-voice-bar { from { transform: scaleY(.3); } to { transform: scaleY(1); } }\r
+.fg-voice-chip[data-voice="phone"] { color: #9fe8ff; border-color: rgba(120, 220, 255, .45); }\r
+.fg-voice-chip[data-voice="radio"] { color: #ffd27a; border-color: rgba(255, 200, 100, .45); }\r
+.fg-voice-chip[data-voice="telepathy"] { color: #e0b8ff; border-color: rgba(210, 160, 255, .55); box-shadow: 0 0 1cqw rgba(190, 120, 255, .45); }\r
+.fg-voice-chip[data-voice="chorus"] { color: #ffe6f2; border-color: rgba(255, 190, 220, .45); }\r
+.fg-voice-chip[data-voice="offscreen"] { color: rgba(255, 255, 255, .75); border-style: dashed; }\r
+.fg-voice-chip[data-voice="echo"] { color: #c6e0ff; border-color: rgba(170, 210, 255, .4); }\r
+.fg-voice-chip[data-voice="memory"] { color: #f2dcb4; border-color: rgba(240, 210, 160, .4); }\r
+.fg-voice-chip[data-voice="machine"] { color: #7dffd8; border-color: rgba(90, 255, 200, .5); border-radius: .2cqw; font-family: ui-monospace, Menlo, Consolas, monospace; }\r
+.fg-voice-chip[data-voice="machine"] i { animation-timing-function: steps(3); }\r
+/* 电话：字偏冷、对话框里一道道细横纹，像隔着听筒 */\r
+.fg-dialog[data-voice="phone"] .fg-text { color: color-mix(in oklab, var(--ink) 80%, #9fe8ff); }\r
+.fg-dialog[data-voice="phone"] .fg-box { background: repeating-linear-gradient(0deg, rgba(160, 230, 255, .05) 0 2px, transparent 2px 5px), var(--box-bg); }\r
+/* 广播 / 对讲机：字微微闪、带一点颗粒 */\r
+.fg-dialog[data-voice="radio"] .fg-text { color: color-mix(in oklab, var(--ink) 82%, #ffd27a); animation: fg-voice-radio 2.4s steps(1) infinite; }\r
+.fg-dialog[data-voice="radio"] .fg-box { background: repeating-linear-gradient(0deg, rgba(255, 220, 140, .06) 0 1px, transparent 1px 3px), var(--box-bg); }\r
+@keyframes fg-voice-radio { 0%, 100% { opacity: 1; } 31% { opacity: .82; } 32% { opacity: 1; } 67% { opacity: .9; } 68% { opacity: 1; } }\r
+/* 心灵感应：字发光、轻轻浮动，对话框边缘泛紫 */\r
+.fg-dialog[data-voice="telepathy"] .fg-text { color: color-mix(in oklab, var(--ink) 72%, #b070ff); text-shadow: 0 0 .7cqw rgba(200, 140, 255, .85), 0 0 1.8cqw rgba(160, 100, 255, .45); }\r
+.fg-dialog[data-voice="telepathy"] .fg-line { display: inline-block; animation: fg-voice-float 3.2s ease-in-out infinite; }\r
+.fg-dialog[data-voice="telepathy"] .fg-box { box-shadow: 0 1.4cqw 4cqw rgba(0, 0, 0, .45), inset 0 0 3cqw rgba(170, 110, 255, .35); border-color: rgba(200, 150, 255, .5); }\r
+@keyframes fg-voice-float { 0%, 100% { transform: translateY(0); filter: blur(0); } 50% { transform: translateY(-.25cqw); filter: blur(.3px); } }\r
+/* 齐声：字叠着两层错开的影子，像几个人同时开口 */\r
+.fg-dialog[data-voice="chorus"] .fg-text { text-shadow: .14cqw .1cqw 0 rgba(255, 190, 220, .4), -.14cqw -.08cqw 0 rgba(170, 210, 255, .4), 0 1px 2px rgba(0, 0, 0, .45); font-weight: 600; }\r
+/* 画外音：人不在画面里，字淡一点、名牌虚线框 */\r
+.fg-dialog[data-voice="offscreen"] .fg-text { opacity: .86; }\r
+.fg-dialog[data-voice="offscreen"] .fg-name-plate { outline: 1px dashed rgba(255, 255, 255, .5); outline-offset: .2cqw; opacity: .85; }\r
+/* 回声：每个字后面拖着两层渐远的影子 */\r
+.fg-dialog[data-voice="echo"] .fg-text { text-shadow: .35cqw 0 0 rgba(255, 255, 255, .2), .75cqw 0 .1cqw rgba(255, 255, 255, .1), 0 1px 2px rgba(0, 0, 0, .45); }\r
+/* 回忆：字泛旧纸的暖色，外面一圈很淡的光晕，像隔着一层时间 */\r
+.fg-dialog[data-voice="memory"] .fg-text { color: color-mix(in oklab, var(--ink) 74%, #f0d2a0); text-shadow: 0 0 .9cqw rgba(255, 220, 170, .3), 0 1px 2px rgba(0, 0, 0, .45); }\r
+/* 机械音：等宽字、青色、扫描线 */\r
+.fg-dialog[data-voice="machine"] .fg-text { font-family: ui-monospace, Menlo, Consolas, monospace; color: color-mix(in oklab, var(--ink) 55%, #10d0a0); letter-spacing: .08em; text-shadow: 0 0 .5cqw rgba(60, 255, 200, .5); }\r
+.fg-dialog[data-voice="machine"] .fg-box { background: repeating-linear-gradient(0deg, rgba(80, 255, 200, .07) 0 1px, transparent 1px 3px), var(--box-bg); }\r
+/* ── 短闪回里的对话框（data-recall 是基调，Dialog.jsx 的 DialogBox）：不加头像、不贴「回忆」标签，对话框自己换个样子 ──\r
+   共通：框染上基调的颜色（用整块的内阴影，换进换出能慢慢过渡）、左右两头化开、顶上那道彩色细线收起，字慢慢洇出来。\r
+   名牌默认模糊压暗：认得出是谁，又像隔着一层看不清（data-recall-name="blur"；hide 时不渲染名牌）。\r
+   前面加 .fg-theater 是为了压过皮肤里的同名规则；字的出场（.fg-char）不加，好让后面的「打完」「等着」和台词演法照常压过它 */\r
+@property --fg-feather { syntax: '<percentage>'; inherits: false; initial-value: 0%; }\r
+.fg-box { transition: box-shadow .8s ease, border-color .8s ease, --fg-feather .8s ease; }\r
+.fg-box::before { transition: opacity .8s ease; }\r
+.fg-theater .fg-dialog[data-recall] .fg-box { --fg-feather: 9%; --tint: rgba(110, 72, 28, .34); border-color: rgba(240, 210, 160, .3);\r
+  box-shadow: 0 1.4cqw 4cqw rgba(0, 0, 0, .4), inset 0 0 0 100vmax var(--tint), inset 0 0 3cqw rgba(0, 0, 0, .35);\r
+  --fade-x: linear-gradient(90deg, transparent, #000 var(--fg-feather), #000 calc(100% - var(--fg-feather)), transparent);\r
+  --fade-y: linear-gradient(180deg, transparent, #000 calc(var(--fg-feather) * 1.6), #000 calc(100% - var(--fg-feather) * .8), transparent);\r
+  -webkit-mask-image: var(--fade-x), var(--fade-y); -webkit-mask-composite: source-in; mask-image: var(--fade-x), var(--fade-y); mask-composite: intersect; }\r
+.fg-theater .fg-dialog[data-recall] .fg-box::before { opacity: 0; }\r
+.fg-theater .fg-dialog[data-recall] .fg-box::after { background: radial-gradient(circle, rgba(255, 206, 140, .2), transparent 65%); }\r
+.fg-theater .fg-dialog[data-recall] .fg-text { color: color-mix(in oklab, var(--ink) 70%, #f0d2a0); text-shadow: 0 0 .9cqw rgba(255, 214, 160, .35), 0 1px 2px rgba(0, 0, 0, .5); }\r
+.fg-dialog[data-recall] .fg-char { animation-name: fg-char-recall; animation-duration: .6s; }\r
+@keyframes fg-char-recall { from { opacity: 0; filter: blur(4px); } to { opacity: 1; filter: none; } }\r
+.fg-theater .fg-dialog[data-recall-name="blur"] .fg-name-plate { background: color-mix(in oklab, var(--speaker, var(--accent)) 22%, rgba(16, 12, 8, .82)); color: rgba(255, 255, 255, .7);\r
+  box-shadow: none; text-shadow: none; filter: blur(.13cqw); opacity: .74; animation: fg-name-recall 4.6s ease-in-out infinite; }\r
+.fg-theater .fg-dialog[data-recall-name="blur"] .fg-name-plate::after { opacity: .25; }\r
+@keyframes fg-name-recall { 0%, 100% { filter: blur(.1cqw); opacity: .78; } 50% { filter: blur(.2cqw); opacity: .62; } }\r
+/* 甜蜜：泛粉，框里几点光斑慢慢飘，字带一圈粉色的光 */\r
+.fg-theater .fg-dialog[data-recall="sweet"] .fg-box { --tint: rgba(140, 48, 90, .3); border-color: rgba(255, 190, 215, .35); }\r
+.fg-theater .fg-dialog[data-recall="sweet"] .fg-box::after { display: block; inset: -10%; width: auto; height: auto; border-radius: 0; filter: blur(.35cqw); animation: fg-bokeh 8s ease-in-out infinite alternate;\r
+  background: radial-gradient(circle at 12% 30%, rgba(255, 190, 220, .22) 0 .6cqw, transparent 1cqw), radial-gradient(circle at 38% 78%, rgba(255, 180, 214, .18) 0 .4cqw, transparent .7cqw),\r
+    radial-gradient(circle at 70% 22%, rgba(255, 200, 226, .2) 0 .8cqw, transparent 1.2cqw), radial-gradient(circle at 90% 70%, rgba(255, 186, 218, .22) 0 .5cqw, transparent .8cqw); }\r
+.fg-theater .fg-dialog[data-recall="sweet"] .fg-text { color: color-mix(in oklab, var(--ink) 72%, #ffd0e2); text-shadow: 0 0 1cqw rgba(255, 170, 205, .5), 0 1px 2px rgba(0, 0, 0, .45); }\r
+/* 伤感：冷灰泛蓝，字褪色、出得慢 */\r
+.fg-theater .fg-dialog[data-recall="sad"] .fg-box { --tint: rgba(18, 30, 50, .52); border-color: rgba(160, 180, 210, .2); }\r
+.fg-theater .fg-dialog[data-recall="sad"] .fg-box::after { background: radial-gradient(circle, rgba(140, 170, 220, .14), transparent 65%); }\r
+.fg-theater .fg-dialog[data-recall="sad"] .fg-text { color: color-mix(in oklab, var(--ink) 60%, #aebdd2); text-shadow: 0 1px 2px rgba(0, 0, 0, .5); }\r
+.fg-dialog[data-recall="sad"] .fg-char { animation-name: fg-char-fade; animation-duration: 1s; }\r
+@keyframes fg-char-fade { from { opacity: 0; filter: blur(1.5px); } to { opacity: 1; filter: none; } }\r
+/* 不安：暗红，框的四边像心跳一样一暗一暗（跟画面四角的节奏一样），字带红青两层错开的影子，时不时抖一下 */\r
+.fg-theater .fg-dialog[data-recall="dread"] .fg-box { --tint: rgba(28, 0, 6, .6); border-color: rgba(200, 30, 45, .45); transition-duration: .25s; }\r
+.fg-theater .fg-dialog[data-recall="dread"] .fg-box::after { display: block; inset: 0; width: auto; height: auto; border-radius: 0; filter: none;\r
+  background: radial-gradient(120% 140% at 50% 50%, transparent 45%, rgba(150, 0, 18, .5)); animation: fg-dread-pulse 1.2s ease-in-out infinite; }\r
+.fg-theater .fg-dialog[data-recall="dread"] .fg-text { color: color-mix(in oklab, var(--ink) 82%, #ffd2d2); text-shadow: .09cqw 0 0 rgba(255, 40, 64, .55), -.09cqw 0 0 rgba(70, 200, 255, .3), 0 1px 2px rgba(0, 0, 0, .6); }\r
+.fg-theater .fg-dialog[data-recall="dread"] .fg-line { display: inline-block; animation: fg-line-jitter 3.4s steps(1) infinite; }\r
+.fg-dialog[data-recall="dread"] .fg-char { animation-name: fg-char-flicker; animation-duration: .32s; animation-timing-function: steps(4); }\r
+@keyframes fg-line-jitter { 0%, 90%, 100% { transform: none; } 91% { transform: translate(.2cqw, -.08cqw); } 93% { transform: translate(-.16cqw, .06cqw); } 95% { transform: translate(.08cqw, 0); } }\r
+@keyframes fg-char-flicker { 0% { opacity: 0; } 25% { opacity: .9; } 50% { opacity: .2; } 75%, 100% { opacity: 1; } }\r
+/* 猛然想起：白边、亮一下，字很清楚，后面拖一层白色残影 */\r
+.fg-theater .fg-dialog[data-recall="flash"] .fg-box { --fg-feather: 4%; --tint: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .7); transition-duration: .2s; animation: fg-box-snap .6s ease-out; }\r
+.fg-theater .fg-dialog[data-recall="flash"] .fg-box::after { background: radial-gradient(circle, rgba(255, 255, 255, .16), transparent 65%); }\r
+@keyframes fg-box-snap { from { box-shadow: 0 0 3cqw rgba(255, 255, 255, .6), inset 0 0 0 100vmax rgba(255, 255, 255, .55); } }\r
+.fg-theater .fg-dialog[data-recall="flash"] .fg-text { color: #fff; text-shadow: .3cqw 0 .05cqw rgba(255, 255, 255, .22), 0 1px 2px rgba(0, 0, 0, .55); }\r
+.fg-dialog[data-recall="flash"] .fg-char { animation-name: fg-char-snap; animation-duration: .3s; }\r
+@keyframes fg-char-snap { from { opacity: 0; text-shadow: 0 0 1cqw #fff, 0 0 2cqw #fff; } }\r
+/* 朦胧如梦：框几乎化开成一团雾，字发着光、慢慢浮出来，整行轻轻失焦又对上焦 */\r
+.fg-theater .fg-dialog[data-recall="haze"] .fg-box { --tint: rgba(255, 248, 236, .14); border-color: transparent; box-shadow: inset 0 0 0 100vmax var(--tint);\r
+  -webkit-mask-image: radial-gradient(62% 110% at 50% 50%, #000 45%, transparent 100%); mask-image: radial-gradient(62% 110% at 50% 50%, #000 45%, transparent 100%); }\r
+.fg-theater .fg-dialog[data-recall="haze"] .fg-box::after { background: radial-gradient(circle, rgba(255, 250, 240, .22), transparent 65%); }\r
+.fg-theater .fg-dialog[data-recall="haze"] .fg-text { color: color-mix(in oklab, var(--ink) 80%, #fff6e6); text-shadow: 0 0 1.2cqw rgba(255, 248, 232, .6), 0 1px 2px rgba(0, 0, 0, .35); }\r
+.fg-theater .fg-dialog[data-recall="haze"] .fg-line { display: inline-block; animation: fg-line-haze 5s ease-in-out infinite; }\r
+.fg-dialog[data-recall="haze"] .fg-char { animation-name: fg-char-mist; animation-duration: 1.1s; }\r
+@keyframes fg-line-haze { 0%, 100% { filter: none; } 50% { filter: blur(.5px); } }\r
+@keyframes fg-char-mist { from { opacity: 0; filter: blur(7px); } to { opacity: 1; filter: none; } }\r
+.fg-text { position: absolute; left: 4.2%; right: 5%; top: clamp(1.6cqw, 23%, calc(.23 * var(--fg-dlg-ref))); bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-family: var(--fg-text-font, var(--font-body)); font-size: calc(1.95cqw * var(--fg-text-scale, 1)); line-height: 1.78; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0, 0, 0, .45); overflow: hidden; }\r
+.fg-text.is-narration { color: color-mix(in oklab, var(--ink) 92%, var(--accent3)); }\r
+.fg-text.is-thought { font-style: italic; color: color-mix(in oklab, var(--ink) 70%, var(--accent2)); }\r
+.fg-text.is-cardhint { color: var(--ink-dim); font-size: calc(1.3cqw * var(--fg-text-scale, 1)); letter-spacing: .4em; text-align: center; }\r
+.fg-text.is-thought .fg-line::before { content: "（"; } .fg-text.is-thought .fg-line::after { content: "）"; }\r
+/* 双语对照：像注音一样，上方小字原文，下方是打出来的翻译；原文的字跟着翻译的进度一起出（Dialog.jsx 的 origChars） */\r
+.fg-orig { font-size: .62em; line-height: 1.45; letter-spacing: .02em; opacity: .72; margin-bottom: .2em; font-style: normal; font-weight: normal; }\r
+.fg-char { opacity: 0; animation: fg-char-in .22s ease forwards; animation-delay: var(--d); display: inline; }\r
+.fg-text.is-done .fg-char { animation: none; opacity: 1; }\r
+.fg-text.is-wait .fg-char { animation: none; }\r
+@keyframes fg-char-in { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: none; } }\r
+/* ── 台词演法与重音（lib/typing.js）：字的样子。要做位移、缩放的字改成 inline-block，空格照样占位 ── */\r
+.fg-text[class*="say-"] .fg-char, .fg-char.is-stress { display: inline-block; white-space: pre; }\r
+.fg-text.say-menace .fg-char { animation-name: fg-char-stamp; animation-duration: .2s; }\r
+.fg-text.say-excited .fg-char { animation-name: fg-char-hop; animation-duration: .14s; }\r
+.fg-text.say-shout .fg-char { animation-name: fg-char-pop; animation-duration: .28s; font-size: 1.16em; font-weight: 700; }\r
+.fg-text.say-hesitant .fg-char { animation-duration: .32s; }\r
+.fg-text.say-whisper { opacity: .8; }\r
+.fg-text.say-whisper .fg-char { font-size: .9em; animation-duration: .45s; }\r
+.fg-text.say-breakdown .fg-char { color: color-mix(in oklab, var(--ink) 72%, #ff3b5c); animation: fg-char-in .12s ease forwards var(--d), fg-char-quake .2s linear infinite var(--d); }\r
+.fg-char.is-stress { color: var(--stress, #ff4d5e); font-weight: 700; font-size: 1.1em; text-shadow: 0 0 .6cqw rgba(255, 60, 80, .45); animation-name: fg-char-stamp; animation-duration: .24s; }\r
+/* 点一下打完 / 等字体时：和普通台词一样立刻全显示、或先不动（要比上面的演法规则更具体才压得住） */\r
+.fg-text.is-done[class*="say-"] .fg-char, .fg-text.is-done .fg-char.is-stress { animation: none; opacity: 1; }\r
+.fg-text.is-wait[class*="say-"] .fg-char, .fg-text.is-wait .fg-char.is-stress { animation: none; }\r
+.fg-text.is-done.say-breakdown .fg-char { animation: fg-char-quake .2s linear infinite; opacity: 1; }\r
+@keyframes fg-char-stamp { from { opacity: 0; transform: translateY(-.35em) scale(1.4); } 60% { opacity: 1; transform: translateY(0) scale(.95); } to { opacity: 1; transform: none; } }\r
+@keyframes fg-char-pop { from { opacity: 0; transform: scale(1.9); } 55% { opacity: 1; transform: scale(.92); } to { opacity: 1; transform: none; } }\r
+@keyframes fg-char-hop { from { opacity: 0; transform: translateY(.3em); } to { opacity: 1; transform: none; } }\r
+@keyframes fg-char-quake { 0%, 100% { opacity: 1; transform: translate(0, 0); } 25% { opacity: 1; transform: translate(.05em, -.04em); } 50% { opacity: 1; transform: translate(-.04em, .05em); } 75% { opacity: 1; transform: translate(.04em, .03em); } }\r
+/* ── 句中文字效果（导演 textfx，节奏和打字音在 lib/typing.js 的 TEXT_STYLES）：某几个字的样子。\r
+   比台词演法（.fg-text.say-*）更具体，同一句里两者都有时以这几个字为准；字号变大的把行高收紧，免得一行被撑高、对话框装不下；越说越大 / 越小按 --k（这段走到几成）变，波浪按 --i（第几个字）错开 ── */\r
+.fg-text .fg-char[class*="tx-"] { display: inline-block; white-space: pre; }\r
+.fg-text .fg-char.tx-shake { animation: fg-char-in .22s ease forwards var(--d), fg-tx-shake .16s steps(2) infinite var(--d); }\r
+.fg-text .fg-char.tx-wave { animation: fg-char-in .3s ease forwards var(--d), fg-tx-wave 1.3s ease-in-out infinite calc(var(--i) * -.13s); }\r
+.fg-text .fg-char.tx-big { font-size: 1.32em; font-weight: 700; line-height: 1.1; animation-name: fg-char-pop; animation-duration: .26s; }\r
+.fg-text .fg-char.tx-roar { font-size: 1.62em; font-weight: 900; line-height: 1; letter-spacing: -.02em; color: color-mix(in oklab, currentColor 80%, #ff5a4a); text-shadow: .06em .06em 0 rgba(0, 0, 0, .55), 0 0 .5em rgba(255, 70, 50, .45); animation-name: fg-tx-slam; animation-duration: .3s; }\r
+.fg-text .fg-char.tx-grow { font-size: calc(1em + var(--k) * .6em); font-weight: calc(500 + var(--k) * 400); line-height: 1; animation-name: fg-char-pop; animation-duration: .22s; }\r
+.fg-text .fg-char.tx-dwindle { font-size: calc(1em - var(--k) * .34em); color: color-mix(in oklab, currentColor calc(100% - var(--k) * 62%), transparent); animation-duration: .45s; }\r
+.fg-text .fg-char.tx-small { font-size: .8em; color: color-mix(in oklab, currentColor 72%, transparent); }\r
+.fg-text .fg-char.tx-faint { color: color-mix(in oklab, currentColor 50%, transparent); letter-spacing: .08em; text-shadow: 0 0 .35em rgba(255, 255, 255, .35); animation-duration: .7s; }\r
+.fg-text .fg-char.tx-glow { color: color-mix(in oklab, var(--accent) 40%, #fff6d8); font-weight: 700; text-shadow: 0 0 .45em color-mix(in oklab, var(--accent) 70%, transparent), 0 0 1em color-mix(in oklab, var(--accent) 40%, transparent); animation: fg-char-in .3s ease forwards var(--d), fg-tx-glow 2.4s ease-in-out infinite calc(var(--d) + var(--i) * .08s); }\r
+/* 打完之后：别的不再重放，发抖、波浪、发光接着动；等字体时先不动 */\r
+.fg-text.is-done .fg-char[class*="tx-"] { animation: none; opacity: 1; }\r
+.fg-text.is-done .fg-char.tx-shake { animation: fg-tx-shake .16s steps(2) infinite; }\r
+.fg-text.is-done .fg-char.tx-wave { animation: fg-tx-wave 1.3s ease-in-out infinite calc(var(--i) * -.13s); }\r
+.fg-text.is-done .fg-char.tx-glow { animation: fg-tx-glow 2.4s ease-in-out infinite calc(var(--i) * .08s); }\r
+.fg-text.is-wait .fg-char[class*="tx-"] { animation: none; }\r
+@keyframes fg-tx-shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(.045em, -.035em) rotate(-1deg); } 50% { transform: translate(-.04em, .04em) rotate(.8deg); } 75% { transform: translate(.035em, .03em); } }\r
+@keyframes fg-tx-wave { 0%, 100% { transform: translateY(.1em); } 50% { transform: translateY(-.16em); } }\r
+@keyframes fg-tx-slam { from { opacity: 0; transform: scale(2.6) rotate(-4deg); } 50% { opacity: 1; transform: scale(.88); } 75% { opacity: 1; transform: scale(1.06); } to { opacity: 1; transform: none; } }\r
+@keyframes fg-tx-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }\r
+.fg-wait { position: absolute; right: 2.6%; bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }\r
+.fg-wait::before { content: var(--wait-glyph); }\r
+@keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }\r
+.fg-quick { position: absolute; right: 2.4%; bottom: min(7%, calc(.07 * var(--fg-dlg-ref))); display: flex; gap: 1.5cqw; font-family: var(--font-latin); font-size: .98cqw; font-weight: 600; letter-spacing: .2em; z-index: 3; }\r
+.fg-quick button { color: var(--ink-dim); transition: color .2s, text-shadow .2s; position: relative; }\r
+.fg-quick button:hover, .fg-quick button.is-on { color: var(--ink); text-shadow: 0 0 .8cqw var(--accent); }\r
+.fg-quick button.is-on::after { content: ""; position: absolute; left: 0; right: .2em; bottom: -.3cqw; height: 1px; background: var(--accent); }\r
+.fg-progress { position: absolute; left: 4.2%; right: 30%; bottom: min(8.6%, calc(.086 * var(--fg-dlg-ref))); height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; }\r
+.fg-progress i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); box-shadow: 0 0 6px var(--accent); transition: width .4s ease; }\r
+.fg-status { position: absolute; left: 4.2%; bottom: min(7%, calc(.07 * var(--fg-dlg-ref))); font-size: .9cqw; letter-spacing: .1em; color: var(--ink-dim); display: flex; align-items: center; gap: .5cqw; }\r
+.fg-status::before { content: ""; width: .6cqw; height: .6cqw; border-radius: 50%; background: var(--accent3); box-shadow: 0 0 .6cqw var(--accent3); animation: fg-pulse 1.4s ease-in-out infinite; }\r
+\r
+/* ── 情境卡片（短信、信件……） ── */\r
+.fg-card { position: absolute; left: 50%; top: 42%; z-index: 21; width: 40cqw; transform: translate(-50%, -50%); animation: fg-card-in .7s cubic-bezier(.2, .8, .2, 1) both; font-size: 1.6cqw; line-height: 1.7; }\r
+@keyframes fg-card-in { from { opacity: 0; transform: translate(-50%, -42%) rotateX(35deg) scale(.9); } }\r
+.fg-card[data-card="sms"] { padding: 1.6cqw; border-radius: 2cqw; background: rgba(250, 250, 255, .94); color: #1b1d2a; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .5); }\r
+.fg-card[data-card="sms"] .fg-card-head { font-size: 1cqw; color: #6b7280; text-align: center; margin-bottom: 1cqw; letter-spacing: .1em; }\r
+.fg-card[data-card="sms"] .fg-card-body { display: inline-block; max-width: 90%; padding: 1cqw 1.4cqw; border-radius: 1.6cqw 1.6cqw 1.6cqw .4cqw; background: #e8ebf4; }\r
+.fg-card[data-card="letter"], .fg-card[data-card="diary"] { padding: 3cqw 3.4cqw; background: repeating-linear-gradient(180deg, #fbf5e6 0 2.6cqw, #e9dcc0 2.6cqw calc(2.6cqw + 1px)), #fbf5e6; color: #4a3626; font-family: var(--font-display); box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); transform-origin: 50% 0; transform: translate(-50%, -50%) rotate(-1.2deg); }\r
+.fg-card[data-card="note"] { width: 28cqw; padding: 2.4cqw; background: #fff59d; color: #3b3200; font-family: var(--font-display); box-shadow: 0 1.4cqw 3cqw rgba(0, 0, 0, .45); transform: translate(-50%, -50%) rotate(2deg); }\r
+.fg-card[data-card="note"]::before { content: ""; position: absolute; left: 38%; top: -1cqw; width: 8cqw; height: 2cqw; background: rgba(255, 255, 255, .55); transform: rotate(-3deg); }\r
+.fg-card[data-card="news"] { padding: 2.4cqw; background: #f3f0e8; color: #111; font-family: var(--font-display); border-top: .6cqw double #111; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); }\r
+.fg-card[data-card="news"] .fg-card-head { font-size: 2.6cqw; font-weight: 900; letter-spacing: .3em; border-bottom: 1px solid #111; margin-bottom: 1cqw; }\r
+.fg-card[data-card="terminal"] { padding: 2cqw; border-radius: .8cqw; background: rgba(4, 16, 8, .92); color: #67ff9a; font-family: "JetBrains Mono", "Cascadia Code", monospace; box-shadow: 0 0 3cqw rgba(60, 255, 140, .25), inset 0 0 2cqw rgba(60, 255, 140, .08); text-shadow: 0 0 .6cqw rgba(60, 255, 140, .7); }\r
+.fg-card[data-card="terminal"] .fg-card-body::after { content: "▌"; animation: fg-pulse 1s steps(2) infinite; }\r
+.fg-card[data-card="notice"], .fg-card[data-card="scroll"] { padding: 3cqw; background: linear-gradient(90deg, #c9a46a, #f1dcae 8%, #f6e7c4 50%, #f1dcae 92%, #c9a46a); color: #3a2410; font-family: var(--font-display); text-align: center; box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, .55); }\r
+.fg-card[data-card="notice"]::after { content: "印"; position: absolute; right: 2cqw; bottom: 1.4cqw; width: 4cqw; height: 4cqw; border: .25cqw solid #b3261e; color: #b3261e; display: grid; place-items: center; font-size: 2cqw; transform: rotate(-12deg); animation: fg-stamp .4s .5s cubic-bezier(.3, 1.6, .5, 1) both; }\r
+@keyframes fg-stamp { from { opacity: 0; transform: scale(2.2) rotate(-12deg); } }\r
+\r
+/* ── 选项 ── */\r
+.fg-choices { position: absolute; inset: 0; z-index: 26; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.3cqw; background: radial-gradient(70% 60% at 50% 45%, rgba(0, 0, 0, .25), rgba(0, 0, 0, .6)); animation: fg-fade-in .4s ease both; }\r
+.fg-choices-title { font-family: var(--font-latin); letter-spacing: .6em; font-size: 1.05cqw; color: var(--ink-dim); margin-bottom: .6cqw; }\r
+.fg-choice { position: relative; width: 46cqw; padding: 1.25cqw 2.4cqw 1.25cqw 6cqw; text-align: left; font-family: var(--fg-text-font, var(--font-body)); font-size: 1.7cqw; letter-spacing: .08em; border-radius: 99px; background: var(--box-bg); border: 1px solid var(--box-border); backdrop-filter: var(--box-blur); box-shadow: 0 .8cqw 2.4cqw rgba(0, 0, 0, .35); transition: transform .25s cubic-bezier(.2, .8, .2, 1), border-color .25s, box-shadow .25s; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); overflow: hidden; }\r
+.fg-choice::before { content: attr(data-n); position: absolute; left: 2.2cqw; top: 50%; transform: translateY(-50%); font-family: var(--font-latin); font-size: 1.5cqw; font-weight: 700; color: var(--accent); letter-spacing: .1em; }\r
+.fg-choice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .16) 50%, transparent 70%); transform: translateX(-100%); transition: transform .6s ease; }\r
+.fg-choice:hover { transform: translateX(1.2cqw) scale(1.02); border-color: var(--accent); box-shadow: 0 0 2.4cqw color-mix(in oklab, var(--accent) 45%, transparent); }\r
+.fg-choice:hover::after { transform: translateX(100%); }\r
+@keyframes fg-choice-in { from { opacity: 0; transform: translateY(1.4cqw); } }\r
+.fg-free { display: flex; gap: .8cqw; width: 46cqw; animation: fg-choice-in .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 90ms + 150ms); }\r
+.fg-free input { flex: 1; min-width: 0; padding: 1cqw 1.8cqw; font: inherit; font-family: var(--fg-text-font, var(--font-body)); font-size: 1.45cqw; color: var(--ink); border-radius: 99px; border: 1px dashed var(--box-border); background: rgba(0, 0, 0, .35); outline: none; user-select: text; }\r
+.fg-free input:focus { border-color: var(--accent); border-style: solid; }\r
+.fg-free button { padding: 0 2cqw; border-radius: 99px; background: linear-gradient(100deg, var(--accent), var(--accent2)); font-size: 1.4cqw; font-weight: 700; letter-spacing: .2em; color: #fff; }\r
+\r
+/* ── 标题画面 ── */\r
+.fg-title { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; justify-content: center; padding-left: 8%; background: linear-gradient(90deg, rgba(4, 4, 14, .86) 0%, rgba(4, 4, 14, .55) 42%, transparent 75%); animation: fg-fade-in 1s ease both; }\r
+.fg-title-kicker { font-family: var(--font-latin); font-size: 1.1cqw; letter-spacing: .7em; color: var(--accent3); text-transform: uppercase; animation: fg-slide-in 1s .2s ease both; }\r
+.fg-title-logo { font-family: var(--font-display); font-weight: 900; font-size: 6cqw; line-height: 1.15; letter-spacing: .12em; margin: 1cqw 0 .6cqw; background: linear-gradient(100deg, #fff 10%, var(--accent) 45%, var(--accent2) 70%, var(--accent3)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 2.4cqw color-mix(in oklab, var(--accent2) 60%, transparent)); animation: fg-logo-in 1.4s .3s cubic-bezier(.2, .8, .2, 1) both; max-width: 60cqw; }\r
+.fg-title-sub { font-size: 1.2cqw; letter-spacing: .3em; color: var(--ink-dim); margin-bottom: 3.4cqw; animation: fg-slide-in 1s .6s ease both; }\r
+.fg-title-menu { display: flex; flex-direction: column; gap: .4cqw; align-items: flex-start; }\r
+.fg-title-menu button { font-family: var(--font-display); font-size: 1.75cqw; letter-spacing: .3em; padding: .45cqw 0; color: var(--ink-dim); position: relative; transition: color .2s, letter-spacing .3s, padding .3s; animation: fg-slide-in .8s ease both; animation-delay: calc(var(--i) * 80ms + 800ms); }\r
+.fg-title-menu button span { font-family: var(--font-latin); font-size: .9cqw; letter-spacing: .4em; margin-left: 1.2cqw; opacity: .55; }\r
+.fg-title-menu button.is-new { color: var(--ink); }\r
+.fg-title-menu button.is-new::after { content: "NEW"; position: absolute; top: .2cqw; right: -3.4cqw; padding: .1cqw .5cqw; border-radius: 99px; font-family: var(--font-latin); font-size: .7cqw; letter-spacing: .12em; color: #fff; background: linear-gradient(100deg, var(--accent), var(--accent2)); animation: fg-pulse 1.6s ease-in-out infinite; }\r
+.fg-title-menu button:hover { color: #fff; letter-spacing: .42em; padding-left: 1.6cqw; }\r
+.fg-title-menu button:hover::before { content: ""; position: absolute; left: 0; top: 50%; width: .9cqw; height: .9cqw; transform: translateY(-50%) rotate(45deg); background: var(--accent); box-shadow: 0 0 1cqw var(--accent); }\r
+.fg-title-foot { position: absolute; left: 8%; bottom: 5%; font-size: .85cqw; letter-spacing: .2em; color: rgba(255, 255, 255, .35); }\r
+@keyframes fg-logo-in { from { opacity: 0; letter-spacing: .5em; filter: blur(10px); } }\r
+@keyframes fg-slide-in { from { opacity: 0; transform: translateX(-1.6cqw); } }\r
+\r
+/* ── 面板（回想 / 鉴赏 / 人物志 / 设置） ── */\r
+.fg-panel { position: absolute; inset: 0; z-index: 60; display: flex; flex-direction: column; background: linear-gradient(135deg, rgba(8, 6, 22, .94), rgba(16, 10, 34, .92)); backdrop-filter: blur(16px); animation: fg-panel-in .35s cubic-bezier(.2, .8, .2, 1) both; user-select: text; }\r
+@keyframes fg-panel-in { from { opacity: 0; transform: scale(1.02); } }\r
+.fg-panel-head { display: flex; align-items: center; gap: 1.4cqw; padding: 2.2cqw 3cqw 1.2cqw; }\r
+.fg-panel-title { font-family: var(--font-display); font-size: 2.4cqw; font-weight: 700; letter-spacing: .24em; }\r
+.fg-panel-en { font-family: var(--font-latin); font-size: 1cqw; letter-spacing: .5em; color: var(--accent); text-transform: uppercase; }\r
+.fg-panel-head .fg-spacer { flex: 1; }\r
+.fg-panel-body { position: relative; flex: 1; overflow: auto; padding: 0 3cqw 2.4cqw; scrollbar-width: thin; scrollbar-color: var(--accent2) transparent; }\r
+.fg-tabs { display: flex; gap: .4cqw; padding: 0 3cqw 1cqw; flex-wrap: wrap; }\r
+.fg-tab { padding: .55cqw 1.4cqw; border-radius: 99px; font-size: 1.05cqw; letter-spacing: .12em; color: var(--ink-dim); border: 1px solid transparent; }\r
+.fg-tab.is-on { color: #fff; border-color: var(--box-border); background: linear-gradient(100deg, color-mix(in oklab, var(--accent) 35%, transparent), color-mix(in oklab, var(--accent2) 35%, transparent)); }\r
+\r
+.fg-log-item { display: grid; grid-template-columns: 9cqw 1fr; gap: 1.4cqw; padding: 1cqw 0; border-bottom: 1px solid rgba(255, 255, 255, .06); cursor: pointer; font-size: 1.35cqw; line-height: 1.7; }\r
+.fg-log-item:hover { background: linear-gradient(90deg, rgba(255, 255, 255, .04), transparent); }\r
+.fg-log-text { font-family: var(--fg-text-font, var(--font-body)); }\r
+.fg-log-name { font-family: var(--fg-name-font, var(--font-display)); font-weight: 700; text-align: right; letter-spacing: .1em; }\r
+.fg-log-turn { grid-column: 1 / -1; font-family: var(--font-latin); font-size: .95cqw; letter-spacing: .5em; color: var(--accent); padding-top: 1.4cqw; }\r
+.fg-log-scene { grid-column: 1 / -1; display: flex; align-items: center; gap: 1cqw; font-size: .9cqw; letter-spacing: .3em; color: var(--ink-dim); padding: .6cqw 0 .2cqw; }\r
+.fg-log-scene::before, .fg-log-scene::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .18), transparent); }\r
+\r
+/* 导演日志：左边历次记录，右边详情（实时输出 / 整理结果 / 原始输出 / 提示词）。两栏各自滚动。 */\r
+.fg-dlog { display: grid; grid-template-columns: 22cqw minmax(0, 1fr); gap: 2cqw; height: 100%; }\r
+.fg-dlog-side, .fg-dlog-detail { min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--accent2) transparent; }\r
+.fg-dlog-side { display: flex; flex-direction: column; gap: .6cqw; padding-right: .4cqw; }\r
+.fg-dlog-detail { padding-right: .6cqw; }\r
+.fg-dlog-row { display: block; width: 100%; flex: none; text-align: left; padding: 1cqw 1.2cqw; border-radius: .8cqw; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .03); transition: background .2s, border-color .2s; }\r
+.fg-dlog-row:hover { background: rgba(255, 255, 255, .07); }\r
+.fg-dlog-row.is-on { border-color: var(--accent); background: linear-gradient(100deg, color-mix(in oklab, var(--accent) 18%, transparent), color-mix(in oklab, var(--accent2) 8%, transparent)); }\r
+.fg-dlog-row-head { display: flex; align-items: center; justify-content: space-between; gap: .6cqw; font-size: 1.15cqw; letter-spacing: .08em; }\r
+.fg-dlog-row-meta { margin-top: .3cqw; font-size: .85cqw; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\r
+.fg-dlog-row-sum { margin-top: .4cqw; font-size: .95cqw; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }\r
+.fg-dlog-status { padding: .1cqw .7cqw; border-radius: 99px; border: 1px solid currentColor; font-size: .8cqw; letter-spacing: .1em; white-space: nowrap; }\r
+.fg-dlog-status.is-running { color: var(--accent); animation: fg-pulse 1.4s ease-in-out infinite; }\r
+.fg-dlog-status.is-ok { color: #6ef0a8; }\r
+.fg-dlog-status.is-failed { color: #ff8a8a; }\r
+.fg-dlog-status.is-cancelled { color: var(--ink-dim); }\r
+.fg-dlog-head { padding: 1.2cqw 1.4cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }\r
+.fg-dlog-title { display: flex; align-items: center; gap: 1cqw; margin-bottom: .8cqw; font-family: var(--font-display); font-size: 1.7cqw; letter-spacing: .16em; }\r
+.fg-dlog-title .fg-spacer, .fg-dlog-label .fg-spacer { flex: 1; }\r
+.fg-dlog-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(30cqw, 1fr)); gap: .3cqw 2cqw; font-size: 1cqw; line-height: 1.6; }\r
+.fg-dlog-facts i { margin-right: .8cqw; font-style: normal; color: var(--ink-dim); letter-spacing: .08em; }\r
+.fg-dlog-notice { margin-top: .6cqw; font-size: .95cqw; color: #ffd27a; }\r
+.fg-dlog-error { margin: .6cqw 0; font-size: 1cqw; white-space: pre-wrap; word-break: break-word; }\r
+.fg-dlog-tabs { padding: 1.2cqw 0 .4cqw; }\r
+.fg-dlog-block { margin: 1cqw 0; }\r
+.fg-dlog-label { display: flex; align-items: center; gap: .8cqw; margin-bottom: .5cqw; font-size: .95cqw; letter-spacing: .12em; color: var(--accent); }\r
+.fg-btn.is-mini { padding: .2cqw .9cqw; font-size: .85cqw; white-space: nowrap; }\r
+.fg-dlog-pre { margin: 0; max-height: 34cqw; overflow: auto; padding: 1cqw 1.2cqw; border-radius: .8cqw; background: rgba(0, 0, 0, .42); border: 1px solid var(--box-border); font-family: "JetBrains Mono", Consolas, monospace; font-size: .95cqw; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: var(--ink); scrollbar-width: thin; }\r
+.fg-dlog-pre.has-cursor::after { content: "▍"; color: var(--accent); animation: fg-pulse 1s steps(2) infinite; }\r
+.fg-dlog-meter { display: flex; align-items: center; gap: .8cqw; margin: .4cqw 0; font-size: 1cqw; color: var(--ink-dim); }\r
+.fg-dlog-dot { width: .8cqw; height: .8cqw; border-radius: 50%; background: var(--accent); box-shadow: 0 0 1cqw var(--accent); animation: fg-pulse 1s ease-in-out infinite; }\r
+.fg-dlog-think summary { margin: .4cqw 0; cursor: pointer; font-size: .95cqw; color: var(--ink-dim); }\r
+.fg-dlog-chips { display: flex; flex-wrap: wrap; gap: .5cqw; }\r
+.fg-dlog-chip { display: inline-flex; align-items: center; gap: .5cqw; padding: .2cqw .8cqw; border-radius: 99px; font-size: .9cqw; background: rgba(255, 255, 255, .06); border: 1px solid var(--box-border); }\r
+.fg-dlog-chip i { font-style: normal; font-size: .8cqw; color: var(--ink-dim); }\r
+.fg-dlog-lines { border-radius: .8cqw; border: 1px solid var(--box-border); overflow: hidden; }\r
+.fg-dlog-line { display: grid; grid-template-columns: 4cqw minmax(0, 1fr) minmax(0, 24cqw); gap: 1.2cqw; align-items: start; padding: .7cqw 1cqw; border-bottom: 1px solid rgba(255, 255, 255, .06); font-size: 1cqw; line-height: 1.6; }\r
+.fg-dlog-line:last-child { border-bottom: 0; }\r
+.fg-dlog-line.is-plain { opacity: .6; }\r
+.fg-dlog-line.is-skipped { opacity: .42; }\r
+.fg-dlog-line.is-skipped .fg-dlog-utext { text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, .35); }\r
+.fg-dlog-uid { padding-top: .15cqw; font-family: var(--font-latin); font-size: .85cqw; letter-spacing: .1em; color: var(--accent); }\r
+.fg-dlog-card { margin-bottom: .6cqw; padding: .8cqw 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); font-size: 1cqw; line-height: 1.6; }\r
+.fg-dlog-mono { margin-top: .4cqw; font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; word-break: break-word; }\r
+.fg-dlog-k { display: inline-block; margin-right: .6cqw; padding: 0 .5cqw; border-radius: .3cqw; font-style: normal; font-family: var(--font-body); font-size: .8cqw; letter-spacing: .08em; color: var(--ink-dim); border: 1px solid var(--box-border); }\r
+.fg-dlog-cgchar { margin-top: .4cqw; padding-left: .8cqw; border-left: 2px solid var(--box-border); }\r
+.fg-dlog-list-plain { margin: 0; padding-left: 2cqw; font-size: 1.05cqw; line-height: 1.8; }\r
+.fg-pill.is-link { cursor: pointer; transition: border-color .2s, opacity 1.2s; }\r
+/* 配乐留白：曲名暗下去，回来时再亮 */\r
+.fg-pill.is-hushed { opacity: .35; transition-duration: .5s; }\r
+.fg-pill.is-nsfw { color: #ff8fb1; border-color: rgba(255, 110, 160, .55); font-weight: 600; }\r
+.fg-pill.is-link:hover { border-color: var(--accent); }\r
+\r
+.fg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20cqw, 1fr)); gap: 1.4cqw; }\r
+.fg-thumb { position: relative; aspect-ratio: 16 / 10; border-radius: 1cqw; overflow: hidden; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); cursor: zoom-in; transition: transform .25s, box-shadow .25s; }\r
+.fg-thumb:hover { transform: translateY(-.4cqw); box-shadow: 0 1cqw 3cqw rgba(0, 0, 0, .5), 0 0 0 1px var(--accent); }\r
+.fg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }\r
+.fg-thumb-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 2cqw 1cqw .7cqw; font-size: 1cqw; letter-spacing: .1em; background: linear-gradient(transparent, rgba(0, 0, 0, .75)); }\r
+.fg-thumb.is-locked { cursor: default; display: grid; place-items: center; color: var(--ink-dim); font-size: 1cqw; background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .03) 0 1cqw, transparent 1cqw 2cqw); }\r
+\r
+.fg-person { display: grid; grid-template-columns: 13cqw 1fr; gap: 2cqw; padding: 1.6cqw; margin-bottom: 1.4cqw; border-radius: 1.2cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }\r
+.fg-track-desc { min-height: 4.6cqw; font-family: var(--font-body); font-size: 1.05cqw; }\r
+/* 曲库、音效库、环境音库的整理界面（LibBrowser）：左边分类树，右边一行一条（点名字展开编辑），勾选后底部浮着一条批量操作。 */\r
+.fg-lib { display: grid; grid-template-columns: 15cqw minmax(0, 1fr); gap: 1.4cqw; align-items: start; margin-top: 1cqw; }\r
+.fg-lib-tree { position: sticky; top: .6cqw; display: flex; flex-direction: column; gap: .15cqw; max-height: 44cqw; overflow-y: auto; padding: .6cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); scrollbar-width: thin; }\r
+.fg-libcat { display: flex; align-items: center; gap: .6cqw; width: 100%; padding: .35cqw .8cqw; border: 0; border-radius: .6cqw; background: none; color: inherit; font: inherit; font-size: 1cqw; text-align: left; cursor: pointer; }\r
+.fg-libcat span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }\r
+.fg-libcat i { font-style: normal; font-size: .85cqw; opacity: .55; }\r
+.fg-libcat:hover { background: rgba(255, 255, 255, .06); }\r
+.fg-libcat.is-sub { padding-left: 2cqw; font-size: .95cqw; }\r
+.fg-libcat.is-on { background: color-mix(in oklab, var(--accent) 22%, transparent); color: var(--accent); }\r
+.fg-lib-main { min-width: 0; }\r
+.fg-lib-tools { margin-bottom: .6cqw; }\r
+.fg-lib-search { flex: 1; width: auto; min-width: 14cqw; }\r
+.fg-lib-cathead { padding: .5cqw .9cqw; margin-bottom: .6cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }\r
+.fg-lib-count { gap: .6cqw; padding: .2cqw .9cqw .4cqw; }\r
+.fg-lib-count label { gap: .5cqw; cursor: pointer; }\r
+.fg-lib-count input, .fg-librow input[type="checkbox"] { width: 1.2cqw; height: 1.2cqw; margin: 0; accent-color: var(--accent); cursor: pointer; }\r
+.fg-lib-empty { margin: 1cqw 0; }\r
+.fg-librow { display: grid; grid-template-columns: auto 2.6cqw minmax(0, 1fr) auto 5cqw; align-items: center; gap: .8cqw; padding: .45cqw .9cqw; border-radius: .7cqw; border: 1px solid transparent; }\r
+.fg-librow:hover { background: rgba(255, 255, 255, .04); }\r
+.fg-librow.is-picked { background: color-mix(in oklab, var(--accent) 10%, transparent); border-color: color-mix(in oklab, var(--accent) 35%, transparent); }\r
+.fg-librow.is-open { background: rgba(255, 255, 255, .06); border-color: var(--box-border); border-radius: .7cqw .7cqw 0 0; }\r
+.fg-librow-play { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink); font-size: .9cqw; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s; }\r
+.fg-librow-play:hover { border-color: var(--accent); }\r
+.fg-librow-play.is-on { background: var(--accent); border-color: var(--accent); color: #111; box-shadow: 0 0 1.2cqw color-mix(in oklab, var(--accent) 55%, transparent); }\r
+.fg-librow-main { display: grid; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }\r
+.fg-librow-main b, .fg-librow-main span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }\r
+.fg-librow-main b { font-size: 1.05cqw; font-weight: 600; }\r
+.fg-librow-main span { font-size: .85cqw; color: var(--ink-dim); }\r
+.fg-librow-main:hover b { color: var(--accent); }\r
+.fg-libchip { max-width: 14cqw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: .15cqw .8cqw; border-radius: 99px; border: 1px solid color-mix(in oklab, var(--accent2) 50%, transparent); background: color-mix(in oklab, var(--accent2) 14%, transparent); color: inherit; font: inherit; font-size: .85cqw; cursor: pointer; }\r
+.fg-libchip.is-none { border-style: dashed; border-color: var(--box-border); background: none; opacity: .6; }\r
+.fg-librow-size { font-size: .85cqw; color: var(--ink-dim); text-align: right; }\r
+.fg-libedit { display: grid; gap: .6cqw; padding: .8cqw 1.2cqw 1cqw; margin-bottom: .6cqw; border: 1px solid var(--box-border); border-top: 0; border-radius: 0 0 .8cqw .8cqw; background: rgba(255, 255, 255, .06); }\r
+.fg-lib-more { margin: .8cqw 0; }\r
+.fg-lib-bar { position: sticky; bottom: 0; z-index: 3; display: grid; gap: .5cqw; margin-top: 1cqw; padding: .9cqw 1.2cqw; border-radius: 1cqw; background: rgb(20, 14, 40); border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent); box-shadow: 0 -.6cqw 1.4cqw rgba(0, 0, 0, .45); }\r
+.fg-lib-bar .fg-row { flex-wrap: nowrap; }\r
+/* 声音页：一键套用音效库里标了用途的声音；给落字音效 / 界面音从音效库挑一个 */\r
+.fg-libpreset { display: flex; flex-wrap: wrap; align-items: center; gap: .6cqw; padding: .8cqw 1.2cqw; margin-bottom: 1cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }\r
+.fg-libpicker { margin-top: .6cqw; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }\r
+.fg-libpicker-list { max-height: 24cqw; overflow-y: auto; margin-top: .6cqw; }\r
+.fg-libpicker-item { gap: .6cqw; padding: .3cqw 0; }\r
+.fg-libpicker-item.is-on .fg-libpicker-name { color: var(--accent); }\r
+.fg-libpicker-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }\r
+.fg-libpicker-name small { margin-left: .6cqw; opacity: .6; }\r
+.fg-person-art { position: relative; height: 19cqw; border-radius: .8cqw; overflow: hidden; background: radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--c) 40%, transparent), rgba(0, 0, 0, .3)); }\r
+.fg-person-art img { width: 100%; height: 100%; object-fit: cover; object-position: top; }\r
+.fg-person-art .fg-silhouette { height: 100%; }\r
+.fg-person h3 { margin: 0 0 .6cqw; font-family: var(--font-display); font-size: 2cqw; letter-spacing: .2em; display: flex; align-items: center; gap: 1cqw; }\r
+.fg-person h3 small { font-family: var(--font-body); font-size: .9cqw; letter-spacing: .1em; padding: .2cqw .7cqw; border-radius: 99px; border: 1px solid var(--box-border); color: var(--ink-dim); }\r
+.fg-emos { display: flex; flex-wrap: wrap; gap: .5cqw; margin: .8cqw 0; }\r
+.fg-emo { position: relative; width: 5.4cqw; height: 6.6cqw; border-radius: .6cqw; overflow: hidden; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); font-size: .78cqw; color: var(--ink-dim); cursor: pointer; transition: border-color .2s, transform .2s; }\r
+.fg-emo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }\r
+.fg-emo span { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.4cqw .2cqw .3cqw; line-height: 1.2; text-align: center; text-shadow: 0 1px 3px #000; background: linear-gradient(transparent, rgba(0, 0, 0, .78) 70%); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }\r
+.fg-emo.is-busy::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .25), transparent 80%); background-size: 200% 100%; animation: fg-skeleton 1.2s linear infinite; }\r
+.fg-emo:hover { border-color: var(--accent); transform: translateY(-.2cqw); }\r
+.fg-emo.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 1.2cqw color-mix(in oklab, var(--accent) 45%, transparent); }\r
+.fg-emo.is-custom { border-style: dashed; }\r
+.fg-emo.is-custom span { color: var(--ink); }\r
+.fg-person-main { min-width: 0; }\r
+.fg-person-tags { font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; color: var(--ink-dim); line-height: 1.5; margin-bottom: .6cqw; word-break: break-word; }\r
+.fg-person-folds .fg-btn.is-on, .fg-btn.is-on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 22%, transparent); }\r
+.fg-person-form { margin: .8cqw 0; padding: 1cqw 1.2cqw; border-radius: .9cqw; background: rgba(0, 0, 0, .22); border: 1px solid var(--box-border); }\r
+.fg-person-form .fg-field { grid-template-columns: 9cqw 1fr; }\r
+.fg-textarea.is-short { min-height: 4cqw; }\r
+/* 固定外貌按字段：两列格子，「其他」占一整行；人物卡片上每个字段一个小标签 */\r
+.fg-look-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6cqw .9cqw; }\r
+.fg-look-field { display: flex; flex-direction: column; gap: .25cqw; }\r
+.fg-look-field > span { font-size: .85cqw; color: var(--ink-dim); letter-spacing: .08em; }\r
+.fg-look-field.is-wide { grid-column: 1 / -1; }\r
+.fg-look-chip { display: inline-flex; gap: .35em; margin: 0 .35cqw .35cqw 0; padding: .1cqw .55cqw; border-radius: 99px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .1); }\r
+.fg-look-chip i { font-style: normal; opacity: .55; }\r
+.fg-cg-chars { display: grid; gap: .9cqw; margin: .9cqw 0 .9cqw 15.2cqw; }\r
+.fg-cg-char { display: grid; gap: .6cqw; padding: 1cqw; border-radius: .9cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .18); }\r
+.fg-sent { user-select: text; margin-top: .4cqw; display: grid; gap: .3cqw; word-break: break-word; }\r
+.fg-wardrobe { display: grid; gap: .5cqw; margin-bottom: .6cqw; }\r
+.fg-outfit { display: grid; grid-template-columns: 8cqw 1fr auto auto; gap: .7cqw; align-items: center; padding: .4cqw .6cqw; border-radius: .7cqw; border: 1px solid transparent; }\r
+.fg-outfit b { font-size: 1.1cqw; letter-spacing: .1em; }\r
+.fg-outfit.is-on { border-color: color-mix(in oklab, var(--accent) 60%, transparent); background: color-mix(in oklab, var(--accent) 10%, transparent); }\r
+.fg-outfit.is-new { grid-template-columns: 8cqw 1fr auto; }\r
+.fg-state { display: inline-flex; align-items: center; gap: .4cqw; padding: .3cqw .5cqw .3cqw .9cqw; border-radius: 99px; font-size: 1cqw; background: color-mix(in oklab, var(--accent2) 22%, transparent); border: 1px solid color-mix(in oklab, var(--accent2) 55%, transparent); }\r
+.fg-state button { width: 1.5cqw; height: 1.5cqw; border-radius: 50%; font-size: .8cqw; color: var(--ink-dim); }\r
+.fg-state button:hover { color: #fff; background: rgba(255, 255, 255, .15); }\r
+.fg-spans { display: flex; flex-direction: column; gap: .5cqw; }\r
+.fg-span { display: flex; align-items: center; gap: .6cqw; font-size: 1cqw; color: var(--ink-dim); }\r
+.fg-span b { min-width: 9cqw; color: var(--ink); font-weight: 600; }\r
+.fg-span .fg-input { text-align: center; padding-inline: .4cqw; }\r
+.fg-looks { display: flex; flex-wrap: wrap; align-items: center; gap: .5cqw; margin-top: 1cqw; }\r
+.fg-look { display: inline-flex; align-items: center; gap: .5cqw; padding: .45cqw 1.1cqw; border-radius: 99px; font-size: 1cqw; letter-spacing: .08em; border: 1px solid var(--box-border); color: var(--ink-dim); background: rgba(255, 255, 255, .04); }\r
+.fg-look i { font-style: normal; font-size: .8cqw; padding: .05cqw .5cqw; border-radius: 99px; background: var(--accent); color: #111; }\r
+.fg-look.is-on { color: #fff; border-color: var(--accent); background: color-mix(in oklab, var(--accent) 22%, transparent); }\r
+.fg-variant { display: grid; grid-template-columns: 11cqw 1fr; gap: 1.4cqw; margin: .4cqw 0 1cqw; padding: 1cqw; border-radius: .9cqw; background: rgba(0, 0, 0, .25); border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--box-border)); animation: fg-pop .25s ease-out; }\r
+.fg-variant-art { height: 15cqw; border-radius: .7cqw; overflow: hidden; display: grid; place-items: center; font-size: 1cqw; color: var(--ink-dim); background: repeating-conic-gradient(rgba(255, 255, 255, .05) 0 25%, transparent 0 50%) 0 0 / 1.4cqw 1.4cqw; }\r
+.fg-variant-art img { width: 100%; height: 100%; object-fit: contain; object-position: top; }\r
+.fg-row > .fg-spacer, .fg-looks > .fg-spacer { flex: 1; }\r
+/* 管理立绘：格子多选、批量删除 */\r
+.fg-manage { margin: .4cqw 0; padding: .6cqw 1cqw; border-radius: .8cqw; background: rgba(0, 0, 0, .25); border: 1px dashed var(--box-border); }\r
+.fg-emo.is-picked { border-color: #ff6b6b; box-shadow: 0 0 0 2px #ff6b6b; }\r
+.fg-emo.is-picked::before { content: "✓"; position: absolute; top: .3cqw; right: .3cqw; z-index: 1; width: 1.4cqw; height: 1.4cqw; border-radius: 50%; background: #ff6b6b; color: #111; font-size: .9cqw; line-height: 1.4cqw; text-align: center; }\r
+.fg-emo:disabled { opacity: .35; cursor: default; transform: none; }\r
+/* 让 AI 加动作、设计时写的要求；画一张差分「不按动作库」时绑到哪：一块虚线框 */\r
+.fg-askbox { display: grid; gap: .5cqw; margin: .5cqw 0; padding: .8cqw 1cqw; border-radius: .8cqw; border: 1px dashed color-mix(in oklab, var(--accent) 45%, var(--box-border)); background: rgba(255, 255, 255, .03); }\r
+.fg-askbox .fg-field { margin: 0; }\r
+.fg-askbox > .fg-row:first-child b { letter-spacing: .08em; }\r
+.fg-ticks { display: flex; flex-wrap: wrap; gap: .4cqw; align-items: center; }\r
+.fg-tick { display: inline-flex; align-items: center; gap: .35em; padding: .25cqw .8cqw; border-radius: 99px; border: 1px solid var(--box-border); font-size: .95cqw; cursor: pointer; }\r
+.fg-tick.is-on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 18%, transparent); }\r
+.fg-tick input { margin: 0; accent-color: var(--accent); }\r
+.fg-tick small { font-size: .8cqw; opacity: .6; }\r
+.fg-textarea.fg-askline { font-family: var(--font-body); }\r
+.fg-askbox .fg-count { width: 10cqw; } .fg-askbox .fg-posename { width: 16cqw; }\r
+.fg-row .fg-input.fg-seedinput { width: 12cqw; flex: none; }\r
+.fg-btn.fg-danger:not(:disabled) { border-color: #ff6b6b; color: #ffb3b3; }\r
+/* 逆转式立绘工作台：左边勾差分，右边框眼睛和嘴、看效果 */\r
+.fg-aa-bench { padding: 1.4cqw; border-radius: 1.2cqw; background: rgba(255, 255, 255, .035); border: 1px solid var(--box-border); }\r
+.fg-aa-grid { display: grid; grid-template-columns: 24cqw 1fr; gap: 1.6cqw; margin-top: 1cqw; }\r
+.fg-aa-list { display: flex; flex-direction: column; gap: .5cqw; max-height: 44cqw; overflow: auto; padding-right: .4cqw; scrollbar-width: thin; }\r
+.fg-aa-item { display: grid; grid-template-columns: auto 4cqw 1fr; align-items: center; gap: .7cqw; padding: .4cqw .6cqw; border-radius: .7cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .22); cursor: pointer; }\r
+.fg-aa-item.is-on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 16%, rgba(0, 0, 0, .3)); }\r
+.fg-aa-item img { width: 4cqw; height: 5cqw; object-fit: cover; object-position: top; border-radius: .4cqw; }\r
+.fg-aa-item b { display: block; font-size: 1cqw; }\r
+.fg-aa-item small { display: block; font-size: .8cqw; color: var(--ink-dim); }\r
+.fg-aa-stage { min-width: 0; display: flex; flex-direction: column; gap: .7cqw; }\r
+.fg-aa-frame, .fg-aa-play { position: relative; width: 100%; height: 34cqw; border-radius: .8cqw; overflow: hidden; background: repeating-conic-gradient(rgba(255, 255, 255, .06) 0 25%, transparent 0 50%) 0 0 / 1.4cqw 1.4cqw; }\r
+.fg-aa-frame { touch-action: none; user-select: none; }\r
+.fg-aa-box rect { fill: rgba(255, 255, 255, .1); stroke: currentColor; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: move; }\r
+.fg-aa-box rect.fg-aa-handle { fill: currentColor; cursor: nwse-resize; }\r
+.fg-aa-box.is-eyes { color: #5fd3ff; }\r
+.fg-aa-box.is-mouth { color: #ff8ad8; }\r
+.fg-aa-box.is-face { color: #ffd166; }\r
+.fg-face-info { gap: .6cqw; margin: .4cqw 0; } .fg-face-info:not(.fg-row) { display: grid; }\r
+.fg-face-editor { margin: .6cqw 0; }\r
+/* 换脸每次画的脸：一排小图，在用的那次描边，没过的压暗一点；点开放大能换 */\r
+.fg-face-tries { display: flex; flex-wrap: wrap; gap: .6cqw; }\r
+.fg-face-try { display: grid; gap: .2cqw; width: 9cqw; min-width: 64px; padding: .25cqw; border: 1px solid var(--box-border); border-radius: .6cqw; background: rgba(255, 255, 255, .04); color: inherit; font: inherit; font-size: .78em; cursor: zoom-in; }\r
+.fg-face-try img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: .4cqw; background: rgba(255, 255, 255, .06); }\r
+.fg-face-try.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }\r
+.fg-face-try.is-flat:not(.is-on), .fg-face-try.is-drift:not(.is-on) { opacity: .78; }\r
+.fg-lightbox.is-face img { width: min(88vw, 104dvh); height: auto; max-height: 78%; image-rendering: auto; }\r
+.fg-face-editor .fg-aa-frame { height: 28cqw; }\r
+/* 动作与表情设计：一个动作一块，块里每个情绪一行（名字、归哪个动作、他的这种表情） */\r
+.fg-acting { display: grid; gap: .7cqw; }\r
+.fg-acting .fg-field { grid-template-columns: 9cqw 1fr; }\r
+/* 「动作 × 情绪」的表（PoseMatrix.jsx）：上面一排动作卡片，下面一列一个动作、一行一个情绪；横着放不下时表自己左右滑，情绪名那一列钉在左边 */\r
+.fg-pm { display: grid; gap: .8cqw; min-width: 0; }\r
+.fg-pm .fg-input { padding: .45cqw .8cqw; font-size: 1cqw; }\r
+.fg-pm-poses { display: grid; grid-template-columns: repeat(auto-fill, minmax(21cqw, 1fr)); gap: .7cqw; }\r
+.fg-pm-pose { display: grid; gap: .4cqw; align-content: start; padding: .7cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }\r
+.fg-pm-pose > .fg-row { flex-wrap: nowrap; gap: .5cqw; }\r
+.fg-pm-id { font-family: var(--font-latin); font-size: .85cqw; opacity: .55; min-width: 2.4cqw; }\r
+.fg-pm-label { flex: 1; font-weight: 600; letter-spacing: .04em; }\r
+.fg-pm-add { min-height: 8cqw; border-radius: .8cqw; border: 1px dashed var(--box-border); background: none; color: var(--ink-dim); font: inherit; font-size: 1.1cqw; letter-spacing: .1em; cursor: pointer; }\r
+.fg-pm-add:hover { border-color: var(--accent); color: var(--ink); }\r
+.fg-pm-scroll { max-width: 100%; max-height: 62cqh; overflow: auto; border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); }\r
+.fg-pm-table { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: 1cqw; }\r
+.fg-pm-table th, .fg-pm-table td { padding: .35cqw .6cqw; border-bottom: 1px solid rgba(255, 255, 255, .05); text-align: center; vertical-align: middle; }\r
+.fg-pm-table thead th { position: sticky; top: 0; z-index: 2; background: rgb(18, 15, 38); font-weight: 600; white-space: nowrap; }\r
+.fg-pm-table thead th.fg-pm-corner { left: 0; z-index: 3; text-align: left; color: var(--ink-dim); font-weight: 400; }\r
+.fg-pm-head { display: flex; align-items: center; justify-content: center; gap: .4cqw; }\r
+.fg-pm-head b { max-width: 9cqw; overflow: hidden; text-overflow: ellipsis; letter-spacing: .04em; }\r
+.fg-pm-emo { position: sticky; left: 0; z-index: 1; background: rgb(15, 12, 33); text-align: left !important; white-space: nowrap; }\r
+.fg-pm-emo > * + * { margin-left: .4cqw; }\r
+.fg-pm-name { padding: 0; font: inherit; font-weight: 600; letter-spacing: .04em; color: inherit; background: none; border: 0; cursor: pointer; }\r
+button.fg-pm-name:hover { color: var(--accent); }\r
+.fg-pm-emo small { font-size: .8cqw; opacity: .55; }\r
+.fg-pm-row.is-loose .fg-pm-name { opacity: .6; }\r
+.fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 10%, rgb(15, 12, 33)); }\r
+.fg-pm-cat td { position: sticky; left: 0; text-align: left !important; background: rgba(0, 0, 0, .25); }\r
+.fg-pm-cat button { display: inline-flex; align-items: baseline; gap: .8cqw; padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }\r
+.fg-pm-cat b { font-family: var(--font-display); font-size: 1.15cqw; letter-spacing: .16em; color: var(--accent); }\r
+.fg-pm-cell { white-space: nowrap; }\r
+.fg-pm-cell > * { vertical-align: middle; }\r
+.fg-pm-cell.is-on { background: rgba(255, 255, 255, .03); }\r
+.fg-pm-cell.is-anchor { background: color-mix(in oklab, var(--accent) 14%, transparent); }\r
+.fg-pm-cell input { width: 1.2cqw; height: 1.2cqw; margin: 0; accent-color: var(--accent); cursor: pointer; }\r
+.fg-pm-star { padding: 0 .2cqw; font-size: 1.15cqw; line-height: 1; color: var(--accent); background: none; border: 0; cursor: pointer; }\r
+.fg-pm-star[disabled] { cursor: default; opacity: 1; }\r
+.fg-pm-cell:not(.is-anchor) .fg-pm-star { opacity: .45; } .fg-pm-cell:not(.is-anchor) .fg-pm-star:hover:not([disabled]) { opacity: 1; }\r
+.fg-pm-thumb { display: inline-grid; place-items: center; width: 2.8cqw; height: 3.6cqw; margin-left: .3cqw; padding: 0; overflow: hidden; border-radius: .4cqw; border: 1px solid var(--box-border); background: rgba(0, 0, 0, .3); color: var(--ink-dim); font-size: .9cqw; cursor: pointer; }\r
+.fg-pm-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }\r
+.fg-pm-thumb:hover { border-color: var(--accent); }\r
+/* 本性 / 处境、前提、靠的长期状态、收起放回（lib/pose-life.js）；此刻收起了的动作那一列和卡片暗下来 */\r
+.fg-pm-pose.is-off { border-style: dashed; background: rgba(255, 255, 255, .02); }\r
+.fg-pm-pose.is-off .fg-pm-label { opacity: .6; }\r
+.fg-pm-table th.is-off, .fg-pm-cell.is-off { opacity: .45; }\r
+.fg-pm-offtag { padding: 0 .4cqw; border-radius: .3cqw; font-size: .8cqw; font-weight: 400; color: var(--ink-dim); border: 1px solid var(--box-border); }\r
+.fg-pm-situ { display: grid; gap: .35cqw; padding-top: .4cqw; border-top: 1px dashed rgba(255, 255, 255, .08); }\r
+.fg-pm-situ > .fg-row { flex-wrap: wrap; gap: .4cqw; }\r
+.fg-pm-kind { display: inline-flex; gap: .3cqw; }\r
+.fg-pm-status { font-size: .9cqw; color: var(--ink-dim); }\r
+.fg-pm-status.is-off { color: var(--accent); }\r
+.fg-pm-needs { display: flex; flex-wrap: wrap; gap: .3cqw; align-items: center; }\r
+.fg-pm-life { display: grid; gap: .2cqw; margin: 0; padding: 0; list-style: none; font-size: .85cqw; color: var(--ink-dim); }\r
+.fg-pm-life li { display: flex; gap: .4cqw; align-items: baseline; }\r
+.fg-pm-life li.is-dropped > span { text-decoration: line-through; opacity: .6; }\r
+.fg-acting-situ { display: flex; flex-wrap: wrap; gap: .5cqw; align-items: center; }\r
+.fg-pm-thumb.is-busy { border-color: var(--accent2); animation: fg-pulse 1.4s ease-in-out infinite; }\r
+.fg-pm-thumb.is-failed { border-color: #ff6b6b; color: #ff9b9b; }\r
+.fg-pm-open td { text-align: left !important; background: color-mix(in oklab, var(--accent) 6%, transparent); }\r
+.fg-pm-face { position: sticky; left: .6cqw; display: grid; grid-template-columns: auto 1fr 1fr; gap: .6cqw; align-items: center; max-width: 70cqw; }\r
+.fg-pose-groups { display: grid; gap: .6cqw; min-width: 0; }\r
+.fg-face-levels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4cqw 2cqw; }\r
+.fg-face-levels > label { gap: .8em; } .fg-face-levels b { min-width: 1.6em; }\r
+.fg-dial input[type=range] { width: 14cqw; }\r
+.fg-pm-level { display: flex; align-items: center; gap: .6em; flex-wrap: wrap; }\r
+.fg-field:has(.fg-pose-groups) { align-items: start; } .fg-field:has(.fg-pose-groups) > div { min-width: 0; }\r
+.fg-aa-box text { fill: currentColor; paint-order: stroke; stroke: rgba(0, 0, 0, .75); stroke-width: 3px; pointer-events: none; }\r
+.fg-aa-play > canvas, .fg-aa-play > img { position: absolute; left: 50%; top: 0; height: 100%; width: auto; transform: translateX(-50%); }\r
+.fg-aa-play.is-close { width: 34cqw; height: auto; aspect-ratio: 1; align-self: center; }\r
+.fg-aa-play.is-close canvas, .fg-aa-play.is-close img { display: block; width: 100%; height: auto; }\r
+.fg-aa-states { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8cqw; }\r
+.fg-aa-state { display: flex; flex-direction: column; align-items: center; gap: .3cqw; font-size: .9cqw; }\r
+.fg-aa-thumb { width: 100%; height: auto; border-radius: .5cqw; background: repeating-conic-gradient(rgba(255, 255, 255, .06) 0 25%, transparent 0 50%) 0 0 / 1cqw 1cqw; }\r
+.fg-aa-actions { margin-top: 1.2cqw; }\r
+/* 自动框：认脸模型条、列表里的结果标记 */\r
+.fg-aa-vision { display: grid; gap: .5cqw; margin-top: .9cqw; padding: .7cqw 1cqw; border-radius: .8cqw; background: rgba(0, 0, 0, .2); border: 1px solid var(--box-border); font-size: .95cqw; }\r
+.fg-aa-vision select { font: inherit; color: var(--ink); background: rgba(0, 0, 0, .35); border: 1px solid var(--box-border); border-radius: .4cqw; padding: .1cqw .4cqw; }\r
+.fg-aa-vision progress { flex: 1; min-width: 10cqw; height: .7cqw; accent-color: var(--accent); }\r
+.fg-aa-vision .fg-check { display: inline-flex; align-items: center; gap: .4cqw; cursor: pointer; }\r
+.fg-aa-badge { margin-left: .5cqw; padding: 0 .5cqw; border-radius: 99px; font-style: normal; font-size: .75cqw; font-weight: normal; vertical-align: middle; }\r
+.fg-aa-badge.is-ok { background: rgba(110, 240, 168, .2); color: #6ef0a8; }\r
+.fg-aa-badge.is-warn { background: rgba(255, 210, 110, .2); color: #ffd26e; }\r
+.fg-aa-badge.is-bad { background: rgba(255, 138, 138, .2); color: #ff8a8a; }\r
+/* 人物志里的立绘小图：做过逆转式动态的直接动；点一下放大 */\r
+.fg-sprite-art { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }\r
+.fg-sprite-art img, .fg-sprite-art canvas { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }\r
+.fg-variant-art .fg-sprite-art img, .fg-variant-art .fg-sprite-art canvas { object-fit: contain; }\r
+.fg-sprite-art i { position: absolute; top: .4cqw; left: .4cqw; padding: .05cqw .5cqw; border-radius: 99px; font-style: normal; font-size: .8cqw; background: var(--accent); color: #111; }\r
+.fg-sprite-art span { position: absolute; right: .4cqw; bottom: .4cqw; font-size: 1cqw; opacity: 0; transition: opacity .2s; text-shadow: 0 1px 3px #000; }\r
+.fg-sprite-art:hover span { opacity: 1; }\r
+/* 放大看立绘 */\r
+.fg-viewer-stage { display: flex; align-items: center; justify-content: center; max-width: 92%; height: min(46cqw, 76cqh); }\r
+.fg-viewer-stage > img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 0 6cqw rgba(0, 0, 0, .8); }\r
+.fg-aa-play.is-big { width: 60cqw; height: min(46cqw, 76cqh); background: none; }\r
+.fg-aa-play.is-big.is-close { width: min(46cqw, 76cqh); height: auto; aspect-ratio: 1; }\r
+.fg-variant-body { display: grid; gap: .6cqw; align-content: start; min-width: 0; }\r
+.fg-variant-body b { font-size: 1.15cqw; letter-spacing: .08em; }\r
+/* 情绪库（EmotionLibrary.jsx）：按类别分组的一行一种情绪 */\r
+.fg-emo-lib { display: grid; gap: .6cqw; }\r
+.fg-emo-lib .fg-input, .fg-emo-lib .fg-select { padding: .45cqw .8cqw; font-size: 1cqw; }\r
+.fg-emo-sticky { position: sticky; top: 0; z-index: 3; display: grid; gap: .5cqw; padding: .6cqw 0; background: rgb(13, 10, 30); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(0, 0, 0, .5); }\r
+.fg-emo-batch { margin: 0; }\r
+.fg-emo-add { display: grid; grid-template-columns: 1fr 8cqw 12cqw auto; gap: .8cqw; align-items: center; }\r
+.fg-emo-group { border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); }\r
+.fg-emo-group-head { display: flex; align-items: center; gap: .6cqw; padding: .5cqw .9cqw; }\r
+.fg-emo-group-head > button { flex: 1; display: flex; align-items: baseline; gap: .8cqw; padding: 0; font: inherit; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; }\r
+.fg-emo-group-head b { font-family: var(--font-display); font-size: 1.3cqw; letter-spacing: .16em; color: var(--accent); }\r
+.fg-emo-caret { width: 1em; color: var(--ink-dim); }\r
+.fg-emo-empty { padding: 0 1cqw .7cqw 3.4cqw; }\r
+.fg-emo-row { display: grid; grid-template-columns: auto 11cqw 7cqw 12cqw 1fr auto; gap: .7cqw; align-items: center; padding: .45cqw .9cqw; border-top: 1px solid rgba(255, 255, 255, .05); }\r
+.fg-emo-row.is-off .fg-emo-name input { opacity: .5; text-decoration: line-through; }\r
+.fg-emo-row.is-picked { background: color-mix(in oklab, var(--accent) 12%, transparent); }\r
+.fg-emo-name { display: flex; align-items: center; gap: .4cqw; min-width: 0; }\r
+.fg-emo-name input { font-weight: 600; letter-spacing: .04em; }\r
+.fg-emo-name small { font-size: .8cqw; opacity: .5; font-family: var(--font-latin); }\r
+.fg-emo-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }\r
+.fg-emo-acts { display: flex; gap: .4cqw; flex-wrap: wrap; justify-content: flex-end; }\r
+.fg-emo-prompts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1cqw; padding: .4cqw 0 .6cqw 2.4cqw; }\r
+.fg-emo-prompt { display: grid; gap: .4cqw; align-content: start; }\r
+.fg-emo-prompts.is-words { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-bottom: 0; }\r
+.fg-emo-prompt b { font-size: 1cqw; }\r
+.fg-emo-cats { display: grid; gap: .5cqw; }\r
+.fg-emo-cat { display: grid; grid-template-columns: 9cqw 14cqw 1fr auto; gap: .7cqw; align-items: center; }\r
+.fg-emo-restore { cursor: pointer; font: inherit; color: inherit; }\r
+.fg-chip small { margin-left: .3em; opacity: .55; font-size: .85em; }\r
+.fg-chip-x { margin-left: .2em; padding: 0 .3em; border: 0; border-radius: 99px; background: transparent; color: inherit; font: inherit; opacity: .6; cursor: pointer; }\r
+.fg-chip-x:hover { opacity: 1; background: rgba(255, 255, 255, .12); }\r
+.fg-chip-x:disabled { opacity: .3; cursor: default; }\r
+.fg-dlog-chip small { margin-left: .3em; opacity: .6; font-size: .85em; }\r
+\r
+/* 设置 →「提示词」（PromptBook.jsx）：按导演、几位设计师、共用、出图固定词、过滤规则分组，每段全文、变量、对照 */\r
+.fg-pb { display: grid; gap: .8cqw; }\r
+.fg-pb .fg-note .fg-btn.is-mini { margin: 0 .4cqw; }\r
+.fg-pb-flow { display: grid; grid-template-columns: 13cqw 1fr; gap: .6cqw 1.2cqw; align-items: center; padding: .8cqw 1cqw; border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); }\r
+.fg-pb-flow label { display: flex; align-items: center; gap: .7cqw; font-size: 1.05cqw; }\r
+.fg-pb-sticky { position: sticky; top: 0; z-index: 3; display: grid; gap: .5cqw; padding: .6cqw 0; background: rgb(13, 10, 30); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(0, 0, 0, .5); }\r
+.fg-pb-sticky .fg-row { flex-wrap: nowrap; }\r
+.fg-pb-sticky .fg-input { flex: 1; }\r
+.fg-pb-sticky .fg-select { width: auto; }\r
+.fg-pb-alert { font-size: .95cqw; color: #ffd27a; display: flex; align-items: center; gap: .6cqw; }\r
+.fg-pb-group { border: 1px solid rgba(255, 255, 255, .06); border-radius: .8cqw; background: rgba(0, 0, 0, .14); padding-bottom: .4cqw; }\r
+.fg-pb-gdesc { padding: 0 1cqw .4cqw 3.2cqw; }\r
+.fg-pb-section { padding: .2cqw 1cqw .6cqw; }\r
+.fg-pb-stitle { margin: .6cqw 0 .4cqw; font-size: 1.05cqw; letter-spacing: .12em; color: var(--accent3); }\r
+.fg-pb-item { display: grid; gap: .45cqw; padding: .8cqw 1cqw; margin: .5cqw 0; border-radius: .7cqw; border: 1px solid rgba(255, 255, 255, .07); background: rgba(255, 255, 255, .02); }\r
+.fg-pb-item.is-edited { border-color: color-mix(in oklab, var(--accent) 45%, transparent); }\r
+.fg-pb-item.is-stale { border-color: rgba(255, 196, 92, .6); }\r
+.fg-pb-head { display: flex; align-items: center; flex-wrap: wrap; gap: .6cqw; font-size: 1.05cqw; }\r
+.fg-pb-head code { font-size: .8cqw; opacity: .5; font-family: var(--font-latin); }\r
+.fg-pb-badge { padding: .1cqw .7cqw; border-radius: 99px; font-size: .8cqw; background: color-mix(in oklab, var(--accent) 30%, transparent); color: #fff; }\r
+.fg-pb-badge.is-new { background: rgba(255, 196, 92, .32); color: #ffe2a8; }\r
+.fg-pb-badge.is-old { background: rgba(255, 255, 255, .1); color: var(--ink-dim); }\r
+.fg-pb-badge.is-dirty { background: rgba(94, 231, 255, .2); color: #bff6ff; }\r
+.fg-pb-text { min-height: 3cqw; max-height: 60cqw; tab-size: 2; }\r
+.fg-pb-foot { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .6cqw; }\r
+.fg-pb-vars { display: flex; flex-wrap: wrap; gap: .4cqw; flex-basis: 100%; }\r
+.fg-pb-var { display: inline-flex; align-items: baseline; gap: .4cqw; padding: .2cqw .7cqw; border-radius: .5cqw; font-size: .85cqw; color: var(--ink-dim); background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .06); }\r
+.fg-pb-var code { color: var(--accent3); font-size: .85cqw; }\r
+.fg-pb-var small { opacity: .6; }\r
+.fg-pb-var.is-unused { opacity: .55; }\r
+.fg-pb-var.is-unknown { border-color: #ff6b6b; color: #ffb3b3; }\r
+.fg-pb-last, .fg-pb-diff, .fg-pb-out { display: grid; gap: .4cqw; }\r
+.fg-pb-last summary { cursor: pointer; font-size: .9cqw; color: var(--ink-dim); }\r
+.fg-pb-last pre, .fg-pb-diff pre, .fg-pb-out pre { margin: 0; max-height: 36cqw; overflow: auto; padding: .7cqw 1cqw; border-radius: .6cqw; background: rgba(0, 0, 0, .35); font-family: "JetBrains Mono", Consolas, monospace; font-size: .9cqw; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }\r
+.fg-pb-del { color: #ff9c9c; background: rgba(255, 90, 90, .08); }\r
+.fg-pb-add { color: #9df0b4; background: rgba(90, 220, 140, .08); }\r
+.fg-pb-diff pre > div { display: grid; grid-template-columns: 1.6cqw 1fr; }\r
+.fg-pb-diff pre i { font-style: normal; opacity: .8; user-select: none; }\r
+.fg-pb-diff mark { color: inherit; background: color-mix(in oklab, currentColor 30%, transparent); border-radius: .2cqw; }\r
+.fg-pb-skip { color: var(--ink-dim); font-style: italic; }\r
+.fg-pb-stale { display: grid; gap: .6cqw; padding: .7cqw 1cqw; border-radius: .6cqw; background: rgba(255, 196, 92, .07); font-size: .95cqw; }\r
+.fg-pb-preview { display: grid; gap: .6cqw; padding: .8cqw 1cqw; border: 1px dashed var(--box-border); border-radius: .8cqw; }\r
+.fg-pb-preview .fg-select { width: auto; }\r
+\r
+/* 表单 */\r
+.fg-field { display: grid; grid-template-columns: 14cqw 1fr; gap: 1.2cqw; align-items: center; margin: .9cqw 0; font-size: 1.1cqw; }\r
+.fg-field > label { color: var(--ink-dim); letter-spacing: .08em; }\r
+.fg-field small { grid-column: 2; color: var(--ink-dim); font-size: .9cqw; margin-top: -.6cqw; }\r
+.fg-input, .fg-select, .fg-textarea { width: 100%; padding: .7cqw 1cqw; font: inherit; font-size: 1.1cqw; color: var(--ink); background: rgba(0, 0, 0, .35); border: 1px solid var(--box-border); border-radius: .6cqw; outline: none; }\r
+.fg-select option { background: #14122a; }\r
+.fg-textarea { min-height: 7cqw; resize: vertical; line-height: 1.5; font-family: "JetBrains Mono", Consolas, monospace; font-size: 1cqw; }\r
+.fg-input:focus, .fg-select:focus, .fg-textarea:focus { border-color: var(--accent); }\r
+.fg-btn { display: inline-flex; align-items: center; gap: .5cqw; padding: .6cqw 1.4cqw; border-radius: 99px; font-size: 1.05cqw; letter-spacing: .1em; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .05); transition: background .2s, border-color .2s; }\r
+.fg-btn:hover { background: rgba(255, 255, 255, .12); border-color: var(--accent); }\r
+.fg-btn.is-primary { background: linear-gradient(100deg, var(--accent), var(--accent2)); border-color: transparent; color: #fff; font-weight: 700; }\r
+.fg-btn[disabled] { opacity: .45; pointer-events: none; }\r
+.fg-row { display: flex; gap: .8cqw; flex-wrap: wrap; align-items: center; }\r
+.fg-switch { position: relative; flex: none; width: 3.4cqw; height: 1.9cqw; border-radius: 99px; background: rgba(255, 255, 255, .14); transition: background .2s; }\r
+.fg-switch::after { content: ""; position: absolute; left: .25cqw; top: .25cqw; width: 1.4cqw; height: 1.4cqw; border-radius: 50%; background: #fff; transition: transform .25s cubic-bezier(.3, 1.4, .5, 1); }\r
+.fg-switch.is-on { background: linear-gradient(100deg, var(--accent), var(--accent2)); }\r
+.fg-switch.is-on::after { transform: translateX(1.5cqw); }\r
+.fg-switch:disabled { opacity: .45; cursor: not-allowed; }\r
+.fg-note { font-size: .95cqw; color: var(--ink-dim); line-height: 1.6; }\r
+.fg-ok { color: #6ef0a8; } .fg-err { color: #ff8a8a; }\r
+/* 设置 → 对话框：缩小版的舞台（自己是 stage 容器，里面的 cqw 按它的宽算），对话框跟剧场里一模一样；百分比滑块；上传的字体清单 */\r
+.fg-dlg-preview { position: relative; container-type: size; container-name: stage; width: min(100%, 44cqw); aspect-ratio: var(--stage-ar, 1.4615); margin: .4cqw auto 0; border-radius: .8cqw; overflow: hidden; border: 1px solid var(--box-border); pointer-events: none;\r
+  background: radial-gradient(60% 50% at 30% 30%, rgba(255, 190, 170, .45), transparent 70%), radial-gradient(50% 60% at 78% 40%, rgba(150, 120, 255, .35), transparent 70%), linear-gradient(180deg, #2b2140, #8a4058 62%, #2a1830); }\r
+.fg-pct input[type=range] { width: 18cqw; }\r
+.fg-pct .fg-input { width: 6.4cqw; }\r
+.fg-fontlist { display: grid; gap: .3cqw; }\r
+.fg-fontitem { padding: .4cqw .2cqw; border-bottom: 1px solid rgba(255, 255, 255, .06); flex-wrap: nowrap; }\r
+.fg-fontname { font-size: 1.3cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }\r
+.fg-section { margin: 1.6cqw 0 .6cqw; font-family: var(--font-display); font-size: 1.4cqw; letter-spacing: .2em; display: flex; align-items: center; gap: .8cqw; }\r
+.fg-section::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--box-border), transparent); }\r
+/* 设置 → 特效：每组一个标题行（名字、开着几个、总开关），下面一排排小开关 */\r
+.fg-fx-top { display: flex; align-items: center; gap: 1cqw; margin: .4cqw 0 .6cqw; }\r
+.fg-fx-top .fg-note { flex: 1; }\r
+.fg-fx-group { margin: 1.4cqw 0 0; padding: 1cqw 1.2cqw 1.2cqw; border-radius: 1cqw; border: 1px solid var(--box-border); background: rgba(255, 255, 255, .03); }\r
+.fg-fx-head { display: flex; align-items: center; gap: .8cqw; margin-bottom: .3cqw; }\r
+.fg-fx-head > .fg-spacer { flex: 1; }\r
+.fg-fx-head b { font-family: var(--font-display); font-size: 1.3cqw; letter-spacing: .16em; }\r
+.fg-fx-count { font-size: .9cqw; letter-spacing: .08em; color: var(--ink-dim); }\r
+.fg-fx-count.is-part { color: var(--accent); }\r
+.fg-fx-items { display: flex; flex-wrap: wrap; gap: .5cqw; margin-top: .8cqw; }\r
+.fg-fx-chip { display: inline-flex; align-items: center; gap: .5cqw; padding: .4cqw 1cqw .4cqw .7cqw; border-radius: 99px; font-size: 1cqw; letter-spacing: .06em; color: var(--ink-dim);\r
+  border: 1px solid var(--box-border); background: rgba(0, 0, 0, .25); transition: color .2s, border-color .2s, background .2s; }\r
+.fg-fx-chip i { width: .8cqw; height: .8cqw; border-radius: 50%; border: 1px solid currentColor; opacity: .6; transition: background .2s, box-shadow .2s, opacity .2s; }\r
+.fg-fx-chip:hover { border-color: var(--accent); }\r
+.fg-fx-chip.is-on { color: var(--ink); border-color: color-mix(in oklab, var(--accent) 55%, transparent); background: color-mix(in oklab, var(--accent) 14%, transparent); }\r
+.fg-fx-chip.is-on i { opacity: 1; border-color: transparent; background: linear-gradient(100deg, var(--accent), var(--accent2)); box-shadow: 0 0 .5cqw var(--accent); }\r
+.fg-fx-chip:not(.is-on) { text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, .3); }\r
+.fg-skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(15cqw, 1fr)); gap: 1cqw; }\r
+.fg-skin { padding: 1cqw; border-radius: 1cqw; border: 1px solid var(--box-border); text-align: left; transition: transform .2s; }\r
+.fg-skin:hover { transform: translateY(-.3cqw); }\r
+.fg-skin.is-on { box-shadow: 0 0 0 2px var(--accent); }\r
+.fg-skin-swatch { height: 4cqw; border-radius: .6cqw; margin-bottom: .6cqw; }\r
+.fg-skin b { display: block; font-size: 1.1cqw; letter-spacing: .1em; } .fg-skin span { font-size: .85cqw; color: var(--ink-dim); }\r
+.fg-style { display: flex; flex-direction: column; min-width: 0; }\r
+.fg-style > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all; }\r
+.fg-styles { grid-template-columns: repeat(auto-fill, minmax(12cqw, 1fr)); }\r
+/* 样图是竖版（试画按竖版尺寸画），卡片封面也竖着放。 */\r
+.fg-style-cover { display: grid; place-items: center; aspect-ratio: 832 / 1216; margin-bottom: .6cqw; border-radius: .6cqw; background: linear-gradient(160deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .02)) center top / cover no-repeat; font-size: .85cqw; color: var(--ink-dim); }\r
+.fg-style-cover span { font-size: inherit; color: inherit; }\r
+.fg-style.is-new .fg-style-cover { font-size: 3cqw; border: 1px dashed var(--box-border); background: none; }\r
+.fg-sent i { opacity: .7; }\r
+\r
+.fg-update-done { margin: .8cqw 0; padding: .9cqw 1.2cqw; border-radius: .8cqw; font-size: 1.05cqw; line-height: 1.6; color: #6ef0a8; background: rgba(110, 240, 168, .08); border: 1px solid rgba(110, 240, 168, .3); }\r
+/* 文件更新了、DSH 还没重启：网页新、后台旧，提醒重启 */\r
+.fg-restart { margin: 0 3cqw .8cqw; padding: .7cqw 1.1cqw; border-radius: .8cqw; font-size: 1cqw; line-height: 1.55; color: #ffd59a; background: rgba(217, 130, 43, .14); border: 1px solid rgba(217, 130, 43, .55); }\r
+.fg-restart b { color: #fff0d6; }\r
+.fg-restart.is-floating { position: absolute; top: 1.2cqw; left: 50%; transform: translateX(-50%); z-index: 40; width: max-content; max-width: 70cqw; margin: 0; background: rgba(40, 24, 8, .86); backdrop-filter: blur(6px); }\r
+.fg-changes { margin: .4cqw 0 0 15.2cqw; border-radius: .8cqw; border: 1px solid var(--box-border); overflow: hidden; }\r
+.fg-changes > div { display: grid; grid-template-columns: 6cqw 1fr auto; gap: 1cqw; padding: .6cqw 1cqw; font-size: 1cqw; line-height: 1.5; border-bottom: 1px solid rgba(255, 255, 255, .06); }\r
+.fg-changes > div:last-child { border-bottom: 0; }\r
+.fg-changes code, .fg-note code { font-family: "JetBrains Mono", Consolas, monospace; color: var(--accent); }\r
+.fg-changes small { color: var(--ink-dim); white-space: nowrap; }\r
+\r
+.fg-lightbox { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2cqw; background: rgba(0, 0, 0, .9); animation: fg-fade-in .25s ease both; cursor: zoom-out; }\r
+.fg-lightbox img { max-width: 92%; max-height: 82%; object-fit: contain; box-shadow: 0 0 6cqw rgba(0, 0, 0, .8); cursor: default; }\r
+.fg-lightbox .fg-row { cursor: default; }\r
+\r
+@keyframes fg-fade-in { from { opacity: 0; } }\r
+@keyframes fg-fade-out { to { opacity: 0; } }\r
+@keyframes fg-spin { to { transform: rotate(360deg); } }\r
+@keyframes fg-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }\r
+@keyframes fg-skeleton { from { background-position: 200% 0; } to { background-position: -200% 0; } }\r
+@keyframes fg-pop { from { opacity: 0; transform: translateY(-.4cqw); } to { opacity: 1; transform: none; } }\r
+\r
+@media (prefers-reduced-motion: reduce) {\r
+  .fg-bg-art, .fg-cg-img, .fg-cg-art, .fg-actor-body, .fg-box::before, .fg-sky::after, .fg-down-mist i { animation: none !important; }\r
+  /* 换背景还是淡入淡出（只是不推拉、不模糊、不旋转），不会一下子跳过去 */\r
+  .fg-bg.is-enter { animation: fg-fade-slow var(--enter-dur, 1.1s) ease both !important; }\r
+  .fg-cover[data-cover="lids"]::before { display: none; }\r
+  .fg-cover[data-cover="lids"] { background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }\r
+  .fg-cover[data-cover="lids"][data-state="up"] { animation: fg-cover-up var(--ms) ease both; }\r
+  .fg-cover[data-cover="lids"][data-state="down"] { animation: fg-cover-down var(--ms) ease both; }\r
+  .fg-cover[data-cover="lids"][data-state="off"], .fg-cover[data-cover="lids"][data-state="idle"] { opacity: 0; }\r
+  .fg-recall::after, .fg-recall-face { animation: none !important; } /* 闪回里的光斑漂移、心跳脉动、小头像错位 */\r
+  .fg-romance::before, .fg-romance::after, .fg-sense::after, .fg-world-in[data-sense] .fg-cast { animation: none !important; } /* 光斑漂移、心跳暗角、耳边的呼吸、触碰的涟漪、失神的晃 */\r
+  .fg-sense[data-v="heat"]::before, .fg-sense[data-v="touch"]::before, .fg-sense[data-v="scent"]::before { animation: none !important; }\r
+  .fg-phone-card, .fg-phone-ripple, .fg-phone-key.is-accept, .fg-notify-wave i { animation: none !important; } /* 手机一震一震、声波跳 */\r
+  .fg-dialog[data-recall] .fg-box, .fg-dialog[data-recall] .fg-box::after, .fg-dialog[data-recall] .fg-line, .fg-dialog[data-recall] .fg-name-plate { animation: none !important; } /* 闪回对话框里的光斑、脉动、抖动、名牌忽隐忽现 */\r
+  .fg-dialog[data-recall] .fg-char { animation-name: fg-char-in !important; }\r
+  .fg-flash.is-dread { animation: fg-bloom .6s ease-out both !important; } /* 撕裂闪烁换成淡入淡出 */\r
+  .fg-cg-pan { animation: none !important; transform: scale(var(--r)); }\r
+  .fg-cg:not(.is-leaving) { animation: fg-cg-fade-in .6s ease both !important; }\r
+  .fg-cg.is-leaving { animation: fg-cg-fade-out .6s ease both !important; }\r
+  .fg-cg::before { display: none; }\r
+  .fg-camera[data-cam="whip"] { animation: none !important; }\r
+  .fg-photo, .fg-cup, .fg-moment-card { animation: fg-fade-in .2s ease both !important; } /* 小瞬间：不飞、不弹，只淡入 */\r
+  .fg-touch-ring, .fg-clink, .fg-fw-trail, .fg-fw-burst, .fg-steam i { animation: none !important; opacity: 0; }\r
+  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */\r
+  .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }\r
+  .fg-text.is-wait .fg-char { animation: none !important; }\r
+}\r
+@container stage (max-aspect-ratio: 4/5) {\r
+  .fg-face-levels { grid-template-columns: minmax(0, 1fr); } .fg-dial input[type=range], .fg-pct input[type=range] { width: 30cqw; }\r
+  .fg-face-try { width: 22cqw; }\r
+  .fg-pct .fg-input { width: 14cqw; } .fg-dlg-preview { width: 100%; } .fg-fontname { font-size: 3.2cqw; }\r
+  .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 6%; }\r
+  .fg-actor { width: calc(60% * var(--s, 1) * var(--d, 1)); height: calc(60% * var(--s, 1) * var(--d, 1)); bottom: calc(23% + var(--db, 0%)); }\r
+  .fg-dialog { left: 3%; right: 3%; height: var(--fg-dlg-h-p, 22%); --fg-dlg-ref: 22cqh; }\r
+  .fg-recall-face { width: 17cqw; }\r
+  .fg-phone { top: 16%; } .fg-phone-card { width: 34cqw; padding: 3cqw 2.6cqw; border-radius: 4cqw; }\r
+  .fg-phone-label { font-size: 2.4cqw; } .fg-phone-label svg { width: 2.6cqw; height: 2.6cqw; }\r
+  .fg-phone-avatar { width: 15cqw; height: 15cqw; margin: 2.4cqw auto 1.6cqw; } .fg-phone-face { font-size: 6.4cqw; }\r
+  .fg-phone-name { font-size: 4.2cqw; } .fg-phone-keys { gap: 7cqw; margin-top: 2.6cqw; } .fg-phone-key { width: 8cqw; height: 8cqw; }\r
+  .fg-phone-result { font-size: 2.8cqw; } .fg-phone-result i { width: 4cqw; height: 4cqw; }\r
+  .fg-call-chip svg { width: 2.6cqw; height: 2.6cqw; } .fg-call-dot { width: 1.4cqw; height: 1.4cqw; }\r
+  .fg-pip { width: 24cqw; top: 9%; border-radius: 2.4cqw; } .fg-pip-name { font-size: 2.4cqw; left: 1.6cqw; bottom: 1.4cqw; } .fg-pip-name i { width: 1.2cqw; height: 1.2cqw; }\r
+  .fg-notify { width: 88cqw; top: 2.4%; padding: 2.2cqw 2.8cqw; gap: 2.2cqw; border-radius: 3.4cqw; }\r
+  .fg-notify-icon { width: 8cqw; height: 8cqw; border-radius: 2cqw; font-size: 4cqw; }\r
+  .fg-notify-head { font-size: 2.8cqw; } .fg-notify-head span { font-size: 2.4cqw; } .fg-notify-text { font-size: 3.2cqw; }\r
+  .fg-notify-wave { height: 4.4cqw; gap: .5cqw; } .fg-notify-wave i { width: .5cqw; }\r
+  .fg-text { font-size: calc(4.6cqw * var(--fg-text-scale, 1)); top: clamp(3cqw, 18%, calc(.18 * var(--fg-dlg-ref))); bottom: min(26%, calc(.26 * var(--fg-dlg-ref))); }\r
+  .fg-progress { bottom: min(12%, calc(.12 * var(--fg-dlg-ref))); right: 4.2%; }\r
+  .fg-quick { bottom: min(5%, calc(.05 * var(--fg-dlg-ref))); left: 4.2%; justify-content: space-between; font-size: 2.4cqw; gap: 3cqw; }\r
+  .fg-wait { bottom: min(28%, calc(.28 * var(--fg-dlg-ref))); }\r
+  .fg-status { display: none; }\r
+  .fg-name-plate { font-size: 4cqw; } .fg-name { top: -5cqw; } .fg-name-sub { font-size: 2.4cqw; } /* 情绪小字：以前沿用横屏的 1cqw，手机上只有 4px */\r
+  .fg-iconbtn { width: 9cqw; height: 9cqw; font-size: 4cqw; }\r
+  .fg-hud-place { font-size: 4cqw; } .fg-hud-meta { font-size: 2.6cqw; }\r
+  .fg-choice, .fg-free { width: 88cqw; font-size: 4cqw; }\r
+  .fg-title-logo { font-size: 11cqw; max-width: 90cqw; } .fg-title-menu button { font-size: 4.4cqw; }\r
+  .fg-dlog { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }\r
+  .fg-dlog-side { flex-direction: row; overflow-x: auto; padding: 0 0 1cqw; }\r
+  .fg-dlog-row { width: 46cqw; }\r
+  .fg-dlog-row-head, .fg-dlog-title { font-size: 3.6cqw; }\r
+  .fg-dlog-row-meta, .fg-dlog-row-sum, .fg-dlog-status, .fg-dlog-label, .fg-dlog-meter, .fg-dlog-think summary, .fg-dlog-chip, .fg-dlog-chip i, .fg-btn.is-mini { font-size: 2.8cqw; }\r
+  .fg-dlog-facts, .fg-dlog-notice, .fg-dlog-error, .fg-dlog-pre, .fg-dlog-line, .fg-dlog-card, .fg-dlog-mono, .fg-dlog-list-plain { font-size: 3cqw; }\r
+  .fg-dlog-facts { grid-template-columns: 1fr; }\r
+  .fg-dlog-pre { max-height: 90cqw; }\r
+  .fg-dlog-line { grid-template-columns: 9cqw minmax(0, 1fr); }\r
+  .fg-dlog-line > .fg-dlog-chips { grid-column: 2; }\r
+  .fg-dlog .fg-note, .fg-dlog-uid { font-size: 2.6cqw; }\r
+  .fg-dlog-list-plain { padding-left: 6cqw; }\r
+  .fg-panel-title { font-size: 6cqw; } .fg-panel-en { font-size: 2.2cqw; }\r
+  .fg-tab { padding: 1.2cqw 3cqw; font-size: 3.2cqw; }\r
+  .fg-pill { padding: .8cqw 2.2cqw; font-size: 2.6cqw; }\r
+  .fg-person { grid-template-columns: 1fr; }\r
+  .fg-person-art { height: 50cqw; }\r
+  .fg-person h3 { font-size: 5cqw; flex-wrap: wrap; } .fg-person h3 small { font-size: 2.6cqw; }\r
+  .fg-person-tags, .fg-note { font-size: 2.8cqw; }\r
+  .fg-look-grid { grid-template-columns: 1fr; } .fg-look-field > span { font-size: 2.6cqw; }\r
+  .fg-btn, .fg-look, .fg-state { font-size: 3cqw; padding: 1cqw 2.4cqw; }\r
+  .fg-emo { width: 15cqw; height: 18cqw; font-size: 2.4cqw; }\r
+  .fg-field, .fg-person-form .fg-field { grid-template-columns: 1fr; font-size: 3cqw; }\r
+  .fg-fx-top { flex-wrap: wrap; } .fg-fx-top .fg-note { flex-basis: 100%; }\r
+  .fg-fx-group { padding: 2cqw 2.4cqw 2.4cqw; border-radius: 2cqw; }\r
+  .fg-fx-head b { font-size: 3.4cqw; } .fg-fx-count { font-size: 2.6cqw; }\r
+  .fg-switch { width: 8.4cqw; height: 4.6cqw; } .fg-switch::after { left: .6cqw; top: .6cqw; width: 3.4cqw; height: 3.4cqw; } .fg-switch.is-on::after { transform: translateX(3.8cqw); }\r
+  .fg-fx-items { gap: 1.2cqw; }\r
+  .fg-fx-chip { font-size: 2.8cqw; padding: .9cqw 2cqw .9cqw 1.4cqw; gap: 1cqw; } .fg-fx-chip i { width: 1.8cqw; height: 1.8cqw; }\r
+  .fg-input, .fg-select, .fg-textarea { font-size: 3cqw; }\r
+  .fg-outfit, .fg-outfit.is-new { grid-template-columns: 1fr; }\r
+  .fg-emo-lib .fg-input, .fg-emo-lib .fg-select { font-size: 3cqw; padding: 1cqw 1.6cqw; }\r
+  .fg-emo-add, .fg-emo-cat, .fg-emo-prompts { grid-template-columns: 1fr; }\r
+  .fg-emo-row { grid-template-columns: auto 1fr 1fr; } .fg-emo-row > .fg-select, .fg-emo-row > .fg-note:not(.fg-emo-meta) { grid-column: 2 / -1; } .fg-emo-name { grid-column: 2 / -1; }\r
+  .fg-emo-meta, .fg-emo-acts { grid-column: 1 / -1; } .fg-emo-acts { justify-content: flex-start; }\r
+  .fg-emo-group-head b { font-size: 3.4cqw; } .fg-emo-name small { font-size: 2.4cqw; } .fg-emo-prompt b { font-size: 3cqw; }\r
+  .fg-pb-flow { grid-template-columns: 1fr; padding: 2cqw; border-radius: 2cqw; } .fg-pb-flow label { font-size: 3.2cqw; gap: 2cqw; }\r
+  .fg-pb-sticky .fg-row { flex-wrap: wrap; } .fg-pb-sticky .fg-input { flex-basis: 100%; }\r
+  .fg-pb-alert, .fg-pb-stale { font-size: 2.8cqw; }\r
+  .fg-pb-gdesc { padding: 0 2cqw 1cqw 6cqw; } .fg-pb-section { padding: .4cqw 2cqw 1.2cqw; }\r
+  .fg-pb-stitle, .fg-pb-head { font-size: 3.2cqw; } .fg-pb-head code, .fg-pb-badge { font-size: 2.4cqw; }\r
+  .fg-pb-item { padding: 2cqw; gap: 1.2cqw; border-radius: 2cqw; } .fg-pb-badge { padding: .3cqw 1.6cqw; }\r
+  .fg-pb-var, .fg-pb-var code, .fg-pb-last summary { font-size: 2.6cqw; } .fg-pb-var { padding: .5cqw 1.6cqw; border-radius: 1.2cqw; }\r
+  .fg-pb-last pre, .fg-pb-diff pre, .fg-pb-out pre { font-size: 2.6cqw; max-height: 100cqw; padding: 1.6cqw 2cqw; }\r
+  .fg-pb-diff pre > div { grid-template-columns: 4cqw 1fr; } .fg-pb-text { max-height: 150cqw; }\r
+  .fg-pb-preview { padding: 2cqw; border-radius: 2cqw; } .fg-pb-preview .fg-row { flex-wrap: wrap; }\r
+  .fg-dlog-chip small { font-size: 2.4cqw; }\r
+  .fg-variant { grid-template-columns: 1fr; } .fg-variant-art { height: 50cqw; }\r
+  .fg-askbox { padding: 2cqw; gap: 1.4cqw; border-radius: 2cqw; } .fg-ticks { gap: 1.2cqw; }\r
+  .fg-tick { font-size: 2.8cqw; padding: .8cqw 2.2cqw; } .fg-tick small { font-size: 2.3cqw; }\r
+  .fg-askbox .fg-count { width: 24cqw; } .fg-askbox .fg-posename { flex: 1; width: auto; min-width: 30cqw; }\r
+  .fg-variant-body b { font-size: 3.4cqw; }\r
+  .fg-row .fg-input.fg-seedinput { width: 26cqw; }\r
+  .fg-aa-grid { grid-template-columns: 1fr; } .fg-aa-list { max-height: 50cqw; }\r
+  .fg-aa-vision { font-size: 2.6cqw; } .fg-aa-badge { font-size: 2.2cqw; } .fg-aa-vision progress { height: 1.6cqw; }\r
+  .fg-acting .fg-field { grid-template-columns: 1fr; }\r
+  .fg-pm .fg-input { font-size: 3cqw; padding: 1cqw 1.6cqw; }\r
+  .fg-pm-poses { grid-template-columns: 1fr; gap: 1.6cqw; } .fg-pm-pose { padding: 1.8cqw; gap: 1cqw; border-radius: 2cqw; }\r
+  .fg-pm-id { font-size: 2.4cqw; min-width: 5cqw; } .fg-pm-add { min-height: 10cqw; font-size: 3cqw; border-radius: 2cqw; }\r
+  .fg-pm-scroll { max-height: 120cqw; border-radius: 2cqw; }\r
+  .fg-pm-table { font-size: 3cqw; } .fg-pm-table th, .fg-pm-table td { padding: 1cqw 1.4cqw; }\r
+  .fg-pm-head b { max-width: 22cqw; } .fg-pm-emo small { font-size: 2.4cqw; } .fg-pm-cat b { font-size: 3.2cqw; }\r
+  .fg-pm-offtag { font-size: 2.2cqw; } .fg-pm-status { font-size: 2.6cqw; } .fg-pm-life { font-size: 2.4cqw; } .fg-pm-situ { gap: 1cqw; padding-top: 1cqw; }\r
+  .fg-pm-cell input { width: 3.6cqw; height: 3.6cqw; } .fg-pm-star { font-size: 3.6cqw; padding: 0 .6cqw; }\r
+  .fg-pm-thumb { width: 7cqw; height: 9cqw; font-size: 2.6cqw; border-radius: 1cqw; }\r
+  .fg-pm-face { grid-template-columns: 1fr; max-width: 80cqw; }\r
+  .fg-face-editor .fg-aa-frame { height: 80cqw; }\r
+  .fg-aa-frame, .fg-aa-play { height: 90cqw; } .fg-aa-play.is-close { width: 90cqw; }\r
+  .fg-aa-item img { width: 9cqw; height: 11cqw; } .fg-aa-item { grid-template-columns: auto 9cqw 1fr; }\r
+  .fg-track-desc { min-height: 12cqw; font-size: 3cqw; }\r
+  .fg-lib { grid-template-columns: 1fr; }\r
+  .fg-lib-tree { position: static; flex-direction: row; flex-wrap: wrap; gap: 1cqw; max-height: 40cqw; padding: 1.2cqw; border-radius: 2cqw; }\r
+  .fg-libcat { width: auto; max-width: 100%; gap: 1cqw; padding: .8cqw 1.8cqw; border: 1px solid var(--box-border); border-radius: 99px; font-size: 2.6cqw; }\r
+  .fg-libcat.is-sub { padding-left: 1.8cqw; font-size: 2.4cqw; border-style: dashed; }\r
+  .fg-libcat i { font-size: 2.2cqw; }\r
+  .fg-lib-search { flex-basis: 100%; }\r
+  .fg-lib-cathead, .fg-lib-count { padding: 1cqw 1.6cqw; border-radius: 1.6cqw; }\r
+  .fg-lib-count input, .fg-librow input[type="checkbox"] { width: 3.6cqw; height: 3.6cqw; }\r
+  .fg-librow { grid-template-columns: auto 7cqw minmax(0, 1fr) auto; gap: 1.6cqw; padding: 1.2cqw 1.6cqw; border-radius: 1.6cqw; }\r
+  .fg-librow.is-open { border-radius: 1.6cqw 1.6cqw 0 0; }\r
+  .fg-librow-size { display: none; }\r
+  .fg-librow-play { width: 7cqw; height: 7cqw; font-size: 2.4cqw; }\r
+  .fg-librow-main b { font-size: 3cqw; } .fg-librow-main span { font-size: 2.4cqw; }\r
+  .fg-libchip { max-width: 22cqw; padding: .4cqw 1.4cqw; font-size: 2.4cqw; }\r
+  .fg-libedit { gap: 1.2cqw; padding: 1.6cqw 2cqw; border-radius: 0 0 1.6cqw 1.6cqw; }\r
+  .fg-lib-bar { gap: 1.2cqw; padding: 1.6cqw 2cqw; border-radius: 2cqw; }\r
+  .fg-lib-bar .fg-row { flex-wrap: wrap; }\r
+}\r
+\r
+/* 亲密场面（lib/eros.js、Eros.jsx）：潮红 .fg-eros（scene.eros，节奏越快越深，余韵时转成一层暖雾）、触手的影子 .fg-tentacle（scene.tentacle）、\r
+   高潮那一下的白光 .fg-peak。不出字、不出爱心和漫画符号，只动光和影。潮红和影子在插画上面一层（z-index 7），只压画面边上一圈，不挡脸；\r
+   白光在对话框下面（z-index 15），字照样读得到。镜头跟着节奏的一送一落、高潮时的一涌是 Eros.jsx 用 Web Animations 动的。 */\r
+.fg-eros, .fg-tentacle { position: absolute; inset: 0; z-index: 7; pointer-events: none; animation: fg-layer-in var(--fade, 1.2s) ease both; }\r
+.fg-eros.is-leave, .fg-tentacle.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }\r
+.fg-eros::before, .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { content: ""; position: absolute; inset: 0; pointer-events: none; }\r
+.fg-eros { --flush: rgba(205, 72, 98, .4); --glow: 4.2s; background: radial-gradient(118% 92% at 50% 46%, rgba(255, 180, 170, .06) 30%, var(--flush)); backdrop-filter: saturate(1.08); -webkit-backdrop-filter: saturate(1.08); }\r
+.fg-eros::after { background: radial-gradient(85% 55% at 50% 104%, rgba(255, 168, 150, .2), transparent 70%), radial-gradient(70% 40% at 50% -6%, rgba(255, 190, 200, .12), transparent 70%); animation: fg-eros-glow var(--glow) ease-in-out infinite; }\r
+.fg-eros[data-v="tease"] { --flush: rgba(225, 112, 124, .28); --glow: 5s; }\r
+.fg-eros[data-v="fast"] { --flush: rgba(200, 62, 92, .48); --glow: 2.6s; backdrop-filter: saturate(1.12) contrast(1.02); -webkit-backdrop-filter: saturate(1.12) contrast(1.02); }\r
+.fg-eros[data-v="frantic"] { --flush: rgba(190, 46, 84, .56); --glow: 1.5s; backdrop-filter: saturate(1.18) contrast(1.05); -webkit-backdrop-filter: saturate(1.18) contrast(1.05); }\r
+.fg-eros[data-v="afterglow"] { --glow: 7s; background: radial-gradient(120% 95% at 50% 46%, rgba(255, 236, 226, .1) 30%, rgba(222, 150, 150, .24)); backdrop-filter: brightness(1.04) contrast(.93) saturate(.95); -webkit-backdrop-filter: brightness(1.04) contrast(.93) saturate(.95); }\r
+.fg-eros[data-v="afterglow"]::before { background: radial-gradient(60% 55% at 50% 44%, rgba(255, 250, 246, .16), transparent 72%); filter: blur(1cqw); }\r
+@keyframes fg-eros-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }\r
+\r
+/* 触手：画面两边和角落里暗紫的触手剪影往里探、慢慢地扭（像镜头前景里没对上焦的东西），身上一道湿亮的反光；\r
+   潜伏（idle）时缩在画面外沿、淡一些，蠕动（writhe）时探进来、扭得快。形状是两张 SVG：剪影一张、反光一张，跟着同一个动画走。 */\r
+.fg-tentacle { --sway: 9s; background: radial-gradient(112% 92% at 50% 42%, transparent 52%, rgba(16, 4, 26, .42));\r
+  --tentacle-shape: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-160 -80 1920 1160' preserveAspectRatio='none'><path fill='%2310051a' fill-opacity='.9' d='M-33,1103 -10,1066 10,1030 26,994 40,959 51,925 60,891 66,858 71,826 74,795 77,764 78,734 78,704 78,675 78,647 77,619 77,591 78,563 79,535 81,508 84,480 89,452 95,424 103,395 114,366 127,337 142,307 144,302 144,297 142,292 137,288 132,286 127,286 122,288 118,293 99,323 83,352 69,382 56,411 46,441 37,470 29,499 23,528 17,557 12,585 8,614 4,642 -0,670 -5,697 -10,725 -15,752 -22,779 -29,805 -38,832 -47,858 -59,884 -72,910 -87,936 -105,963 -125,990 -147,1017ZM-128,708 -97,704 -68,699 -41,692 -16,683 7,674 29,663 48,652 67,640 84,628 99,615 114,602 127,589 140,575 152,562 163,550 174,537 185,525 196,513 207,502 219,491 231,481 243,471 256,462 271,454 286,447 303,441 307,439 310,436 312,432 311,427 309,423 306,420 302,418 297,419 278,423 260,429 243,435 226,442 211,450 195,459 181,468 166,478 152,488 139,498 125,508 111,517 98,527 84,536 70,545 56,553 41,561 26,567 10,573 -7,579 -24,583 -43,587 -63,590 -84,591 -107,592 -132,592ZM-123,-23 -101,-14 -80,-4 -62,7 -46,17 -32,27 -19,37 -7,48 4,59 14,70 23,81 32,92 40,104 48,116 57,128 65,139 73,151 82,163 91,174 102,185 113,195 125,204 139,213 154,221 170,228 188,234 207,240 211,240 215,239 218,237 220,233 220,229 219,225 217,222 213,220 195,213 180,206 167,198 156,189 146,180 138,170 131,160 125,150 119,139 114,127 109,115 104,103 99,89 94,75 88,61 81,46 73,30 64,14 53,-2 41,-19 27,-35 11,-52 -8,-68 -28,-85 -51,-101 -77,-117ZM288,1070 289,1052 291,1035 293,1018 296,1003 300,987 304,973 309,958 314,943 319,929 325,914 330,900 336,885 342,870 348,854 353,839 359,822 363,806 367,788 371,770 374,752 376,732 377,712 377,690 376,668 374,644 372,619 370,615 367,611 363,609 359,608 355,610 351,613 349,617 348,621 349,645 348,668 346,689 344,708 340,726 335,743 330,759 323,774 317,788 310,802 302,815 294,828 285,840 277,853 268,865 258,878 249,891 239,905 230,920 220,935 211,951 202,969 194,987 186,1007 179,1028 172,1050ZM1754,1015 1731,986 1711,958 1694,929 1679,901 1665,873 1654,845 1644,816 1635,788 1628,759 1622,731 1616,701 1611,672 1607,643 1603,613 1598,583 1594,553 1589,523 1583,493 1576,463 1568,432 1559,402 1548,372 1534,342 1519,312 1502,282 1482,252 1478,248 1473,246 1467,246 1462,248 1458,252 1456,257 1456,263 1458,268 1475,298 1488,327 1499,356 1508,386 1514,414 1519,443 1522,472 1524,500 1525,529 1525,558 1525,588 1524,617 1523,647 1522,678 1522,709 1522,741 1524,774 1526,808 1531,842 1537,877 1545,913 1555,950 1568,988 1584,1026 1604,1065 1626,1105ZM1745,202 1722,205 1701,208 1681,209 1663,209 1645,209 1629,207 1613,205 1598,202 1583,198 1569,194 1556,189 1542,183 1529,177 1515,170 1502,163 1489,156 1476,149 1462,142 1449,135 1435,128 1421,122 1406,116 1391,110 1375,106 1359,102 1342,99 1338,98 1334,100 1330,103 1329,108 1328,112 1330,116 1333,120 1338,121 1352,126 1366,132 1379,138 1391,146 1403,153 1414,162 1425,171 1436,180 1447,190 1458,200 1470,210 1482,220 1494,231 1507,241 1521,251 1536,261 1551,271 1568,280 1587,288 1606,296 1627,303 1650,308 1674,313 1699,316 1726,318 1755,318ZM1457,1046 1449,1026 1440,1006 1431,988 1422,972 1412,956 1401,941 1391,926 1381,912 1371,899 1360,886 1351,874 1341,862 1332,849 1323,837 1314,824 1306,812 1299,798 1292,785 1286,770 1281,755 1277,739 1273,722 1271,704 1270,684 1270,664 1272,642 1271,637 1269,633 1266,630 1262,628 1257,629 1253,631 1250,634 1248,638 1245,661 1242,683 1240,704 1240,725 1241,744 1242,763 1245,781 1249,799 1253,816 1258,833 1263,849 1269,865 1276,881 1282,896 1289,911 1296,926 1302,940 1309,955 1315,970 1321,984 1326,999 1331,1013 1335,1028 1338,1043 1341,1058 1343,1074ZM1737,725 1717,723 1699,721 1682,718 1666,715 1651,711 1637,707 1624,703 1611,698 1599,693 1588,688 1577,682 1567,676 1557,670 1547,664 1537,658 1527,652 1518,646 1508,640 1498,634 1488,628 1478,622 1468,617 1457,612 1446,608 1435,605 1423,601 1419,601 1416,602 1413,604 1411,607 1411,611 1412,614 1414,617 1417,619 1428,623 1437,628 1446,633 1455,639 1463,646 1471,653 1478,660 1486,667 1493,675 1501,684 1509,692 1517,701 1526,710 1535,719 1545,728 1556,737 1567,746 1580,755 1594,764 1608,772 1624,781 1641,789 1659,796 1679,803 1700,809 1723,815Z'/></svg>");\r
+  --tentacle-sheen: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-160 -80 1920 1160' preserveAspectRatio='none'><path fill='%23c496ff' fill-opacity='.42' d='M-15,969 1,934 13,900 23,866 31,833 37,800 41,768 44,736 47,704 49,673 50,642 52,611 53,580 56,550 60,519 64,488 71,457 79,425 89,394 89,394 80,426 73,457 68,489 65,520 63,550 62,581 62,612 62,643 61,674 60,706 58,737 54,770 49,802 41,835 31,868 19,902 4,935 -15,969ZM-46,653 -21,646 2,637 23,628 43,618 61,607 79,595 95,583 110,570 124,557 138,544 151,532 164,519 178,507 191,495 205,483 219,472 234,462 250,453 250,453 234,463 220,474 207,486 194,498 182,511 169,524 157,538 144,551 131,565 116,578 101,591 85,604 67,615 47,626 26,635 4,642 -21,648 -46,653ZM-26,-39 -7,-23 9,-7 24,8 36,24 47,40 57,55 65,70 73,85 80,99 87,113 94,127 100,140 108,152 116,164 125,175 135,186 147,196 160,205 160,205 147,195 136,185 127,173 119,161 112,149 106,136 100,123 94,109 88,95 81,80 74,65 65,50 54,35 42,19 29,4 13,-11 -6,-25 -26,-39ZM257,1005 262,986 269,969 275,952 283,936 290,920 298,905 305,890 313,874 321,859 328,843 335,827 342,810 348,793 353,775 358,756 361,736 364,715 365,692 365,692 365,715 363,736 361,757 358,776 353,795 349,813 343,830 337,847 330,863 323,879 315,895 307,910 299,925 290,940 282,955 273,971 265,987 257,1005ZM1614,962 1599,924 1587,888 1577,851 1570,816 1564,781 1561,746 1558,712 1556,679 1555,646 1553,613 1552,580 1550,548 1548,515 1545,483 1540,451 1533,419 1525,387 1514,355 1514,355 1523,387 1531,420 1536,452 1539,484 1540,516 1541,548 1541,581 1541,613 1541,646 1542,680 1543,714 1547,748 1551,783 1558,818 1568,854 1580,890 1595,926 1614,962ZM1674,274 1650,271 1628,266 1607,260 1588,254 1570,246 1553,238 1537,229 1521,220 1507,210 1493,201 1480,191 1466,181 1453,171 1440,162 1427,153 1413,144 1400,136 1385,129 1385,129 1399,137 1412,146 1425,155 1438,165 1450,176 1462,187 1475,198 1488,208 1501,219 1516,229 1531,239 1548,248 1566,256 1585,262 1605,267 1627,271 1650,273 1674,274ZM1370,1011 1363,994 1356,978 1348,962 1340,946 1331,930 1322,915 1314,900 1305,884 1297,869 1289,853 1281,837 1274,820 1268,803 1263,786 1258,767 1255,748 1253,728 1252,706 1252,706 1252,728 1253,748 1255,768 1258,787 1263,805 1268,823 1274,841 1280,858 1288,874 1296,890 1304,905 1313,921 1323,936 1332,950 1342,965 1351,980 1361,995 1370,1011ZM1666,766 1647,760 1629,753 1613,745 1598,737 1584,729 1571,721 1559,712 1548,704 1537,695 1527,686 1518,678 1508,669 1499,661 1490,654 1481,646 1471,639 1462,632 1452,626 1452,626 1461,633 1471,640 1479,648 1488,656 1496,665 1505,674 1513,683 1523,692 1532,701 1543,710 1554,719 1567,728 1580,736 1595,743 1611,750 1628,756 1646,762 1666,766Z'/></svg>"); }\r
+/* 两张 SVG 比画面四周各大出一圈（inset 负值，viewBox 也多出同样一圈），扭的时候不露出图的边 */\r
+.fg-tentacle::before, .fg-tentacle::after { inset: -8% -10%; background: var(--tentacle-shape) 0 0 / 100% 100% no-repeat; transform-origin: 50% 92%; animation: fg-tentacle-sway var(--sway) ease-in-out infinite alternate; }\r
+.fg-tentacle::before { filter: blur(.45cqw); }\r
+.fg-tentacle::after { background-image: var(--tentacle-sheen); mix-blend-mode: screen; filter: blur(.25cqw); animation: fg-tentacle-sway var(--sway) ease-in-out infinite alternate, fg-tentacle-glint calc(var(--sway) * .7) ease-in-out infinite; }\r
+.fg-tentacle[data-v="idle"] { opacity: .72; }\r
+.fg-tentacle[data-v="idle"]::before, .fg-tentacle[data-v="idle"]::after { scale: 1.12; }\r
+.fg-tentacle[data-v="writhe"] { --sway: 2.6s; background: radial-gradient(108% 88% at 50% 42%, transparent 44%, rgba(16, 4, 26, .55)); }\r
+.fg-tentacle[data-v="writhe"]::before, .fg-tentacle[data-v="writhe"]::after { animation-name: fg-tentacle-writhe; }\r
+.fg-tentacle[data-v="writhe"]::after { animation-name: fg-tentacle-writhe, fg-tentacle-glint; }\r
+@keyframes fg-tentacle-sway { 0% { transform: skewX(-1.5deg) scaleY(.97); } 50% { transform: skewX(1deg) scaleY(1.02); } 100% { transform: skewX(2deg) scaleY(.99) translateY(-.6%); } }\r
+@keyframes fg-tentacle-writhe { 0% { transform: skewX(-3.5deg) scale(1.01, .97); } 40% { transform: skewX(2.5deg) scale(.985, 1.05) translateY(-1.2%); } 100% { transform: skewX(4deg) scale(1, 1.01); } }\r
+@keyframes fg-tentacle-glint { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }\r
+\r
+/* 高潮：画面柔和地白起来、带一点虚，再慢慢回来；射精：跟着声音一下一下地亮，一下比一下弱。 */\r
+.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; }\r
+.fg-peak.is-climax, .fg-peak.is-both { background: radial-gradient(78% 72% at 50% 48%, rgba(255, 253, 250, .94), rgba(255, 238, 242, .62) 55%, rgba(255, 222, 232, .28)); backdrop-filter: blur(3px) brightness(1.15); -webkit-backdrop-filter: blur(3px) brightness(1.15); animation: fg-peak-bloom 2.6s cubic-bezier(.3, 0, .2, 1) both; }\r
+.fg-peak i { position: absolute; inset: 0; opacity: 0; background: radial-gradient(90% 80% at 50% 56%, rgba(255, 250, 246, .9), rgba(255, 236, 240, .36) 58%, transparent 92%); animation: fg-peak-pulse .55s ease-out var(--at, 0ms) both; }\r
+@keyframes fg-peak-bloom { 0% { opacity: 0; } 22% { opacity: .84; } 42% { opacity: .7; } 100% { opacity: 0; } }\r
+@keyframes fg-peak-pulse { 0% { opacity: 0; } 14% { opacity: calc(.6 * var(--k, 1)); } 100% { opacity: 0; } }\r
+@media (prefers-reduced-motion: reduce) {\r
+  .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */\r
+}\r
+\r
+/* 设置 → 声音：音色一览按男女分组；自己做音色的编辑器；自动分配的音色组 */\r
+.fg-voice-group { margin: .8cqw 0 .3cqw; color: var(--ink-dim); letter-spacing: .1em; }\r
+.fg-linkbtn { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }\r
+.fg-linkbtn:hover { color: var(--accent); }\r
+.fg-vm-list { display: flex; flex-direction: column; gap: .5cqw; margin-top: .6cqw; }\r
+.fg-vm-item { padding: .6cqw .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .03); border: 1px solid var(--box-border); }\r
+.fg-vm-item b { letter-spacing: .08em; }\r
+.fg-vm-editor { display: flex; flex-direction: column; gap: .6cqw; margin: .6cqw 0; padding: .8cqw; border-radius: .8cqw; background: rgba(255, 255, 255, .04); border: 1px solid var(--box-border); }\r
+.fg-vm-parts { display: flex; flex-direction: column; gap: .4cqw; }\r
+.fg-vm-part { display: flex; flex-wrap: wrap; align-items: center; gap: .4cqw .6cqw; padding: .4cqw .6cqw; border-radius: .6cqw; background: rgba(0, 0, 0, .18); }\r
+.fg-vm-part label { display: inline-flex; align-items: center; gap: .3cqw; font-size: .85cqw; color: var(--ink-dim); white-space: nowrap; }\r
+.fg-vm-part .fg-input { padding: .2cqw .4cqw; }\r
+.fg-vm-idx { min-width: 1.4cqw; color: var(--accent); font-weight: 600; }\r
+.fg-vm-tools { flex-wrap: wrap; gap: .4cqw; }\r
+.fg-vm-pools { display: flex; flex-direction: column; gap: .3cqw; margin-top: .4cqw; }\r
+.fg-vm-pool { flex-wrap: wrap; gap: .2cqw; }\r
+.fg-vm-pool .fg-look-chip { margin: 0; align-items: center; }\r
+.fg-vm-pool-label { min-width: 5cqw; color: var(--ink-dim); }\r
+@media (max-width: 700px), (orientation: portrait) {\r
+  .fg-vm-part label, .fg-vm-pool-label { font-size: 2.8cqw; }\r
+  .fg-vm-part .fg-input { width: 12cqw !important; }\r
+}\r
 `;
 
 // src/client/styles/skins.css
-var skins_default = `/* ───────────── 皮肤 ───────────── */
-.fg-theater, .fg-chat {
-  --font-latin: "Cormorant Garamond", Georgia, serif;
-}
-
-/* 星穹（默认）：深空玻璃 + 粉紫青霓虹。 */
-.fg-theater[data-skin="stellar"] {
-  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-display: "Noto Serif SC", "Songti SC", "SimSun", serif;
-}
-
-/* 樱色：浅色毛玻璃、圆角、文楷。 */
-.fg-theater[data-skin="sakura"] {
-  --accent: #ff6fa5; --accent2: #b28dff; --accent3: #7fd8ff;
-  --ink: #4a2b3d; --ink-dim: rgba(90, 50, 75, .62);
-  --box-bg: linear-gradient(180deg, rgba(255, 250, 253, .82), rgba(255, 238, 246, .9));
-  --box-border: rgba(255, 160, 200, .55);
-  --box-radius: 2.4cqw;
-  --name-ink: #fff;
-  --chip-bg: rgba(255, 245, 250, .72);
-  --font-body: "LXGW WenKai", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-display: "LXGW WenKai", "Songti SC", serif;
-  --wait-glyph: "❀";
-}
-.fg-theater[data-skin="sakura"] .fg-text { text-shadow: none; }
-.fg-theater[data-skin="sakura"] .fg-name-plate { border-radius: 99px; clip-path: none; padding: .5cqw 2cqw; }
-.fg-theater[data-skin="sakura"] .fg-name-plate::after { display: none; }
-.fg-theater[data-skin="sakura"] .fg-box::before { height: .5cqw; background: repeating-linear-gradient(90deg, #ffc2da 0 1.2cqw, #fff 1.2cqw 2.4cqw); opacity: .8; animation: none; }
-.fg-theater[data-skin="sakura"] .fg-hud-place, .fg-theater[data-skin="sakura"] .fg-hud-meta { color: #fff; }
-.fg-theater[data-skin="sakura"] .fg-panel { background: linear-gradient(135deg, rgba(255, 246, 250, .96), rgba(245, 236, 255, .95)); color: var(--ink); }
-.fg-theater[data-skin="sakura"] .fg-lib-bar { background: rgb(252, 242, 250); box-shadow: 0 -.6cqw 1.4cqw rgba(120, 60, 100, .18); }
-.fg-theater[data-skin="sakura"] .fg-emo-sticky { background: rgb(252, 242, 250); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(120, 60, 100, .18); }
-.fg-theater[data-skin="sakura"] .fg-pm-table thead th { background: rgb(250, 236, 246); } .fg-theater[data-skin="sakura"] .fg-pm-emo { background: rgb(252, 242, 250); } .fg-theater[data-skin="sakura"] .fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 12%, rgb(252, 242, 250)); }
-.fg-theater[data-skin="sakura"] .fg-input, .fg-theater[data-skin="sakura"] .fg-select, .fg-theater[data-skin="sakura"] .fg-textarea { background: rgba(255, 255, 255, .7); }
-.fg-theater[data-skin="sakura"] .fg-choice { color: var(--ink); }
-.fg-theater[data-skin="sakura"] .fg-free input { background: rgba(255, 255, 255, .7); color: var(--ink); }
-.fg-theater[data-skin="sakura"] .fg-title { background: linear-gradient(90deg, rgba(255, 240, 248, .9), rgba(255, 240, 248, .55) 42%, transparent 75%); color: var(--ink); }
-.fg-theater[data-skin="sakura"] .fg-title-menu button:hover { color: var(--accent); }
-.fg-theater[data-skin="sakura"] .fg-title-logo { background: linear-gradient(100deg, #ff4f93, #b28dff 60%, #6fc7ff); -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 .3cqw 1cqw rgba(255, 120, 170, .35)); }
-
-/* 水墨：宣纸对话框、毛笔名牌、朱印。 */
-.fg-theater[data-skin="ink"] {
-  --accent: #b3261e; --accent2: #3a3530; --accent3: #8a7a5c;
-  --ink: #2b2620; --ink-dim: rgba(60, 50, 40, .62);
-  --box-bg: linear-gradient(180deg, rgba(246, 239, 222, .95), rgba(236, 226, 202, .96));
-  --box-border: rgba(80, 60, 40, .35);
-  --box-radius: .2cqw;
-  --box-blur: none;
-  --chip-bg: rgba(246, 239, 222, .85);
-  --font-body: "LXGW WenKai", "Songti SC", serif;
-  --font-display: "Ma Shan Zheng", "LXGW WenKai", "KaiTi", serif;
-  --wait-glyph: "❖";
-}
-.fg-theater[data-skin="ink"] .fg-box { background-image: radial-gradient(120% 140% at 0% 100%, rgba(120, 90, 50, .14), transparent 55%), var(--box-bg); box-shadow: 0 1cqw 3cqw rgba(0, 0, 0, .45); }
-.fg-theater[data-skin="ink"] .fg-box::before { height: .25cqw; background: linear-gradient(90deg, transparent, #3a3530 20%, #3a3530 80%, transparent); animation: none; }
-.fg-theater[data-skin="ink"] .fg-box::after { display: none; }
-.fg-theater[data-skin="ink"] .fg-text { text-shadow: none; }
-.fg-theater[data-skin="ink"] .fg-name-plate { background: #2b2620; clip-path: polygon(2% 10%, 100% 0, 96% 90%, 0 100%); color: #f6efde; letter-spacing: .3em; }
-.fg-theater[data-skin="ink"] .fg-name-plate::after { background: #b3261e; height: .2cqw; }
-.fg-theater[data-skin="ink"] .fg-hud-place, .fg-theater[data-skin="ink"] .fg-hud-meta { color: #f6efde; }
-.fg-theater[data-skin="ink"] .fg-hud-bar { background: #b3261e; box-shadow: none; }
-.fg-theater[data-skin="ink"] .fg-panel { background: linear-gradient(135deg, rgba(242, 234, 214, .97), rgba(232, 220, 196, .97)); color: var(--ink); }
-.fg-theater[data-skin="ink"] .fg-lib-bar { background: rgb(238, 229, 207); box-shadow: 0 -.6cqw 1.4cqw rgba(60, 40, 20, .2); }
-.fg-theater[data-skin="ink"] .fg-emo-sticky { background: rgb(238, 229, 207); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(60, 40, 20, .2); }
-.fg-theater[data-skin="ink"] .fg-pm-table thead th { background: rgb(232, 221, 196); } .fg-theater[data-skin="ink"] .fg-pm-emo { background: rgb(238, 229, 207); } .fg-theater[data-skin="ink"] .fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 12%, rgb(238, 229, 207)); }
-.fg-theater[data-skin="ink"] .fg-input, .fg-theater[data-skin="ink"] .fg-select, .fg-theater[data-skin="ink"] .fg-textarea { background: rgba(255, 252, 244, .7); }
-.fg-theater[data-skin="ink"] .fg-choice { border-radius: .2cqw; color: var(--ink); }
-.fg-theater[data-skin="ink"] .fg-free input { border-radius: .2cqw; background: rgba(255, 252, 244, .7); color: var(--ink); }
-.fg-theater[data-skin="ink"] .fg-title { background: linear-gradient(90deg, rgba(240, 232, 212, .92), rgba(240, 232, 212, .6) 42%, transparent 78%); color: var(--ink); }
-.fg-theater[data-skin="ink"] .fg-title-logo { background: none; color: #1e1a16; -webkit-text-fill-color: #1e1a16; filter: none; text-shadow: .2cqw .2cqw 0 rgba(179, 38, 30, .25); }
-.fg-theater[data-skin="ink"] .fg-title-menu button:hover { color: #b3261e; }
-.fg-theater[data-skin="ink"] .fg-titlecard-name { writing-mode: vertical-rl; font-size: 5cqw; text-shadow: 0 0 2cqw rgba(0, 0, 0, .7); }
-.fg-theater[data-skin="ink"] .fg-grade { filter: sepia(.2); }
-
-/* 夜金：黑底金字、电影字幕式对话框。 */
-.fg-theater[data-skin="noir"] {
-  --accent: #d8b26a; --accent2: #8c6a2f; --accent3: #f3e2b8;
-  --ink: #f3ead6; --ink-dim: rgba(243, 234, 214, .55);
-  --box-bg: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, .82) 40%, rgba(0, 0, 0, .92));
-  --box-border: transparent;
-  --box-radius: 0;
-  --box-blur: none;
-  --font-body: "Noto Serif SC", "Songti SC", "SimSun", serif;
-  --font-display: "Noto Serif SC", "Songti SC", "SimSun", serif;
-  --wait-glyph: "▼";
-}
-/* 名字、金线、正文的位置按对话框高度的比例；对话框调高时停在原来的位置（min 封顶，见 theater.css 的 --fg-dlg-ref），多出来的地方给正文 */
-.fg-theater[data-skin="noir"] .fg-dialog { left: 0; right: 0; bottom: 0; height: var(--fg-dlg-h, 31%); --fg-dlg-ref: 31cqh; }
-/* 不要边框：透明边框底下会露出对话框底色从下往上重复的那一行（最黑的那行），成了名字上方横贯整个画面的一条黑线 */
-.fg-theater[data-skin="noir"] .fg-box { box-shadow: none; border: 0; }
-.fg-theater[data-skin="noir"] .fg-box::before { top: min(26%, calc(.26 * var(--fg-dlg-ref))); left: 20%; right: 20%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: none; }
-.fg-theater[data-skin="noir"] .fg-box::after { display: none; }
-.fg-theater[data-skin="noir"] .fg-name { left: 0; right: 0; top: min(10%, calc(.1 * var(--fg-dlg-ref))); justify-content: center; transform-origin: 50% 100%; }
-.fg-theater[data-skin="noir"] .fg-name-plate { background: none; clip-path: none; box-shadow: none; color: var(--accent); font-size: 1.5cqw; letter-spacing: .6em; padding: 0; }
-.fg-theater[data-skin="noir"] .fg-name-plate::after { display: none; }
-.fg-theater[data-skin="noir"] .fg-text { left: 14%; right: 14%; top: min(36%, calc(.36 * var(--fg-dlg-ref))); text-align: center; font-size: calc(2.05cqw * var(--fg-text-scale, 1)); }
-.fg-theater[data-skin="noir"] .fg-progress { left: 30%; right: 30%; }
-.fg-theater[data-skin="noir"] .fg-stage::after { content: ""; position: absolute; inset: 0; z-index: 45; pointer-events: none; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.06'/></svg>"); mix-blend-mode: overlay; }
-.fg-theater[data-skin="noir"] .fg-camera { filter: saturate(.75) contrast(1.06); }
-/* 竖屏（手机）：字跟别的皮肤一样大（以前沿用横屏的字号，只有 8px 左右） */
-@container stage (max-aspect-ratio: 4/5) {
-  .fg-theater[data-skin="noir"] .fg-dialog { height: var(--fg-dlg-h-p, 31%); }
-  .fg-theater[data-skin="noir"] .fg-name-plate { font-size: 3.4cqw; }
-  .fg-theater[data-skin="noir"] .fg-text { left: 8%; right: 8%; font-size: calc(4.6cqw * var(--fg-text-scale, 1)); }
-}
-
-/* 赛博：扫描线、等宽、青品红。 */
-.fg-theater[data-skin="cyber"] {
-  --accent: #00f0ff; --accent2: #ff2bd6; --accent3: #c6ff00;
-  --ink: #e8fbff; --ink-dim: rgba(160, 230, 255, .6);
-  --box-bg: linear-gradient(180deg, rgba(2, 16, 24, .82), rgba(4, 8, 20, .92));
-  --box-border: rgba(0, 240, 255, .45);
-  --box-radius: 0;
-  --font-body: "JetBrains Mono", "Noto Sans SC", "Microsoft YaHei", monospace;
-  --font-display: "JetBrains Mono", "Noto Sans SC", "Microsoft YaHei", monospace;
-  --font-latin: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-  --wait-glyph: "▍";
-}
-.fg-theater[data-skin="cyber"] .fg-box { clip-path: polygon(0 0, calc(100% - 2cqw) 0, 100% 2cqw, 100% 100%, 2cqw 100%, 0 calc(100% - 2cqw)); box-shadow: inset 0 0 2cqw rgba(0, 240, 255, .12); }
-.fg-theater[data-skin="cyber"] .fg-box::after { background: repeating-linear-gradient(0deg, rgba(0, 240, 255, .06) 0 1px, transparent 1px 4px); width: auto; height: auto; inset: 0; border-radius: 0; right: 0; bottom: 0; }
-.fg-theater[data-skin="cyber"] .fg-name-plate { background: var(--accent2); clip-path: polygon(0 0, 100% 0, calc(100% - 1cqw) 100%, 0 100%); text-shadow: .1cqw 0 #00f0ff, -.1cqw 0 #ff2bd6; }
-.fg-theater[data-skin="cyber"] .fg-text { text-shadow: 0 0 .5cqw rgba(0, 240, 255, .35); }
-.fg-theater[data-skin="cyber"] .fg-choice { border-radius: 0; clip-path: polygon(0 0, calc(100% - 1.4cqw) 0, 100% 50%, calc(100% - 1.4cqw) 100%, 0 100%); }
-.fg-theater[data-skin="cyber"] .fg-title-logo { font-family: var(--font-display); animation: fg-logo-in 1.4s .3s both, fg-glitch 3.4s 2s steps(1) infinite; }
-.fg-theater[data-skin="cyber"] .fg-stage::after { content: ""; position: absolute; inset: 0; z-index: 45; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px); }
-@keyframes fg-glitch { 0%, 92%, 100% { transform: none; } 93% { transform: translate(.3cqw, -.2cqw) skewX(8deg); } 95% { transform: translate(-.4cqw, .1cqw); } 97% { transform: translate(.1cqw, .2cqw) skewX(-6deg); } }
+var skins_default = `/* ───────────── 皮肤 ───────────── */\r
+.fg-theater, .fg-chat {\r
+  --font-latin: "Cormorant Garamond", Georgia, serif;\r
+}\r
+\r
+/* 星穹（默认）：深空玻璃 + 粉紫青霓虹。 */\r
+.fg-theater[data-skin="stellar"] {\r
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;\r
+  --font-display: "Noto Serif SC", "Songti SC", "SimSun", serif;\r
+}\r
+\r
+/* 樱色：浅色毛玻璃、圆角、文楷。 */\r
+.fg-theater[data-skin="sakura"] {\r
+  --accent: #ff6fa5; --accent2: #b28dff; --accent3: #7fd8ff;\r
+  --ink: #4a2b3d; --ink-dim: rgba(90, 50, 75, .62);\r
+  --box-bg: linear-gradient(180deg, rgba(255, 250, 253, .82), rgba(255, 238, 246, .9));\r
+  --box-border: rgba(255, 160, 200, .55);\r
+  --box-radius: 2.4cqw;\r
+  --name-ink: #fff;\r
+  --chip-bg: rgba(255, 245, 250, .72);\r
+  --font-body: "LXGW WenKai", "PingFang SC", "Microsoft YaHei", sans-serif;\r
+  --font-display: "LXGW WenKai", "Songti SC", serif;\r
+  --wait-glyph: "❀";\r
+}\r
+.fg-theater[data-skin="sakura"] .fg-text { text-shadow: none; }\r
+.fg-theater[data-skin="sakura"] .fg-name-plate { border-radius: 99px; clip-path: none; padding: .5cqw 2cqw; }\r
+.fg-theater[data-skin="sakura"] .fg-name-plate::after { display: none; }\r
+.fg-theater[data-skin="sakura"] .fg-box::before { height: .5cqw; background: repeating-linear-gradient(90deg, #ffc2da 0 1.2cqw, #fff 1.2cqw 2.4cqw); opacity: .8; animation: none; }\r
+.fg-theater[data-skin="sakura"] .fg-hud-place, .fg-theater[data-skin="sakura"] .fg-hud-meta { color: #fff; }\r
+.fg-theater[data-skin="sakura"] .fg-panel { background: linear-gradient(135deg, rgba(255, 246, 250, .96), rgba(245, 236, 255, .95)); color: var(--ink); }\r
+.fg-theater[data-skin="sakura"] .fg-lib-bar { background: rgb(252, 242, 250); box-shadow: 0 -.6cqw 1.4cqw rgba(120, 60, 100, .18); }\r
+.fg-theater[data-skin="sakura"] .fg-emo-sticky { background: rgb(252, 242, 250); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(120, 60, 100, .18); }\r
+.fg-theater[data-skin="sakura"] .fg-pm-table thead th { background: rgb(250, 236, 246); } .fg-theater[data-skin="sakura"] .fg-pm-emo { background: rgb(252, 242, 250); } .fg-theater[data-skin="sakura"] .fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 12%, rgb(252, 242, 250)); }\r
+.fg-theater[data-skin="sakura"] .fg-input, .fg-theater[data-skin="sakura"] .fg-select, .fg-theater[data-skin="sakura"] .fg-textarea { background: rgba(255, 255, 255, .7); }\r
+.fg-theater[data-skin="sakura"] .fg-choice { color: var(--ink); }\r
+.fg-theater[data-skin="sakura"] .fg-free input { background: rgba(255, 255, 255, .7); color: var(--ink); }\r
+.fg-theater[data-skin="sakura"] .fg-title { background: linear-gradient(90deg, rgba(255, 240, 248, .9), rgba(255, 240, 248, .55) 42%, transparent 75%); color: var(--ink); }\r
+.fg-theater[data-skin="sakura"] .fg-title-menu button:hover { color: var(--accent); }\r
+.fg-theater[data-skin="sakura"] .fg-title-logo { background: linear-gradient(100deg, #ff4f93, #b28dff 60%, #6fc7ff); -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 .3cqw 1cqw rgba(255, 120, 170, .35)); }\r
+\r
+/* 水墨：宣纸对话框、毛笔名牌、朱印。 */\r
+.fg-theater[data-skin="ink"] {\r
+  --accent: #b3261e; --accent2: #3a3530; --accent3: #8a7a5c;\r
+  --ink: #2b2620; --ink-dim: rgba(60, 50, 40, .62);\r
+  --box-bg: linear-gradient(180deg, rgba(246, 239, 222, .95), rgba(236, 226, 202, .96));\r
+  --box-border: rgba(80, 60, 40, .35);\r
+  --box-radius: .2cqw;\r
+  --box-blur: none;\r
+  --chip-bg: rgba(246, 239, 222, .85);\r
+  --font-body: "LXGW WenKai", "Songti SC", serif;\r
+  --font-display: "Ma Shan Zheng", "LXGW WenKai", "KaiTi", serif;\r
+  --wait-glyph: "❖";\r
+}\r
+.fg-theater[data-skin="ink"] .fg-box { background-image: radial-gradient(120% 140% at 0% 100%, rgba(120, 90, 50, .14), transparent 55%), var(--box-bg); box-shadow: 0 1cqw 3cqw rgba(0, 0, 0, .45); }\r
+.fg-theater[data-skin="ink"] .fg-box::before { height: .25cqw; background: linear-gradient(90deg, transparent, #3a3530 20%, #3a3530 80%, transparent); animation: none; }\r
+.fg-theater[data-skin="ink"] .fg-box::after { display: none; }\r
+.fg-theater[data-skin="ink"] .fg-text { text-shadow: none; }\r
+.fg-theater[data-skin="ink"] .fg-name-plate { background: #2b2620; clip-path: polygon(2% 10%, 100% 0, 96% 90%, 0 100%); color: #f6efde; letter-spacing: .3em; }\r
+.fg-theater[data-skin="ink"] .fg-name-plate::after { background: #b3261e; height: .2cqw; }\r
+.fg-theater[data-skin="ink"] .fg-hud-place, .fg-theater[data-skin="ink"] .fg-hud-meta { color: #f6efde; }\r
+.fg-theater[data-skin="ink"] .fg-hud-bar { background: #b3261e; box-shadow: none; }\r
+.fg-theater[data-skin="ink"] .fg-panel { background: linear-gradient(135deg, rgba(242, 234, 214, .97), rgba(232, 220, 196, .97)); color: var(--ink); }\r
+.fg-theater[data-skin="ink"] .fg-lib-bar { background: rgb(238, 229, 207); box-shadow: 0 -.6cqw 1.4cqw rgba(60, 40, 20, .2); }\r
+.fg-theater[data-skin="ink"] .fg-emo-sticky { background: rgb(238, 229, 207); box-shadow: 0 .6cqw 1cqw -.4cqw rgba(60, 40, 20, .2); }\r
+.fg-theater[data-skin="ink"] .fg-pm-table thead th { background: rgb(232, 221, 196); } .fg-theater[data-skin="ink"] .fg-pm-emo { background: rgb(238, 229, 207); } .fg-theater[data-skin="ink"] .fg-pm-row.is-open > * { background: color-mix(in oklab, var(--accent) 12%, rgb(238, 229, 207)); }\r
+.fg-theater[data-skin="ink"] .fg-input, .fg-theater[data-skin="ink"] .fg-select, .fg-theater[data-skin="ink"] .fg-textarea { background: rgba(255, 252, 244, .7); }\r
+.fg-theater[data-skin="ink"] .fg-choice { border-radius: .2cqw; color: var(--ink); }\r
+.fg-theater[data-skin="ink"] .fg-free input { border-radius: .2cqw; background: rgba(255, 252, 244, .7); color: var(--ink); }\r
+.fg-theater[data-skin="ink"] .fg-title { background: linear-gradient(90deg, rgba(240, 232, 212, .92), rgba(240, 232, 212, .6) 42%, transparent 78%); color: var(--ink); }\r
+.fg-theater[data-skin="ink"] .fg-title-logo { background: none; color: #1e1a16; -webkit-text-fill-color: #1e1a16; filter: none; text-shadow: .2cqw .2cqw 0 rgba(179, 38, 30, .25); }\r
+.fg-theater[data-skin="ink"] .fg-title-menu button:hover { color: #b3261e; }\r
+.fg-theater[data-skin="ink"] .fg-titlecard-name { writing-mode: vertical-rl; font-size: 5cqw; text-shadow: 0 0 2cqw rgba(0, 0, 0, .7); }\r
+.fg-theater[data-skin="ink"] .fg-grade { filter: sepia(.2); }\r
+\r
+/* 夜金：黑底金字、电影字幕式对话框。 */\r
+.fg-theater[data-skin="noir"] {\r
+  --accent: #d8b26a; --accent2: #8c6a2f; --accent3: #f3e2b8;\r
+  --ink: #f3ead6; --ink-dim: rgba(243, 234, 214, .55);\r
+  --box-bg: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, .82) 40%, rgba(0, 0, 0, .92));\r
+  --box-border: transparent;\r
+  --box-radius: 0;\r
+  --box-blur: none;\r
+  --font-body: "Noto Serif SC", "Songti SC", "SimSun", serif;\r
+  --font-display: "Noto Serif SC", "Songti SC", "SimSun", serif;\r
+  --wait-glyph: "▼";\r
+}\r
+/* 名字、金线、正文的位置按对话框高度的比例；对话框调高时停在原来的位置（min 封顶，见 theater.css 的 --fg-dlg-ref），多出来的地方给正文 */\r
+.fg-theater[data-skin="noir"] .fg-dialog { left: 0; right: 0; bottom: 0; height: var(--fg-dlg-h, 31%); --fg-dlg-ref: 31cqh; }\r
+/* 不要边框：透明边框底下会露出对话框底色从下往上重复的那一行（最黑的那行），成了名字上方横贯整个画面的一条黑线 */\r
+.fg-theater[data-skin="noir"] .fg-box { box-shadow: none; border: 0; }\r
+.fg-theater[data-skin="noir"] .fg-box::before { top: min(26%, calc(.26 * var(--fg-dlg-ref))); left: 20%; right: 20%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: none; }\r
+.fg-theater[data-skin="noir"] .fg-box::after { display: none; }\r
+.fg-theater[data-skin="noir"] .fg-name { left: 0; right: 0; top: min(10%, calc(.1 * var(--fg-dlg-ref))); justify-content: center; transform-origin: 50% 100%; }\r
+.fg-theater[data-skin="noir"] .fg-name-plate { background: none; clip-path: none; box-shadow: none; color: var(--accent); font-size: 1.5cqw; letter-spacing: .6em; padding: 0; }\r
+.fg-theater[data-skin="noir"] .fg-name-plate::after { display: none; }\r
+.fg-theater[data-skin="noir"] .fg-text { left: 14%; right: 14%; top: min(36%, calc(.36 * var(--fg-dlg-ref))); text-align: center; font-size: calc(2.05cqw * var(--fg-text-scale, 1)); }\r
+.fg-theater[data-skin="noir"] .fg-progress { left: 30%; right: 30%; }\r
+.fg-theater[data-skin="noir"] .fg-stage::after { content: ""; position: absolute; inset: 0; z-index: 45; pointer-events: none; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.06'/></svg>"); mix-blend-mode: overlay; }\r
+.fg-theater[data-skin="noir"] .fg-camera { filter: saturate(.75) contrast(1.06); }\r
+/* 竖屏（手机）：字跟别的皮肤一样大（以前沿用横屏的字号，只有 8px 左右） */\r
+@container stage (max-aspect-ratio: 4/5) {\r
+  .fg-theater[data-skin="noir"] .fg-dialog { height: var(--fg-dlg-h-p, 31%); }\r
+  .fg-theater[data-skin="noir"] .fg-name-plate { font-size: 3.4cqw; }\r
+  .fg-theater[data-skin="noir"] .fg-text { left: 8%; right: 8%; font-size: calc(4.6cqw * var(--fg-text-scale, 1)); }\r
+}\r
+\r
+/* 赛博：扫描线、等宽、青品红。 */\r
+.fg-theater[data-skin="cyber"] {\r
+  --accent: #00f0ff; --accent2: #ff2bd6; --accent3: #c6ff00;\r
+  --ink: #e8fbff; --ink-dim: rgba(160, 230, 255, .6);\r
+  --box-bg: linear-gradient(180deg, rgba(2, 16, 24, .82), rgba(4, 8, 20, .92));\r
+  --box-border: rgba(0, 240, 255, .45);\r
+  --box-radius: 0;\r
+  --font-body: "JetBrains Mono", "Noto Sans SC", "Microsoft YaHei", monospace;\r
+  --font-display: "JetBrains Mono", "Noto Sans SC", "Microsoft YaHei", monospace;\r
+  --font-latin: "JetBrains Mono", "Cascadia Code", Consolas, monospace;\r
+  --wait-glyph: "▍";\r
+}\r
+.fg-theater[data-skin="cyber"] .fg-box { clip-path: polygon(0 0, calc(100% - 2cqw) 0, 100% 2cqw, 100% 100%, 2cqw 100%, 0 calc(100% - 2cqw)); box-shadow: inset 0 0 2cqw rgba(0, 240, 255, .12); }\r
+.fg-theater[data-skin="cyber"] .fg-box::after { background: repeating-linear-gradient(0deg, rgba(0, 240, 255, .06) 0 1px, transparent 1px 4px); width: auto; height: auto; inset: 0; border-radius: 0; right: 0; bottom: 0; }\r
+.fg-theater[data-skin="cyber"] .fg-name-plate { background: var(--accent2); clip-path: polygon(0 0, 100% 0, calc(100% - 1cqw) 100%, 0 100%); text-shadow: .1cqw 0 #00f0ff, -.1cqw 0 #ff2bd6; }\r
+.fg-theater[data-skin="cyber"] .fg-text { text-shadow: 0 0 .5cqw rgba(0, 240, 255, .35); }\r
+.fg-theater[data-skin="cyber"] .fg-choice { border-radius: 0; clip-path: polygon(0 0, calc(100% - 1.4cqw) 0, 100% 50%, calc(100% - 1.4cqw) 100%, 0 100%); }\r
+.fg-theater[data-skin="cyber"] .fg-title-logo { font-family: var(--font-display); animation: fg-logo-in 1.4s .3s both, fg-glitch 3.4s 2s steps(1) infinite; }\r
+.fg-theater[data-skin="cyber"] .fg-stage::after { content: ""; position: absolute; inset: 0; z-index: 45; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px); }\r
+@keyframes fg-glitch { 0%, 92%, 100% { transform: none; } 93% { transform: translate(.3cqw, -.2cqw) skewX(8deg); } 95% { transform: translate(-.4cqw, .1cqw); } 97% { transform: translate(.1cqw, .2cqw) skewX(-6deg); } }\r
 `;
 
 // src/client/styles/chat.css
-var chat_default = '/* ───────────── 聊天里的场景卡与插画（Tavern 正文下方） ───────────── */\n.fg-chat { --accent: #ff7eb6; --accent2: #9b7bff; --accent3: #5ee7ff; font-family: inherit; color: inherit; margin: 10px 0; max-width: 680px; }\n.fg-chat *, .fg-chat *::before, .fg-chat *::after { box-sizing: border-box; }\n.fg-chat button { font: inherit; cursor: pointer; }\n\n.fg-scene { position: relative; display: grid; grid-template-columns: 112px 1fr; min-height: 108px; border-radius: 14px; overflow: hidden; color: #f5f3ff; background: #110e24; border: 1px solid rgba(255, 255, 255, .1); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); isolation: isolate; }\n.fg-scene-bg { position: absolute; inset: 0; z-index: -2; background-size: cover; background-position: center; filter: saturate(1.1); transform: scale(1.05); transition: transform 6s ease; }\n.fg-scene:hover .fg-scene-bg { transform: scale(1.12); }\n.fg-scene::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(10, 8, 26, .2) 0, rgba(10, 8, 26, .78) 112px, rgba(10, 8, 26, .9)); }\n.fg-scene-clock { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px; font-family: "Cormorant Garamond", Georgia, serif; text-shadow: 0 1px 6px rgba(0, 0, 0, .8); }\n.fg-scene-clock b { font-size: 30px; line-height: 1; font-weight: 700; letter-spacing: .02em; }\n.fg-scene-clock span { font-size: 10px; letter-spacing: .35em; opacity: .8; text-transform: uppercase; }\n.fg-scene-main { padding: 12px 14px 12px 4px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }\n.fg-scene-loc { font-size: 17px; font-weight: 700; letter-spacing: .12em; display: flex; align-items: center; gap: 8px; }\n.fg-scene-loc::before { content: ""; width: 3px; height: 16px; border-radius: 3px; background: linear-gradient(180deg, var(--accent), var(--accent2)); box-shadow: 0 0 8px var(--accent); }\n.fg-scene-chips { display: flex; flex-wrap: wrap; gap: 5px; }\n.fg-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 11px; letter-spacing: .06em; background: rgba(255, 255, 255, .09); border: 1px solid rgba(255, 255, 255, .12); }\n.fg-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--accent)); box-shadow: 0 0 6px var(--c, var(--accent)); }\n.fg-scene-sum { font-size: 12.5px; opacity: .78; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }\n.fg-scene-actions { display: flex; gap: 6px; margin-top: auto; flex-wrap: wrap; }\n.fg-play { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px 5px 10px; border-radius: 99px; border: 0; color: #fff; font-weight: 700; font-size: 12.5px; letter-spacing: .1em; background: linear-gradient(100deg, var(--accent), var(--accent2)); box-shadow: 0 4px 16px rgba(255, 126, 182, .35); transition: transform .2s, box-shadow .2s; }\n.fg-play:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(255, 126, 182, .5); }\n.fg-play::before { content: ""; width: 0; height: 0; border-left: 8px solid #fff; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }\n.fg-ghost { padding: 5px 12px; border-radius: 99px; font-size: 12px; color: inherit; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .16); transition: background .2s; }\n.fg-ghost:hover { background: rgba(255, 255, 255, .16); }\n.fg-scene.is-pending .fg-scene-main::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .08) 50%, transparent 70%); background-size: 200% 100%; animation: fg-skeleton 1.4s linear infinite; pointer-events: none; }\n.fg-scene-err { font-size: 12px; color: #ffb4b4; }\n.fg-dots::after { content: "…"; display: inline-block; animation: fg-dots 1.2s steps(4) infinite; width: 1.2em; overflow: hidden; vertical-align: bottom; }\n@keyframes fg-dots { from { width: 0; } to { width: 1.2em; } }\n\n.fg-cgcard { position: relative; border-radius: 14px; overflow: hidden; background: #0d0b1c; box-shadow: 0 12px 34px rgba(0, 0, 0, .3); border: 1px solid rgba(255, 255, 255, .08); }\n.fg-cgcard img { display: block; width: 100%; height: auto; max-height: min(70vh, 520px); object-fit: cover; cursor: zoom-in; animation: fg-cgcard-in .9s cubic-bezier(.2, .8, .2, 1) both; }\n.fg-cgcard.is-tall { width: min(100%, 360px); }\n.fg-cgcard.is-tall img { max-height: none; }\n@keyframes fg-cgcard-in { from { opacity: 0; filter: blur(12px) brightness(1.4); transform: scale(1.03); } }\n.fg-cgcard-wait { position: relative; display: grid; place-items: center; color: rgba(255, 255, 255, .78); font-size: 13px; letter-spacing: .1em; background: radial-gradient(120% 120% at 30% 20%, rgba(155, 123, 255, .35), transparent 60%), radial-gradient(100% 100% at 80% 90%, rgba(255, 126, 182, .3), transparent 60%), #120f26; overflow: hidden; }\n.fg-cgcard-wait::before { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .12) 50%, transparent 70%); background-size: 200% 100%; animation: fg-skeleton 1.6s linear infinite; }\n.fg-cgcard-wait span { position: relative; display: flex; align-items: center; gap: 8px; }\n.fg-cgcard-wait span::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: fg-spin .8s linear infinite; }\n.fg-cgcard-fail { padding: 14px 16px; font-size: 13px; color: #ffcdcd; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #1e1020; }\n.fg-cgcard-bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 6px; padding: 26px 10px 8px; color: #fff; background: linear-gradient(transparent, rgba(0, 0, 0, .72)); opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s; }\n.fg-cgcard:hover .fg-cgcard-bar, .fg-cgcard:focus-within .fg-cgcard-bar { opacity: 1; transform: none; }\n.fg-cgcard-bar .fg-cap { flex: 1; min-width: 0; font-size: 12.5px; letter-spacing: .12em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.fg-cgcard-bar button { padding: 3px 10px; border-radius: 99px; font-size: 12px; color: #fff; background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .2); backdrop-filter: blur(6px); }\n.fg-cgcard-bar button:hover { background: rgba(255, 255, 255, .26); }\n.fg-cgcard-bar button[disabled] { opacity: .35; pointer-events: none; }\n@media (hover: none) { .fg-cgcard-bar { opacity: 1; transform: none; } }\n\n.fg-chat-lightbox { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 2147483100; display: grid; place-items: center; background: rgba(0, 0, 0, .9); cursor: zoom-out; animation: fg-fade-in .2s ease both; }\n.fg-chat-lightbox img { max-width: 94vw; max-height: 92vh; object-fit: contain; }\n\n.fg-toast { position: fixed; left: 50%; top: 93vh; top: 93dvh; z-index: 2147483200; transform: translate(-50%, -100%); padding: 10px 18px; border-radius: 99px; font-size: 13.5px; letter-spacing: .04em; color: #fff; background: rgba(18, 14, 40, .92); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 10px 30px rgba(0, 0, 0, .4); backdrop-filter: blur(10px); animation: fg-toast-in .35s cubic-bezier(.2, .8, .2, 1) both; max-width: 86vw; }\n.fg-toast.is-error { border-color: rgba(255, 120, 120, .6); }\n@keyframes fg-toast-in { from { opacity: 0; transform: translate(-50%, calc(-100% + 10px)); } }\n\n/* 确认框、输入框（src/client/ask.jsx）：盖在剧场和聊天大图上面、提示条下面。宽高写死成视口大小，理由同剧场（酒馆给 html 加了 transform）。 */\n.fg-ask { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 2147483150; display: grid; place-items: center; padding: 16px; box-sizing: border-box; background: rgba(4, 3, 12, .58); backdrop-filter: blur(3px); animation: fg-fade-in .18s ease both; user-select: text; -webkit-user-select: text; }\n.fg-ask *, .fg-ask *::before, .fg-ask *::after { box-sizing: border-box; }\n.fg-ask-box { width: min(460px, 100%); max-height: calc(100dvh - 32px); overflow: auto; display: grid; gap: 14px; padding: 22px 22px 18px; border-radius: 16px; color: #f5f3ff; font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif; background: linear-gradient(135deg, rgba(22, 17, 48, .97), rgba(12, 10, 30, .97)); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 24px 60px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .06); animation: fg-ask-in .22s cubic-bezier(.2, .8, .2, 1) both; }\n.fg-ask-box::before { content: ""; height: 3px; margin: -22px -22px 4px; border-radius: 16px 16px 0 0; background: linear-gradient(90deg, #ff7eb6, #9b7bff); }\n.fg-ask-box.is-danger::before { background: linear-gradient(90deg, #ff6b6b, #ff7eb6); }\n.fg-ask-title { font-size: 16px; font-weight: 700; letter-spacing: .06em; }\n.fg-ask-text { font-size: 14.5px; line-height: 1.75; letter-spacing: .02em; white-space: pre-wrap; word-break: break-word; color: rgba(245, 243, 255, .92); }\n.fg-ask-input { width: 100%; margin: 0; padding: 9px 12px; font: inherit; font-size: 14.5px; color: #f5f3ff; background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .16); border-radius: 10px; outline: none; transition: border-color .15s; }\n.fg-ask-input:focus { border-color: #ff7eb6; }\n.fg-ask-row { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 2px; }\n.fg-ask-btn { margin: 0; min-width: 84px; padding: 8px 18px; font: inherit; font-size: 14px; letter-spacing: .08em; line-height: 1.4; color: #f5f3ff; cursor: pointer; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .05); transition: background .15s, border-color .15s, filter .15s; }\n.fg-ask-btn:hover { background: rgba(255, 255, 255, .12); border-color: #ff7eb6; }\n.fg-ask-btn:focus-visible { outline: 2px solid #9b7bff; outline-offset: 2px; }\n.fg-ask-btn.is-yes { font-weight: 700; color: #fff; border-color: transparent; background: linear-gradient(100deg, #ff7eb6, #9b7bff); }\n.fg-ask-btn.is-yes:hover { filter: brightness(1.1); }\n.fg-ask-box.is-danger .fg-ask-btn.is-yes { background: linear-gradient(100deg, #ff6b6b, #e0447a); }\n.fg-ask-btn.is-yes.is-danger { background: linear-gradient(100deg, #ff6b6b, #e0447a); }\n@keyframes fg-ask-in { from { opacity: 0; transform: translateY(8px) scale(.97); } }\n@media (prefers-reduced-motion: reduce) { .fg-ask, .fg-ask-box { animation: none; } }\n\n.fg-settings-card { --accent: #ff7eb6; --accent2: #9b7bff; --accent3: #5ee7ff; display: grid; gap: 12px; padding: 18px; border-radius: 14px; border: 1px solid rgba(127, 127, 127, .25); background: linear-gradient(135deg, rgba(155, 123, 255, .08), rgba(255, 126, 182, .06)); }\n.fg-settings-card h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }\n.fg-settings-card p { margin: 0; font-size: 13px; opacity: .75; line-height: 1.6; }\n.fg-settings-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }\n';
+var chat_default = '/* ───────────── 聊天里的场景卡与插画（Tavern 正文下方） ───────────── */\r\n.fg-chat { --accent: #ff7eb6; --accent2: #9b7bff; --accent3: #5ee7ff; font-family: inherit; color: inherit; margin: 10px 0; max-width: 680px; }\r\n.fg-chat *, .fg-chat *::before, .fg-chat *::after { box-sizing: border-box; }\r\n.fg-chat button { font: inherit; cursor: pointer; }\r\n\r\n.fg-scene { position: relative; display: grid; grid-template-columns: 112px 1fr; min-height: 108px; border-radius: 14px; overflow: hidden; color: #f5f3ff; background: #110e24; border: 1px solid rgba(255, 255, 255, .1); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); isolation: isolate; }\r\n.fg-scene-bg { position: absolute; inset: 0; z-index: -2; background-size: cover; background-position: center; filter: saturate(1.1); transform: scale(1.05); transition: transform 6s ease; }\r\n.fg-scene:hover .fg-scene-bg { transform: scale(1.12); }\r\n.fg-scene::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(10, 8, 26, .2) 0, rgba(10, 8, 26, .78) 112px, rgba(10, 8, 26, .9)); }\r\n.fg-scene-clock { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px; font-family: "Cormorant Garamond", Georgia, serif; text-shadow: 0 1px 6px rgba(0, 0, 0, .8); }\r\n.fg-scene-clock b { font-size: 30px; line-height: 1; font-weight: 700; letter-spacing: .02em; }\r\n.fg-scene-clock span { font-size: 10px; letter-spacing: .35em; opacity: .8; text-transform: uppercase; }\r\n.fg-scene-main { padding: 12px 14px 12px 4px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }\r\n.fg-scene-loc { font-size: 17px; font-weight: 700; letter-spacing: .12em; display: flex; align-items: center; gap: 8px; }\r\n.fg-scene-loc::before { content: ""; width: 3px; height: 16px; border-radius: 3px; background: linear-gradient(180deg, var(--accent), var(--accent2)); box-shadow: 0 0 8px var(--accent); }\r\n.fg-scene-chips { display: flex; flex-wrap: wrap; gap: 5px; }\r\n.fg-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 11px; letter-spacing: .06em; background: rgba(255, 255, 255, .09); border: 1px solid rgba(255, 255, 255, .12); }\r\n.fg-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--accent)); box-shadow: 0 0 6px var(--c, var(--accent)); }\r\n.fg-scene-sum { font-size: 12.5px; opacity: .78; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }\r\n.fg-scene-actions { display: flex; gap: 6px; margin-top: auto; flex-wrap: wrap; }\r\n.fg-play { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px 5px 10px; border-radius: 99px; border: 0; color: #fff; font-weight: 700; font-size: 12.5px; letter-spacing: .1em; background: linear-gradient(100deg, var(--accent), var(--accent2)); box-shadow: 0 4px 16px rgba(255, 126, 182, .35); transition: transform .2s, box-shadow .2s; }\r\n.fg-play:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(255, 126, 182, .5); }\r\n.fg-play::before { content: ""; width: 0; height: 0; border-left: 8px solid #fff; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }\r\n.fg-ghost { padding: 5px 12px; border-radius: 99px; font-size: 12px; color: inherit; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .16); transition: background .2s; }\r\n.fg-ghost:hover { background: rgba(255, 255, 255, .16); }\r\n.fg-scene.is-pending .fg-scene-main::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .08) 50%, transparent 70%); background-size: 200% 100%; animation: fg-skeleton 1.4s linear infinite; pointer-events: none; }\r\n.fg-scene-err { font-size: 12px; color: #ffb4b4; }\r\n.fg-dots::after { content: "…"; display: inline-block; animation: fg-dots 1.2s steps(4) infinite; width: 1.2em; overflow: hidden; vertical-align: bottom; }\r\n@keyframes fg-dots { from { width: 0; } to { width: 1.2em; } }\r\n\r\n.fg-cgcard { position: relative; border-radius: 14px; overflow: hidden; background: #0d0b1c; box-shadow: 0 12px 34px rgba(0, 0, 0, .3); border: 1px solid rgba(255, 255, 255, .08); }\r\n.fg-cgcard img { display: block; width: 100%; height: auto; max-height: min(70vh, 520px); object-fit: cover; cursor: zoom-in; animation: fg-cgcard-in .9s cubic-bezier(.2, .8, .2, 1) both; }\r\n.fg-cgcard.is-tall { width: min(100%, 360px); }\r\n.fg-cgcard.is-tall img { max-height: none; }\r\n@keyframes fg-cgcard-in { from { opacity: 0; filter: blur(12px) brightness(1.4); transform: scale(1.03); } }\r\n.fg-cgcard-wait { position: relative; display: grid; place-items: center; color: rgba(255, 255, 255, .78); font-size: 13px; letter-spacing: .1em; background: radial-gradient(120% 120% at 30% 20%, rgba(155, 123, 255, .35), transparent 60%), radial-gradient(100% 100% at 80% 90%, rgba(255, 126, 182, .3), transparent 60%), #120f26; overflow: hidden; }\r\n.fg-cgcard-wait::before { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .12) 50%, transparent 70%); background-size: 200% 100%; animation: fg-skeleton 1.6s linear infinite; }\r\n.fg-cgcard-wait span { position: relative; display: flex; align-items: center; gap: 8px; }\r\n.fg-cgcard-wait span::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: fg-spin .8s linear infinite; }\r\n.fg-cgcard-fail { padding: 14px 16px; font-size: 13px; color: #ffcdcd; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #1e1020; }\r\n.fg-cgcard-bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 6px; padding: 26px 10px 8px; color: #fff; background: linear-gradient(transparent, rgba(0, 0, 0, .72)); opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s; }\r\n.fg-cgcard:hover .fg-cgcard-bar, .fg-cgcard:focus-within .fg-cgcard-bar { opacity: 1; transform: none; }\r\n.fg-cgcard-bar .fg-cap { flex: 1; min-width: 0; font-size: 12.5px; letter-spacing: .12em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\r\n.fg-cgcard-bar button { padding: 3px 10px; border-radius: 99px; font-size: 12px; color: #fff; background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .2); backdrop-filter: blur(6px); }\r\n.fg-cgcard-bar button:hover { background: rgba(255, 255, 255, .26); }\r\n.fg-cgcard-bar button[disabled] { opacity: .35; pointer-events: none; }\r\n@media (hover: none) { .fg-cgcard-bar { opacity: 1; transform: none; } }\r\n\r\n.fg-chat-lightbox { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 2147483100; display: grid; place-items: center; background: rgba(0, 0, 0, .9); cursor: zoom-out; animation: fg-fade-in .2s ease both; }\r\n.fg-chat-lightbox img { max-width: 94vw; max-height: 92vh; object-fit: contain; }\r\n\r\n.fg-toast { position: fixed; left: 50%; top: 93vh; top: 93dvh; z-index: 2147483200; transform: translate(-50%, -100%); padding: 10px 18px; border-radius: 99px; font-size: 13.5px; letter-spacing: .04em; color: #fff; background: rgba(18, 14, 40, .92); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 10px 30px rgba(0, 0, 0, .4); backdrop-filter: blur(10px); animation: fg-toast-in .35s cubic-bezier(.2, .8, .2, 1) both; max-width: 86vw; }\r\n.fg-toast.is-error { border-color: rgba(255, 120, 120, .6); }\r\n@keyframes fg-toast-in { from { opacity: 0; transform: translate(-50%, calc(-100% + 10px)); } }\r\n\r\n/* 确认框、输入框（src/client/ask.jsx）：盖在剧场和聊天大图上面、提示条下面。宽高写死成视口大小，理由同剧场（酒馆给 html 加了 transform）。 */\r\n.fg-ask { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 2147483150; display: grid; place-items: center; padding: 16px; box-sizing: border-box; background: rgba(4, 3, 12, .58); backdrop-filter: blur(3px); animation: fg-fade-in .18s ease both; user-select: text; -webkit-user-select: text; }\r\n.fg-ask *, .fg-ask *::before, .fg-ask *::after { box-sizing: border-box; }\r\n.fg-ask-box { width: min(460px, 100%); max-height: calc(100dvh - 32px); overflow: auto; display: grid; gap: 14px; padding: 22px 22px 18px; border-radius: 16px; color: #f5f3ff; font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif; background: linear-gradient(135deg, rgba(22, 17, 48, .97), rgba(12, 10, 30, .97)); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 24px 60px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .06); animation: fg-ask-in .22s cubic-bezier(.2, .8, .2, 1) both; }\r\n.fg-ask-box::before { content: ""; height: 3px; margin: -22px -22px 4px; border-radius: 16px 16px 0 0; background: linear-gradient(90deg, #ff7eb6, #9b7bff); }\r\n.fg-ask-box.is-danger::before { background: linear-gradient(90deg, #ff6b6b, #ff7eb6); }\r\n.fg-ask-title { font-size: 16px; font-weight: 700; letter-spacing: .06em; }\r\n.fg-ask-text { font-size: 14.5px; line-height: 1.75; letter-spacing: .02em; white-space: pre-wrap; word-break: break-word; color: rgba(245, 243, 255, .92); }\r\n.fg-ask-input { width: 100%; margin: 0; padding: 9px 12px; font: inherit; font-size: 14.5px; color: #f5f3ff; background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .16); border-radius: 10px; outline: none; transition: border-color .15s; }\r\n.fg-ask-input:focus { border-color: #ff7eb6; }\r\n.fg-ask-row { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 2px; }\r\n.fg-ask-btn { margin: 0; min-width: 84px; padding: 8px 18px; font: inherit; font-size: 14px; letter-spacing: .08em; line-height: 1.4; color: #f5f3ff; cursor: pointer; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .05); transition: background .15s, border-color .15s, filter .15s; }\r\n.fg-ask-btn:hover { background: rgba(255, 255, 255, .12); border-color: #ff7eb6; }\r\n.fg-ask-btn:focus-visible { outline: 2px solid #9b7bff; outline-offset: 2px; }\r\n.fg-ask-btn.is-yes { font-weight: 700; color: #fff; border-color: transparent; background: linear-gradient(100deg, #ff7eb6, #9b7bff); }\r\n.fg-ask-btn.is-yes:hover { filter: brightness(1.1); }\r\n.fg-ask-box.is-danger .fg-ask-btn.is-yes { background: linear-gradient(100deg, #ff6b6b, #e0447a); }\r\n.fg-ask-btn.is-yes.is-danger { background: linear-gradient(100deg, #ff6b6b, #e0447a); }\r\n@keyframes fg-ask-in { from { opacity: 0; transform: translateY(8px) scale(.97); } }\r\n@media (prefers-reduced-motion: reduce) { .fg-ask, .fg-ask-box { animation: none; } }\r\n\r\n.fg-settings-card { --accent: #ff7eb6; --accent2: #9b7bff; --accent3: #5ee7ff; display: grid; gap: 12px; padding: 18px; border-radius: 14px; border: 1px solid rgba(127, 127, 127, .25); background: linear-gradient(135deg, rgba(155, 123, 255, .08), rgba(255, 126, 182, .06)); }\r\n.fg-settings-card h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }\r\n.fg-settings-card p { margin: 0; font-size: 13px; opacity: .75; line-height: 1.6; }\r\n.fg-settings-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }\r\n';
 
 // src/client/theater/Theater.jsx
 var import_react18 = __toESM(require("react"), 1);
