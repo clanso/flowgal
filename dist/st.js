@@ -704,26 +704,37 @@ Error generating stack: `+r.message+`
 @keyframes fg-flare-ghost { from { opacity: .7; transform: translate(.6%, -.6%); } to { opacity: 1; transform: translate(-.6%, .7%); } }\r
 @keyframes fg-flicker { 0%, 100% { opacity: 1; } 8% { opacity: .25; } 9% { opacity: 1; } 11% { opacity: .35; } 12% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .15; } 50% { opacity: .9; } 51% { opacity: .3; } 53% { opacity: 1; } 78% { opacity: .45; } 79% { opacity: 1; } }\r
 \r
-/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密更暖，人离得更近一点，四角像心跳一样一明一暗。压在背景和立绘上，插画不受影响。\r
+/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密是更温润的蜜桃暖粉柔光与缓缓流淌的光晕（不再做四角高频心跳闪烁，免得晃眼）。压在背景和立绘上，插画不受影响。\r
    只用纯 GPU 合成的渐变与混合模式，不用 backdrop-filter（Chromium 在多层 backdrop-filter 叠在动画背景上时会闪烁掉帧）。 */\r
 .fg-romance { z-index: 5; }\r
-.fg-romance[data-v="ambiguous"] { background: radial-gradient(115% 92% at 50% 42%, rgba(255, 228, 240, .08) 32%, rgba(255, 145, 192, .34)); mix-blend-mode: screen; }\r
+.fg-romance[data-v="ambiguous"] { background: radial-gradient(115% 92% at 50% 42%, rgba(255, 228, 240, .06) 35%, rgba(255, 145, 192, .26)); mix-blend-mode: screen; }\r
 .fg-romance[data-v="ambiguous"]::before { bottom: -100%; background:\r
-    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .55) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .48) 0 .8cqw, transparent 1.6cqw),\r
-    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .38) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .5) 0 1.1cqw, transparent 2cqw),\r
-    radial-gradient(circle at 80% 54%, rgba(255, 195, 222, .42) 0 1.6cqw, transparent 2.6cqw), radial-gradient(circle at 93% 90%, rgba(255, 236, 246, .45) 0 .9cqw, transparent 1.7cqw);\r
-  background-size: 100% 50%; filter: blur(.18cqw); animation: fg-bokeh-rise 24s linear infinite, fg-bokeh-twinkle 4.5s ease-in-out infinite alternate; }\r
-.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .32), transparent 72%); }\r
-.fg-romance[data-v="intimate"] { background: radial-gradient(108% 88% at 50% 44%, rgba(255, 200, 175, .14) 24%, rgba(235, 92, 128, .44)); }\r
+    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .5) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .44) 0 .8cqw, transparent 1.6cqw),\r
+    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .34) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .45) 0 1.1cqw, transparent 2cqw),\r
+    radial-gradient(circle at 80% 54%, rgba(255, 195, 222, .38) 0 1.6cqw, transparent 2.6cqw), radial-gradient(circle at 93% 90%, rgba(255, 236, 246, .4) 0 .9cqw, transparent 1.7cqw);\r
+  background-size: 100% 50%; filter: blur(.18cqw); animation: fg-bokeh-rise 26s linear infinite, fg-bokeh-twinkle 5.5s ease-in-out infinite alternate; }\r
+.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .26), transparent 72%); }\r
+.fg-romance[data-v="intimate"] {\r
+  background:\r
+    radial-gradient(85% 65% at 50% 38%, rgba(255, 236, 224, .14), transparent 72%),\r
+    radial-gradient(125% 100% at 50% 44%, transparent 46%, rgba(255, 168, 186, .22) 78%, rgba(225, 108, 142, .32) 100%);\r
+  mix-blend-mode: screen;\r
+}\r
 .fg-romance[data-v="intimate"]::before { bottom: -100%; background:\r
-    radial-gradient(circle at 16% 76%, rgba(255, 215, 225, .5) 0 1.6cqw, transparent 2.8cqw), radial-gradient(circle at 38% 28%, rgba(255, 240, 230, .42) 0 1cqw, transparent 2cqw),\r
-    radial-gradient(circle at 68% 62%, rgba(255, 185, 205, .45) 0 1.8cqw, transparent 3cqw), radial-gradient(circle at 86% 24%, rgba(255, 228, 236, .46) 0 1.2cqw, transparent 2.2cqw);\r
-  background-size: 100% 50%; filter: blur(.22cqw); mix-blend-mode: screen; animation: fg-bokeh-rise 20s linear infinite, fg-bokeh-twinkle 3.6s ease-in-out infinite alternate; }\r
-.fg-romance[data-v="intimate"]::after { background: radial-gradient(92% 78% at 50% 46%, transparent 42%, rgba(125, 12, 48, .46) 78%, rgba(82, 4, 32, .68)); animation: fg-romance-beat 1.25s ease-out infinite; }\r
+    radial-gradient(circle at 14% 78%, rgba(255, 222, 232, .48) 0 1.5cqw, transparent 2.8cqw), radial-gradient(circle at 36% 28%, rgba(255, 242, 232, .42) 0 1cqw, transparent 2.1cqw),\r
+    radial-gradient(circle at 54% 88%, rgba(255, 205, 220, .38) 0 1.2cqw, transparent 2.4cqw), radial-gradient(circle at 70% 60%, rgba(255, 195, 212, .42) 0 1.7cqw, transparent 3cqw),\r
+    radial-gradient(circle at 86% 24%, rgba(255, 232, 238, .44) 0 1.1cqw, transparent 2.2cqw);\r
+  background-size: 100% 50%; filter: blur(.24cqw); opacity: .82; animation: fg-bokeh-rise 28s linear infinite, fg-bokeh-twinkle 6s ease-in-out infinite alternate; }\r
+.fg-romance[data-v="intimate"]::after {\r
+  background:\r
+    radial-gradient(75% 48% at 50% 0%, rgba(255, 224, 210, .28), transparent 74%),\r
+    radial-gradient(85% 50% at 50% 104%, rgba(255, 175, 195, .24), transparent 72%);\r
+  animation: fg-romance-glow 7s ease-in-out infinite alternate;\r
+}\r
 [data-romance="intimate"] .fg-cast { scale: 1.035; }\r
 @keyframes fg-bokeh-rise { to { transform: translateY(-50%); } }\r
-@keyframes fg-bokeh-twinkle { from { opacity: .55; } to { opacity: .95; } }\r
-@keyframes fg-romance-beat { 0%, 100% { opacity: .55; } 12% { opacity: 1; } 24% { opacity: .7; } 36% { opacity: .9; } 62% { opacity: .55; } }\r
+@keyframes fg-bokeh-twinkle { from { opacity: .65; } to { opacity: .92; } }\r
+@keyframes fg-romance-glow { from { opacity: .72; } to { opacity: 1; } }\r
 /* 感官主导的一段：蒙眼、耳边、触碰、发烫、发凉、香气、屏息、失神。在镜头外面（特写时不跟着放大），叠在插画和天气上面（眼睛被蒙住时什么都看不见），对话框不受影响。 */\r
 .fg-sense { z-index: 9; }\r
 .fg-sense[data-v="blind"] { background: #050307; opacity: .95; }\r
@@ -1805,52 +1816,50 @@ button.fg-pm-name:hover { color: var(--accent); }\r
 .fg-eros.is-leave, .fg-tentacle.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }\r
 .fg-eros::before, .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { content: ""; position: absolute; inset: 0; pointer-events: none; }\r
 .fg-eros {\r
-  --flush-inner: rgba(255, 165, 182, .16);\r
-  --flush-edge: rgba(185, 38, 78, .46);\r
-  --glow: 3.4s;\r
-  background: radial-gradient(108% 86% at 50% 44%, transparent 38%, var(--flush-inner) 68%, var(--flush-edge) 100%);\r
+  --flush-inner: rgba(255, 180, 198, .12);\r
+  --flush-edge: rgba(215, 72, 112, .28);\r
+  --glow: 6s;\r
+  background: radial-gradient(115% 92% at 50% 44%, transparent 44%, var(--flush-inner) 74%, var(--flush-edge) 100%);\r
 }\r
-/* ::before 漂浮的细碎温存光晕与绯红雾气；::after 随呼吸与心跳一明一暗的体温热浪 */\r
+/* ::before 漂浮的细碎温存光晕与绯红雾气；::after 随呼吸缓缓起伏的柔和暖雾（不做四角急促闪烁） */\r
 .fg-eros::before {\r
   bottom: -100%;\r
   background:\r
-    radial-gradient(circle at 12% 84%, rgba(255, 195, 212, .45) 0 1.2cqw, transparent 2.6cqw),\r
-    radial-gradient(circle at 28% 36%, rgba(255, 232, 238, .38) 0 .7cqw, transparent 1.7cqw),\r
-    radial-gradient(circle at 52% 72%, rgba(255, 175, 198, .32) 0 1.6cqw, transparent 3cqw),\r
-    radial-gradient(circle at 76% 28%, rgba(255, 220, 230, .4) 0 .9cqw, transparent 2cqw),\r
-    radial-gradient(circle at 88% 64%, rgba(255, 185, 208, .42) 0 1.3cqw, transparent 2.6cqw);\r
+    radial-gradient(circle at 12% 84%, rgba(255, 205, 220, .42) 0 1.2cqw, transparent 2.6cqw),\r
+    radial-gradient(circle at 28% 36%, rgba(255, 236, 242, .36) 0 .7cqw, transparent 1.7cqw),\r
+    radial-gradient(circle at 52% 72%, rgba(255, 185, 206, .3) 0 1.6cqw, transparent 3cqw),\r
+    radial-gradient(circle at 76% 28%, rgba(255, 224, 234, .38) 0 .9cqw, transparent 2cqw),\r
+    radial-gradient(circle at 88% 64%, rgba(255, 192, 214, .38) 0 1.3cqw, transparent 2.6cqw);\r
   background-size: 100% 50%;\r
   mix-blend-mode: screen;\r
-  opacity: .75;\r
-  animation: fg-bokeh-rise 22s linear infinite, fg-bokeh-twinkle var(--glow) ease-in-out infinite alternate;\r
+  opacity: .72;\r
+  animation: fg-bokeh-rise 26s linear infinite, fg-bokeh-twinkle var(--glow) ease-in-out infinite alternate;\r
 }\r
 .fg-eros::after {\r
   background:\r
-    radial-gradient(88% 52% at 50% 104%, rgba(255, 130, 155, .34), transparent 72%),\r
-    radial-gradient(76% 42% at 50% -6%, rgba(255, 185, 205, .22), transparent 70%),\r
-    radial-gradient(96% 80% at 50% 45%, transparent 48%, rgba(140, 14, 52, .32) 84%, rgba(92, 6, 34, .52));\r
-  animation: fg-eros-pulse var(--glow) ease-in-out infinite;\r
+    radial-gradient(88% 48% at 50% 104%, rgba(255, 155, 178, .26), transparent 72%),\r
+    radial-gradient(76% 38% at 50% -6%, rgba(255, 205, 218, .18), transparent 70%);\r
+  mix-blend-mode: screen;\r
+  animation: fg-eros-pulse var(--glow) ease-in-out infinite alternate;\r
 }\r
-.fg-eros[data-v="tease"] { --flush-inner: rgba(255, 185, 202, .12); --flush-edge: rgba(210, 75, 110, .32); --glow: 4.8s; }\r
-.fg-eros[data-v="slow"] { --flush-inner: rgba(255, 165, 182, .16); --flush-edge: rgba(190, 44, 82, .44); --glow: 3.4s; }\r
-.fg-eros[data-v="fast"] { --flush-inner: rgba(255, 140, 168, .22); --flush-edge: rgba(185, 28, 72, .56); --glow: 1.9s; }\r
-.fg-eros[data-v="frantic"] { --flush-inner: rgba(255, 120, 155, .28); --flush-edge: rgba(175, 16, 62, .66); --glow: 1.1s; }\r
+.fg-eros[data-v="tease"] { --flush-inner: rgba(255, 195, 210, .09); --flush-edge: rgba(220, 92, 125, .22); --glow: 7s; }\r
+.fg-eros[data-v="slow"] { --flush-inner: rgba(255, 180, 198, .12); --flush-edge: rgba(215, 72, 112, .28); --glow: 5.5s; }\r
+.fg-eros[data-v="fast"] { --flush-inner: rgba(255, 165, 188, .16); --flush-edge: rgba(210, 58, 102, .34); --glow: 4.2s; }\r
+.fg-eros[data-v="frantic"] { --flush-inner: rgba(255, 150, 178, .2); --flush-edge: rgba(205, 44, 92, .4); --glow: 3.2s; }\r
 .fg-eros[data-v="afterglow"] {\r
-  --glow: 6.5s;\r
+  --glow: 7.5s;\r
   background:\r
-    radial-gradient(95% 80% at 50% 44%, rgba(255, 244, 234, .14) 0%, rgba(255, 212, 205, .18) 55%, rgba(215, 128, 145, .32) 100%);\r
+    radial-gradient(95% 80% at 50% 44%, rgba(255, 244, 234, .12) 0%, rgba(255, 212, 205, .15) 55%, rgba(215, 128, 145, .24) 100%);\r
 }\r
-.fg-eros[data-v="afterglow"]::before { opacity: .95; animation-duration: 32s, 5.5s; }\r
+.fg-eros[data-v="afterglow"]::before { opacity: .88; animation-duration: 32s, 6.5s; }\r
 .fg-eros[data-v="afterglow"]::after {\r
   background:\r
-    radial-gradient(68% 58% at 50% 42%, rgba(255, 250, 244, .22), transparent 74%),\r
-    radial-gradient(90% 50% at 50% 102%, rgba(255, 205, 185, .28), transparent 72%);\r
+    radial-gradient(68% 58% at 50% 42%, rgba(255, 250, 244, .2), transparent 74%),\r
+    radial-gradient(90% 50% at 50% 102%, rgba(255, 205, 185, .24), transparent 72%);\r
 }\r
 @keyframes fg-eros-pulse {\r
-  0%, 100% { opacity: .48; transform: scale(1); }\r
-  38% { opacity: .96; transform: scale(1.012); }\r
-  56% { opacity: .68; transform: scale(1.004); }\r
-  74% { opacity: .88; transform: scale(1.008); }\r
+  from { opacity: .68; }\r
+  to { opacity: .96; }\r
 }\r
 \r
 /* 触手：画面两边和角落里暗紫的触手剪影往里探、慢慢地扭（像镜头前景里没对上焦的东西），身上一道湿亮的反光；\r
