@@ -1422,7 +1422,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-text.is-wait .fg-char { animation: none; }\r
 @keyframes fg-char-in { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: none; } }\r
 /* ── 台词演法与重音（lib/typing.js）：字的样子。要做位移、缩放的字改成 inline-block，空格照样占位 ── */\r
-.fg-text[class*="say-"] .fg-char, .fg-char.is-stress { display: inline-block; white-space: pre; }\r
+.fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char.is-stress-soft { display: inline-block; white-space: pre; }\r
 .fg-text.say-menace .fg-char { animation-name: fg-char-stamp; animation-duration: .2s; }\r
 .fg-text.say-excited .fg-char { animation-name: fg-char-hop; animation-duration: .14s; }\r
 .fg-text.say-shout .fg-char { animation-name: fg-char-pop; animation-duration: .28s; font-size: 1.16em; font-weight: 700; }\r
@@ -1431,11 +1431,13 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-text.say-whisper .fg-char { font-size: .9em; animation-duration: .45s; }\r
 .fg-text.say-breakdown .fg-char { color: color-mix(in oklab, var(--ink) 72%, #ff3b5c); animation: fg-char-in .12s ease forwards var(--d), fg-char-quake .2s linear infinite var(--d); }\r
 .fg-char.is-stress { color: var(--stress, #ff4d5e); font-weight: 700; font-size: 1.1em; text-shadow: 0 0 .6cqw rgba(255, 60, 80, .45); animation-name: fg-char-stamp; animation-duration: .24s; }\r
+.fg-char.is-stress-soft { color: color-mix(in oklab, var(--ink) 45%, #ffd992); font-weight: 600; font-size: 1.05em; text-shadow: 0 0 .55cqw rgba(255, 210, 140, .55), 0 0 1.2cqw color-mix(in oklab, var(--speaker, var(--accent)) 35%, transparent); animation-name: fg-char-bloom; animation-duration: .38s; }\r
 /* 点一下打完 / 等字体时：和普通台词一样立刻全显示、或先不动（要比上面的演法规则更具体才压得住） */\r
-.fg-text.is-done[class*="say-"] .fg-char, .fg-text.is-done .fg-char.is-stress { animation: none; opacity: 1; }\r
-.fg-text.is-wait[class*="say-"] .fg-char, .fg-text.is-wait .fg-char.is-stress { animation: none; }\r
+.fg-text.is-done[class*="say-"] .fg-char, .fg-text.is-done .fg-char.is-stress, .fg-text.is-done .fg-char.is-stress-soft { animation: none; opacity: 1; }\r
+.fg-text.is-wait[class*="say-"] .fg-char, .fg-text.is-wait .fg-char.is-stress, .fg-text.is-wait .fg-char.is-stress-soft { animation: none; }\r
 .fg-text.is-done.say-breakdown .fg-char { animation: fg-char-quake .2s linear infinite; opacity: 1; }\r
 @keyframes fg-char-stamp { from { opacity: 0; transform: translateY(-.35em) scale(1.4); } 60% { opacity: 1; transform: translateY(0) scale(.95); } to { opacity: 1; transform: none; } }\r
+@keyframes fg-char-bloom { from { opacity: 0; filter: blur(3px) brightness(1.4); transform: translateY(.08em) scale(1.06); } to { opacity: 1; filter: none; transform: none; } }\r
 @keyframes fg-char-pop { from { opacity: 0; transform: scale(1.9); } 55% { opacity: 1; transform: scale(.92); } to { opacity: 1; transform: none; } }\r
 @keyframes fg-char-hop { from { opacity: 0; transform: translateY(.3em); } to { opacity: 1; transform: none; } }\r
 @keyframes fg-char-quake { 0%, 100% { opacity: 1; transform: translate(0, 0); } 25% { opacity: 1; transform: translate(.05em, -.04em); } 50% { opacity: 1; transform: translate(-.04em, .05em); } 75% { opacity: 1; transform: translate(.04em, .03em); } }\r
@@ -1451,16 +1453,25 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-text .fg-char.tx-small { font-size: .8em; color: color-mix(in oklab, currentColor 72%, transparent); }\r
 .fg-text .fg-char.tx-faint { color: color-mix(in oklab, currentColor 50%, transparent); letter-spacing: .08em; text-shadow: 0 0 .35em rgba(255, 255, 255, .35); animation-duration: .7s; }\r
 .fg-text .fg-char.tx-glow { color: color-mix(in oklab, var(--accent) 40%, #fff6d8); font-weight: 700; text-shadow: 0 0 .45em color-mix(in oklab, var(--accent) 70%, transparent), 0 0 1em color-mix(in oklab, var(--accent) 40%, transparent); animation: fg-char-in .3s ease forwards var(--d), fg-tx-glow 2.4s ease-in-out infinite calc(var(--d) + var(--i) * .08s); }\r
-/* 打完之后：别的不再重放，发抖、波浪、发光接着动；等字体时先不动 */\r
+.fg-text .fg-char.tx-warm { color: color-mix(in oklab, var(--ink) 50%, #ffbe98); font-weight: 600; text-shadow: 0 0 .5em rgba(255, 165, 130, .55), 0 0 1.1em rgba(255, 210, 160, .35); animation: fg-char-bloom .38s ease forwards var(--d), fg-tx-glow 3s ease-in-out infinite calc(var(--d) + var(--i) * .1s); }\r
+.fg-text .fg-char.tx-cold { color: color-mix(in oklab, var(--ink) 42%, #8ed8ff); font-weight: 600; letter-spacing: .06em; text-shadow: 0 0 .45em rgba(110, 200, 255, .55), 0 1px 2px rgba(0, 12, 28, .75); animation-name: fg-char-stamp; animation-duration: .26s; }\r
+.fg-text .fg-char.tx-dot { font-weight: 600; text-emphasis: filled sesame var(--accent); -webkit-text-emphasis: filled sesame var(--accent); text-emphasis-position: under right; -webkit-text-emphasis-position: under right; animation-duration: .3s; }\r
+.fg-text .fg-char.tx-choke { color: color-mix(in oklab, currentColor 86%, #b8d4ff); text-shadow: 0 .06em .28em rgba(150, 195, 255, .45); animation: fg-char-in .42s ease forwards var(--d), fg-tx-choke 1.1s ease-in-out infinite calc(var(--d) + var(--i) * -.19s); }\r
+.fg-text .fg-char.tx-flutter { color: color-mix(in oklab, var(--ink) 58%, #ffa6c9); text-shadow: 0 0 .45em rgba(255, 145, 190, .55); animation: fg-char-bloom .34s ease forwards var(--d), fg-tx-flutter 1.8s ease-in-out infinite calc(var(--i) * -.18s); }\r
+/* 打完之后：别的不再重放，发抖、波浪、发光、暖意、哽咽、心醉接着动；等字体时先不动 */\r
 .fg-text.is-done .fg-char[class*="tx-"] { animation: none; opacity: 1; }\r
 .fg-text.is-done .fg-char.tx-shake { animation: fg-tx-shake .16s steps(2) infinite; }\r
 .fg-text.is-done .fg-char.tx-wave { animation: fg-tx-wave 1.3s ease-in-out infinite calc(var(--i) * -.13s); }\r
-.fg-text.is-done .fg-char.tx-glow { animation: fg-tx-glow 2.4s ease-in-out infinite calc(var(--i) * .08s); }\r
+.fg-text.is-done .fg-char.tx-glow, .fg-text.is-done .fg-char.tx-warm { animation: fg-tx-glow 2.4s ease-in-out infinite calc(var(--i) * .08s); }\r
+.fg-text.is-done .fg-char.tx-choke { animation: fg-tx-choke 1.1s ease-in-out infinite calc(var(--i) * -.19s); }\r
+.fg-text.is-done .fg-char.tx-flutter { animation: fg-tx-flutter 1.8s ease-in-out infinite calc(var(--i) * -.18s); }\r
 .fg-text.is-wait .fg-char[class*="tx-"] { animation: none; }\r
 @keyframes fg-tx-shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(.045em, -.035em) rotate(-1deg); } 50% { transform: translate(-.04em, .04em) rotate(.8deg); } 75% { transform: translate(.035em, .03em); } }\r
 @keyframes fg-tx-wave { 0%, 100% { transform: translateY(.1em); } 50% { transform: translateY(-.16em); } }\r
 @keyframes fg-tx-slam { from { opacity: 0; transform: scale(2.6) rotate(-4deg); } 50% { opacity: 1; transform: scale(.88); } 75% { opacity: 1; transform: scale(1.06); } to { opacity: 1; transform: none; } }\r
 @keyframes fg-tx-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }\r
+@keyframes fg-tx-choke { 0%, 100% { transform: translateY(0); filter: blur(0); } 45% { transform: translateY(.04em) translateX(-.02em); filter: blur(.35px); } 75% { transform: translateY(-.02em) translateX(.02em); } }\r
+@keyframes fg-tx-flutter { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-.08em) scale(1.03); } }\r
 .fg-wait { position: absolute; right: 2.6%; bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }\r
 .fg-wait::before { content: var(--wait-glyph); }\r
 @keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }\r
@@ -2022,7 +2033,7 @@ button.fg-pm-name:hover { color: var(--accent); }\r
   .fg-camera[data-cam="whip"] { animation: none !important; }\r
   .fg-photo, .fg-cup, .fg-moment-card { animation: fg-fade-in .2s ease both !important; } /* 小瞬间：不飞、不弹，只淡入 */\r
   .fg-touch-ring, .fg-clink, .fg-fw-trail, .fg-fw-burst, .fg-steam i { animation: none !important; opacity: 0; }\r
-  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */\r
+  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char.is-stress-soft, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */\r
   .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }\r
   .fg-text.is-wait .fg-char { animation: none !important; }\r
 }\r
@@ -2677,8 +2688,8 @@ var ENTER_HOW_LABEL = { run: "跑进来", peek: "探头", slow: "慢慢走进来
 var EXIT_HOW_LABEL = { storm: "甩头离开", run: "跑开", slow: "慢慢走远" };
 var DELIVERIES = ["menace", "excited", "shout", "hesitant", "whisper", "breakdown"];
 var DELIVERY_LABEL = { menace: "威压", excited: "激动", shout: "怒吼", hesitant: "迟疑", whisper: "低语", breakdown: "崩溃" };
-var TEXT_FX = ["shake", "wave", "big", "roar", "grow", "dwindle", "small", "faint", "glow"];
-var TEXT_FX_LABEL = { shake: "发抖", wave: "波浪", big: "放大", roar: "吼", grow: "越说越大", dwindle: "越说越小", small: "小声", faint: "轻淡", glow: "发光强调" };
+var TEXT_FX = ["shake", "wave", "big", "roar", "grow", "dwindle", "small", "faint", "glow", "warm", "cold", "dot", "choke", "flutter"];
+var TEXT_FX_LABEL = { shake: "发抖", wave: "波浪", big: "放大", roar: "吼", grow: "越说越大", dwindle: "越说越小", small: "小声", faint: "轻淡", glow: "发光强调", warm: "暖意", cold: "冰冷", dot: "着重号", choke: "哽咽", flutter: "心醉" };
 var WEATHER = ["clear", "rain", "storm", "snow", "blizzard", "wind", "sakura", "leaves", "fireflies", "fog", "embers", "dust", "bokeh", "stars", "sparkles", "bubbles"];
 var TRANSITIONS = ["dissolve", "fade", "cinematic", "wipe", "iris", "strips", "black", "flash", "blink", "glitch", "swirl", "haze", "none"];
 var LIGHTS = ["normal", "dim", "dark", "black", "candle", "spot", "neon", "screen", "alarm", "moon", "warm", "cold", "glare", "flicker", "sunbeam", "leak", "flare"];
@@ -6079,6 +6090,15 @@ var IMPACT = {
   whisper: [],
   breakdown: [["shake", 3], ["redflash", 2], ["sound", "stab"]]
 };
+var GENTLE_STRESS_EMO = /* @__PURE__ */ new Set(["love", "smile", "happy", "shy", "blush", "sad", "cry", "tired", "worried", "wronged", "wry", "passion"]);
+var GENTLE_STRESS_MOOD = /* @__PURE__ */ new Set(["sweet", "touching", "calm", "daily"]);
+var HARD_STRESS_EMO = /* @__PURE__ */ new Set(["angry", "scared", "cold", "disgust", "suspicious"]);
+var HARD_STRESS_SAY = /* @__PURE__ */ new Set(["menace", "shout", "breakdown"]);
+function isGentleStress(emo = "", say = "", mood = "") {
+  if (HARD_STRESS_SAY.has(say) || HARD_STRESS_EMO.has(emo)) return false;
+  if (say === "whisper" || GENTLE_STRESS_EMO.has(emo) || GENTLE_STRESS_MOOD.has(mood)) return true;
+  return /温柔|微笑|含泪|流泪|落泪|哽咽|喜极而泣|心动|深情|宠溺|欣慰|感动|怀念|释然|安心|羞|红着脸/.test(emo);
+}
 var TEXT_STYLES = {
   shake: { gap: 1.3, gain: 0.9, pitch: "jitter" },
   wave: { gap: 1.25, pitch: "wave" },
@@ -6088,7 +6108,12 @@ var TEXT_STYLES = {
   dwindle: { gap: [1.1, 2.6], gain: [1, 0.25], pitch: [1, 0.9] },
   small: { gap: 1.15, gain: 0.55, pitch: 1.05 },
   faint: { gap: 1.4, gain: 0.32, pitch: 0.96 },
-  glow: { gap: 1.45, before: 3, gain: 1.1, after: 2 }
+  glow: { gap: 1.45, before: 3, gain: 1.1, after: 2 },
+  warm: { gap: 1.35, before: 2, gain: 0.85, pitch: 1.02, after: 2 },
+  cold: { gap: 1.55, before: 3, gain: 0.8, pitch: 0.86, after: 2 },
+  dot: { gap: 1.3, before: 1, gain: 1.05, after: 1 },
+  choke: { gap: [1.5, 2.2], before: 3, gain: [0.75, 0.45], pitch: "jitter", after: 3 },
+  flutter: { gap: 1.3, gain: 0.82, pitch: "wave" }
 };
 var lerp = (v, k) => Array.isArray(v) ? v[0] + (v[1] - v[0]) * k : v;
 function textFxSpans(chars, textfx = []) {
@@ -6134,7 +6159,7 @@ function inferDelivery(text, emo = "", type = "dialogue") {
   if (stammer || dots >= 4 || dots >= 2 && HESITANT_EMO.has(emo)) return "hesitant";
   return "";
 }
-function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialogue", seed = "", textfx = null, offStyles = null } = {}) {
+function planLine(chars, speed, { say = "", stress = "", emo = "", mood = "", type = "dialogue", seed = "", textfx = null, offStyles = null } = {}) {
   const n = chars.length;
   const text = chars.join("");
   const spoken = type === "dialogue" || type === "thought";
@@ -6142,6 +6167,7 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
   const style = offStyles && offStyles.has(wanted) ? "" : wanted;
   const S = STYLES[style];
   const base = Math.max(speed * S.gap, S.min || 0);
+  const gentle = isGentleStress(emo, style, mood);
   const plan = { times: [], marks: new Array(n).fill(""), say: style, gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: S.blip, fx: [], tx: new Array(n).fill(""), txk: new Array(n).fill(0), txi: new Array(n).fill(0), blips: null };
   if (!n) return plan;
   const spans = textFxSpans(chars, textfx);
@@ -6160,17 +6186,18 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
       plan.blips[i] = { gain: lerp(T.gain ?? 1, k), pitch };
     }
   }
-  if (!(speed > 0)) {
-    plan.times = new Array(n).fill(0);
-    return plan;
-  }
   let s0 = -1;
   let s1 = -1;
   const at2 = stress && spoken ? text.indexOf(stress) : -1;
   if (at2 >= 0) {
     s0 = Array.from(text.slice(0, at2)).length;
     s1 = s0 + Array.from(stress).length - 1;
-    for (let i = s0; i <= s1; i += 1) plan.marks[i] = "stress";
+    const mark = gentle ? "stress-soft" : "stress";
+    for (let i = s0; i <= s1; i += 1) plan.marks[i] = mark;
+  }
+  if (!(speed > 0)) {
+    plan.times = new Array(n).fill(0);
+    return plan;
   }
   const inStress = (i) => s0 >= 0 && i >= s0 && i <= s1;
   const rand2 = seeded(`${seed}|${style}|${text}`);
@@ -6204,7 +6231,7 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
   const push = (time, list3) => {
     for (const [kind, v] of list3) fx.push(kind === "sound" ? { at: time, kind, sound: v } : { at: time, kind, power: v });
   };
-  if (s0 >= 0) push(plan.times[s1], IMPACT[style]);
+  if (s0 >= 0 && !gentle) push(plan.times[s1], IMPACT[style]);
   else if (style === "shout" && !spans.some((sp) => (TEXT_STYLES[sp.style].land || []).some(([k]) => k === "shake"))) push(0, IMPACT.shout);
   for (const sp of spans) {
     const land = TEXT_STYLES[sp.style].land;
@@ -8928,11 +8955,12 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
   const key = beat ? beat.key : "";
   const chars = import_react5.default.useMemo(() => Array.from(beat && beat.text || ""), [key, beat && beat.text]);
   const emo = beat && beat.speaker ? beat.emotions && beat.emotions[beat.speaker] || beat.emo : "";
+  const mood = beat && beat.scene ? beat.scene.mood : "";
   const say = beat ? beat.say : "";
   const stress = beat ? beat.stress : "";
   const type = beat ? beat.type : "narration";
   const textfx = beat ? beat.textfx : null;
-  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles }), [chars, speed, say, stress, emo, type, key, textfx, offStyles]);
+  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, mood, type, seed: key, textfx, offStyles }), [chars, speed, say, stress, emo, mood, type, key, textfx, offStyles]);
   const [shown, setShown] = import_react5.default.useState({ key, done: false });
   const [start, setStart] = import_react5.default.useState({ key: "", at: NaN });
   if (shown.key !== key) setShown({ key, done: false });

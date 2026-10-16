@@ -33,7 +33,10 @@ test('gate: 重音前先顿一拍，一字一顿落下，落地那一下才震',
   assert.ok(g[2] >= 100 && g[3] >= 100, '重音一字一顿')
   assert.deepEqual(kinds(p), ['shake', 'sound:impact'])
   assert.equal(p.fx[0].at, p.times[4]) // 「你」出现的那一刻
-  // 低语的重音只标红、放慢，不震不响；原文里没有的重音不生效
+  // 低语或温和情绪（心动、微笑、含泪……）的重音收成暖光（stress-soft），放慢但不震屏不响闷咚；怒斥、威压照旧标红震屏
+  const soft = plan('就知道你是谁。', { emo: 'love', stress: '就知道你是谁。' })
+  assert.deepEqual(soft.marks, ['stress-soft', 'stress-soft', 'stress-soft', 'stress-soft', 'stress-soft', 'stress-soft', 'stress-soft'])
+  assert.equal(soft.fx.length, 0)
   assert.equal(plan('就是你', { say: 'whisper', stress: '就是你' }).fx.length, 0)
   assert.ok(plan('凶手就是你', { stress: '不存在' }).marks.every(m => !m))
 })

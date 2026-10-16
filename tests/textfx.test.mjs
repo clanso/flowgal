@@ -68,10 +68,19 @@ test('gate: 吼成块砸下来、落下时震屏拍桌；越说越小越来越�
   assert.ok(grow.blips.at(-1).gain > grow.blips[0].gain)
   assert.deepEqual(kinds(grow), ['box', 'shake'])
 
-  // 发光强调：进这段之前先顿一下，一字一字慢慢亮出来
+  // 发光强调、暖意、冰冷、着重号、哽咽、心醉
   const glow = plan('他的名字是林岚。', { textfx: [{ text: '林岚', style: 'glow' }] })
   const gl = gaps(glow)
   assert.ok(gl[4] > gl[3] + 60, '进强调之前顿一下')
+  const warm = plan('让他喊你真正的名字吧，就知道你是谁。', { textfx: [{ text: '就知道你是谁。', style: 'warm' }] })
+  assert.equal(warm.tx.at(-1), 'warm')
+  assert.equal(warm.fx.length, 0, '暖意不震屏')
+  const choke = plan('谢谢你一直陪着我', { textfx: [{ text: '一直陪着我', style: 'choke' }] })
+  const cg = gaps(choke).slice(-4)
+  assert.ok(cg.at(-1) > cg[0], '哽咽越说越慢')
+  assert.ok(choke.blips.at(-1).gain < choke.blips[3].gain, '哽咽声音越来越轻')
+  const cold = plan('给我滚出去。', { textfx: [{ text: '滚出去', style: 'cold' }] })
+  assert.ok(cold.blips[2].pitch < 0.9, '冰冷音高偏低')
   // 跟重音落在同一处的不重复砸
   const both = plan('凶手就是你', { stress: '就是你', textfx: [{ text: '就是你', style: 'roar' }] })
   assert.equal(both.fx.filter(f => f.kind === 'shake').length, 1)
