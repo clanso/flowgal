@@ -318,7 +318,6 @@
 .fg-camera[data-cam="dolly"] .fg-bg { scale: 1.28; }
 .fg-camera[data-cam="dolly"] .fg-cast { scale: .96; }
 .fg-camera[data-cam="shake"] { animation: fg-shake .5s linear; }
-.fg-camera[data-cam="throb"] { animation: fg-cam-throb .78s cubic-bezier(.22, .68, .32, 1); }
 .fg-camera[data-cam="whip"] { animation: fg-whip .55s cubic-bezier(.6, 0, .3, 1); }
 .fg-camera[data-cam="zoomout"] { animation: fg-zoomout 1.6s cubic-bezier(.2, .7, .2, 1) both; }
 .fg-camera[data-cam="pan"] { animation: fg-pan 3s ease-in-out both; }
@@ -332,7 +331,6 @@
 .fg-camera[data-cam="rackfocus"] .fg-cast { filter: blur(calc(var(--rack-cast) * .45cqw)) brightness(calc(1 - var(--rack-cast) * .18)); transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }
 @keyframes fg-rack { 0% { --rack-bg: 0; --rack-cast: 0; } 26%, 36% { --rack-bg: 1; --rack-cast: 0; } 100% { --rack-bg: 0; --rack-cast: 1; } }
 @keyframes fg-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-1.2%, .6%); } 30% { transform: translate(1%, -.8%); } 45% { transform: translate(-.8%, .4%); } 60% { transform: translate(.6%, .6%); } 80% { transform: translate(-.3%, -.2%); } }
-@keyframes fg-cam-throb { 0%, 100% { transform: scale(1); } 16% { transform: scale(1.014); } 34% { transform: scale(1.002); } 52% { transform: scale(1.008); } }
 @keyframes fg-whip { 0% { transform: none; filter: none; } 35% { transform: translateX(-9%) scale(1.04); filter: blur(10px); } 60% { transform: translateX(2.5%) scale(1.02); filter: blur(3px); } 100% { transform: none; filter: none; } }
 @keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }
 @keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }
@@ -698,37 +696,21 @@
 @keyframes fg-flare-ghost { from { opacity: .7; transform: translate(.6%, -.6%); } to { opacity: 1; transform: translate(-.6%, .7%); } }
 @keyframes fg-flicker { 0%, 100% { opacity: 1; } 8% { opacity: .25; } 9% { opacity: 1; } 11% { opacity: .35; } 12% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .15; } 50% { opacity: .9; } 51% { opacity: .3; } 53% { opacity: 1; } 78% { opacity: .45; } 79% { opacity: 1; } }
 
-/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密是更温润的蜜桃暖粉柔光与缓缓流淌的光晕（不再做四角高频心跳闪烁，免得晃眼）。压在背景和立绘上，插画不受影响。
-   只用纯 GPU 合成的渐变与混合模式，不用 backdrop-filter（Chromium 在多层 backdrop-filter 叠在动画背景上时会闪烁掉帧）。 */
+/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密更暖，人离得更近一点，四角像心跳一样一明一暗。压在背景和立绘上，插画不受影响。 */
 .fg-romance { z-index: 5; }
-.fg-romance[data-v="ambiguous"] { background: radial-gradient(115% 92% at 50% 42%, rgba(255, 228, 240, .06) 35%, rgba(255, 145, 192, .26)); mix-blend-mode: screen; }
+.fg-romance[data-v="ambiguous"] { background: radial-gradient(120% 95% at 50% 40%, rgba(255, 215, 235, .05) 35%, rgba(255, 150, 195, .3)); backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); -webkit-backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); }
 .fg-romance[data-v="ambiguous"]::before { bottom: -100%; background:
-    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .5) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .44) 0 .8cqw, transparent 1.6cqw),
-    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .34) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .45) 0 1.1cqw, transparent 2cqw),
+    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .5) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .42) 0 .8cqw, transparent 1.6cqw),
+    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .32) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .45) 0 1.1cqw, transparent 2cqw),
     radial-gradient(circle at 80% 54%, rgba(255, 195, 222, .38) 0 1.6cqw, transparent 2.6cqw), radial-gradient(circle at 93% 90%, rgba(255, 236, 246, .4) 0 .9cqw, transparent 1.7cqw);
-  background-size: 100% 50%; filter: blur(.18cqw); animation: fg-bokeh-rise 26s linear infinite, fg-bokeh-twinkle 5.5s ease-in-out infinite alternate; }
-.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .26), transparent 72%); }
-.fg-romance[data-v="intimate"] {
-  background:
-    radial-gradient(85% 65% at 50% 38%, rgba(255, 236, 224, .14), transparent 72%),
-    radial-gradient(125% 100% at 50% 44%, transparent 46%, rgba(255, 168, 186, .22) 78%, rgba(225, 108, 142, .32) 100%);
-  mix-blend-mode: screen;
-}
-.fg-romance[data-v="intimate"]::before { bottom: -100%; background:
-    radial-gradient(circle at 14% 78%, rgba(255, 222, 232, .48) 0 1.5cqw, transparent 2.8cqw), radial-gradient(circle at 36% 28%, rgba(255, 242, 232, .42) 0 1cqw, transparent 2.1cqw),
-    radial-gradient(circle at 54% 88%, rgba(255, 205, 220, .38) 0 1.2cqw, transparent 2.4cqw), radial-gradient(circle at 70% 60%, rgba(255, 195, 212, .42) 0 1.7cqw, transparent 3cqw),
-    radial-gradient(circle at 86% 24%, rgba(255, 232, 238, .44) 0 1.1cqw, transparent 2.2cqw);
-  background-size: 100% 50%; filter: blur(.24cqw); opacity: .82; animation: fg-bokeh-rise 28s linear infinite, fg-bokeh-twinkle 6s ease-in-out infinite alternate; }
-.fg-romance[data-v="intimate"]::after {
-  background:
-    radial-gradient(75% 48% at 50% 0%, rgba(255, 224, 210, .28), transparent 74%),
-    radial-gradient(85% 50% at 50% 104%, rgba(255, 175, 195, .24), transparent 72%);
-  animation: fg-romance-glow 7s ease-in-out infinite alternate;
-}
+  background-size: 100% 50%; filter: blur(.2cqw); animation: fg-bokeh-rise 24s linear infinite, fg-bokeh-twinkle 4.5s ease-in-out infinite alternate; }
+.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .28), transparent 72%); }
+.fg-romance[data-v="intimate"] { background: radial-gradient(110% 90% at 50% 45%, rgba(255, 190, 150, .14) 25%, rgba(235, 95, 125, .42)); backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); -webkit-backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); }
+.fg-romance[data-v="intimate"]::after { background: radial-gradient(90% 76% at 50% 46%, transparent 40%, rgba(110, 0, 40, .5) 78%, rgba(80, 0, 30, .72)); animation: fg-romance-beat 1.15s ease-out infinite; }
 [data-romance="intimate"] .fg-cast { scale: 1.035; }
 @keyframes fg-bokeh-rise { to { transform: translateY(-50%); } }
-@keyframes fg-bokeh-twinkle { from { opacity: .65; } to { opacity: .92; } }
-@keyframes fg-romance-glow { from { opacity: .72; } to { opacity: 1; } }
+@keyframes fg-bokeh-twinkle { from { opacity: .55; } to { opacity: .95; } }
+@keyframes fg-romance-beat { 0%, 100% { opacity: .55; } 12% { opacity: 1; } 24% { opacity: .7; } 36% { opacity: .9; } 62% { opacity: .55; } }
 /* 感官主导的一段：蒙眼、耳边、触碰、发烫、发凉、香气、屏息、失神。在镜头外面（特写时不跟着放大），叠在插画和天气上面（眼睛被蒙住时什么都看不见），对话框不受影响。 */
 .fg-sense { z-index: 9; }
 .fg-sense[data-v="blind"] { background: #050307; opacity: .95; }
@@ -764,19 +746,9 @@
 .fg-world-in[data-sense="breath"] :is(.fg-actor-body, .fg-down-mist i) { animation-play-state: paused !important; }
 .fg-sense[data-v="daze"] { background: radial-gradient(100% 80% at 50% 50%, rgba(255, 255, 255, .05) 30%, rgba(228, 222, 255, .24)); backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); -webkit-backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); }
 .fg-world-in[data-sense="daze"] .fg-cast { filter: drop-shadow(1.4cqw 0 0 rgba(255, 120, 160, .26)) drop-shadow(-1.4cqw 0 0 rgba(120, 200, 255, .26)); animation: fg-daze-sway 6s ease-in-out infinite; }
-/* 心音（pulse）：靠在对方怀里、脸贴上胸口听见对方沉稳温热的心音——从胸口位置（50% 56%）一圈圈漾开暖柔的微光涟漪，画面稳稳不动 */
-.fg-sense[data-v="pulse"] { background: radial-gradient(64% 56% at 50% 56%, rgba(255, 224, 212, .16), transparent 72%), radial-gradient(110% 90% at 50% 50%, transparent 52%, rgba(235, 145, 168, .2)); mix-blend-mode: screen; }
-.fg-sense[data-v="pulse"]::before, .fg-sense[data-v="pulse"]::after {
-  inset: auto; left: 50%; top: 56%; width: 38cqw; height: 38cqw; border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(255, 236, 226, .28) 0%, transparent 32%, rgba(255, 198, 212, .42) 50%, rgba(255, 162, 185, .18) 60%, transparent 72%);
-  animation: fg-sense-pulse 2.4s cubic-bezier(.22, .62, .35, 1) infinite;
-}
-.fg-sense[data-v="pulse"]::after { animation-delay: .36s; opacity: .7; }
 @keyframes fg-blind-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
 @keyframes fg-ear-breath { 0%, 100% { opacity: .55; transform: scale(.96); } 45% { opacity: 1; transform: scale(1.04); } }
 @keyframes fg-touch-ripple { from { transform: translate(-50%, -50%) scale(.3); opacity: .9; } to { transform: translate(-50%, -50%) scale(2.4); opacity: 0; } }
-@keyframes fg-sense-pulse { 0% { transform: translate(-50%, -50%) scale(.38); opacity: .88; } 75% { opacity: .22; } 100% { transform: translate(-50%, -50%) scale(2.05); opacity: 0; } }
 @keyframes fg-heat-rise { to { -webkit-mask-position: 0 -3.6cqw; mask-position: 0 -3.6cqw; } }
 @keyframes fg-scent-drift { from { transform: translateX(-3%); } to { transform: translateX(3%); } }
 @keyframes fg-breath-close { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -789,8 +761,7 @@
 .fg-bars::after { bottom: 0; }
 .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 10.5%; }
 
-/* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。
-   心跳分三档：pulse 慢心跳（心动、温存，完全不晃画面，只留柔和光晕呼吸）/ heartbeat 持续心跳（告白、屏息等待门后，极轻微的呼吸缩放 0.4%）/ palpitate 急促心跳（受刺激、惊惧、心跳飙升，0.7% 搏动）。 */
+/* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。 */
 .fg-world[data-fx="sway"] { animation: fg-fx-sway 7s ease-in-out infinite; }
 .fg-world[data-fx="ride"] { animation: fg-fx-ride 1.7s ease-in-out infinite; }
 .fg-world[data-fx="handheld"] { animation: fg-fx-handheld 6.5s ease-in-out infinite; }
@@ -799,8 +770,7 @@
 .fg-world[data-fx="heat"] { animation: fg-fx-heat 2.6s ease-in-out infinite; }
 .fg-world[data-fx="underwater"] { animation: fg-fx-water 6s ease-in-out infinite; }
 .fg-world[data-fx="rumble"] { animation: fg-fx-rumble .16s linear infinite; }
-.fg-world[data-fx="heartbeat"] { animation: fg-fx-beat 1.8s ease-in-out infinite; }
-.fg-world[data-fx="palpitate"] { animation: fg-fx-palpitate 1.1s ease-in-out infinite; }
+.fg-world[data-fx="heartbeat"] { animation: fg-fx-beat 1.05s ease-out infinite; }
 /* 慢动作：画面极慢地推近，粒子几乎停住（见 Particles 的 speed）；时间停止：画面褪成灰、一切静止（立绘不呼吸、插画不动） */
 .fg-world { transition: filter .9s ease; }
 .fg-world[data-fx="slowmo"] { animation: fg-fx-slowmo 10s ease-in-out infinite alternate; }
@@ -818,8 +788,7 @@
 @keyframes fg-fx-heat { 0%, 100% { transform: scale(1.02) skewX(0); } 25% { transform: scale(1.02) skewX(.35deg) scaleY(1.004); } 75% { transform: scale(1.02) skewX(-.35deg); } }
 @keyframes fg-fx-water { 0%, 100% { transform: scale(1.05) skewX(-.6deg) translateY(.4%); } 50% { transform: scale(1.05) skewX(.6deg) translateY(-.4%); } }
 @keyframes fg-fx-rumble { 0% { transform: scale(1.03) translate(.25%, -.2%); } 25% { transform: scale(1.03) translate(-.3%, .15%); } 50% { transform: scale(1.03) translate(.2%, .25%); } 75% { transform: scale(1.03) translate(-.15%, -.25%); } 100% { transform: scale(1.03) translate(.25%, -.2%); } }
-@keyframes fg-fx-beat { 0%, 62%, 100% { transform: scale(1); } 16% { transform: scale(1.004); } 30% { transform: scale(1.001); } 44% { transform: scale(1.0025); } }
-@keyframes fg-fx-palpitate { 0%, 58%, 100% { transform: scale(1); } 14% { transform: scale(1.0075); } 28% { transform: scale(1.0015); } 42% { transform: scale(1.005); } }
+@keyframes fg-fx-beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.022); } 24% { transform: scale(1.004); } 36% { transform: scale(1.014); } 60% { transform: scale(1); } }
 .fg-fxlayer { z-index: 8; }
 .fg-fxlayer[data-v="slowmo"] { background: radial-gradient(100% 85% at 50% 50%, transparent 45%, rgba(10, 24, 48, .5)); backdrop-filter: saturate(.72) contrast(1.06); -webkit-backdrop-filter: saturate(.72) contrast(1.06); }
 .fg-fxlayer[data-v="slowmo"]::before { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); -webkit-mask-image: radial-gradient(75% 65% at 50% 50%, transparent 50%, #000 95%); mask-image: radial-gradient(75% 65% at 50% 50%, transparent 50%, #000 95%); }
@@ -844,15 +813,9 @@
 .fg-fxlayer[data-v="heat"] { background: linear-gradient(0deg, rgba(255, 140, 40, .22), transparent 55%); mix-blend-mode: screen; }
 .fg-fxlayer[data-v="heat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-breathe-light 2.6s ease-in-out infinite; }
 .fg-fxlayer[data-v="woozy"] { backdrop-filter: blur(.5px); -webkit-backdrop-filter: blur(.5px); background: radial-gradient(100% 80% at 50% 50%, transparent 40%, rgba(80, 40, 90, .35)); }
-.fg-fxlayer[data-v="pulse"] { background: radial-gradient(115% 92% at 50% 48%, transparent 50%, rgba(255, 178, 198, .18) 82%, rgba(235, 120, 152, .26)); mix-blend-mode: screen; }
-.fg-fxlayer[data-v="pulse"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-pulse-vignette 2.8s ease-in-out infinite; }
-.fg-fxlayer[data-v="heartbeat"] { background: radial-gradient(110% 88% at 50% 48%, transparent 48%, rgba(215, 85, 118, .2) 80%, rgba(155, 32, 64, .32)); }
-.fg-fxlayer[data-v="heartbeat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-beat-vignette 1.8s ease-in-out infinite; }
-.fg-fxlayer[data-v="palpitate"] { background: radial-gradient(102% 84% at 50% 48%, transparent 44%, rgba(185, 36, 68, .28) 78%, rgba(125, 12, 38, .44)); }
-.fg-fxlayer[data-v="palpitate"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-palpitate-vignette 1.1s ease-in-out infinite; }
-@keyframes fg-pulse-vignette { 0%, 100% { opacity: .62; } 35% { opacity: .94; } 55% { opacity: .76; } 72% { opacity: .88; } }
-@keyframes fg-beat-vignette { 0%, 62%, 100% { opacity: .55; } 18% { opacity: .88; } 32% { opacity: .66; } 46% { opacity: .78; } }
-@keyframes fg-palpitate-vignette { 0%, 58%, 100% { opacity: .52; } 15% { opacity: .95; } 28% { opacity: .65; } 42% { opacity: .85; } }
+.fg-fxlayer[data-v="heartbeat"] { background: radial-gradient(95% 80% at 50% 48%, transparent 38%, rgba(140, 0, 24, .5) 75%, rgba(90, 0, 14, .85)); }
+.fg-fxlayer[data-v="heartbeat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-beat-vignette 1.05s ease-out infinite; }
+@keyframes fg-beat-vignette { 0%, 60%, 100% { opacity: .45; } 12% { opacity: 1; } 24% { opacity: .6; } 36% { opacity: .85; } }
 .fg-fxlayer[data-v="rumble"] { background: radial-gradient(110% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, .35)); }
 .fg-fxlayer[data-v="drift"], .fg-fxlayer[data-v="sway"], .fg-fxlayer[data-v="ride"], .fg-fxlayer[data-v="handheld"] { display: none; }
 .fg-fxlayer[data-v="fading"] { background: radial-gradient(115% 85% at 50% 45%, transparent 50%, rgba(255, 236, 205, .42)), radial-gradient(150% 120% at 50% 50%, transparent 62%, rgba(40, 24, 10, .3)); }
@@ -1086,24 +1049,20 @@
 .fg-text.is-wait .fg-char { animation: none; }
 @keyframes fg-char-in { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: none; } }
 /* ── 台词演法与重音（lib/typing.js）：字的样子。要做位移、缩放的字改成 inline-block，空格照样占位 ── */
-.fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char.is-stress-soft { display: inline-block; white-space: pre; }
+.fg-text[class*="say-"] .fg-char, .fg-char.is-stress { display: inline-block; white-space: pre; }
 .fg-text.say-menace .fg-char { animation-name: fg-char-stamp; animation-duration: .2s; }
 .fg-text.say-excited .fg-char { animation-name: fg-char-hop; animation-duration: .14s; }
-.fg-text.say-chatter { line-height: 1.48; letter-spacing: -.01em; }
-.fg-text.say-chatter .fg-char { animation-name: fg-char-hop; animation-duration: .09s; }
 .fg-text.say-shout .fg-char { animation-name: fg-char-pop; animation-duration: .28s; font-size: 1.16em; font-weight: 700; }
 .fg-text.say-hesitant .fg-char { animation-duration: .32s; }
 .fg-text.say-whisper { opacity: .8; }
 .fg-text.say-whisper .fg-char { font-size: .9em; animation-duration: .45s; }
 .fg-text.say-breakdown .fg-char { color: color-mix(in oklab, var(--ink) 72%, #ff3b5c); animation: fg-char-in .12s ease forwards var(--d), fg-char-quake .2s linear infinite var(--d); }
 .fg-char.is-stress { color: var(--stress, #ff4d5e); font-weight: 700; font-size: 1.1em; text-shadow: 0 0 .6cqw rgba(255, 60, 80, .45); animation-name: fg-char-stamp; animation-duration: .24s; }
-.fg-char.is-stress-soft { color: color-mix(in oklab, var(--ink) 45%, #ffd992); font-weight: 600; font-size: 1.05em; text-shadow: 0 0 .55cqw rgba(255, 210, 140, .55), 0 0 1.2cqw color-mix(in oklab, var(--speaker, var(--accent)) 35%, transparent); animation-name: fg-char-bloom; animation-duration: .38s; }
 /* 点一下打完 / 等字体时：和普通台词一样立刻全显示、或先不动（要比上面的演法规则更具体才压得住） */
-.fg-text.is-done[class*="say-"] .fg-char, .fg-text.is-done .fg-char.is-stress, .fg-text.is-done .fg-char.is-stress-soft { animation: none; opacity: 1; }
-.fg-text.is-wait[class*="say-"] .fg-char, .fg-text.is-wait .fg-char.is-stress, .fg-text.is-wait .fg-char.is-stress-soft { animation: none; }
+.fg-text.is-done[class*="say-"] .fg-char, .fg-text.is-done .fg-char.is-stress { animation: none; opacity: 1; }
+.fg-text.is-wait[class*="say-"] .fg-char, .fg-text.is-wait .fg-char.is-stress { animation: none; }
 .fg-text.is-done.say-breakdown .fg-char { animation: fg-char-quake .2s linear infinite; opacity: 1; }
 @keyframes fg-char-stamp { from { opacity: 0; transform: translateY(-.35em) scale(1.4); } 60% { opacity: 1; transform: translateY(0) scale(.95); } to { opacity: 1; transform: none; } }
-@keyframes fg-char-bloom { from { opacity: 0; filter: blur(3px) brightness(1.4); transform: translateY(.08em) scale(1.06); } to { opacity: 1; filter: none; transform: none; } }
 @keyframes fg-char-pop { from { opacity: 0; transform: scale(1.9); } 55% { opacity: 1; transform: scale(.92); } to { opacity: 1; transform: none; } }
 @keyframes fg-char-hop { from { opacity: 0; transform: translateY(.3em); } to { opacity: 1; transform: none; } }
 @keyframes fg-char-quake { 0%, 100% { opacity: 1; transform: translate(0, 0); } 25% { opacity: 1; transform: translate(.05em, -.04em); } 50% { opacity: 1; transform: translate(-.04em, .05em); } 75% { opacity: 1; transform: translate(.04em, .03em); } }
@@ -1119,25 +1078,16 @@
 .fg-text .fg-char.tx-small { font-size: .8em; color: color-mix(in oklab, currentColor 72%, transparent); }
 .fg-text .fg-char.tx-faint { color: color-mix(in oklab, currentColor 50%, transparent); letter-spacing: .08em; text-shadow: 0 0 .35em rgba(255, 255, 255, .35); animation-duration: .7s; }
 .fg-text .fg-char.tx-glow { color: color-mix(in oklab, var(--accent) 40%, #fff6d8); font-weight: 700; text-shadow: 0 0 .45em color-mix(in oklab, var(--accent) 70%, transparent), 0 0 1em color-mix(in oklab, var(--accent) 40%, transparent); animation: fg-char-in .3s ease forwards var(--d), fg-tx-glow 2.4s ease-in-out infinite calc(var(--d) + var(--i) * .08s); }
-.fg-text .fg-char.tx-warm { color: color-mix(in oklab, var(--ink) 50%, #ffbe98); font-weight: 600; text-shadow: 0 0 .5em rgba(255, 165, 130, .55), 0 0 1.1em rgba(255, 210, 160, .35); animation: fg-char-bloom .38s ease forwards var(--d), fg-tx-glow 3s ease-in-out infinite calc(var(--d) + var(--i) * .1s); }
-.fg-text .fg-char.tx-cold { color: color-mix(in oklab, var(--ink) 42%, #8ed8ff); font-weight: 600; letter-spacing: .06em; text-shadow: 0 0 .45em rgba(110, 200, 255, .55), 0 1px 2px rgba(0, 12, 28, .75); animation-name: fg-char-stamp; animation-duration: .26s; }
-.fg-text .fg-char.tx-dot { font-weight: 600; text-emphasis: filled sesame var(--accent); -webkit-text-emphasis: filled sesame var(--accent); text-emphasis-position: under right; -webkit-text-emphasis-position: under right; animation-duration: .3s; }
-.fg-text .fg-char.tx-choke { color: color-mix(in oklab, currentColor 86%, #b8d4ff); text-shadow: 0 .06em .28em rgba(150, 195, 255, .45); animation: fg-char-in .42s ease forwards var(--d), fg-tx-choke 1.1s ease-in-out infinite calc(var(--d) + var(--i) * -.19s); }
-.fg-text .fg-char.tx-flutter { color: color-mix(in oklab, var(--ink) 58%, #ffa6c9); text-shadow: 0 0 .45em rgba(255, 145, 190, .55); animation: fg-char-bloom .34s ease forwards var(--d), fg-tx-flutter 1.8s ease-in-out infinite calc(var(--i) * -.18s); }
-/* 打完之后：别的不再重放，发抖、波浪、发光、暖意、哽咽、心醉接着动；等字体时先不动 */
+/* 打完之后：别的不再重放，发抖、波浪、发光接着动；等字体时先不动 */
 .fg-text.is-done .fg-char[class*="tx-"] { animation: none; opacity: 1; }
 .fg-text.is-done .fg-char.tx-shake { animation: fg-tx-shake .16s steps(2) infinite; }
 .fg-text.is-done .fg-char.tx-wave { animation: fg-tx-wave 1.3s ease-in-out infinite calc(var(--i) * -.13s); }
-.fg-text.is-done .fg-char.tx-glow, .fg-text.is-done .fg-char.tx-warm { animation: fg-tx-glow 2.4s ease-in-out infinite calc(var(--i) * .08s); }
-.fg-text.is-done .fg-char.tx-choke { animation: fg-tx-choke 1.1s ease-in-out infinite calc(var(--i) * -.19s); }
-.fg-text.is-done .fg-char.tx-flutter { animation: fg-tx-flutter 1.8s ease-in-out infinite calc(var(--i) * -.18s); }
+.fg-text.is-done .fg-char.tx-glow { animation: fg-tx-glow 2.4s ease-in-out infinite calc(var(--i) * .08s); }
 .fg-text.is-wait .fg-char[class*="tx-"] { animation: none; }
 @keyframes fg-tx-shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(.045em, -.035em) rotate(-1deg); } 50% { transform: translate(-.04em, .04em) rotate(.8deg); } 75% { transform: translate(.035em, .03em); } }
 @keyframes fg-tx-wave { 0%, 100% { transform: translateY(.1em); } 50% { transform: translateY(-.16em); } }
 @keyframes fg-tx-slam { from { opacity: 0; transform: scale(2.6) rotate(-4deg); } 50% { opacity: 1; transform: scale(.88); } 75% { opacity: 1; transform: scale(1.06); } to { opacity: 1; transform: none; } }
 @keyframes fg-tx-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
-@keyframes fg-tx-choke { 0%, 100% { transform: translateY(0); filter: blur(0); } 45% { transform: translateY(.04em) translateX(-.02em); filter: blur(.35px); } 75% { transform: translateY(-.02em) translateX(.02em); } }
-@keyframes fg-tx-flutter { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-.08em) scale(1.03); } }
 .fg-wait { position: absolute; right: 2.6%; bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }
 .fg-wait::before { content: var(--wait-glyph); }
 @keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }
@@ -1699,7 +1649,7 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-camera[data-cam="whip"] { animation: none !important; }
   .fg-photo, .fg-cup, .fg-moment-card { animation: fg-fade-in .2s ease both !important; } /* 小瞬间：不飞、不弹，只淡入 */
   .fg-touch-ring, .fg-clink, .fg-fw-trail, .fg-fw-burst, .fg-steam i { animation: none !important; opacity: 0; }
-  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char.is-stress-soft, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */
+  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */
   .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }
   .fg-text.is-wait .fg-char { animation: none !important; }
 }
@@ -1821,59 +1771,20 @@ button.fg-pm-name:hover { color: var(--accent); }
   .fg-lib-bar .fg-row { flex-wrap: wrap; }
 }
 
-/* 亲密场面（lib/eros.js、Eros.jsx）：潮红与热气 .fg-eros（scene.eros，节奏越快越深、四周泛起丝绒般的绯红热气与微光，余韵时转成一层柔蜜暖雾）、
-   触手的影子 .fg-tentacle（scene.tentacle）、高潮那一下的白光 .fg-peak。
-   全程使用纯 GPU 渐变与混合模式（不用 backdrop-filter，彻底杜绝 Chromium 多层背景滤镜重采样造成的贴图闪烁故障）。
-   潮红和影子在插画上面一层（z-index 7），正中留出通透的视觉区不挡画，只渲染画面四周的呼吸热气；白光在对话框下面（z-index 15），字照样读得到。 */
+/* 亲密场面（lib/eros.js、Eros.jsx）：潮红 .fg-eros（scene.eros，节奏越快越深，余韵时转成一层暖雾）、触手的影子 .fg-tentacle（scene.tentacle）、
+   高潮那一下的白光 .fg-peak。不出字、不出爱心和漫画符号，只动光和影。潮红和影子在插画上面一层（z-index 7），只压画面边上一圈，不挡脸；
+   白光在对话框下面（z-index 15），字照样读得到。镜头跟着节奏的一送一落、高潮时的一涌是 Eros.jsx 用 Web Animations 动的。 */
 .fg-eros, .fg-tentacle { position: absolute; inset: 0; z-index: 7; pointer-events: none; animation: fg-layer-in var(--fade, 1.2s) ease both; }
 .fg-eros.is-leave, .fg-tentacle.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }
 .fg-eros::before, .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
-.fg-eros {
-  --flush-inner: rgba(255, 180, 198, .12);
-  --flush-edge: rgba(215, 72, 112, .28);
-  --glow: 6s;
-  background: radial-gradient(115% 92% at 50% 44%, transparent 44%, var(--flush-inner) 74%, var(--flush-edge) 100%);
-}
-/* ::before 漂浮的细碎温存光晕与绯红雾气；::after 随呼吸缓缓起伏的柔和暖雾（不做四角急促闪烁） */
-.fg-eros::before {
-  bottom: -100%;
-  background:
-    radial-gradient(circle at 12% 84%, rgba(255, 205, 220, .42) 0 1.2cqw, transparent 2.6cqw),
-    radial-gradient(circle at 28% 36%, rgba(255, 236, 242, .36) 0 .7cqw, transparent 1.7cqw),
-    radial-gradient(circle at 52% 72%, rgba(255, 185, 206, .3) 0 1.6cqw, transparent 3cqw),
-    radial-gradient(circle at 76% 28%, rgba(255, 224, 234, .38) 0 .9cqw, transparent 2cqw),
-    radial-gradient(circle at 88% 64%, rgba(255, 192, 214, .38) 0 1.3cqw, transparent 2.6cqw);
-  background-size: 100% 50%;
-  mix-blend-mode: screen;
-  opacity: .72;
-  animation: fg-bokeh-rise 26s linear infinite, fg-bokeh-twinkle var(--glow) ease-in-out infinite alternate;
-}
-.fg-eros::after {
-  background:
-    radial-gradient(88% 48% at 50% 104%, rgba(255, 155, 178, .26), transparent 72%),
-    radial-gradient(76% 38% at 50% -6%, rgba(255, 205, 218, .18), transparent 70%);
-  mix-blend-mode: screen;
-  animation: fg-eros-pulse var(--glow) ease-in-out infinite alternate;
-}
-.fg-eros[data-v="tease"] { --flush-inner: rgba(255, 195, 210, .09); --flush-edge: rgba(220, 92, 125, .22); --glow: 7s; }
-.fg-eros[data-v="slow"] { --flush-inner: rgba(255, 180, 198, .12); --flush-edge: rgba(215, 72, 112, .28); --glow: 5.5s; }
-.fg-eros[data-v="fast"] { --flush-inner: rgba(255, 165, 188, .16); --flush-edge: rgba(210, 58, 102, .34); --glow: 4.2s; }
-.fg-eros[data-v="frantic"] { --flush-inner: rgba(255, 150, 178, .2); --flush-edge: rgba(205, 44, 92, .4); --glow: 3.2s; }
-.fg-eros[data-v="afterglow"] {
-  --glow: 7.5s;
-  background:
-    radial-gradient(95% 80% at 50% 44%, rgba(255, 244, 234, .12) 0%, rgba(255, 212, 205, .15) 55%, rgba(215, 128, 145, .24) 100%);
-}
-.fg-eros[data-v="afterglow"]::before { opacity: .88; animation-duration: 32s, 6.5s; }
-.fg-eros[data-v="afterglow"]::after {
-  background:
-    radial-gradient(68% 58% at 50% 42%, rgba(255, 250, 244, .2), transparent 74%),
-    radial-gradient(90% 50% at 50% 102%, rgba(255, 205, 185, .24), transparent 72%);
-}
-@keyframes fg-eros-pulse {
-  from { opacity: .68; }
-  to { opacity: .96; }
-}
+.fg-eros { --flush: rgba(205, 72, 98, .4); --glow: 4.2s; background: radial-gradient(118% 92% at 50% 46%, rgba(255, 180, 170, .06) 30%, var(--flush)); backdrop-filter: saturate(1.08); -webkit-backdrop-filter: saturate(1.08); }
+.fg-eros::after { background: radial-gradient(85% 55% at 50% 104%, rgba(255, 168, 150, .2), transparent 70%), radial-gradient(70% 40% at 50% -6%, rgba(255, 190, 200, .12), transparent 70%); animation: fg-eros-glow var(--glow) ease-in-out infinite; }
+.fg-eros[data-v="tease"] { --flush: rgba(225, 112, 124, .28); --glow: 5s; }
+.fg-eros[data-v="fast"] { --flush: rgba(200, 62, 92, .48); --glow: 2.6s; backdrop-filter: saturate(1.12) contrast(1.02); -webkit-backdrop-filter: saturate(1.12) contrast(1.02); }
+.fg-eros[data-v="frantic"] { --flush: rgba(190, 46, 84, .56); --glow: 1.5s; backdrop-filter: saturate(1.18) contrast(1.05); -webkit-backdrop-filter: saturate(1.18) contrast(1.05); }
+.fg-eros[data-v="afterglow"] { --glow: 7s; background: radial-gradient(120% 95% at 50% 46%, rgba(255, 236, 226, .1) 30%, rgba(222, 150, 150, .24)); backdrop-filter: brightness(1.04) contrast(.93) saturate(.95); -webkit-backdrop-filter: brightness(1.04) contrast(.93) saturate(.95); }
+.fg-eros[data-v="afterglow"]::before { background: radial-gradient(60% 55% at 50% 44%, rgba(255, 250, 246, .16), transparent 72%); filter: blur(1cqw); }
+@keyframes fg-eros-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
 /* 触手：画面两边和角落里暗紫的触手剪影往里探、慢慢地扭（像镜头前景里没对上焦的东西），身上一道湿亮的反光；
    潜伏（idle）时缩在画面外沿、淡一些，蠕动（writhe）时探进来、扭得快。形状是两张 SVG：剪影一张、反光一张，跟着同一个动画走。 */
@@ -1893,44 +1804,14 @@ button.fg-pm-name:hover { color: var(--accent); }
 @keyframes fg-tentacle-writhe { 0% { transform: skewX(-3.5deg) scale(1.01, .97); } 40% { transform: skewX(2.5deg) scale(.985, 1.05) translateY(-1.2%); } 100% { transform: skewX(4deg) scale(1, 1.01); } }
 @keyframes fg-tentacle-glint { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
 
-/* 高潮与射精（ErosPeak）：
-   - climax / both：.fg-peak-veil 先骤然涌起一层纯白强光（0.16s 到顶），随后化作柔和的暖粉白光晕再痉挛着亮一下，最后在 3.1 秒内缓缓消融；
-   - cum / both：四道脉冲环（.fg-peak i）跟着声音的四下（0ms / 380ms / 780ms / 1220ms）从下腹与画面四周同时潮涌收缩，一下比一下柔和。
-   纯 opacity + transform 合成，完全不用 backdrop-filter，丝滑不闪贴图。 */
-.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; overflow: hidden; }
-.fg-peak-veil {
-  position: absolute; inset: 0; display: block; opacity: 0; will-change: opacity, transform;
-  background:
-    radial-gradient(72% 66% at 50% 46%, #fff 0%, rgba(255, 252, 250, .97) 42%, rgba(255, 232, 240, .86) 76%, rgba(255, 205, 222, .68) 100%);
-  animation: fg-peak-bloom 3.1s cubic-bezier(.22, 0, .2, 1) both;
-}
-.fg-peak.is-both .fg-peak-veil {
-  background:
-    radial-gradient(76% 70% at 50% 48%, #fff 0%, rgba(255, 253, 252, .98) 48%, rgba(255, 228, 238, .9) 80%, rgba(255, 195, 216, .75) 100%);
-}
-.fg-peak i {
-  position: absolute; inset: -4%; opacity: 0; will-change: opacity, transform;
-  background:
-    radial-gradient(64% 58% at 50% 58%, rgba(255, 253, 250, .96) 0%, rgba(255, 234, 242, .68) 44%, rgba(255, 182, 206, .36) 72%, rgba(255, 150, 185, .18) 100%);
-  animation: fg-peak-pulse .68s cubic-bezier(.2, .65, .3, 1) var(--at, 0ms) both;
-}
-@keyframes fg-peak-bloom {
-  0% { opacity: 0; transform: scale(.98); }
-  6% { opacity: .98; transform: scale(1.01); }
-  14% { opacity: .66; transform: scale(1); }
-  22% { opacity: .90; transform: scale(1.008); }
-  38% { opacity: .62; transform: scale(1.002); }
-  65% { opacity: .26; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1); }
-}
-@keyframes fg-peak-pulse {
-  0% { opacity: 0; transform: scale(.94); }
-  18% { opacity: calc(.88 * var(--k, 1)); transform: scale(1.02); }
-  48% { opacity: calc(.42 * var(--k, 1)); transform: scale(1.005); }
-  100% { opacity: 0; transform: scale(1); }
-}
+/* 高潮：画面柔和地白起来、带一点虚，再慢慢回来；射精：跟着声音一下一下地亮，一下比一下弱。 */
+.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+.fg-peak.is-climax, .fg-peak.is-both { background: radial-gradient(78% 72% at 50% 48%, rgba(255, 253, 250, .94), rgba(255, 238, 242, .62) 55%, rgba(255, 222, 232, .28)); backdrop-filter: blur(3px) brightness(1.15); -webkit-backdrop-filter: blur(3px) brightness(1.15); animation: fg-peak-bloom 2.6s cubic-bezier(.3, 0, .2, 1) both; }
+.fg-peak i { position: absolute; inset: 0; opacity: 0; background: radial-gradient(90% 80% at 50% 56%, rgba(255, 250, 246, .9), rgba(255, 236, 240, .36) 58%, transparent 92%); animation: fg-peak-pulse .55s ease-out var(--at, 0ms) both; }
+@keyframes fg-peak-bloom { 0% { opacity: 0; } 22% { opacity: .84; } 42% { opacity: .7; } 100% { opacity: 0; } }
+@keyframes fg-peak-pulse { 0% { opacity: 0; } 14% { opacity: calc(.6 * var(--k, 1)); } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .fg-eros::before, .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */
+  .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */
 }
 
 /* 设置 → 声音：音色一览按男女分组；自己做音色的编辑器；自动分配的音色组 */

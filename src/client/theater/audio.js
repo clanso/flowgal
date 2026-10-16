@@ -145,7 +145,6 @@ export function stopAll() {
   for (const src of [...oneShots]) { try { src.stop() } catch {} }
   oneShots.clear()
   stopEros()
-  stopHeartbeat()
   erosRecording.stop()
 }
 
@@ -746,37 +745,6 @@ function tentacleLoop(kind) {
 }
 const erosBed = rhythm()
 const tentacleBed = rhythm()
-const heartBed = rhythm()
-
-/**
- * 画面效果 / 感官的心跳联动音（fx.pulse / fx.heartbeat / fx.palpitate / sense.pulse）：
- * 当场景挂了心跳特效、且当前没有已经在放含「心」的环境音时，按对应画面动画的同一周期（2.4s / 2.8s / 1.8s / 1.1s）自动合成低沉温润的「扑-通」心音。
- */
-const HEARTBEAT_SPEC = {
-  'sense:pulse': { beat: 2.4, f1: 58, f2: 52, sep: 0.24, gain: 0.56 },
-  pulse: { beat: 2.8, f1: 60, f2: 54, sep: 0.23, gain: 0.45 },
-  heartbeat: { beat: 1.8, f1: 64, f2: 58, sep: 0.19, gain: 0.65 },
-  palpitate: { beat: 1.1, f1: 72, f2: 65, sep: 0.15, gain: 0.82 },
-}
-function heartLoop(kind) {
-  const spec = HEARTBEAT_SPEC[kind]
-  if (!spec) return null
-  const { beat, f1, f2, sep, gain } = spec
-  const parts = [
-    { wave: 'sine', f: f1, to: f1 * 0.62, dur: 0.16, gain: 0.26 * gain, attack: 0.005, at: 0 },
-    { wave: 'noise', f: 185, q: 1.2, dur: 0.07, gain: 0.11 * gain, at: 0 },
-    { wave: 'sine', f: f2, to: f2 * 0.62, dur: 0.18, gain: 0.19 * gain, attack: 0.006, at: sep },
-    { wave: 'noise', f: 165, q: 1.2, dur: 0.07, gain: 0.08 * gain, at: sep },
-  ]
-  return {
-    gap: () => beat,
-    play(ac, at, step, volume) { playParts(ac, parts, { volume, at }) },
-  }
-}
-export function playHeartbeat(kind, volume = 1) {
-  heartBed.set(kind || '', heartLoop(kind), volume)
-}
-export function stopHeartbeat() { heartBed.stop() }
 
 /** 节奏底：pace 是 scene.eros，tentacle 是 scene.tentacle；是 none（或 volume 为 0）的那一条停下。 */
 export function playEros(pace, tentacle, volume = 1) {
@@ -813,7 +781,6 @@ export function previewEros(pace, tentacle, volume = 1, seconds = 5) {
   beds[1].set('trial', tentacleLoop(tentacle), volume * 0.8)
   erosBed.quiet(seconds + 0.5)
   tentacleBed.quiet(seconds + 0.5)
-  heartBed.quiet(seconds + 0.5)
   erosRecording.duck(0, (seconds + 0.5) * 1000)
   trial = { beds, timer: setTimeout(() => { beds.forEach(b => b.stop()); trial = null }, seconds * 1000) }
 }

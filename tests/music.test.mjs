@@ -91,8 +91,8 @@ test('gate: 导演选曲：编号 / none / keep 规整，转折点以外换歌�
   assert.equal(s.lines.U3.bgm, undefined)
   assert.equal(s.lines.U4.bgm, undefined)
   assert.equal(playingAfter(s), 'rain')
-  // 转折点（基调变了、换地方）上换不占名额；模型把 bgm 写进 line.scene.bgm 时也照收
-  const turning = normalizeScript({ scene: { bgm: 'night' }, lines: [{ u: 'U1', bgm: 'rain' }, { u: 'U2', bgm: 'night', scene: { mood: 'tense' } }, { u: 'U3', scene: { location: '天台', bgm: 'rain' } }] }, units, { trackIds: ['night', 'rain'], limits: { bgmSwaps: 1 } })
+  // 转折点（基调变了、换地方）上换不占名额
+  const turning = normalizeScript({ scene: { bgm: 'night' }, lines: [{ u: 'U1', bgm: 'rain' }, { u: 'U2', bgm: 'night', scene: { mood: 'tense' } }, { u: 'U3', bgm: 'rain', scene: { location: '天台' } }] }, units, { trackIds: ['night', 'rain'], limits: { bgmSwaps: 1 } })
   assert.deepEqual(['U1', 'U2', 'U3'].map(u => turning.lines[u].bgm), ['rain', 'night', 'rain'])
 
   // keep、乱写都沿用上一幕结束时的曲子；上一幕的曲子被删了就不沿用。

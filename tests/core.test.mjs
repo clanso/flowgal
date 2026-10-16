@@ -40,38 +40,11 @@ test('gate: 正文切成旁白、台词、心声，并猜出说话人', () => {
   assert.equal(anchorFor(units, 'U1'), '夕阳把天台染成了橘红色。')
 })
 
-test('gate: 长旁白与长台词按呼吸节奏分页；超长单句按破折号、逗号找气口切分；双语长台词在播放时按句读拆成多拍，连珠炮不拆', () => {
+test('gate: 长旁白按句子分页', () => {
   const long = '这是一句很长的话。'.repeat(30)
   const units = segmentTurn(long)
   assert.ok(units.length > 2)
   assert.ok(units.every(u => u.text.length <= 100))
-  // 超过 96 字的单句（无句号，只有破折号和逗号）也能按气口切开
-  const singleLong = '快感如同溃堤的洪水一瞬间淹没了全身，腰剧烈地颤抖着弓起，白浊的液体从指尖握着的顶端喷涌而出，弄脏了她的手和我自己的小腹——与此同时，下面那个属于女性的器官也在痉挛着绞紧，一波接一波的高潮从深处涌出来，让我整个人蜷缩着抖了好几秒钟。'
-  const singleUnits = segmentTurn(singleLong)
-  assert.ok(singleUnits.length >= 2, '超长单句按气口切成两页以上')
-  assert.ok(singleUnits.every(u => u.text.length <= 96))
-  // 双语长台词在 buildBeats 时拆成多拍（原文和翻译一一对齐），但如果标了 say: chatter 就保留在一拍里一口气说完
-  const dualUnit = {
-    id: 'U1',
-    type: 'dialogue',
-    text: '你看，连一扇门都替你想好了。你在第一层走街串巷的时候是那个少年，回了家把门一关，你想是谁就是谁。不用挑，也不用扔。',
-    orig: 'ほら、扉一つでちゃんと分けてくれるでしょう。第一層を歩き回る時はあの少年で、家に帰って戸を閉めれば、あなたはなりたい誰にでもなれる。選ぶ必要も、捨てる必要もないのよ。',
-  }
-  const splitBeats = buildBeats({
-    turns: [{ turn: 1, textVersion: 'v1', units: [dualUnit], script: { scene: {}, cast: [], lines: { U1: { sp: '阿黛尔', textfx: [{ text: '不用挑，也不用扔', style: 'warm' }] } } } }],
-    images: [],
-  }).beats
-  assert.ok(splitBeats.length >= 2, '双语长台词拆成多拍')
-  assert.equal(splitBeats[0].key, '1:U1')
-  assert.equal(splitBeats[1].key, '1:U1.2')
-  assert.ok(splitBeats[0].orig && splitBeats[1].orig, '每拍都有对应的日文原文')
-  assert.equal((splitBeats[0].textfx || []).length, 0, '文字效果只留在出现那句话的那一拍上')
-  assert.equal(splitBeats.at(-1).textfx[0].style, 'warm')
-  const chatterBeats = buildBeats({
-    turns: [{ turn: 1, textVersion: 'v1', units: [dualUnit], script: { scene: {}, cast: [], lines: { U1: { sp: '大场香', say: 'chatter' } } } }],
-    images: [],
-  }).beats
-  assert.equal(chatterBeats.length, 1, '连珠炮（chatter）不拆页，一口气说完自动跳下一句')
 })
 
 test('gate: 导演 JSON 容错与规整', () => {

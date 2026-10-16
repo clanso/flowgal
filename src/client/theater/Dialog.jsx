@@ -18,12 +18,11 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
   const key = beat ? beat.key : ''
   const chars = React.useMemo(() => Array.from((beat && beat.text) || ''), [key, beat && beat.text])
   const emo = beat && beat.speaker ? (beat.emotions && beat.emotions[beat.speaker]) || beat.emo : ''
-  const mood = beat && beat.scene ? beat.scene.mood : ''
   const say = beat ? beat.say : ''
   const stress = beat ? beat.stress : ''
   const type = beat ? beat.type : 'narration'
   const textfx = beat ? beat.textfx : null
-  const plan = React.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, mood, type, seed: key, textfx, offStyles }), [chars, speed, say, stress, emo, mood, type, key, textfx, offStyles])
+  const plan = React.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles }), [chars, speed, say, stress, emo, type, key, textfx, offStyles])
   const [shown, setShown] = React.useState({ key, done: false })
   const [start, setStart] = React.useState({ key: '', at: NaN })
   if (shown.key !== key) setShown({ key, done: false })

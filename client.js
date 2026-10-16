@@ -691,7 +691,6 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-camera[data-cam="dolly"] .fg-bg { scale: 1.28; }\r
 .fg-camera[data-cam="dolly"] .fg-cast { scale: .96; }\r
 .fg-camera[data-cam="shake"] { animation: fg-shake .5s linear; }\r
-.fg-camera[data-cam="throb"] { animation: fg-cam-throb .78s cubic-bezier(.22, .68, .32, 1); }\r
 .fg-camera[data-cam="whip"] { animation: fg-whip .55s cubic-bezier(.6, 0, .3, 1); }\r
 .fg-camera[data-cam="zoomout"] { animation: fg-zoomout 1.6s cubic-bezier(.2, .7, .2, 1) both; }\r
 .fg-camera[data-cam="pan"] { animation: fg-pan 3s ease-in-out both; }\r
@@ -705,7 +704,6 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-camera[data-cam="rackfocus"] .fg-cast { filter: blur(calc(var(--rack-cast) * .45cqw)) brightness(calc(1 - var(--rack-cast) * .18)); transition: right .65s cubic-bezier(.4, .1, .2, 1), opacity .9s ease, scale 2.6s cubic-bezier(.4, 0, .2, 1); }\r
 @keyframes fg-rack { 0% { --rack-bg: 0; --rack-cast: 0; } 26%, 36% { --rack-bg: 1; --rack-cast: 0; } 100% { --rack-bg: 0; --rack-cast: 1; } }\r
 @keyframes fg-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-1.2%, .6%); } 30% { transform: translate(1%, -.8%); } 45% { transform: translate(-.8%, .4%); } 60% { transform: translate(.6%, .6%); } 80% { transform: translate(-.3%, -.2%); } }\r
-@keyframes fg-cam-throb { 0%, 100% { transform: scale(1); } 16% { transform: scale(1.014); } 34% { transform: scale(1.002); } 52% { transform: scale(1.008); } }\r
 @keyframes fg-whip { 0% { transform: none; filter: none; } 35% { transform: translateX(-9%) scale(1.04); filter: blur(10px); } 60% { transform: translateX(2.5%) scale(1.02); filter: blur(3px); } 100% { transform: none; filter: none; } }\r
 @keyframes fg-zoomout { from { transform: scale(1.14); } to { transform: scale(1); } }\r
 @keyframes fg-pan { 0% { transform: translateX(2%) scale(1.06); } 100% { transform: translateX(-2%) scale(1.06); } }\r
@@ -1071,37 +1069,21 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-flare-ghost { from { opacity: .7; transform: translate(.6%, -.6%); } to { opacity: 1; transform: translate(-.6%, .7%); } }\r
 @keyframes fg-flicker { 0%, 100% { opacity: 1; } 8% { opacity: .25; } 9% { opacity: 1; } 11% { opacity: .35; } 12% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .15; } 50% { opacity: .9; } 51% { opacity: .3; } 53% { opacity: 1; } 78% { opacity: .45; } 79% { opacity: 1; } }\r
 \r
-/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密是更温润的蜜桃暖粉柔光与缓缓流淌的光晕（不再做四角高频心跳闪烁，免得晃眼）。压在背景和立绘上，插画不受影响。\r
-   只用纯 GPU 合成的渐变与混合模式，不用 backdrop-filter（Chromium 在多层 backdrop-filter 叠在动画背景上时会闪烁掉帧）。 */\r
+/* 亲密氛围：暧昧是淡粉的柔光和慢慢往上飘的光斑；亲密更暖，人离得更近一点，四角像心跳一样一明一暗。压在背景和立绘上，插画不受影响。 */\r
 .fg-romance { z-index: 5; }\r
-.fg-romance[data-v="ambiguous"] { background: radial-gradient(115% 92% at 50% 42%, rgba(255, 228, 240, .06) 35%, rgba(255, 145, 192, .26)); mix-blend-mode: screen; }\r
+.fg-romance[data-v="ambiguous"] { background: radial-gradient(120% 95% at 50% 40%, rgba(255, 215, 235, .05) 35%, rgba(255, 150, 195, .3)); backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); -webkit-backdrop-filter: brightness(1.05) saturate(1.08) contrast(.94); }\r
 .fg-romance[data-v="ambiguous"]::before { bottom: -100%; background:\r
-    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .5) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .44) 0 .8cqw, transparent 1.6cqw),\r
-    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .34) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .45) 0 1.1cqw, transparent 2cqw),\r
+    radial-gradient(circle at 10% 82%, rgba(255, 205, 228, .5) 0 1.4cqw, transparent 2.4cqw), radial-gradient(circle at 27% 34%, rgba(255, 238, 246, .42) 0 .8cqw, transparent 1.6cqw),\r
+    radial-gradient(circle at 46% 66%, rgba(255, 185, 215, .32) 0 2cqw, transparent 3.2cqw), radial-gradient(circle at 63% 18%, rgba(255, 228, 242, .45) 0 1.1cqw, transparent 2cqw),\r
     radial-gradient(circle at 80% 54%, rgba(255, 195, 222, .38) 0 1.6cqw, transparent 2.6cqw), radial-gradient(circle at 93% 90%, rgba(255, 236, 246, .4) 0 .9cqw, transparent 1.7cqw);\r
-  background-size: 100% 50%; filter: blur(.18cqw); animation: fg-bokeh-rise 26s linear infinite, fg-bokeh-twinkle 5.5s ease-in-out infinite alternate; }\r
-.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .26), transparent 72%); }\r
-.fg-romance[data-v="intimate"] {\r
-  background:\r
-    radial-gradient(85% 65% at 50% 38%, rgba(255, 236, 224, .14), transparent 72%),\r
-    radial-gradient(125% 100% at 50% 44%, transparent 46%, rgba(255, 168, 186, .22) 78%, rgba(225, 108, 142, .32) 100%);\r
-  mix-blend-mode: screen;\r
-}\r
-.fg-romance[data-v="intimate"]::before { bottom: -100%; background:\r
-    radial-gradient(circle at 14% 78%, rgba(255, 222, 232, .48) 0 1.5cqw, transparent 2.8cqw), radial-gradient(circle at 36% 28%, rgba(255, 242, 232, .42) 0 1cqw, transparent 2.1cqw),\r
-    radial-gradient(circle at 54% 88%, rgba(255, 205, 220, .38) 0 1.2cqw, transparent 2.4cqw), radial-gradient(circle at 70% 60%, rgba(255, 195, 212, .42) 0 1.7cqw, transparent 3cqw),\r
-    radial-gradient(circle at 86% 24%, rgba(255, 232, 238, .44) 0 1.1cqw, transparent 2.2cqw);\r
-  background-size: 100% 50%; filter: blur(.24cqw); opacity: .82; animation: fg-bokeh-rise 28s linear infinite, fg-bokeh-twinkle 6s ease-in-out infinite alternate; }\r
-.fg-romance[data-v="intimate"]::after {\r
-  background:\r
-    radial-gradient(75% 48% at 50% 0%, rgba(255, 224, 210, .28), transparent 74%),\r
-    radial-gradient(85% 50% at 50% 104%, rgba(255, 175, 195, .24), transparent 72%);\r
-  animation: fg-romance-glow 7s ease-in-out infinite alternate;\r
-}\r
+  background-size: 100% 50%; filter: blur(.2cqw); animation: fg-bokeh-rise 24s linear infinite, fg-bokeh-twinkle 4.5s ease-in-out infinite alternate; }\r
+.fg-romance[data-v="ambiguous"]::after { background: radial-gradient(70% 45% at 50% 0%, rgba(255, 232, 242, .28), transparent 72%); }\r
+.fg-romance[data-v="intimate"] { background: radial-gradient(110% 90% at 50% 45%, rgba(255, 190, 150, .14) 25%, rgba(235, 95, 125, .42)); backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); -webkit-backdrop-filter: saturate(1.18) brightness(1.02) sepia(.22); }\r
+.fg-romance[data-v="intimate"]::after { background: radial-gradient(90% 76% at 50% 46%, transparent 40%, rgba(110, 0, 40, .5) 78%, rgba(80, 0, 30, .72)); animation: fg-romance-beat 1.15s ease-out infinite; }\r
 [data-romance="intimate"] .fg-cast { scale: 1.035; }\r
 @keyframes fg-bokeh-rise { to { transform: translateY(-50%); } }\r
-@keyframes fg-bokeh-twinkle { from { opacity: .65; } to { opacity: .92; } }\r
-@keyframes fg-romance-glow { from { opacity: .72; } to { opacity: 1; } }\r
+@keyframes fg-bokeh-twinkle { from { opacity: .55; } to { opacity: .95; } }\r
+@keyframes fg-romance-beat { 0%, 100% { opacity: .55; } 12% { opacity: 1; } 24% { opacity: .7; } 36% { opacity: .9; } 62% { opacity: .55; } }\r
 /* 感官主导的一段：蒙眼、耳边、触碰、发烫、发凉、香气、屏息、失神。在镜头外面（特写时不跟着放大），叠在插画和天气上面（眼睛被蒙住时什么都看不见），对话框不受影响。 */\r
 .fg-sense { z-index: 9; }\r
 .fg-sense[data-v="blind"] { background: #050307; opacity: .95; }\r
@@ -1137,19 +1119,9 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-world-in[data-sense="breath"] :is(.fg-actor-body, .fg-down-mist i) { animation-play-state: paused !important; }\r
 .fg-sense[data-v="daze"] { background: radial-gradient(100% 80% at 50% 50%, rgba(255, 255, 255, .05) 30%, rgba(228, 222, 255, .24)); backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); -webkit-backdrop-filter: blur(1.6px) saturate(.8) brightness(1.06); }\r
 .fg-world-in[data-sense="daze"] .fg-cast { filter: drop-shadow(1.4cqw 0 0 rgba(255, 120, 160, .26)) drop-shadow(-1.4cqw 0 0 rgba(120, 200, 255, .26)); animation: fg-daze-sway 6s ease-in-out infinite; }\r
-/* 心音（pulse）：靠在对方怀里、脸贴上胸口听见对方沉稳温热的心音——从胸口位置（50% 56%）一圈圈漾开暖柔的微光涟漪，画面稳稳不动 */\r
-.fg-sense[data-v="pulse"] { background: radial-gradient(64% 56% at 50% 56%, rgba(255, 224, 212, .16), transparent 72%), radial-gradient(110% 90% at 50% 50%, transparent 52%, rgba(235, 145, 168, .2)); mix-blend-mode: screen; }\r
-.fg-sense[data-v="pulse"]::before, .fg-sense[data-v="pulse"]::after {\r
-  inset: auto; left: 50%; top: 56%; width: 38cqw; height: 38cqw; border-radius: 50%;\r
-  transform: translate(-50%, -50%);\r
-  background: radial-gradient(circle, rgba(255, 236, 226, .28) 0%, transparent 32%, rgba(255, 198, 212, .42) 50%, rgba(255, 162, 185, .18) 60%, transparent 72%);\r
-  animation: fg-sense-pulse 2.4s cubic-bezier(.22, .62, .35, 1) infinite;\r
-}\r
-.fg-sense[data-v="pulse"]::after { animation-delay: .36s; opacity: .7; }\r
 @keyframes fg-blind-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }\r
 @keyframes fg-ear-breath { 0%, 100% { opacity: .55; transform: scale(.96); } 45% { opacity: 1; transform: scale(1.04); } }\r
 @keyframes fg-touch-ripple { from { transform: translate(-50%, -50%) scale(.3); opacity: .9; } to { transform: translate(-50%, -50%) scale(2.4); opacity: 0; } }\r
-@keyframes fg-sense-pulse { 0% { transform: translate(-50%, -50%) scale(.38); opacity: .88; } 75% { opacity: .22; } 100% { transform: translate(-50%, -50%) scale(2.05); opacity: 0; } }\r
 @keyframes fg-heat-rise { to { -webkit-mask-position: 0 -3.6cqw; mask-position: 0 -3.6cqw; } }\r
 @keyframes fg-scent-drift { from { transform: translateX(-3%); } to { transform: translateX(3%); } }\r
 @keyframes fg-breath-close { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }\r
@@ -1162,8 +1134,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-bars::after { bottom: 0; }\r
 .fg-bars[data-on]::before, .fg-bars[data-on]::after { height: 10.5%; }\r
 \r
-/* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。\r
-   心跳分三档：pulse 慢心跳（心动、温存，完全不晃画面，只留柔和光晕呼吸）/ heartbeat 持续心跳（告白、屏息等待门后，极轻微的呼吸缩放 0.4%）/ palpitate 急促心跳（受刺激、惊惧、心跳飙升，0.7% 搏动）。 */\r
+/* 画面效果：整个画面持续地动（.fg-world），有的再叠一层（.fg-fxlayer）。系统设了减少动态效果时不动。 */\r
 .fg-world[data-fx="sway"] { animation: fg-fx-sway 7s ease-in-out infinite; }\r
 .fg-world[data-fx="ride"] { animation: fg-fx-ride 1.7s ease-in-out infinite; }\r
 .fg-world[data-fx="handheld"] { animation: fg-fx-handheld 6.5s ease-in-out infinite; }\r
@@ -1172,8 +1143,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-world[data-fx="heat"] { animation: fg-fx-heat 2.6s ease-in-out infinite; }\r
 .fg-world[data-fx="underwater"] { animation: fg-fx-water 6s ease-in-out infinite; }\r
 .fg-world[data-fx="rumble"] { animation: fg-fx-rumble .16s linear infinite; }\r
-.fg-world[data-fx="heartbeat"] { animation: fg-fx-beat 1.8s ease-in-out infinite; }\r
-.fg-world[data-fx="palpitate"] { animation: fg-fx-palpitate 1.1s ease-in-out infinite; }\r
+.fg-world[data-fx="heartbeat"] { animation: fg-fx-beat 1.05s ease-out infinite; }\r
 /* 慢动作：画面极慢地推近，粒子几乎停住（见 Particles 的 speed）；时间停止：画面褪成灰、一切静止（立绘不呼吸、插画不动） */\r
 .fg-world { transition: filter .9s ease; }\r
 .fg-world[data-fx="slowmo"] { animation: fg-fx-slowmo 10s ease-in-out infinite alternate; }\r
@@ -1191,8 +1161,7 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 @keyframes fg-fx-heat { 0%, 100% { transform: scale(1.02) skewX(0); } 25% { transform: scale(1.02) skewX(.35deg) scaleY(1.004); } 75% { transform: scale(1.02) skewX(-.35deg); } }\r
 @keyframes fg-fx-water { 0%, 100% { transform: scale(1.05) skewX(-.6deg) translateY(.4%); } 50% { transform: scale(1.05) skewX(.6deg) translateY(-.4%); } }\r
 @keyframes fg-fx-rumble { 0% { transform: scale(1.03) translate(.25%, -.2%); } 25% { transform: scale(1.03) translate(-.3%, .15%); } 50% { transform: scale(1.03) translate(.2%, .25%); } 75% { transform: scale(1.03) translate(-.15%, -.25%); } 100% { transform: scale(1.03) translate(.25%, -.2%); } }\r
-@keyframes fg-fx-beat { 0%, 62%, 100% { transform: scale(1); } 16% { transform: scale(1.004); } 30% { transform: scale(1.001); } 44% { transform: scale(1.0025); } }\r
-@keyframes fg-fx-palpitate { 0%, 58%, 100% { transform: scale(1); } 14% { transform: scale(1.0075); } 28% { transform: scale(1.0015); } 42% { transform: scale(1.005); } }\r
+@keyframes fg-fx-beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.022); } 24% { transform: scale(1.004); } 36% { transform: scale(1.014); } 60% { transform: scale(1); } }\r
 .fg-fxlayer { z-index: 8; }\r
 .fg-fxlayer[data-v="slowmo"] { background: radial-gradient(100% 85% at 50% 50%, transparent 45%, rgba(10, 24, 48, .5)); backdrop-filter: saturate(.72) contrast(1.06); -webkit-backdrop-filter: saturate(.72) contrast(1.06); }\r
 .fg-fxlayer[data-v="slowmo"]::before { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); -webkit-mask-image: radial-gradient(75% 65% at 50% 50%, transparent 50%, #000 95%); mask-image: radial-gradient(75% 65% at 50% 50%, transparent 50%, #000 95%); }\r
@@ -1217,15 +1186,9 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-fxlayer[data-v="heat"] { background: linear-gradient(0deg, rgba(255, 140, 40, .22), transparent 55%); mix-blend-mode: screen; }\r
 .fg-fxlayer[data-v="heat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-breathe-light 2.6s ease-in-out infinite; }\r
 .fg-fxlayer[data-v="woozy"] { backdrop-filter: blur(.5px); -webkit-backdrop-filter: blur(.5px); background: radial-gradient(100% 80% at 50% 50%, transparent 40%, rgba(80, 40, 90, .35)); }\r
-.fg-fxlayer[data-v="pulse"] { background: radial-gradient(115% 92% at 50% 48%, transparent 50%, rgba(255, 178, 198, .18) 82%, rgba(235, 120, 152, .26)); mix-blend-mode: screen; }\r
-.fg-fxlayer[data-v="pulse"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-pulse-vignette 2.8s ease-in-out infinite; }\r
-.fg-fxlayer[data-v="heartbeat"] { background: radial-gradient(110% 88% at 50% 48%, transparent 48%, rgba(215, 85, 118, .2) 80%, rgba(155, 32, 64, .32)); }\r
-.fg-fxlayer[data-v="heartbeat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-beat-vignette 1.8s ease-in-out infinite; }\r
-.fg-fxlayer[data-v="palpitate"] { background: radial-gradient(102% 84% at 50% 48%, transparent 44%, rgba(185, 36, 68, .28) 78%, rgba(125, 12, 38, .44)); }\r
-.fg-fxlayer[data-v="palpitate"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-palpitate-vignette 1.1s ease-in-out infinite; }\r
-@keyframes fg-pulse-vignette { 0%, 100% { opacity: .62; } 35% { opacity: .94; } 55% { opacity: .76; } 72% { opacity: .88; } }\r
-@keyframes fg-beat-vignette { 0%, 62%, 100% { opacity: .55; } 18% { opacity: .88; } 32% { opacity: .66; } 46% { opacity: .78; } }\r
-@keyframes fg-palpitate-vignette { 0%, 58%, 100% { opacity: .52; } 15% { opacity: .95; } 28% { opacity: .65; } 42% { opacity: .85; } }\r
+.fg-fxlayer[data-v="heartbeat"] { background: radial-gradient(95% 80% at 50% 48%, transparent 38%, rgba(140, 0, 24, .5) 75%, rgba(90, 0, 14, .85)); }\r
+.fg-fxlayer[data-v="heartbeat"]:not(.is-leave) { animation: fg-layer-in var(--fade) ease both, fg-beat-vignette 1.05s ease-out infinite; }\r
+@keyframes fg-beat-vignette { 0%, 60%, 100% { opacity: .45; } 12% { opacity: 1; } 24% { opacity: .6; } 36% { opacity: .85; } }\r
 .fg-fxlayer[data-v="rumble"] { background: radial-gradient(110% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, .35)); }\r
 .fg-fxlayer[data-v="drift"], .fg-fxlayer[data-v="sway"], .fg-fxlayer[data-v="ride"], .fg-fxlayer[data-v="handheld"] { display: none; }\r
 .fg-fxlayer[data-v="fading"] { background: radial-gradient(115% 85% at 50% 45%, transparent 50%, rgba(255, 236, 205, .42)), radial-gradient(150% 120% at 50% 50%, transparent 62%, rgba(40, 24, 10, .3)); }\r
@@ -1459,24 +1422,20 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-text.is-wait .fg-char { animation: none; }\r
 @keyframes fg-char-in { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: none; } }\r
 /* ── 台词演法与重音（lib/typing.js）：字的样子。要做位移、缩放的字改成 inline-block，空格照样占位 ── */\r
-.fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char.is-stress-soft { display: inline-block; white-space: pre; }\r
+.fg-text[class*="say-"] .fg-char, .fg-char.is-stress { display: inline-block; white-space: pre; }\r
 .fg-text.say-menace .fg-char { animation-name: fg-char-stamp; animation-duration: .2s; }\r
 .fg-text.say-excited .fg-char { animation-name: fg-char-hop; animation-duration: .14s; }\r
-.fg-text.say-chatter { line-height: 1.48; letter-spacing: -.01em; }\r
-.fg-text.say-chatter .fg-char { animation-name: fg-char-hop; animation-duration: .09s; }\r
 .fg-text.say-shout .fg-char { animation-name: fg-char-pop; animation-duration: .28s; font-size: 1.16em; font-weight: 700; }\r
 .fg-text.say-hesitant .fg-char { animation-duration: .32s; }\r
 .fg-text.say-whisper { opacity: .8; }\r
 .fg-text.say-whisper .fg-char { font-size: .9em; animation-duration: .45s; }\r
 .fg-text.say-breakdown .fg-char { color: color-mix(in oklab, var(--ink) 72%, #ff3b5c); animation: fg-char-in .12s ease forwards var(--d), fg-char-quake .2s linear infinite var(--d); }\r
 .fg-char.is-stress { color: var(--stress, #ff4d5e); font-weight: 700; font-size: 1.1em; text-shadow: 0 0 .6cqw rgba(255, 60, 80, .45); animation-name: fg-char-stamp; animation-duration: .24s; }\r
-.fg-char.is-stress-soft { color: color-mix(in oklab, var(--ink) 45%, #ffd992); font-weight: 600; font-size: 1.05em; text-shadow: 0 0 .55cqw rgba(255, 210, 140, .55), 0 0 1.2cqw color-mix(in oklab, var(--speaker, var(--accent)) 35%, transparent); animation-name: fg-char-bloom; animation-duration: .38s; }\r
 /* 点一下打完 / 等字体时：和普通台词一样立刻全显示、或先不动（要比上面的演法规则更具体才压得住） */\r
-.fg-text.is-done[class*="say-"] .fg-char, .fg-text.is-done .fg-char.is-stress, .fg-text.is-done .fg-char.is-stress-soft { animation: none; opacity: 1; }\r
-.fg-text.is-wait[class*="say-"] .fg-char, .fg-text.is-wait .fg-char.is-stress, .fg-text.is-wait .fg-char.is-stress-soft { animation: none; }\r
+.fg-text.is-done[class*="say-"] .fg-char, .fg-text.is-done .fg-char.is-stress { animation: none; opacity: 1; }\r
+.fg-text.is-wait[class*="say-"] .fg-char, .fg-text.is-wait .fg-char.is-stress { animation: none; }\r
 .fg-text.is-done.say-breakdown .fg-char { animation: fg-char-quake .2s linear infinite; opacity: 1; }\r
 @keyframes fg-char-stamp { from { opacity: 0; transform: translateY(-.35em) scale(1.4); } 60% { opacity: 1; transform: translateY(0) scale(.95); } to { opacity: 1; transform: none; } }\r
-@keyframes fg-char-bloom { from { opacity: 0; filter: blur(3px) brightness(1.4); transform: translateY(.08em) scale(1.06); } to { opacity: 1; filter: none; transform: none; } }\r
 @keyframes fg-char-pop { from { opacity: 0; transform: scale(1.9); } 55% { opacity: 1; transform: scale(.92); } to { opacity: 1; transform: none; } }\r
 @keyframes fg-char-hop { from { opacity: 0; transform: translateY(.3em); } to { opacity: 1; transform: none; } }\r
 @keyframes fg-char-quake { 0%, 100% { opacity: 1; transform: translate(0, 0); } 25% { opacity: 1; transform: translate(.05em, -.04em); } 50% { opacity: 1; transform: translate(-.04em, .05em); } 75% { opacity: 1; transform: translate(.04em, .03em); } }\r
@@ -1492,25 +1451,16 @@ var theater_default = `/* ───────────── 沉浸式 Galg
 .fg-text .fg-char.tx-small { font-size: .8em; color: color-mix(in oklab, currentColor 72%, transparent); }\r
 .fg-text .fg-char.tx-faint { color: color-mix(in oklab, currentColor 50%, transparent); letter-spacing: .08em; text-shadow: 0 0 .35em rgba(255, 255, 255, .35); animation-duration: .7s; }\r
 .fg-text .fg-char.tx-glow { color: color-mix(in oklab, var(--accent) 40%, #fff6d8); font-weight: 700; text-shadow: 0 0 .45em color-mix(in oklab, var(--accent) 70%, transparent), 0 0 1em color-mix(in oklab, var(--accent) 40%, transparent); animation: fg-char-in .3s ease forwards var(--d), fg-tx-glow 2.4s ease-in-out infinite calc(var(--d) + var(--i) * .08s); }\r
-.fg-text .fg-char.tx-warm { color: color-mix(in oklab, var(--ink) 50%, #ffbe98); font-weight: 600; text-shadow: 0 0 .5em rgba(255, 165, 130, .55), 0 0 1.1em rgba(255, 210, 160, .35); animation: fg-char-bloom .38s ease forwards var(--d), fg-tx-glow 3s ease-in-out infinite calc(var(--d) + var(--i) * .1s); }\r
-.fg-text .fg-char.tx-cold { color: color-mix(in oklab, var(--ink) 42%, #8ed8ff); font-weight: 600; letter-spacing: .06em; text-shadow: 0 0 .45em rgba(110, 200, 255, .55), 0 1px 2px rgba(0, 12, 28, .75); animation-name: fg-char-stamp; animation-duration: .26s; }\r
-.fg-text .fg-char.tx-dot { font-weight: 600; text-emphasis: filled sesame var(--accent); -webkit-text-emphasis: filled sesame var(--accent); text-emphasis-position: under right; -webkit-text-emphasis-position: under right; animation-duration: .3s; }\r
-.fg-text .fg-char.tx-choke { color: color-mix(in oklab, currentColor 86%, #b8d4ff); text-shadow: 0 .06em .28em rgba(150, 195, 255, .45); animation: fg-char-in .42s ease forwards var(--d), fg-tx-choke 1.1s ease-in-out infinite calc(var(--d) + var(--i) * -.19s); }\r
-.fg-text .fg-char.tx-flutter { color: color-mix(in oklab, var(--ink) 58%, #ffa6c9); text-shadow: 0 0 .45em rgba(255, 145, 190, .55); animation: fg-char-bloom .34s ease forwards var(--d), fg-tx-flutter 1.8s ease-in-out infinite calc(var(--i) * -.18s); }\r
-/* 打完之后：别的不再重放，发抖、波浪、发光、暖意、哽咽、心醉接着动；等字体时先不动 */\r
+/* 打完之后：别的不再重放，发抖、波浪、发光接着动；等字体时先不动 */\r
 .fg-text.is-done .fg-char[class*="tx-"] { animation: none; opacity: 1; }\r
 .fg-text.is-done .fg-char.tx-shake { animation: fg-tx-shake .16s steps(2) infinite; }\r
 .fg-text.is-done .fg-char.tx-wave { animation: fg-tx-wave 1.3s ease-in-out infinite calc(var(--i) * -.13s); }\r
-.fg-text.is-done .fg-char.tx-glow, .fg-text.is-done .fg-char.tx-warm { animation: fg-tx-glow 2.4s ease-in-out infinite calc(var(--i) * .08s); }\r
-.fg-text.is-done .fg-char.tx-choke { animation: fg-tx-choke 1.1s ease-in-out infinite calc(var(--i) * -.19s); }\r
-.fg-text.is-done .fg-char.tx-flutter { animation: fg-tx-flutter 1.8s ease-in-out infinite calc(var(--i) * -.18s); }\r
+.fg-text.is-done .fg-char.tx-glow { animation: fg-tx-glow 2.4s ease-in-out infinite calc(var(--i) * .08s); }\r
 .fg-text.is-wait .fg-char[class*="tx-"] { animation: none; }\r
 @keyframes fg-tx-shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(.045em, -.035em) rotate(-1deg); } 50% { transform: translate(-.04em, .04em) rotate(.8deg); } 75% { transform: translate(.035em, .03em); } }\r
 @keyframes fg-tx-wave { 0%, 100% { transform: translateY(.1em); } 50% { transform: translateY(-.16em); } }\r
 @keyframes fg-tx-slam { from { opacity: 0; transform: scale(2.6) rotate(-4deg); } 50% { opacity: 1; transform: scale(.88); } 75% { opacity: 1; transform: scale(1.06); } to { opacity: 1; transform: none; } }\r
 @keyframes fg-tx-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }\r
-@keyframes fg-tx-choke { 0%, 100% { transform: translateY(0); filter: blur(0); } 45% { transform: translateY(.04em) translateX(-.02em); filter: blur(.35px); } 75% { transform: translateY(-.02em) translateX(.02em); } }\r
-@keyframes fg-tx-flutter { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-.08em) scale(1.03); } }\r
 .fg-wait { position: absolute; right: 2.6%; bottom: min(20%, calc(.2 * var(--fg-dlg-ref))); font-size: 1.2cqw; color: var(--accent); text-shadow: 0 0 .8cqw var(--accent); animation: fg-wait 1.1s ease-in-out infinite; }\r
 .fg-wait::before { content: var(--wait-glyph); }\r
 @keyframes fg-wait { 0%, 100% { transform: translateY(0) rotate(0); opacity: .9; } 50% { transform: translateY(-.35cqw) rotate(45deg); opacity: .5; } }\r
@@ -2072,7 +2022,7 @@ button.fg-pm-name:hover { color: var(--accent); }\r
   .fg-camera[data-cam="whip"] { animation: none !important; }\r
   .fg-photo, .fg-cup, .fg-moment-card { animation: fg-fade-in .2s ease both !important; } /* 小瞬间：不飞、不弹，只淡入 */\r
   .fg-touch-ring, .fg-clink, .fg-fw-trail, .fg-fw-burst, .fg-steam i { animation: none !important; opacity: 0; }\r
-  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char.is-stress-soft, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */\r
+  .fg-text[class*="say-"] .fg-char, .fg-char.is-stress, .fg-char[class*="tx-"] { animation: fg-char-in .22s ease forwards var(--d) !important; } /* 文字效果只留样子，不抖不晃 */\r
   .fg-text.is-done .fg-char { animation: none !important; opacity: 1; }\r
   .fg-text.is-wait .fg-char { animation: none !important; }\r
 }\r
@@ -2194,59 +2144,20 @@ button.fg-pm-name:hover { color: var(--accent); }\r
   .fg-lib-bar .fg-row { flex-wrap: wrap; }\r
 }\r
 \r
-/* 亲密场面（lib/eros.js、Eros.jsx）：潮红与热气 .fg-eros（scene.eros，节奏越快越深、四周泛起丝绒般的绯红热气与微光，余韵时转成一层柔蜜暖雾）、\r
-   触手的影子 .fg-tentacle（scene.tentacle）、高潮那一下的白光 .fg-peak。\r
-   全程使用纯 GPU 渐变与混合模式（不用 backdrop-filter，彻底杜绝 Chromium 多层背景滤镜重采样造成的贴图闪烁故障）。\r
-   潮红和影子在插画上面一层（z-index 7），正中留出通透的视觉区不挡画，只渲染画面四周的呼吸热气；白光在对话框下面（z-index 15），字照样读得到。 */\r
+/* 亲密场面（lib/eros.js、Eros.jsx）：潮红 .fg-eros（scene.eros，节奏越快越深，余韵时转成一层暖雾）、触手的影子 .fg-tentacle（scene.tentacle）、\r
+   高潮那一下的白光 .fg-peak。不出字、不出爱心和漫画符号，只动光和影。潮红和影子在插画上面一层（z-index 7），只压画面边上一圈，不挡脸；\r
+   白光在对话框下面（z-index 15），字照样读得到。镜头跟着节奏的一送一落、高潮时的一涌是 Eros.jsx 用 Web Animations 动的。 */\r
 .fg-eros, .fg-tentacle { position: absolute; inset: 0; z-index: 7; pointer-events: none; animation: fg-layer-in var(--fade, 1.2s) ease both; }\r
 .fg-eros.is-leave, .fg-tentacle.is-leave { animation: fg-layer-out var(--fade, 1.2s) ease both; }\r
 .fg-eros::before, .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { content: ""; position: absolute; inset: 0; pointer-events: none; }\r
-.fg-eros {\r
-  --flush-inner: rgba(255, 180, 198, .12);\r
-  --flush-edge: rgba(215, 72, 112, .28);\r
-  --glow: 6s;\r
-  background: radial-gradient(115% 92% at 50% 44%, transparent 44%, var(--flush-inner) 74%, var(--flush-edge) 100%);\r
-}\r
-/* ::before 漂浮的细碎温存光晕与绯红雾气；::after 随呼吸缓缓起伏的柔和暖雾（不做四角急促闪烁） */\r
-.fg-eros::before {\r
-  bottom: -100%;\r
-  background:\r
-    radial-gradient(circle at 12% 84%, rgba(255, 205, 220, .42) 0 1.2cqw, transparent 2.6cqw),\r
-    radial-gradient(circle at 28% 36%, rgba(255, 236, 242, .36) 0 .7cqw, transparent 1.7cqw),\r
-    radial-gradient(circle at 52% 72%, rgba(255, 185, 206, .3) 0 1.6cqw, transparent 3cqw),\r
-    radial-gradient(circle at 76% 28%, rgba(255, 224, 234, .38) 0 .9cqw, transparent 2cqw),\r
-    radial-gradient(circle at 88% 64%, rgba(255, 192, 214, .38) 0 1.3cqw, transparent 2.6cqw);\r
-  background-size: 100% 50%;\r
-  mix-blend-mode: screen;\r
-  opacity: .72;\r
-  animation: fg-bokeh-rise 26s linear infinite, fg-bokeh-twinkle var(--glow) ease-in-out infinite alternate;\r
-}\r
-.fg-eros::after {\r
-  background:\r
-    radial-gradient(88% 48% at 50% 104%, rgba(255, 155, 178, .26), transparent 72%),\r
-    radial-gradient(76% 38% at 50% -6%, rgba(255, 205, 218, .18), transparent 70%);\r
-  mix-blend-mode: screen;\r
-  animation: fg-eros-pulse var(--glow) ease-in-out infinite alternate;\r
-}\r
-.fg-eros[data-v="tease"] { --flush-inner: rgba(255, 195, 210, .09); --flush-edge: rgba(220, 92, 125, .22); --glow: 7s; }\r
-.fg-eros[data-v="slow"] { --flush-inner: rgba(255, 180, 198, .12); --flush-edge: rgba(215, 72, 112, .28); --glow: 5.5s; }\r
-.fg-eros[data-v="fast"] { --flush-inner: rgba(255, 165, 188, .16); --flush-edge: rgba(210, 58, 102, .34); --glow: 4.2s; }\r
-.fg-eros[data-v="frantic"] { --flush-inner: rgba(255, 150, 178, .2); --flush-edge: rgba(205, 44, 92, .4); --glow: 3.2s; }\r
-.fg-eros[data-v="afterglow"] {\r
-  --glow: 7.5s;\r
-  background:\r
-    radial-gradient(95% 80% at 50% 44%, rgba(255, 244, 234, .12) 0%, rgba(255, 212, 205, .15) 55%, rgba(215, 128, 145, .24) 100%);\r
-}\r
-.fg-eros[data-v="afterglow"]::before { opacity: .88; animation-duration: 32s, 6.5s; }\r
-.fg-eros[data-v="afterglow"]::after {\r
-  background:\r
-    radial-gradient(68% 58% at 50% 42%, rgba(255, 250, 244, .2), transparent 74%),\r
-    radial-gradient(90% 50% at 50% 102%, rgba(255, 205, 185, .24), transparent 72%);\r
-}\r
-@keyframes fg-eros-pulse {\r
-  from { opacity: .68; }\r
-  to { opacity: .96; }\r
-}\r
+.fg-eros { --flush: rgba(205, 72, 98, .4); --glow: 4.2s; background: radial-gradient(118% 92% at 50% 46%, rgba(255, 180, 170, .06) 30%, var(--flush)); backdrop-filter: saturate(1.08); -webkit-backdrop-filter: saturate(1.08); }\r
+.fg-eros::after { background: radial-gradient(85% 55% at 50% 104%, rgba(255, 168, 150, .2), transparent 70%), radial-gradient(70% 40% at 50% -6%, rgba(255, 190, 200, .12), transparent 70%); animation: fg-eros-glow var(--glow) ease-in-out infinite; }\r
+.fg-eros[data-v="tease"] { --flush: rgba(225, 112, 124, .28); --glow: 5s; }\r
+.fg-eros[data-v="fast"] { --flush: rgba(200, 62, 92, .48); --glow: 2.6s; backdrop-filter: saturate(1.12) contrast(1.02); -webkit-backdrop-filter: saturate(1.12) contrast(1.02); }\r
+.fg-eros[data-v="frantic"] { --flush: rgba(190, 46, 84, .56); --glow: 1.5s; backdrop-filter: saturate(1.18) contrast(1.05); -webkit-backdrop-filter: saturate(1.18) contrast(1.05); }\r
+.fg-eros[data-v="afterglow"] { --glow: 7s; background: radial-gradient(120% 95% at 50% 46%, rgba(255, 236, 226, .1) 30%, rgba(222, 150, 150, .24)); backdrop-filter: brightness(1.04) contrast(.93) saturate(.95); -webkit-backdrop-filter: brightness(1.04) contrast(.93) saturate(.95); }\r
+.fg-eros[data-v="afterglow"]::before { background: radial-gradient(60% 55% at 50% 44%, rgba(255, 250, 246, .16), transparent 72%); filter: blur(1cqw); }\r
+@keyframes fg-eros-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }\r
 \r
 /* 触手：画面两边和角落里暗紫的触手剪影往里探、慢慢地扭（像镜头前景里没对上焦的东西），身上一道湿亮的反光；\r
    潜伏（idle）时缩在画面外沿、淡一些，蠕动（writhe）时探进来、扭得快。形状是两张 SVG：剪影一张、反光一张，跟着同一个动画走。 */\r
@@ -2266,44 +2177,14 @@ button.fg-pm-name:hover { color: var(--accent); }\r
 @keyframes fg-tentacle-writhe { 0% { transform: skewX(-3.5deg) scale(1.01, .97); } 40% { transform: skewX(2.5deg) scale(.985, 1.05) translateY(-1.2%); } 100% { transform: skewX(4deg) scale(1, 1.01); } }\r
 @keyframes fg-tentacle-glint { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }\r
 \r
-/* 高潮与射精（ErosPeak）：\r
-   - climax / both：.fg-peak-veil 先骤然涌起一层纯白强光（0.16s 到顶），随后化作柔和的暖粉白光晕再痉挛着亮一下，最后在 3.1 秒内缓缓消融；\r
-   - cum / both：四道脉冲环（.fg-peak i）跟着声音的四下（0ms / 380ms / 780ms / 1220ms）从下腹与画面四周同时潮涌收缩，一下比一下柔和。\r
-   纯 opacity + transform 合成，完全不用 backdrop-filter，丝滑不闪贴图。 */\r
-.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; overflow: hidden; }\r
-.fg-peak-veil {\r
-  position: absolute; inset: 0; display: block; opacity: 0; will-change: opacity, transform;\r
-  background:\r
-    radial-gradient(72% 66% at 50% 46%, #fff 0%, rgba(255, 252, 250, .97) 42%, rgba(255, 232, 240, .86) 76%, rgba(255, 205, 222, .68) 100%);\r
-  animation: fg-peak-bloom 3.1s cubic-bezier(.22, 0, .2, 1) both;\r
-}\r
-.fg-peak.is-both .fg-peak-veil {\r
-  background:\r
-    radial-gradient(76% 70% at 50% 48%, #fff 0%, rgba(255, 253, 252, .98) 48%, rgba(255, 228, 238, .9) 80%, rgba(255, 195, 216, .75) 100%);\r
-}\r
-.fg-peak i {\r
-  position: absolute; inset: -4%; opacity: 0; will-change: opacity, transform;\r
-  background:\r
-    radial-gradient(64% 58% at 50% 58%, rgba(255, 253, 250, .96) 0%, rgba(255, 234, 242, .68) 44%, rgba(255, 182, 206, .36) 72%, rgba(255, 150, 185, .18) 100%);\r
-  animation: fg-peak-pulse .68s cubic-bezier(.2, .65, .3, 1) var(--at, 0ms) both;\r
-}\r
-@keyframes fg-peak-bloom {\r
-  0% { opacity: 0; transform: scale(.98); }\r
-  6% { opacity: .98; transform: scale(1.01); }\r
-  14% { opacity: .66; transform: scale(1); }\r
-  22% { opacity: .90; transform: scale(1.008); }\r
-  38% { opacity: .62; transform: scale(1.002); }\r
-  65% { opacity: .26; transform: scale(1); }\r
-  100% { opacity: 0; transform: scale(1); }\r
-}\r
-@keyframes fg-peak-pulse {\r
-  0% { opacity: 0; transform: scale(.94); }\r
-  18% { opacity: calc(.88 * var(--k, 1)); transform: scale(1.02); }\r
-  48% { opacity: calc(.42 * var(--k, 1)); transform: scale(1.005); }\r
-  100% { opacity: 0; transform: scale(1); }\r
-}\r
+/* 高潮：画面柔和地白起来、带一点虚，再慢慢回来；射精：跟着声音一下一下地亮，一下比一下弱。 */\r
+.fg-peak { position: absolute; inset: 0; z-index: 15; pointer-events: none; }\r
+.fg-peak.is-climax, .fg-peak.is-both { background: radial-gradient(78% 72% at 50% 48%, rgba(255, 253, 250, .94), rgba(255, 238, 242, .62) 55%, rgba(255, 222, 232, .28)); backdrop-filter: blur(3px) brightness(1.15); -webkit-backdrop-filter: blur(3px) brightness(1.15); animation: fg-peak-bloom 2.6s cubic-bezier(.3, 0, .2, 1) both; }\r
+.fg-peak i { position: absolute; inset: 0; opacity: 0; background: radial-gradient(90% 80% at 50% 56%, rgba(255, 250, 246, .9), rgba(255, 236, 240, .36) 58%, transparent 92%); animation: fg-peak-pulse .55s ease-out var(--at, 0ms) both; }\r
+@keyframes fg-peak-bloom { 0% { opacity: 0; } 22% { opacity: .84; } 42% { opacity: .7; } 100% { opacity: 0; } }\r
+@keyframes fg-peak-pulse { 0% { opacity: 0; } 14% { opacity: calc(.6 * var(--k, 1)); } 100% { opacity: 0; } }\r
 @media (prefers-reduced-motion: reduce) {\r
-  .fg-eros::before, .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */\r
+  .fg-eros::after, .fg-tentacle::before, .fg-tentacle::after { animation: none !important; } /* 潮红的起伏、触手的扭动 */\r
 }\r
 \r
 /* 设置 → 声音：音色一览按男女分组；自己做音色的编辑器；自动分配的音色组 */\r
@@ -2780,7 +2661,7 @@ var EMOTION_FACE = {
   suspicious: { add: "suspicious, narrowed eyes, raised eyebrow, closed mouth", neg: "smile, blush, tears" },
   passion: { add: "blush, half-closed eyes, parted lips", neg: "frown, angry, tears" }
 };
-var CAMERAS = ["shake", "throb", "zoom", "zoomout", "flash", "pan", "blur", "fadeblack", "redflash", "tilt", "closeup", "focus", "whip", "sink", "rise", "lowangle", "dolly", "empty", "slowpush", "rackfocus"];
+var CAMERAS = ["shake", "zoom", "zoomout", "flash", "pan", "blur", "fadeblack", "redflash", "tilt", "closeup", "focus", "whip", "sink", "rise", "lowangle", "dolly", "empty", "slowpush", "rackfocus"];
 var HIT_EFFECTS = ["hit", "crit", "miss", "block", "down", "heal"];
 var HIT_EFFECT_LABEL = { hit: "命中", crit: "暴击", miss: "闪避", block: "格挡", down: "击倒", heal: "治疗" };
 var MOMENTS = ["photo", "touch", "pat", "poke", "cheers", "fireworks", "cook", "nickname", "promise", "contact"];
@@ -2795,18 +2676,18 @@ var ENTER_HOWS = ["run", "peek", "slow"];
 var EXIT_HOWS = ["storm", "run", "slow"];
 var ENTER_HOW_LABEL = { run: "跑进来", peek: "探头", slow: "慢慢走进来" };
 var EXIT_HOW_LABEL = { storm: "甩头离开", run: "跑开", slow: "慢慢走远" };
-var DELIVERIES = ["menace", "excited", "shout", "hesitant", "whisper", "breakdown", "chatter"];
-var DELIVERY_LABEL = { menace: "威压", excited: "激动", shout: "怒吼", hesitant: "迟疑", whisper: "低语", breakdown: "崩溃", chatter: "连珠炮" };
-var TEXT_FX = ["shake", "wave", "big", "roar", "grow", "dwindle", "small", "faint", "glow", "warm", "cold", "dot", "choke", "flutter"];
-var TEXT_FX_LABEL = { shake: "发抖", wave: "波浪", big: "放大", roar: "吼", grow: "越说越大", dwindle: "越说越小", small: "小声", faint: "轻淡", glow: "发光强调", warm: "暖意", cold: "冰冷", dot: "着重号", choke: "哽咽", flutter: "心醉" };
+var DELIVERIES = ["menace", "excited", "shout", "hesitant", "whisper", "breakdown"];
+var DELIVERY_LABEL = { menace: "威压", excited: "激动", shout: "怒吼", hesitant: "迟疑", whisper: "低语", breakdown: "崩溃" };
+var TEXT_FX = ["shake", "wave", "big", "roar", "grow", "dwindle", "small", "faint", "glow"];
+var TEXT_FX_LABEL = { shake: "发抖", wave: "波浪", big: "放大", roar: "吼", grow: "越说越大", dwindle: "越说越小", small: "小声", faint: "轻淡", glow: "发光强调" };
 var WEATHER = ["clear", "rain", "storm", "snow", "blizzard", "wind", "sakura", "leaves", "fireflies", "fog", "embers", "dust", "bokeh", "stars", "sparkles", "bubbles"];
 var TRANSITIONS = ["dissolve", "fade", "cinematic", "wipe", "iris", "strips", "black", "flash", "blink", "glitch", "swirl", "haze", "none"];
 var LIGHTS = ["normal", "dim", "dark", "black", "candle", "spot", "neon", "screen", "alarm", "moon", "warm", "cold", "glare", "flicker", "sunbeam", "leak", "flare"];
-var FX = ["none", "sway", "ride", "handheld", "drift", "woozy", "heat", "underwater", "rumble", "speed", "heartbeat", "pulse", "palpitate", "slowmo", "timestop", "fading"];
+var FX = ["none", "sway", "ride", "handheld", "drift", "woozy", "heat", "underwater", "rumble", "speed", "heartbeat", "slowmo", "timestop", "fading"];
 var ROMANCE = ["none", "ambiguous", "intimate"];
 var ROMANCE_LABEL = { none: "", ambiguous: "暧昧", intimate: "亲密" };
-var SENSES = ["none", "blind", "ear", "touch", "heat", "cold", "scent", "breath", "daze", "pulse"];
-var SENSE_LABEL = { none: "", blind: "蒙眼", ear: "耳边", touch: "触碰", heat: "发烫", cold: "发凉", scent: "香气", breath: "屏息", daze: "失神", pulse: "心音" };
+var SENSES = ["none", "blind", "ear", "touch", "heat", "cold", "scent", "breath", "daze"];
+var SENSE_LABEL = { none: "", blind: "蒙眼", ear: "耳边", touch: "触碰", heat: "发烫", cold: "发凉", scent: "香气", breath: "屏息", daze: "失神" };
 var VOICES = ["phone", "radio", "telepathy", "chorus", "offscreen", "echo", "memory", "machine"];
 var CG_INS = ["dissolve", "slow", "black", "flash", "focus", "cut", "impact"];
 var CG_OUTS = ["dissolve", "slow", "black", "flash", "cut"];
@@ -2984,95 +2865,6 @@ function stageWalk(script, units, carry = [], inside = null, { walkOn = null, ca
   });
   cast = cast.filter((c) => !after.includes(c.name) && !c.extra);
   return { steps, end: saved || cast, inside: saved ? cast : null };
-}
-
-// lib/segment.js
-var QUOTE_PAIRS = [["“", "”"], ["「", "」"], ["『", "』"], ['"', '"'], ["﹁", "﹂"]];
-var OPENERS = new Map(QUOTE_PAIRS);
-var PAGE_LIMIT = 96;
-var SOFT_PAGE_LIMIT = 56;
-var DIALOGUE_PAGE_LIMIT = 52;
-var DUAL_PAGE_LIMIT = 38;
-var MIN_TAIL_CHARS = 10;
-var SPEAKER_BEFORE = /([\p{Script=Han}A-Za-z゠-ヿ·・]{1,8}?)(?:[^\p{Script=Han}A-Za-z]{0,2}(?:轻声|低声|小声|大声|笑着|笑|冷冷地|淡淡地|喃喃|忍不住|开口|回答|回应|反问|追问|补充|嘟囔|嘀咕|咕哝|叹气|叹)?(?:说道|说|道|问道|问|喊道|喊|叫道|叫|答道|答|笑道|嚷道|嚷|骂道|哼道|吼道|应道|应))?\s*[：:，,]?\s*$/u;
-var SPEAKER_ONLY = new RegExp("^\\s*" + SPEAKER_BEFORE.source, "u");
-function splitSentences(text) {
-  const parts = String(text).match(/[^。！？!?…~～\n]+(?:[。！？!?…~～]+[」』”"）)]*|$)/gu) || [];
-  const merged = [];
-  for (const raw of parts.map((s) => s.trim()).filter(Boolean)) {
-    if (merged.length && /[…~～]$/.test(merged[merged.length - 1]) && !/[。！？!?]$/.test(merged[merged.length - 1]) && merged[merged.length - 1].length < 18) {
-      merged[merged.length - 1] += raw;
-    } else merged.push(raw);
-  }
-  return merged;
-}
-function splitLongSentence(sentence, hard = PAGE_LIMIT, soft = SOFT_PAGE_LIMIT) {
-  const limit = Math.min(hard, soft + 16);
-  if (sentence.length <= limit) return [sentence];
-  const clauses = sentence.match(/[^——；;，,]+(?:——|[；;，,]+|$)/gu) || [sentence];
-  if (clauses.length <= 1) return [sentence];
-  const out = [];
-  let cur = "";
-  for (let i = 0; i < clauses.length; i++) {
-    const c = clauses[i];
-    const rest = clauses.slice(i).join("").length;
-    if (cur && cur.length >= 16 && (cur.length + c.length > hard || cur.length >= Math.min(soft, 28) && rest >= 14)) {
-      out.push(cur.trim());
-      cur = "";
-    }
-    cur += c;
-  }
-  if (cur.trim()) out.push(cur.trim());
-  return out.length ? out : [sentence];
-}
-function pageText(text, { soft = SOFT_PAGE_LIMIT, hard = PAGE_LIMIT } = {}) {
-  const raw = String(text || "").trim();
-  if (!raw) return [];
-  const sentences = splitSentences(raw).flatMap((s) => splitLongSentence(s, hard, soft));
-  const pages = [];
-  let current2 = "";
-  for (let i = 0; i < sentences.length; i++) {
-    const sentence = sentences[i];
-    const remaining = sentences.slice(i).reduce((sum, s) => sum + s.length, 0);
-    if (current2 && (current2.length + sentence.length > hard || (current2.length >= soft || current2.length + sentence.length >= soft + 10) && remaining >= MIN_TAIL_CHARS)) {
-      pages.push(current2);
-      current2 = "";
-    }
-    current2 += sentence;
-  }
-  if (current2) pages.push(current2);
-  return pages.length ? pages : [raw];
-}
-var SCRIPTS = [["kana", /[\p{Script=Hiragana}\p{Script=Katakana}]/u], ["han", new RegExp("\\p{Script=Han}", "u")], ["hangul", new RegExp("\\p{Script=Hangul}", "u")], ["latin", new RegExp("\\p{Script=Latin}", "u")], ["cyrillic", new RegExp("\\p{Script=Cyrillic}", "u")], ["greek", new RegExp("\\p{Script=Greek}", "u")], ["thai", new RegExp("\\p{Script=Thai}", "u")], ["arabic", new RegExp("\\p{Script=Arabic}", "u")]];
-function splitUnitPages(unit) {
-  if (!unit || !unit.text) return [unit];
-  const soft = unit.orig ? DUAL_PAGE_LIMIT : unit.type === "dialogue" ? DIALOGUE_PAGE_LIMIT : SOFT_PAGE_LIMIT;
-  const hard = unit.orig ? 68 : PAGE_LIMIT;
-  const pages = pageText(unit.text, { soft, hard });
-  if (pages.length <= 1) return [unit];
-  let origPages = null;
-  if (unit.orig) {
-    const oSents = splitSentences(unit.orig);
-    if (oSents.length === pages.length) origPages = oSents;
-    else {
-      const total = pages.reduce((s, p4) => s + p4.length, 0) || 1;
-      const oChars = Array.from(unit.orig);
-      let pos = 0;
-      origPages = pages.map((p4, i) => {
-        if (i === pages.length - 1) return oChars.slice(pos).join("").trim();
-        const take = Math.max(1, Math.round(p4.length / total * oChars.length));
-        const slice = oChars.slice(pos, pos + take).join("").trim();
-        pos += take;
-        return slice;
-      });
-    }
-  }
-  return pages.map((text, i) => ({
-    ...unit,
-    text,
-    ...origPages ? { orig: origPages[i] } : {},
-    ...i > 0 ? { pageIndex: i } : {}
-  }));
 }
 
 // lib/limits.js
@@ -5284,7 +5076,7 @@ var TIME_LABEL = { dawn: "黎明", morning: "清晨", noon: "正午", afternoon:
 var WEATHER_LABEL = { clear: "晴", rain: "雨", storm: "暴雨", snow: "雪", blizzard: "暴风雪", wind: "狂风", sakura: "樱吹雪", leaves: "落叶", fireflies: "萤火", fog: "雾", embers: "余烬", dust: "浮尘", bokeh: "光斑", stars: "星空", sparkles: "光点", bubbles: "气泡" };
 var MOOD_LABEL = { daily: "日常", cheerful: "轻快", comic: "滑稽", sweet: "甜蜜", touching: "感动", calm: "静谧", solemn: "庄严", sad: "感伤", despair: "绝望", tense: "紧张", mystery: "悬疑", eerie: "诡异", battle: "激战", heroic: "热血", silence: "寂静" };
 var LIGHT_LABEL = { normal: "", dim: "昏暗", dark: "熄灯", black: "漆黑", candle: "烛光", spot: "聚光", neon: "霓虹", screen: "屏幕光", alarm: "警报红光", moon: "月光", warm: "暖光", cold: "冷光", glare: "强光", flicker: "灯光闪烁", sunbeam: "窗光", leak: "漏光", flare: "逆光" };
-var FX_LABEL = { none: "", sway: "摇晃", ride: "颠簸", handheld: "手持", drift: "推近", woozy: "晕眩", heat: "热浪", underwater: "水下", rumble: "震动", speed: "疾驰", heartbeat: "心跳", pulse: "慢心跳", palpitate: "急促心跳", slowmo: "慢动作", timestop: "时间停止", fading: "褪成回忆" };
+var FX_LABEL = { none: "", sway: "摇晃", ride: "颠簸", handheld: "手持", drift: "推近", woozy: "晕眩", heat: "热浪", underwater: "水下", rumble: "震动", speed: "疾驰", heartbeat: "心跳", slowmo: "慢动作", timestop: "时间停止", fading: "褪成回忆" };
 var MODE_LABEL = { ...MODE_NAMES, real: "回到现实" };
 var CUT_LABEL = { time: "Time Skip", date: "Date", chapter: "Chapter", meanwhile: "Meanwhile" };
 var VOICE_LABEL = { phone: "电话", radio: "广播", telepathy: "心灵感应", chorus: "齐声", offscreen: "画外音", echo: "回声", memory: "回忆", machine: "机械音" };
@@ -5293,7 +5085,7 @@ var CG_OUT_LABEL = { dissolve: "溶回场景", slow: "慢慢淡去", black: "暗
 var CG_MOTION_LABEL = { still: "静止", push: "极慢推近", pan: "横移一遍" };
 var CARD_LABEL = { sms: "短信", letter: "信", note: "便条", news: "报纸", terminal: "终端", notice: "告示", diary: "日记", scroll: "卷轴" };
 var POS_LABEL = { farleft: "最左", left: "左", center: "中", right: "右", farright: "最右" };
-var CAMERA_LABEL = { shake: "震动", throb: "心头一震", zoom: "推近", zoomout: "拉远", flash: "闪白", pan: "平移", blur: "虚焦", fadeblack: "黑场", redflash: "红闪", tilt: "倾斜", closeup: "特写", focus: "背景虚化", whip: "甩镜", sink: "下沉", rise: "升起", lowangle: "仰拍", dolly: "希区柯克变焦", empty: "空镜", slowpush: "缓推", rackfocus: "移焦" };
+var CAMERA_LABEL = { shake: "震动", zoom: "推近", zoomout: "拉远", flash: "闪白", pan: "平移", blur: "虚焦", fadeblack: "黑场", redflash: "红闪", tilt: "倾斜", closeup: "特写", focus: "背景虚化", whip: "甩镜", sink: "下沉", rise: "升起", lowangle: "仰拍", dolly: "希区柯克变焦", empty: "空镜", slowpush: "缓推", rackfocus: "移焦" };
 var SYMBOL_LABEL = { heart: "爱心", anger: "怒筋", sweat: "汗滴", sparkle: "闪光", surprise: "惊叹", gloom: "阴云", note: "音符", zzz: "睡着", bulb: "灵光", heartbreak: "心碎", sigh: "叹气", dizzy: "眩晕", fire: "燃起", blush: "红晕", bloom: "开花", silence: "无语" };
 var TRANSITION_LABEL = { dissolve: "溶解", fade: "慢慢变化", cinematic: "电影黑边", wipe: "横扫", iris: "圆形收缩", strips: "百叶", black: "黑场", flash: "白闪", blink: "闭眼睁眼", glitch: "画面撕裂", swirl: "旋转入梦", haze: "起雾", none: "直接切" };
 var POS_X = { farleft: 14, left: 28, center: 50, right: 72, farright: 86 };
@@ -5457,97 +5249,92 @@ function buildBeats(view) {
       if (line.bgm === "hush") hush = HUSH_BEATS;
       const hushed = hush ? hush === HUSH_BEATS ? "start" : "on" : "";
       if (hush) hush--;
-      const pages = line.say === "chatter" || line.card ? [unit] : splitUnitPages(unit);
-      pages.forEach((page, pi) => {
-        const first = pi === 0;
-        const last2 = pi === pages.length - 1;
-        beats.push({
-          key: first ? `${t.turn}:${unit.id}` : `${t.turn}:${unit.id}.${pi + 1}`,
-          turn: t.turn,
-          textVersion: t.textVersion,
-          unitId: unit.id,
-          type,
-          text: page.text,
-          ...page.orig ? { orig: page.orig } : {},
-          // 双语对照的原文（剧场上方小字）
-          speaker,
-          ...speakers.length > 1 ? { speakers } : {},
-          // 齐声：几个人一起高亮
-          ...voice ? { voice } : {},
-          // 声音的样子：电话里、广播、心灵感应……
-          ...split ? { split } : {},
-          alias: line.as || "",
-          emo: line.emo || "",
-          sym: first ? line.sym || "" : "",
-          cam: first ? line.cam || "" : "",
-          ...first && line.camOn ? { camOn: line.camOn } : {},
-          // 镜头对准谁（不写是说话的人）
-          ...first && hit ? { hit } : {},
-          // 一次出手：被打的人一震
-          ...first && line.moment ? { moment: line.moment } : {},
-          // 小瞬间：拍照、摸头、干杯、约定……
-          ...calling ? { call: calling } : {},
-          // 正在打的电话：响着（ringing）还是接通了（live）
-          ...first && phoneEdge ? { phone: phoneEdge } : {},
-          // 手机这一句的事：来电、拨出、挂断、通知、语音留言
-          say: line.say || "",
-          stress: line.stress && page.text.includes(line.stress) ? line.stress : "",
-          ...line.textfx ? { textfx: line.textfx.filter((f) => page.text.includes(f.text)) } : {},
-          // 句中文字效果：落在这页上的才算
-          card: first ? line.card || "" : "",
-          scene: at2.scene,
-          mode: at2.mode,
-          ...at2.layer && at2.layer.then ? { then: at2.layer.then } : {},
-          // 段落里的人当时的样子（回忆里还没受伤、穿着当时的衣服……）
-          ...ahead[ui2] ? { ahead: ahead[ui2] } : {},
-          // 这一轮后面才变的样子（之后才缠上发带、才换衣服）：这一拍按变化之前的
-          ...first && at2.cut ? { cut: at2.cut } : {},
-          ...recall ? { recall } : {},
-          // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
-          ...first && recallEdge ? { recallEdge } : {},
-          bgm: at2.bgm,
-          ...hushed ? { hush: first ? hushed : "on" } : {},
-          // 配乐留白：start 是停下的那一句，on 是还没回来
-          amb: at2.amb,
-          sfx: first ? line.sfx || "" : "",
-          ...first && line.peak ? { peak: line.peak } : {},
-          // 高潮那一下：climax / cum / both（lib/eros.js）
-          ...first && line.pause ? { pause: line.pause } : {},
-          // 「間」：这句的字出来之前先停一下
-          sceneEnter: first ? enter : false,
-          set,
-          transition: first ? transition : "",
-          cast: steps[ui2].cast,
-          recent: steps[ui2].cast.map((c) => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)),
-          // 台上的人，最近有动静的在前
-          ...front.length ? { front } : {},
-          // 台上开过口的人，最近开口的在前：谁挡在谁前面（lib/blocking.js 的 stackLayers）
-          entered: first ? steps[ui2].entered : [],
-          left: first ? steps[ui2].left : [],
-          ...first && reacts.length ? { reacts } : {},
-          // 没在说话的人的反应 [{ name, emo, sym }]
-          ...Object.keys(block.poses).length ? { poses: block.poses } : {},
-          // 走位：每个人现在的样子（靠近谁、上前、背对……）
-          ...first && block.moves.length ? { moves: block.moves } : {},
-          // 这一拍发生的走位
-          ...first && Object.keys(ways).length ? { enterHow: ways } : {},
-          // 跑进来、探头、慢慢走进来
-          ...first && Object.keys(gone).length ? { exitHow: gone } : {},
-          // 甩头离开、跑开、慢慢走远
-          emotions: { ...emotions },
-          ...Object.keys(postures).length ? { postures } : {},
-          // 每个人此刻在哪个动作（动作编号；没走到过的人按他情绪的主动作）
-          ...Object.values(offs).some((list3) => list3.length) ? { offPoses: offs } : {},
-          // 这一刻收起了的动作：剧场找图时不退到它们上面
-          cg,
-          cgAnchor: first && Boolean(cgEntry && cgEntry.at === ui2),
-          directed: Boolean(script),
-          status: t.status,
-          error: t.error,
-          lastOfTurn: ui2 === units.length - 1 && last2,
-          lastTurn: ti === turns.length - 1,
-          choices: ti === turns.length - 1 && ui2 === units.length - 1 && last2 && script ? script.choices || [] : []
-        });
+      beats.push({
+        key: `${t.turn}:${unit.id}`,
+        turn: t.turn,
+        textVersion: t.textVersion,
+        unitId: unit.id,
+        type,
+        text: unit.text,
+        ...unit.orig ? { orig: unit.orig } : {},
+        // 双语对照的原文（剧场上方小字）
+        speaker,
+        ...speakers.length > 1 ? { speakers } : {},
+        // 齐声：几个人一起高亮
+        ...voice ? { voice } : {},
+        // 声音的样子：电话里、广播、心灵感应……
+        ...split ? { split } : {},
+        alias: line.as || "",
+        emo: line.emo || "",
+        sym: line.sym || "",
+        cam: line.cam || "",
+        ...line.camOn ? { camOn: line.camOn } : {},
+        // 镜头对准谁（不写是说话的人）
+        ...hit ? { hit } : {},
+        // 一次出手：被打的人一震
+        ...line.moment ? { moment: line.moment } : {},
+        // 小瞬间：拍照、摸头、干杯、约定……
+        ...calling ? { call: calling } : {},
+        // 正在打的电话：响着（ringing）还是接通了（live）
+        ...phoneEdge ? { phone: phoneEdge } : {},
+        // 手机这一句的事：来电、拨出、挂断、通知、语音留言
+        say: line.say || "",
+        stress: line.stress || "",
+        ...line.textfx ? { textfx: line.textfx } : {},
+        // 句中文字效果：某几个字发抖、放大、越说越小……
+        card: line.card || "",
+        scene: at2.scene,
+        mode: at2.mode,
+        ...at2.layer && at2.layer.then ? { then: at2.layer.then } : {},
+        // 段落里的人当时的样子（回忆里还没受伤、穿着当时的衣服……）
+        ...ahead[ui2] ? { ahead: ahead[ui2] } : {},
+        // 这一轮后面才变的样子（之后才缠上发带、才换衣服）：这一拍按变化之前的
+        ...at2.cut ? { cut: at2.cut } : {},
+        ...recall ? { recall } : {},
+        // 短闪回：现在的画面压暗，这一段开口的人以当时的样子浮在前面
+        ...recallEdge ? { recallEdge } : {},
+        bgm: at2.bgm,
+        ...hushed ? { hush: hushed } : {},
+        // 配乐留白：start 是停下的那一句，on 是还没回来
+        amb: at2.amb,
+        sfx: line.sfx || "",
+        ...line.peak ? { peak: line.peak } : {},
+        // 高潮那一下：climax / cum / both（lib/eros.js）
+        ...line.pause ? { pause: line.pause } : {},
+        // 「間」：这句的字出来之前先停一下
+        sceneEnter: enter,
+        set,
+        transition,
+        cast: steps[ui2].cast,
+        recent: steps[ui2].cast.map((c) => c.name).sort((a, b) => (active.get(b) ?? -1) - (active.get(a) ?? -1)),
+        // 台上的人，最近有动静的在前
+        ...front.length ? { front } : {},
+        // 台上开过口的人，最近开口的在前：谁挡在谁前面（lib/blocking.js 的 stackLayers）
+        entered: steps[ui2].entered,
+        left: steps[ui2].left,
+        ...reacts.length ? { reacts } : {},
+        // 没在说话的人的反应 [{ name, emo, sym }]
+        ...Object.keys(block.poses).length ? { poses: block.poses } : {},
+        // 走位：每个人现在的样子（靠近谁、上前、背对……）
+        ...block.moves.length ? { moves: block.moves } : {},
+        // 这一拍发生的走位
+        ...Object.keys(ways).length ? { enterHow: ways } : {},
+        // 跑进来、探头、慢慢走进来
+        ...Object.keys(gone).length ? { exitHow: gone } : {},
+        // 甩头离开、跑开、慢慢走远
+        emotions: { ...emotions },
+        ...Object.keys(postures).length ? { postures } : {},
+        // 每个人此刻在哪个动作（动作编号；没走到过的人按他情绪的主动作）
+        ...Object.values(offs).some((list3) => list3.length) ? { offPoses: offs } : {},
+        // 这一刻收起了的动作：剧场找图时不退到它们上面
+        cg,
+        cgAnchor: Boolean(cgEntry && cgEntry.at === ui2),
+        directed: Boolean(script),
+        status: t.status,
+        error: t.error,
+        lastOfTurn: ui2 === units.length - 1,
+        lastTurn: ti === turns.length - 1,
+        choices: ti === turns.length - 1 && ui2 === units.length - 1 && script ? script.choices || [] : []
       });
     });
     const last = scenes[scenes.length - 1];
@@ -6117,8 +5904,6 @@ var FOLEY = Object.freeze({
   shutter: [p2("noise", 4200, 0.035, 0.22, { q: 1.4 }), p2("square", 1800, 0.02, 0.015, { attack: 1e-3, lp: 3200 }), p2("noise", 2600, 0.05, 0.16, { q: 1.1, at: 0.085 })],
   // 心动：两下轻轻的心跳，再一声很轻的铃
   heartbeat: [p2("sine", 64, 0.16, 0.3, { to: 48 }), p2("sine", 64, 0.2, 0.24, { to: 46, at: 0.22 }), p2("sine", 1568, 0.9, 0.025, { at: 0.36 }), p2("sine", 2093, 0.8, 0.02, { at: 0.44 })],
-  // 心头一震（咚——）：被某句话或回忆猛然戳中时，胸口只沉沉地搏动一下（不带高音铃声）
-  throb: [p2("sine", 72, 0.18, 0.34, { to: 46, attack: 4e-3 }), p2("sine", 58, 0.32, 0.26, { to: 38, at: 0.19, attack: 6e-3 }), p2("noise", 180, 0.14, 0.06, { q: 0.9 })],
   // 摸头：噗、噗两下软软的
   pat: [p2("sine", 340, 0.09, 0.13, { to: 230, attack: 4e-3 }), p2("noise", 900, 0.05, 0.04, { q: 0.8 }), p2("sine", 340, 0.09, 0.11, { to: 230, attack: 4e-3, at: 0.24 }), p2("noise", 900, 0.05, 0.035, { q: 0.8, at: 0.24 })],
   // 戳脸：啵嘤（往上一挑）
@@ -6284,8 +6069,7 @@ var STYLES = {
   shout: { gap: 1.1, chunk: 3, pause: 0.7, blip: { every: 1, pitch: 1.1, gain: 1.3 }, mouth: "wide" },
   hesitant: { gap: 1.35, pause: 1.8, stall: true, blip: { every: 3, pitch: 0.95, gain: 0.8 }, mouth: "loop" },
   whisper: { gap: 1.25, pause: 1.2, blip: { every: 2, pitch: 0.9, gain: 0.35 }, mouth: "soft" },
-  breakdown: { gap: 0.8, jitter: true, pause: 0.6, blip: { every: 1, pitch: 1.25, gain: 1.2 }, mouth: "wide" },
-  chatter: { gap: 0.36, pause: 0.12, rush: true, blip: { every: 2, pitch: 1.24, gain: 0.92 }, mouth: "loop" }
+  breakdown: { gap: 0.8, jitter: true, pause: 0.6, blip: { every: 1, pitch: 1.25, gain: 1.2 }, mouth: "wide" }
 };
 var IMPACT = {
   "": [["shake", 1], ["sound", "impact"]],
@@ -6294,18 +6078,8 @@ var IMPACT = {
   shout: [["shake", 3], ["box", 3], ["flash", 2], ["sound", "slam"]],
   hesitant: [["sound", "impact"]],
   whisper: [],
-  breakdown: [["shake", 3], ["redflash", 2], ["sound", "stab"]],
-  chatter: []
+  breakdown: [["shake", 3], ["redflash", 2], ["sound", "stab"]]
 };
-var GENTLE_STRESS_EMO = /* @__PURE__ */ new Set(["love", "smile", "happy", "shy", "blush", "sad", "cry", "tired", "worried", "wronged", "wry", "passion"]);
-var GENTLE_STRESS_MOOD = /* @__PURE__ */ new Set(["sweet", "touching", "calm", "daily"]);
-var HARD_STRESS_EMO = /* @__PURE__ */ new Set(["angry", "scared", "cold", "disgust", "suspicious"]);
-var HARD_STRESS_SAY = /* @__PURE__ */ new Set(["menace", "shout", "breakdown"]);
-function isGentleStress(emo = "", say = "", mood = "") {
-  if (HARD_STRESS_SAY.has(say) || HARD_STRESS_EMO.has(emo)) return false;
-  if (say === "whisper" || GENTLE_STRESS_EMO.has(emo) || GENTLE_STRESS_MOOD.has(mood)) return true;
-  return /温柔|微笑|含泪|流泪|落泪|哽咽|喜极而泣|心动|深情|宠溺|欣慰|感动|怀念|释然|安心|羞|红着脸/.test(emo);
-}
 var TEXT_STYLES = {
   shake: { gap: 1.3, gain: 0.9, pitch: "jitter" },
   wave: { gap: 1.25, pitch: "wave" },
@@ -6315,12 +6089,7 @@ var TEXT_STYLES = {
   dwindle: { gap: [1.1, 2.6], gain: [1, 0.25], pitch: [1, 0.9] },
   small: { gap: 1.15, gain: 0.55, pitch: 1.05 },
   faint: { gap: 1.4, gain: 0.32, pitch: 0.96 },
-  glow: { gap: 1.45, before: 3, gain: 1.1, after: 2 },
-  warm: { gap: 1.35, before: 2, gain: 0.85, pitch: 1.02, after: 2 },
-  cold: { gap: 1.55, before: 3, gain: 0.8, pitch: 0.86, after: 2 },
-  dot: { gap: 1.3, before: 1, gain: 1.05, after: 1 },
-  choke: { gap: [1.5, 2.2], before: 3, gain: [0.75, 0.45], pitch: "jitter", after: 3 },
-  flutter: { gap: 1.3, gain: 0.82, pitch: "wave" }
+  glow: { gap: 1.45, before: 3, gain: 1.1, after: 2 }
 };
 var lerp = (v, k) => Array.isArray(v) ? v[0] + (v[1] - v[0]) * k : v;
 function textFxSpans(chars, textfx = []) {
@@ -6366,7 +6135,7 @@ function inferDelivery(text, emo = "", type = "dialogue") {
   if (stammer || dots >= 4 || dots >= 2 && HESITANT_EMO.has(emo)) return "hesitant";
   return "";
 }
-function planLine(chars, speed, { say = "", stress = "", emo = "", mood = "", type = "dialogue", seed = "", textfx = null, offStyles = null } = {}) {
+function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialogue", seed = "", textfx = null, offStyles = null } = {}) {
   const n = chars.length;
   const text = chars.join("");
   const spoken = type === "dialogue" || type === "thought";
@@ -6374,8 +6143,7 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", mood = "", ty
   const style = offStyles && offStyles.has(wanted) ? "" : wanted;
   const S = STYLES[style];
   const base = Math.max(speed * S.gap, S.min || 0);
-  const gentle = isGentleStress(emo, style, mood);
-  const plan = { times: [], marks: new Array(n).fill(""), say: style, rush: Boolean(S.rush), gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: S.blip, fx: [], tx: new Array(n).fill(""), txk: new Array(n).fill(0), txi: new Array(n).fill(0), blips: null };
+  const plan = { times: [], marks: new Array(n).fill(""), say: style, gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: S.blip, fx: [], tx: new Array(n).fill(""), txk: new Array(n).fill(0), txi: new Array(n).fill(0), blips: null };
   if (!n) return plan;
   const spans = textFxSpans(chars, textfx);
   const spanAt = new Array(n).fill(null);
@@ -6393,18 +6161,17 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", mood = "", ty
       plan.blips[i] = { gain: lerp(T.gain ?? 1, k), pitch };
     }
   }
+  if (!(speed > 0)) {
+    plan.times = new Array(n).fill(0);
+    return plan;
+  }
   let s0 = -1;
   let s1 = -1;
   const at2 = stress && spoken ? text.indexOf(stress) : -1;
   if (at2 >= 0) {
     s0 = Array.from(text.slice(0, at2)).length;
     s1 = s0 + Array.from(stress).length - 1;
-    const mark = gentle ? "stress-soft" : "stress";
-    for (let i = s0; i <= s1; i += 1) plan.marks[i] = mark;
-  }
-  if (!(speed > 0)) {
-    plan.times = new Array(n).fill(0);
-    return plan;
+    for (let i = s0; i <= s1; i += 1) plan.marks[i] = "stress";
   }
   const inStress = (i) => s0 >= 0 && i >= s0 && i <= s1;
   const rand2 = seeded(`${seed}|${style}|${text}`);
@@ -6438,7 +6205,7 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", mood = "", ty
   const push = (time, list3) => {
     for (const [kind, v] of list3) fx.push(kind === "sound" ? { at: time, kind, sound: v } : { at: time, kind, power: v });
   };
-  if (s0 >= 0 && !gentle) push(plan.times[s1], IMPACT[style]);
+  if (s0 >= 0) push(plan.times[s1], IMPACT[style]);
   else if (style === "shout" && !spans.some((sp) => (TEXT_STYLES[sp.style].land || []).some(([k]) => k === "shake"))) push(0, IMPACT.shout);
   for (const sp of spans) {
     const land = TEXT_STYLES[sp.style].land;
@@ -7548,7 +7315,6 @@ function stopAll() {
   }
   oneShots.clear();
   stopEros();
-  stopHeartbeat();
   erosRecording.stop();
 }
 function previewTrack(track, onEnd) {
@@ -8117,36 +7883,6 @@ function tentacleLoop(kind) {
 }
 var erosBed = rhythm();
 var tentacleBed = rhythm();
-var heartBed = rhythm();
-var HEARTBEAT_SPEC = {
-  "sense:pulse": { beat: 2.4, f1: 58, f2: 52, sep: 0.24, gain: 0.56 },
-  pulse: { beat: 2.8, f1: 60, f2: 54, sep: 0.23, gain: 0.45 },
-  heartbeat: { beat: 1.8, f1: 64, f2: 58, sep: 0.19, gain: 0.65 },
-  palpitate: { beat: 1.1, f1: 72, f2: 65, sep: 0.15, gain: 0.82 }
-};
-function heartLoop(kind) {
-  const spec = HEARTBEAT_SPEC[kind];
-  if (!spec) return null;
-  const { beat, f1, f2, sep, gain } = spec;
-  const parts = [
-    { wave: "sine", f: f1, to: f1 * 0.62, dur: 0.16, gain: 0.26 * gain, attack: 5e-3, at: 0 },
-    { wave: "noise", f: 185, q: 1.2, dur: 0.07, gain: 0.11 * gain, at: 0 },
-    { wave: "sine", f: f2, to: f2 * 0.62, dur: 0.18, gain: 0.19 * gain, attack: 6e-3, at: sep },
-    { wave: "noise", f: 165, q: 1.2, dur: 0.07, gain: 0.08 * gain, at: sep }
-  ];
-  return {
-    gap: () => beat,
-    play(ac, at2, step2, volume) {
-      playParts(ac, parts, { volume, at: at2 });
-    }
-  };
-}
-function playHeartbeat(kind, volume = 1) {
-  heartBed.set(kind || "", heartLoop(kind), volume);
-}
-function stopHeartbeat() {
-  heartBed.stop();
-}
 function playEros(pace, tentacle, volume = 1) {
   const writhing = Boolean(TENTACLE_LOOPS[tentacle]);
   erosBed.set(pace + (writhing ? "|tentacle" : ""), paceLoop(pace, writhing), volume);
@@ -8181,7 +7917,6 @@ function previewEros(pace, tentacle, volume = 1, seconds = 5) {
   beds[1].set("trial", tentacleLoop(tentacle), volume * 0.8);
   erosBed.quiet(seconds + 0.5);
   tentacleBed.quiet(seconds + 0.5);
-  heartBed.quiet(seconds + 0.5);
   erosRecording.duck(0, (seconds + 0.5) * 1e3);
   trial = { beds, timer: setTimeout(() => {
     beds.forEach((b) => b.stop());
@@ -9194,12 +8929,11 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
   const key = beat ? beat.key : "";
   const chars = import_react5.default.useMemo(() => Array.from(beat && beat.text || ""), [key, beat && beat.text]);
   const emo = beat && beat.speaker ? beat.emotions && beat.emotions[beat.speaker] || beat.emo : "";
-  const mood = beat && beat.scene ? beat.scene.mood : "";
   const say = beat ? beat.say : "";
   const stress = beat ? beat.stress : "";
   const type = beat ? beat.type : "narration";
   const textfx = beat ? beat.textfx : null;
-  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, mood, type, seed: key, textfx, offStyles }), [chars, speed, say, stress, emo, mood, type, key, textfx, offStyles]);
+  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles }), [chars, speed, say, stress, emo, type, key, textfx, offStyles]);
   const [shown, setShown] = import_react5.default.useState({ key, done: false });
   const [start, setStart] = import_react5.default.useState({ key: "", at: NaN });
   if (shown.key !== key) setShown({ key, done: false });
@@ -14450,53 +14184,29 @@ function useParallax(stageRef, targetRef, enabled = true) {
 // src/client/theater/Eros.jsx
 var import_react17 = __toESM(require("react"), 1);
 var still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-var PUSH = {
-  tease: { y: 0.16, scale: 1.003, beat: 2400 },
-  slow: { y: 0.42, scale: 1.006, beat: 1250 },
-  fast: { y: 0.56, scale: 1.009, beat: 680 },
-  frantic: { y: 0.72, scale: 1.013, beat: 440 }
-};
-function useErosPulse(cameraRef, pace, synced = false) {
+var PUSH = { slow: 0.45, fast: 0.55, frantic: 0.7 };
+function useErosPulse(cameraRef, on) {
   import_react17.default.useEffect(() => {
-    if (!pace || still()) return void 0;
-    const spec = PUSH[pace];
-    if (!spec) return void 0;
-    const pulseOnce = (delay, duration) => {
-      const cam2 = cameraRef.current;
-      if (!cam2 || typeof cam2.animate !== "function") return null;
-      const { y: y2, scale } = spec;
-      return cam2.animate([
+    if (!on || still()) return void 0;
+    const moving = /* @__PURE__ */ new Set();
+    const off = onErosBeat(({ in: delay, beat, pace }) => {
+      const cam = cameraRef.current;
+      const amp2 = PUSH[pace];
+      if (!amp2 || !cam || typeof cam.animate !== "function") return;
+      const move = cam.animate([
         { translate: "0 0" },
-        { translate: `0 ${-y2}%`, offset: 0.22, easing: "cubic-bezier(.28, 0, .25, 1)" },
-        { translate: `0 ${(y2 * 0.14).toFixed(3)}%`, offset: 0.62 },
+        { translate: `0 ${-amp2}%`, offset: 0.2, easing: "cubic-bezier(.3, 0, .3, 1)" },
+        { translate: `0 ${(amp2 * 0.15).toFixed(3)}%`, offset: 0.58 },
         { translate: "0 0" }
-      ], { duration: Math.min(duration * 0.92, 1400), delay, easing: "cubic-bezier(.22, .6, .36, 1)" });
+      ], { duration: Math.min(beat * 0.9, 1e3), delay, easing: "cubic-bezier(.2, .6, .4, 1)" });
+      moving.add(move);
+      move.onfinish = () => moving.delete(move);
+    });
+    return () => {
+      off();
+      moving.forEach((m) => m.cancel());
     };
-    if (synced && pace !== "tease") {
-      const moving = /* @__PURE__ */ new Set();
-      const off = onErosBeat(({ in: delay, beat }) => {
-        const move = pulseOnce(delay, beat);
-        if (move) {
-          moving.add(move);
-          move.onfinish = () => moving.delete(move);
-        }
-      });
-      return () => {
-        off();
-        moving.forEach((m) => m.cancel());
-      };
-    }
-    const cam = cameraRef.current;
-    if (!cam || typeof cam.animate !== "function") return void 0;
-    const { y } = spec;
-    const loop = cam.animate([
-      { translate: "0 0" },
-      { translate: `0 ${-y}%`, offset: 0.26, easing: "cubic-bezier(.32, 0, .28, 1)" },
-      { translate: `0 ${(y * 0.12).toFixed(3)}%`, offset: 0.64 },
-      { translate: "0 0" }
-    ], { duration: spec.beat, iterations: Infinity, easing: "cubic-bezier(.25, .6, .35, 1)" });
-    return () => loop.cancel();
-  }, [pace, synced]);
+  }, [on]);
 }
 function ErosPeak({ beat, cameraRef, volume, sound = true }) {
   const kind = beat.peak;
@@ -14504,36 +14214,10 @@ function ErosPeak({ beat, cameraRef, volume, sound = true }) {
     if (volume > 0) erosPeak(kind, volume, { sound });
     const cam = cameraRef && cameraRef.current;
     if (!cam || typeof cam.animate !== "function" || still()) return void 0;
-    const keyframes = kind === "cum" ? [
-      { scale: "1", offset: 0 },
-      { scale: "1.026", offset: 0.06 },
-      { scale: "1.006", offset: 0.16 },
-      { scale: "1.022", offset: 0.22 },
-      { scale: "1.004", offset: 0.34 },
-      { scale: "1.016", offset: 0.4 },
-      { scale: "1.002", offset: 0.54 },
-      { scale: "1.010", offset: 0.6 },
-      { scale: "1", offset: 1 }
-    ] : kind === "both" ? [
-      { scale: "1", offset: 0 },
-      { scale: "1.042", offset: 0.08 },
-      { scale: "1.018", offset: 0.15 },
-      { scale: "1.032", offset: 0.21 },
-      { scale: "1.012", offset: 0.31 },
-      { scale: "1.022", offset: 0.38 },
-      { scale: "1.006", offset: 0.5 },
-      { scale: "1.014", offset: 0.56 },
-      { scale: "1", offset: 1 }
-    ] : [
-      { scale: "1", offset: 0 },
-      { scale: "1.038", offset: 0.12 },
-      { scale: "1.022", offset: 0.36 },
-      { scale: "1", offset: 1 }
-    ];
-    const move = cam.animate(keyframes, { duration: kind === "cum" ? 2200 : 3100, easing: "cubic-bezier(.25, 0, .2, 1)" });
-    return () => move.cancel();
+    const moves = kind !== "cum" ? [cam.animate([{ scale: "1" }, { scale: "1.03", offset: 0.28 }, { scale: "1" }], { duration: 2600, easing: "cubic-bezier(.3, 0, .2, 1)" })] : EROS_PULSES.map((ms, i) => cam.animate([{ scale: "1" }, { scale: String(1.016 - i * 3e-3), offset: 0.2 }, { scale: "1" }], { duration: 360, delay: ms, easing: "ease-out" }));
+    return () => moves.forEach((m) => m.cancel());
   }, []);
-  return /* @__PURE__ */ import_react17.default.createElement("div", { className: `fg-peak is-${kind}`, "aria-hidden": "true" }, kind !== "cum" && /* @__PURE__ */ import_react17.default.createElement("b", { className: "fg-peak-veil" }), kind !== "climax" && EROS_PULSES.map((ms, i) => /* @__PURE__ */ import_react17.default.createElement("i", { key: ms, style: { "--at": ms + "ms", "--k": (1 - i * 0.2).toFixed(2) } })));
+  return /* @__PURE__ */ import_react17.default.createElement("div", { className: `fg-peak is-${kind}`, "aria-hidden": "true" }, kind !== "climax" && EROS_PULSES.map((ms, i) => /* @__PURE__ */ import_react17.default.createElement("i", { key: ms, style: { "--at": ms + "ms", "--k": (1 - i * 0.2).toFixed(2) } })));
 }
 
 // src/client/theater/preload.js
@@ -14818,9 +14502,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }, [panel, done]);
   const talk = import_react18.default.useMemo(() => beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null, [beat, chars, typed, typeSpeed, typedAt, done]);
   import_react18.default.useEffect(() => {
-    if (!beat || title || !sfxOn) return;
-    if (beat.cam === "whip") stinger("whoosh");
-    else if (beat.cam === "throb" && !beat.sfx) storyFoley("throb", (ui0.storySfxVolume ?? 0.8) / 0.8);
+    if (beat && beat.cam === "whip" && !title && sfxOn) stinger("whoosh");
   }, [beat && beat.key]);
   const cameraRef = import_react18.default.useRef(null);
   const cam = useCamera(title ? null : beat, cameraRef);
@@ -14898,16 +14580,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if ((bedPace || bedTentacle) && !bedSound) playEros(bedPace, bedTentacle, erosVolume);
     else stopEros();
   }, [bedPace, bedTentacle, erosVolume, bedSound && bedSound.id, bedSound && bedSound.volume]);
-  useErosPulse(cameraRef, bedPace, !bedSound);
-  const heartScene = ui0.storySfx !== false && !skip && !title && soundBeat ? soundBeat.scene : null;
-  const ambHasHeart = Boolean(ambSound && /心|脉|beat/i.test(`${ambSound.name || ""} ${ambSound.category || ""}`));
-  const heartKind = !heartScene || ambHasHeart ? "" : heartScene.sense === "pulse" ? "sense:pulse" : ["pulse", "heartbeat", "palpitate"].includes(heartScene.fx) ? heartScene.fx : "";
-  const heartVolume = (ui0.storySfxVolume ?? 0.8) / 0.8;
-  import_react18.default.useEffect(() => {
-    if (closingRef.current) return;
-    if (heartKind) playHeartbeat(heartKind, heartVolume);
-    else stopHeartbeat();
-  }, [heartKind, heartVolume]);
+  useErosPulse(cameraRef, Boolean(bedPace) && !bedSound);
   const go = import_react18.default.useCallback((i) => {
     if (!beats.length) return;
     const next = Math.max(0, Math.min(beats.length - 1, i));
@@ -14934,18 +14607,10 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     sfx("page");
     go(index + 1);
   }, [beat, done, atEnd, index, go, finish, pausing, change, visit]);
-  const rushedRef = import_react18.default.useRef("");
   import_react18.default.useEffect(() => {
     if (title || panel || choosing || !beat) return void 0;
     if (skip) {
       const t = setTimeout(() => atEnd ? setSkip(false) : go(index + 1), 70);
-      return () => clearTimeout(t);
-    }
-    if (typed && typed.rush && done && !atEnd && speed > 0 && rushedRef.current !== visit) {
-      const t = setTimeout(() => {
-        rushedRef.current = visit;
-        go(index + 1);
-      }, 120);
       return () => clearTimeout(t);
     }
     if (auto && done && !atEnd) {
@@ -14953,7 +14618,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       return () => clearTimeout(t);
     }
     return void 0;
-  }, [auto, skip, done, index, title, panel, choosing, atEnd, typed && typed.rush, speed, visit]);
+  }, [auto, skip, done, index, title, panel, choosing, atEnd]);
   const prevLen = import_react18.default.useRef(beats.length);
   import_react18.default.useEffect(() => {
     if (beats.length > prevLen.current && choosing && index === prevLen.current - 1) {

@@ -8,17 +8,13 @@ const plan = (text, opts = {}) => planLine(chars(text), 30, { seed: 'k', ...opts
 const gaps = p => p.times.slice(1).map((t, i) => t - p.times[i])
 const kinds = p => p.fx.map(f => f.kind + (f.sound ? ':' + f.sound : ''))
 
-test('gate: 威压一个字一个字蹦，激动飞快，连珠炮标点几乎不停、打完自动下一句', () => {
+test('gate: 威压一个字一个字蹦，激动连珠炮', () => {
   const menace = plan('你以为我会放过你吗', { say: 'menace' })
   assert.ok(gaps(menace).every(g => g >= 110), '威压每个字至少隔 110ms')
   assert.equal(menace.mouth, 'syllable')
   const excited = plan('等等等等你说什么', { say: 'excited' })
   assert.ok(gaps(excited).every(g => g < 20), '激动字距不到普通的一半')
   assert.ok(excited.times.at(-1) < plan('等等等等你说什么').times.at(-1) / 1.5)
-  assert.equal(excited.rush, false)
-  const chatter = plan('小哥我跟你说啊那天晚上真是不得了，噼里啪啦的什么都看不清！', { say: 'chatter' })
-  assert.equal(chatter.rush, true)
-  assert.ok(chatter.times.at(-1) < plan('小哥我跟你说啊那天晚上真是不得了，噼里啪啦的什么都看不清！', { say: 'excited' }).times.at(-1), '连珠炮比激动更快、标点几乎不停')
 })
 
 test('gate: 怒吼几个字一块砸出来，一开口就震屏、闪白、拍桌声', () => {
@@ -37,10 +33,7 @@ test('gate: 重音前先顿一拍，一字一顿落下，落地那一下才震',
   assert.ok(g[2] >= 100 && g[3] >= 100, '重音一字一顿')
   assert.deepEqual(kinds(p), ['shake', 'sound:impact'])
   assert.equal(p.fx[0].at, p.times[4]) // 「你」出现的那一刻
-  // 低语或温和情绪（心动、微笑、含泪……）的重音收成暖光（stress-soft），放慢但不震屏不响闷咚；怒斥、威压照旧标红震屏
-  const soft = plan('就知道你是谁。', { emo: 'love', stress: '就知道你是谁。' })
-  assert.deepEqual(soft.marks, ['stress-soft', 'stress-soft', 'stress-soft', 'stress-soft', 'stress-soft', 'stress-soft', 'stress-soft'])
-  assert.equal(soft.fx.length, 0)
+  // 低语的重音只标红、放慢，不震不响；原文里没有的重音不生效
   assert.equal(plan('就是你', { say: 'whisper', stress: '就是你' }).fx.length, 0)
   assert.ok(plan('凶手就是你', { stress: '不存在' }).marks.every(m => !m))
 })

@@ -10,7 +10,7 @@ import { DirectorLog } from './DirectorLog.jsx'
 import { asking } from '../ask.jsx'
 import { useFaceFramer } from './faceFramer.js'
 import { useParallax } from './parallax.js'
-import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros, playErosLoop, playHeartbeat, stopHeartbeat, warmVoices } from './audio.js'
+import { playBgm, hushBgm, playAmbience, stopAll, playLibSound, storyFoley, sfx, stinger, configureSounds, erosFoley, playEros, stopEros, playErosLoop, warmVoices } from './audio.js'
 import { ErosPeak, useErosPulse } from './Eros.jsx'
 import { EROS_SFX } from '../../../lib/eros.js'
 import { ONOMATOPOEIA } from '../../../lib/foley.js'
@@ -273,12 +273,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
   React.useEffect(() => { if (panel && !done) finish() }, [panel, done])
   const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])
-  // 甩镜：「唰」一下；心头一震（cam: throb）：这句没有单配 sfx 时，自动配一声沉沉的心搏
-  React.useEffect(() => {
-    if (!beat || title || !sfxOn) return
-    if (beat.cam === 'whip') stinger('whoosh')
-    else if (beat.cam === 'throb' && !beat.sfx) storyFoley('throb', (ui0.storySfxVolume ?? 0.8) / 0.8)
-  }, [beat && beat.key])
+  // 甩镜：「唰」一下
+  React.useEffect(() => { if (beat && beat.cam === 'whip' && !title && sfxOn) stinger('whoosh') }, [beat && beat.key])
   const cameraRef = React.useRef(null)
   const cam = useCamera(title ? null : beat, cameraRef)
   useParallax(stageRef, cameraRef, !off.has('look.parallax'))
@@ -363,19 +359,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if ((bedPace || bedTentacle) && !bedSound) playEros(bedPace, bedTentacle, erosVolume)
     else stopEros()
   }, [bedPace, bedTentacle, erosVolume, bedSound && bedSound.id, bedSound && bedSound.volume])
-  useErosPulse(cameraRef, bedPace, !bedSound)
-  // 心跳画面特效与心音联动：当场景开着 sense: pulse 或 fx: pulse / heartbeat / palpitate，且当前环境音不是心跳录音时，按画面呼吸的同一拍子自动响起对应快慢的心音。
-  const heartScene = ui0.storySfx !== false && !skip && !title && soundBeat ? soundBeat.scene : null
-  const ambHasHeart = Boolean(ambSound && /心|脉|beat/i.test(`${ambSound.name || ''} ${ambSound.category || ''}`))
-  const heartKind = !heartScene || ambHasHeart ? ''
-    : heartScene.sense === 'pulse' ? 'sense:pulse'
-    : ['pulse', 'heartbeat', 'palpitate'].includes(heartScene.fx) ? heartScene.fx : ''
-  const heartVolume = (ui0.storySfxVolume ?? 0.8) / 0.8
-  React.useEffect(() => {
-    if (closingRef.current) return
-    if (heartKind) playHeartbeat(heartKind, heartVolume)
-    else stopHeartbeat()
-  }, [heartKind, heartVolume])
+  useErosPulse(cameraRef, Boolean(bedPace) && !bedSound)
 
   const go = React.useCallback(i => {
     if (!beats.length) return
@@ -394,18 +378,13 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     go(index + 1)
   }, [beat, done, atEnd, index, go, finish, pausing, change, visit])
 
-  // 自动 / 快进 / 连珠炮（chatter：像逆转裁判的大场香大婶那样机关枪似的一口气说完，打完字不等玩家按键，只停 120ms 直接跳下一句）。
-  const rushedRef = React.useRef('')
+  // 自动 / 快进。
   React.useEffect(() => {
     if (title || panel || choosing || !beat) return undefined
     if (skip) { const t = setTimeout(() => (atEnd ? setSkip(false) : go(index + 1)), 70); return () => clearTimeout(t) }
-    if (typed && typed.rush && done && !atEnd && speed > 0 && rushedRef.current !== visit) {
-      const t = setTimeout(() => { rushedRef.current = visit; go(index + 1) }, 120)
-      return () => clearTimeout(t)
-    }
     if (auto && done && !atEnd) { const t = setTimeout(() => go(index + 1), ui0.autoDelay + chars.length * 18); return () => clearTimeout(t) }
     return undefined
-  }, [auto, skip, done, index, title, panel, choosing, atEnd, typed && typed.rush, speed, visit])
+  }, [auto, skip, done, index, title, panel, choosing, atEnd])
 
   // 读到末尾时新的一拍到了（导演补了单元 / 新一轮）：继续往下演。
   const prevLen = React.useRef(beats.length)
