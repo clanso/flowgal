@@ -1554,15 +1554,41 @@ function listOptions(list, value, emptyLabel) {
   return opts
 }
 
-function KeyInput({ backend, endpoint, has }) {
+function KeyInput({ backend, endpoint, has, label = '' }) {
   const [value, setValue] = React.useState('')
+  const [editing, setEditing] = React.useState(false)
   const [busy, run] = useBusy()
+  const save = () => {
+    if (!value.trim() || busy === 's') return
+    run('s', async () => {
+      setConfig(await api.secret(backend, endpoint, value.trim()))
+      setValue('')
+      setEditing(false)
+    }, 'Key 已保存在宿主，不会发到浏览器')
+  }
+  const clear = async () => {
+    if (!(await confirmBox(`清除${label ? `「${label}」的 ` : ''}Key？`, { ok: '清除', danger: true }))) return
+    run('c', async () => {
+      setConfig(await api.secret(backend, endpoint, ''))
+      setEditing(false)
+    }, '已清除')
+  }
+  if (has && !editing) {
+    return (
+      <div className="fg-row">
+        <span className="fg-ok">✓ 已保存 Key</span>
+        <span className="fg-note">（保存在宿主，不回显明文）</span>
+        <button type="button" className="fg-btn" onClick={() => setEditing(true)}>更换 Key</button>
+        <button type="button" className="fg-btn" disabled={busy === 'c'} onClick={clear}>清除</button>
+      </div>
+    )
+  }
   return (
     <div className="fg-row">
-      <input className="fg-input" style={{ flex: 1, width: 'auto' }} type="password" autoComplete="off" placeholder={has ? '已保存（不会回显）；填新的会覆盖' : '粘贴 Key'} value={value} onChange={e => setValue(e.target.value)} onKeyDown={e => e.stopPropagation()} />
-      <button type="button" className="fg-btn is-primary" disabled={!value || busy === 's'} onClick={() => run('s', async () => { setConfig(await api.secret(backend, endpoint, value)); setValue('') }, 'Key 已保存在宿主，不会发到浏览器')}>保存</button>
-      {has && <button type="button" className="fg-btn" onClick={() => run('c', async () => setConfig(await api.secret(backend, endpoint, '')), '已清除')}>清除</button>}
-      <span className={has ? 'fg-ok' : 'fg-note'}>{has ? '✓ 已保存' : '未填写'}</span>
+      <input className="fg-input" style={{ flex: 1, width: 'auto' }} type="password" autoComplete="off" placeholder={has ? `粘贴新的${label ? `「${label}」` : ''} Key 覆盖原 Key` : `粘贴${label ? `「${label}」的` : ''} Key`} value={value} onChange={e => setValue(e.target.value)} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') save(); if (e.key === 'Escape' && editing) { setValue(''); setEditing(false) } }} />
+      <button type="button" className="fg-btn is-primary" disabled={!value.trim() || busy === 's'} onClick={save}>{busy === 's' ? '保存中…' : has ? '保存新 Key' : '保存 Key'}</button>
+      {editing && <button type="button" className="fg-btn" onClick={() => { setValue(''); setEditing(false) }}>取消</button>}
+      {!has && <span className="fg-note">未填写</span>}
     </div>
   )
 }
@@ -1586,7 +1612,8 @@ function BackendSection({ data }) {
   const [busy, run] = useBusy()
   const [test, setTest] = React.useState(null)
   const [list, setList] = React.useState(null)
-  const [relay, setRelay] = React.useState({ name: '', baseURL: '' })
+  const [addingRelay, setAddingRelay] = React.useState(false)
+  const [relay, setRelay] = React.useState({ name: '', baseURL: '', key: '' })
   const p = (section, patch) => patchConfig({ [section]: patch }).catch(e => toast(e.message, 'error'))
   // 模型列表跟着渠道、地址和 Key 走：换了任何一个就重新读。
   const source = backend === 'novelai' ? '' : [cfg[backend].baseURL, cfg[backend].authType, data.keys[backend]].join('|')
@@ -1600,29 +1627,34 @@ function BackendSection({ data }) {
   const doTest = () => run('t', async () => { setTest(await api.test()); if (backend !== 'novelai') loadList() })
   // V5 起固定 karras、没有 Variety+、支持透明底；没见过的模型按名字里的版本号判断（与宿主一致）。
   const nai = naiModelInfo(cfg.novelai.model) || {}
-  const currentEndpoint = cfg.novelai.endpoints.find(e => e.id === cfg.novelai.endpoint) || cfg.novelai.endpoints[0] || { id: 'official', name: 'NovelAI 官方', baseURL: 'https://image.novelai.net' }
-  const editEndpoint = patch => saveNovelai(n => ({
-    endpoints: n.endpoints.map(e => (e.id === currentEndpoint.id ? { ...e, ...patch } : e)),
+  const editEndpoint = (id, patch) => saveNovelai(n => ({
+    endpoints: n.endpoints.map(e => (e.id === id ? { ...e, ...patch } : e)),
   }))
   const addEndpoint = () => {
     const baseURL = relay.baseURL.trim()
-    if (!/^https?:\/\//i.test(baseURL)) return
+    if (!/^https?:\/\//i.test(baseURL)) { toast('接口地址需以 http:// 或 https:// 开头', 'error'); return }
     const name = relay.name.trim()
+    const key = relay.key.trim()
     const id = 'relay' + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 4)
-    saveNovelai(n => ({
-      endpoints: [...n.endpoints, { id, name: name || `中转站 ${n.endpoints.length}`, baseURL }],
-      endpoint: id,
-    }), '已添加接入点')
-    setRelay({ name: '', baseURL: '' })
+    run('add-relay', async () => {
+      await saveNovelai(n => ({
+        endpoints: [...n.endpoints, { id, name: name || `中转站 ${n.endpoints.length}`, baseURL }],
+        endpoint: id,
+      }))
+      if (key) setConfig(await api.secret('novelai', id, key))
+      setRelay({ name: '', baseURL: '', key: '' })
+      setAddingRelay(false)
+    }, key ? '已添加中转站并保存 Key' : '已添加中转站')
   }
-  const removeEndpoint = async () => {
-    if (currentEndpoint.id === 'official') return
-    if (!(await confirmBox(`删除接入点「${currentEndpoint.name}」（${currentEndpoint.baseURL || '未填地址'}）？`, { ok: '删除', danger: true }))) return
-    saveNovelai(n => {
-      const rest = n.endpoints.filter(e => e.id !== currentEndpoint.id)
-      const next = (rest.find(e => e.id !== 'official') || rest[0] || { id: 'official' }).id
+  const removeEndpoint = async ep => {
+    if (ep.id === 'official') return
+    if (!(await confirmBox(`删除中转站「${ep.name}」（${ep.baseURL || '未填地址'}）？`, { ok: '删除', danger: true }))) return
+    await saveNovelai(n => {
+      const rest = n.endpoints.filter(e => e.id !== ep.id)
+      const next = n.endpoint === ep.id ? (rest.find(e => e.id !== 'official') || rest[0] || { id: 'official' }).id : n.endpoint
       return { endpoints: rest, endpoint: next }
-    }, '已删除接入点')
+    }, '已删除中转站')
+    if (data.keys['novelai:' + ep.id]) api.secret('novelai', ep.id, '').then(setConfig).catch(() => {})
   }
   const auth = section => (
     <Field label="鉴权"><Select value={cfg[section].authType} onChange={v => p(section, { authType: v })} options={[['none', '无'], ['bearer', 'Bearer Token'], ['basic', 'Basic（用户名:密码）']]} /></Field>
@@ -1635,38 +1667,68 @@ function BackendSection({ data }) {
       </Field>
       {backend === 'novelai' && (
         <>
-          <Field label="接入点" hint={`官方站之外可添加任意多个第三方中转站（当前共 ${cfg.novelai.endpoints.length} 个），每个站点各自独立保存地址与 Key；切换站点不影响模型与画风。`}>
-            <div className="fg-row">
-              <Select value={cfg.novelai.endpoint} onChange={v => saveNovelai(() => ({ endpoint: v }))} options={cfg.novelai.endpoints.map(e => [e.id, `${e.name}${e.baseURL ? `（${e.baseURL}）` : ''}${data.keys['novelai:' + e.id] ? ' ✓' : ''}`])} />
-              {currentEndpoint.id !== 'official' && <button type="button" className="fg-btn" onClick={removeEndpoint}>删除此站</button>}
+          <Field label="接入点列表" hint="官方站与多个第三方中转站并列保存，各自独立记住接口地址和 Key；点选卡片即可切换当前出图站点，不影响模型与画风。">
+            <div style={{ display: 'grid', gap: '.7cqw' }}>
+              {cfg.novelai.endpoints.map(ep => {
+                const active = ep.id === cfg.novelai.endpoint
+                const official = ep.id === 'official'
+                const hasKey = Boolean(data.keys['novelai:' + ep.id])
+                return (
+                  <div key={ep.id} className="fg-cg-char" style={{ borderColor: active ? 'var(--accent)' : undefined, background: active ? 'color-mix(in oklab, var(--accent) 9%, rgba(0, 0, 0, .24))' : undefined }}>
+                    <div className="fg-row">
+                      <button type="button" className={`fg-btn${active ? ' is-primary' : ''}`} onClick={() => !active && saveNovelai(() => ({ endpoint: ep.id }), `已切换到「${ep.name}」`)}>
+                        {active ? '● 当前使用' : '○ 切换到此站'}
+                      </button>
+                      {official ? (
+                        <>
+                          <b style={{ fontSize: '1.1cqw' }}>{ep.name}</b>
+                          <code className="fg-note" style={{ userSelect: 'text' }}>{ep.baseURL}</code>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={{ width: '11cqw' }} placeholder="站点名称" value={ep.name} onCommit={v => editEndpoint(ep.id, { name: v.trim() || ep.id })} />
+                          <Text style={{ flex: 1, width: 'auto' }} placeholder="https://…" value={ep.baseURL} onCommit={v => {
+                            const url = v.trim()
+                            if (!/^https?:\/\//i.test(url)) { toast('地址需以 http:// 或 https:// 开头', 'error'); return }
+                            editEndpoint(ep.id, { baseURL: url })
+                          }} />
+                        </>
+                      )}
+                      <span className="fg-spacer" />
+                      {!official && <button type="button" className="fg-btn" onClick={() => removeEndpoint(ep)}>删除站点</button>}
+                    </div>
+                    <div className="fg-row" style={{ paddingLeft: '.4cqw' }}>
+                      <span className="fg-note" style={{ minWidth: '3.2cqw' }}>Key：</span>
+                      <div style={{ flex: 1 }}>
+                        <KeyInput backend="novelai" endpoint={ep.id} has={hasKey} label={ep.name} />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {!addingRelay ? (
+                <div className="fg-row">
+                  <button type="button" className="fg-btn" onClick={() => setAddingRelay(true)}>＋ 新增中转站</button>
+                </div>
+              ) : (
+                <div className="fg-cg-char" style={{ borderStyle: 'dashed' }}>
+                  <div className="fg-row">
+                    <b style={{ fontSize: '1.05cqw' }}>新增中转站</b>
+                    <span className="fg-note">（名称、接口地址、Key 一次填好，保存后自动切换到新站点）</span>
+                  </div>
+                  <div className="fg-row">
+                    <input className="fg-input" style={{ width: '12cqw' }} placeholder="站点名称（如 共享站）" value={relay.name} onChange={e => setRelay(r => ({ ...r, name: e.target.value }))} onKeyDown={e => e.stopPropagation()} />
+                    <input className="fg-input" style={{ flex: 1, width: 'auto' }} placeholder="接口地址 https://…" value={relay.baseURL} onChange={e => setRelay(r => ({ ...r, baseURL: e.target.value }))} onKeyDown={e => e.stopPropagation()} />
+                  </div>
+                  <div className="fg-row">
+                    <input className="fg-input" style={{ flex: 1, width: 'auto' }} type="password" autoComplete="off" placeholder="该中转站的 Key（选填，也可添加后再填）" value={relay.key} onChange={e => setRelay(r => ({ ...r, key: e.target.value }))} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' && /^https?:\/\//i.test(relay.baseURL.trim())) addEndpoint() }} />
+                    <button type="button" className="fg-btn is-primary" disabled={busy === 'add-relay' || !/^https?:\/\//i.test(relay.baseURL.trim())} onClick={addEndpoint}>{busy === 'add-relay' ? '添加中…' : '保存并启用'}</button>
+                    <button type="button" className="fg-btn" onClick={() => { setAddingRelay(false); setRelay({ name: '', baseURL: '', key: '' }) }}>取消</button>
+                  </div>
+                </div>
+              )}
             </div>
           </Field>
-          {currentEndpoint.id === 'official' ? (
-            <Field label="接口地址" hint="NovelAI 官方生图接口（固定地址）。">
-              <div className="fg-row">
-                <input className="fg-input" style={{ flex: 1, width: 'auto', opacity: 0.75 }} value={currentEndpoint.baseURL} readOnly />
-              </div>
-            </Field>
-          ) : (
-            <Field label="当前中转站" hint="可直接修改当前选中站点的名称和接口地址（失焦或回车自动保存，不会覆盖其他中转站）。">
-              <div className="fg-row">
-                <Text style={{ width: '12cqw' }} placeholder="站点名称" value={currentEndpoint.name} onCommit={v => editEndpoint({ name: v.trim() || currentEndpoint.id })} />
-                <Text style={{ flex: 1, width: 'auto' }} placeholder="https://…" value={currentEndpoint.baseURL} onCommit={v => {
-                  const url = v.trim()
-                  if (!/^https?:\/\//i.test(url)) { toast('地址需以 http:// 或 https:// 开头', 'error'); return }
-                  editEndpoint({ baseURL: url })
-                }} />
-              </div>
-            </Field>
-          )}
-          <Field label="新增中转站" hint="填好新站点的名称与地址后点「添加」，会追加到接入点列表中并自动切换到新站点。">
-            <div className="fg-row">
-              <input className="fg-input" style={{ width: '12cqw' }} placeholder="新站点名称" value={relay.name} onChange={e => setRelay(r => ({ ...r, name: e.target.value }))} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') addEndpoint() }} />
-              <input className="fg-input" style={{ flex: 1, width: 'auto' }} placeholder="https://…" value={relay.baseURL} onChange={e => setRelay(r => ({ ...r, baseURL: e.target.value }))} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') addEndpoint() }} />
-              <button type="button" className="fg-btn" disabled={!/^https?:\/\//i.test(relay.baseURL.trim())} onClick={addEndpoint}>＋ 添加新站</button>
-            </div>
-          </Field>
-          <Field label="Key"><KeyInput key={cfg.novelai.endpoint} backend="novelai" endpoint={cfg.novelai.endpoint} has={data.keys['novelai:' + cfg.novelai.endpoint]} /></Field>
           <Field label="模型" hint={modelHint}><ModelField value={cfg.novelai.model} options={models} placeholder="nai-diffusion-…" onCommit={v => p('novelai', { model: v })} /></Field>
           <Field label="采样器"><Select value={cfg.novelai.sampler} onChange={v => p('novelai', { sampler: v })} options={listOptions(samplers, cfg.novelai.sampler)} /></Field>
           <Field label="步数 / 提示词引导" hint="当前画风里填了 CFG 时，以画风的为准。">
