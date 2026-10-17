@@ -22,9 +22,11 @@ import { SKINS, loadFontFile } from './skins.js'
 import { FONT_PACKS, FONT_GROUPS, LOCAL_FONTS, DIALOG_LIMITS, cleanFontName, fontFamilyOf, skinDialogHeight } from '../../../lib/fonts.js'
 import { CORNER_ITEMS, CORNER_DEFAULTS } from '../../../lib/corner.js'
 import { EFFECT_GROUPS, EFFECT_IDS } from './effects.js'
-import { previewTrack, stopPreview, previewVoice, previewSound, erosFoley, previewEros, erosPeak } from './audio.js'
+import { previewTrack, stopPreview, previewVoice, previewLine, previewSound, erosFoley, previewEros, erosPeak } from './audio.js'
+import { planLine } from '../../../lib/typing.js'
+import { voiceMood, scaleMood, NEUTRAL_MOOD } from '../../../lib/voice-mood.js'
 import { EROS_SFX, EROS_PACES, EROS_LABEL, TENTACLE, TENTACLE_LABEL, PEAKS, PEAK_LABEL } from '../../../lib/eros.js'
-import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, castVoices, libraryBlips, voiceLabel, isLibRef, libRef, libIdOf, LIBRARY_VOICES, AA_VOICES, libraryPreset, builtinPreset, aaPreset, narrationPatch, customRef, isCustomRef } from '../../../lib/sounds.js'
+import { VOICES, SOUND_SLOTS, VOICE_PITCH_LIMIT, castVoices, resolveVoice, libraryBlips, voiceLabel, isLibRef, libRef, libIdOf, LIBRARY_VOICES, AA_VOICES, libraryPreset, builtinPreset, aaPreset, narrationPatch, customRef, isCustomRef } from '../../../lib/sounds.js'
 import { VoiceMaker, VoicePools, VOICE_GENDERS } from './VoiceMaker.jsx'
 import { cleanPack, packFiles } from '../../../lib/aa-sprite.js'
 import { MUSIC_SIDECAR, AUDIO_FILE, readSidecar, writeSidecar } from '../../../lib/music-sidecar.js'
@@ -2572,6 +2574,24 @@ function EffectsSection({ data }) {
 const VOICE_GENDER = { female: '女声', male: '男声', '': '不分男女' }
 const SOUND_GROUPS = [['stage', '落字音效', '台词演出里的重音、怒吼、崩溃，打斗的出手'], ['ui', '界面音', '按钮、选项、翻页']]
 
+// 试听「声音带情绪」：同一句话按平静、开心、哭着说各念一遍（剧场的算法，带着设置里的强度）。
+const MOOD_SAMPLE = '我一直都在等你回来，真的，每天都在想你。'
+const MOOD_TRIES = [['', '平静'], ['happy', '开心'], ['cry', '哭着说']]
+function MoodPreview({ ui }) {
+  const voice = React.useMemo(() => resolveVoice(null, '试听', ui, []), [ui])
+  const [playing, setPlaying] = React.useState('')
+  const play = async emo => {
+    if (!voice) return
+    const chars = Array.from(MOOD_SAMPLE)
+    const mood = ui.voiceMood === false || !emo ? NEUTRAL_MOOD : scaleMood(voiceMood(emo, shownLib()), ui.voiceMoodAmount ?? 1)
+    const plan = planLine(chars, ui.textSpeed || 30, { emo, type: 'dialogue', seed: 'preview', mood })
+    setPlaying(emo || 'calm')
+    const ms = await previewLine(voice, chars, plan, ui)
+    setTimeout(() => setPlaying(p => (p === (emo || 'calm') ? '' : p)), ms)
+  }
+  return MOOD_TRIES.map(([emo, label]) => <button key={label} type="button" className={`fg-btn${playing === (emo || 'calm') ? ' is-primary' : ''}`} disabled={!voice} title={`用自动分配的声音念「${MOOD_SAMPLE}」`} onClick={() => play(emo)}>▶ {label}</button>)
+}
+
 /**
  * 打字音和音效：试听每个音色、定没指定声音的角色怎么分、旁白用什么；每种音效选版本、试听、换成自己的文件或音效库里的声音。
  * 音效库里种类是「打字音」的声音也是音色；标了推荐用途的（比如逆转裁判音效包）可以一键套用。
@@ -2610,6 +2630,13 @@ function SoundSection({ data }) {
       )}
       <div className="fg-section">打字音</div>
       <Field label="打字音"><div className="fg-row"><Toggle value={ui.blip} onChange={v => p({ blip: v })} /><input type="range" min="0" max="2" step="0.1" value={ui.blipVolume} aria-label="打字音音量" onChange={e => p({ blipVolume: Number(e.target.value) })} style={{ flex: 1 }} /></div></Field>
+      <Field label="声音带情绪" hint="台词和心声的打字音跟着说话人此刻的情绪变：哭着说的压低、放慢、变轻、带气声，说到一半会哽一下；开心的抬高、起伏大；生气的变响、起音变硬；害怕的发颤。情绪按情绪库归的类（喜怒哀惧……）和强弱算，表演设计师给这个人标了强弱的照他的；导演新造的情绪（「哽咽着温柔」）按字面认，几种掺在一起。旁白不带情绪。强度 0 等于关掉，2 是加倍。">
+        <div className="fg-row">
+          <Toggle value={ui.voiceMood !== false} onChange={v => p({ voiceMood: v })} />
+          <input type="range" min="0" max="2" step="0.1" value={ui.voiceMoodAmount ?? 1} disabled={ui.voiceMood === false} aria-label="情绪起伏强度" onChange={e => p({ voiceMoodAmount: Number(e.target.value) })} style={{ flex: 1 }} />
+          <MoodPreview ui={ui} />
+        </div>
+      </Field>
       <Field label="没指定的角色" hint="每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。">
         <Select value={ui.voiceDefault} options={defaultOptions} onChange={v => p({ voiceDefault: v })} />
       </Field>

@@ -17,6 +17,7 @@ import { ONOMATOPOEIA } from '../../../lib/foley.js'
 import { loadSkinFonts, loadGlyphs, dialogVars } from './skins.js'
 import { preloadImage, whenImageReady } from './preload.js'
 import { castVoices, lineVoice, libraryBlips } from '../../../lib/sounds.js'
+import { voiceMood, scaleMood, NEUTRAL_MOOD } from '../../../lib/voice-mood.js'
 import { ROMANCE_LABEL, SENSE_LABEL } from '../../../lib/vocab.js'
 
 // 读到哪一句：每局记在浏览器里。
@@ -269,7 +270,14 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     const tone = beat.recall ? recallTone || beat.recall.tone : ''
     return { ...main, style: beat.voice, ...(also.length ? { also } : {}), ...(tone ? { tone } : {}) }
   }, [beat && beat.type, beat && beat.speaker, beat && beat.voice, beat && beat.recall, recallTone, voices, ui0, blips])
-  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff })
+  // 声音带情绪（lib/voice-mood.js）：说话人此刻的情绪按情绪库认大类，强弱看表演设计师给这个人标的，再乘设置里的起伏强度
+  const speakerEmo = beat && beat.speaker ? (beat.emotions && beat.emotions[beat.speaker]) || beat.emo : ''
+  const speakerActing = beat && beat.speaker ? (people.get(beat.speaker) || {}).acting : null
+  const mood = React.useMemo(() => {
+    if (ui0.voiceMood === false || !speakerEmo) return NEUTRAL_MOOD
+    return scaleMood(voiceMood(speakerEmo, (view && view.emotions) || [], { acting: speakerActing }), ui0.voiceMoodAmount ?? 1)
+  }, [speakerEmo, speakerActing, view && view.emotions, ui0.voiceMood, ui0.voiceMoodAmount])
+  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff, mood })
   // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
   React.useEffect(() => { if (panel && !done) finish() }, [panel, done])
   const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])

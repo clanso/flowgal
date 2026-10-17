@@ -6,6 +6,8 @@ import { assetUrl, soundlibNow } from '../api.js'
 import { voiceById, findVoice, isCustomRef, soundFor, slotById, DEFAULT_SOUNDS, isLibRef, libIdOf } from '../../../lib/sounds.js'
 import { FOLEY } from '../../../lib/foley.js'
 import { EROS_FOLEY, EROS_LOOPS, TENTACLE_LOOPS, TENTACLE_SWAP, PEAK_FOLEY } from '../../../lib/eros.js'
+import { shapeBlip } from '../../../lib/voice-mood.js'
+import { SILENT as SILENT_CHAR } from '../../../lib/typing.js'
 
 let preview = null   // { el, id, onEnd }
 let ctx = null
@@ -230,6 +232,8 @@ function playParts(ac, parts, { rate = 1, volume = 1, at = ac.currentTime, out =
     const freq = part.wave === 'noise' ? head.frequency : src.frequency
     freq.setValueAtTime(part.f * rate, t)
     if (part.to && part.to !== part.f) freq.exponentialRampToValueAtTime(part.to * rate, end)
+    // 发颤（情绪的 tremor，lib/voice-mood.js 的 shapeBlip）：音高往上一抖再回来
+    else if (part.vibrato) { const f = part.f * rate; freq.linearRampToValueAtTime(f * (1 + part.vibrato), t + part.dur * 0.35); freq.linearRampToValueAtTime(f * (1 - part.vibrato * 0.5), t + part.dur * 0.7); freq.linearRampToValueAtTime(f, end) }
     if (part.lp) { const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = part.lp; head.connect(lp); head = lp }
     head.connect(g).connect(out)
     // 噪声从缓冲里随便一处开始：同一个配方连着响（节奏底一拍一拍）时每一下的颗粒不一样
@@ -343,13 +347,13 @@ function loadSample(ac, id) {
 /** 等采样准备好。 */
 const sampleReady = (ac, id) => decoded(ac, id).then(buffer => measured(id, buffer))
 /** 放一下采样：rate 变速（音高跟着变），volume 增益。 */
-function playSample(ac, sample, { rate = 1, volume = 1, at = ac.currentTime, out = ac.destination } = {}) {
+function playSample(ac, sample, { rate = 1, volume = 1, at = ac.currentTime, out = ac.destination, fadeIn = 0 } = {}) {
   if (!(volume > 0)) return
   const src = ac.createBufferSource()
   const g = ac.createGain()
   src.buffer = sample.buffer
   src.playbackRate.value = rate
-  g.gain.value = volume
+  if (fadeIn > 0) { g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(volume, at + fadeIn) } else g.gain.value = volume
   src.connect(g).connect(out)
   src.start(at)
 }
@@ -540,11 +544,18 @@ function voiceSource(ac, id) {
   recipeLevel(CLASSIC)
   return sample ? { sample, gain: slotVolume(lib) * matchGain(CLASSIC, sample) } : null
 }
-/** 响一下：配方合成，或者放采样（变速当移调）。memory 时配方的起音软下来、尾巴拖长（采样照原样，只靠效果链闷住）。 */
-function emit(ac, source, { rate = 1, volume = 1, at = ac.currentTime, out = ac.destination, memory = false } = {}) {
-  if (source.sample) playSample(ac, source.sample, { rate, volume: volume * source.gain, at, out })
-  else playParts(ac, memory ? submerged(source.parts) : source.parts, { rate, volume, at, out })
+/**
+ * 响一下：配方合成，或者放采样（变速当移调）。memory 时配方的起音软下来、尾巴拖长（采样照原样，只靠效果链闷住）。
+ * mood 是这句的情绪（lib/voice-mood.js）：配方按它叠气声、改起音、发颤；采样叠一层气息、软起音靠淡入。
+ */
+function emit(ac, source, { rate = 1, volume = 1, at = ac.currentTime, out = ac.destination, memory = false, mood = null } = {}) {
+  if (source.sample) {
+    playSample(ac, source.sample, { rate, volume: volume * source.gain, at, out, fadeIn: mood && mood.attack > 1.05 ? 0.004 * mood.attack : 0 })
+    if (mood && mood.breath >= 0.05) playParts(ac, BREATH, { rate, volume: volume * mood.breath, at, out })
+  } else playParts(ac, shapeBlip(memory ? submerged(source.parts) : source.parts, mood), { rate, volume, at, out })
 }
+/** 采样的打字音带气声时叠的那一层（合成的配方由 shapeBlip 按配方本身的音高叠）。 */
+const BREATH = [{ wave: 'noise', f: 2600, q: 1.4, dur: 0.06, gain: 0.012, attack: 0.008 }]
 
 /** 先把这些音色用到的采样下载、解码好（剧场按这一局的角色和旁白调一次），第一句话第一个字就能响。 */
 export function warmVoices(voices) {
@@ -561,10 +572,11 @@ export function warmVoices(voices) {
 /**
  * 打字音：voice 是 lib/sounds.js 的 lineVoice 算出来的 { id 音色, pitch 升降几个半音, gain }，
  * 再带上这句的声音样子 style（电话、广播、心灵感应、齐声……见 lib/vocab.js 的 VOICES）；齐声时 also 是另外几个人的声音。
- * pitch / gain 是演法给的倍数（威压低沉、激动尖细、低语轻）。每个字音高随机抖一点，不那么机械。
+ * pitch / gain 是演法和情绪合起来的倍数（威压低沉、激动尖细、低语轻、哭着说压低）。每个字音高随机抖一点，不那么机械。
+ * mood 是这句的情绪（lib/voice-mood.js）：气声、起音、发颤跟着它。
  * 音色可以是音效库里的打字音（lib:编号）：放那段采样，变速当移调。
  */
-export function blip(voice, { pitch = 1, gain = 1 } = {}) {
+export function blip(voice, { pitch = 1, gain = 1, mood = null } = {}) {
   const ac = voice && audioCtx()
   const v = ac && voiceSource(ac, voice.id)
   if (!v) return
@@ -577,7 +589,7 @@ export function blip(voice, { pitch = 1, gain = 1 } = {}) {
     const others = (voice.also || []).map(o => ({ who: o, source: voiceSource(ac, o.id) })).filter(o => o.source)
     const group = others.length ? [{ who: voice, source: v }, ...others] : [voice, { ...voice, pitch: (voice.pitch || 0) - 3 }, { ...voice, pitch: (voice.pitch || 0) + 4 }].map(who => ({ who, source: v }))
     const share = 1 / Math.sqrt(group.length)
-    group.forEach(({ who, source }, i) => emit(ac, source, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014 }))
+    group.forEach(({ who, source }, i) => emit(ac, source, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014, mood }))
     return
   }
   // 短闪回里的回忆声按基调换一条链（voice.tone，见 Theater.jsx）
@@ -586,12 +598,12 @@ export function blip(voice, { pitch = 1, gain = 1 } = {}) {
   const rate = rateOf(voice) * (style === 'telepathy' ? 1.08 : style === 'machine' ? 0.94 : memory ? MEMORY_RATE[memory] : 1)
   if (memory) {
     // 回忆：软起音的字 + 低八度的一层（声音变厚、发闷），偶尔冒个气泡
-    emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, memory: true })
+    emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, memory: true, mood })
     emit(ac, v, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out, memory: true })
     if (Math.random() < 0.16) playParts(ac, BUBBLE, { rate: 0.8 + Math.random() * 0.6, volume, out, at: ac.currentTime + 0.03 + Math.random() * 0.04 })
     return
   }
-  emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out })
+  emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, mood })
   // 心灵感应：高八度的一层虚影；广播：一点电流声
   if (style === 'telepathy') emit(ac, v, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out })
   if (style === 'radio') playParts(ac, [{ wave: 'noise', f: 3200, q: 0.8, gain: 0.05, dur: 0.06 }], { volume, out })
@@ -613,6 +625,29 @@ export async function previewVoice(voice, ui = sounds) {
   const base = 2 ** ((voice.pitch || 0) / 12)
   const t0 = ac.currentTime + 0.02
   for (const dt of [0, 0.09, 0.18, 0.42, 0.51, 0.6, 0.69]) emit(ac, v, { rate: base * (0.96 + Math.random() * 0.08), volume: ui.blipVolume ?? 1, at: t0 + dt })
+}
+/**
+ * 试听情绪：同一个音色把一句话按 plan（lib/typing.js 的 planLine，带着情绪）念一遍：哪个字响、什么时候响、音高音量都照剧场的算法。
+ * 返回这句念多久（毫秒）。
+ */
+export async function previewLine(voice, chars, plan, ui = sounds) {
+  const ac = voice && audioCtx()
+  if (!ac || !plan || !plan.times.length) return 0
+  if (isLibRef(voice.id)) {
+    const lib = libSound(libIdOf(voice.id))
+    if (lib) { await sampleReady(ac, lib.assetId); await recipeLevelDone(CLASSIC) }
+  }
+  const v = isCustomRef(voice.id) ? { parts: findVoice(voice.id, ui)?.parts || CLASSIC } : voiceSource(ac, voice.id)
+  if (!v) return 0
+  const base = 2 ** ((voice.pitch || 0) / 12)
+  const t0 = ac.currentTime + 0.03
+  const d = plan.blip
+  plan.times.forEach((ms, i) => {
+    if (i % d.every !== 0 || SILENT_CHAR.test(chars[i]) || (i > 0 && ms === plan.times[i - 1])) return
+    const b = plan.blips && plan.blips[i]
+    emit(ac, v, { rate: base * d.pitch * (b ? b.pitch : 1) * (0.96 + Math.random() * 0.08), volume: (ui.blipVolume ?? 1) * d.gain * (b ? b.gain : 1), at: t0 + ms / 1000, mood: plan.mood })
+  })
+  return plan.times[plan.times.length - 1] + 200
 }
 /** 这份配方比经典哔哔响多少（A 计权响度之比），做自己的音色时「音量对齐经典哔哔」用。量不出来时是 1。 */
 export async function loudnessVsClassic(parts) {

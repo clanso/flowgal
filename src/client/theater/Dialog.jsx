@@ -13,8 +13,9 @@ const CARD_HEAD = { sms: '新消息', letter: '', note: '', news: '号外', term
  * voice 是这句用谁的声音念（lib/sounds.js 的 lineVoice；null 不出声）。
  * 开始时刻是 performance.now()，还没开始时是 NaN（逆转式立绘的口型按它对齐）。
  * offStyles 是设置里关掉的演法（effects.js 的 offDeliveries），这几种按平常的念。
+ * mood 是剧场按情绪库认好的说话人情绪（lib/voice-mood.js；不给时按这句的情绪认，NEUTRAL_MOOD 是不带情绪）。
  */
-export function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null } = {}) {
+export function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null, mood = null } = {}) {
   const key = beat ? beat.key : ''
   const chars = React.useMemo(() => Array.from((beat && beat.text) || ''), [key, beat && beat.text])
   const emo = beat && beat.speaker ? (beat.emotions && beat.emotions[beat.speaker]) || beat.emo : ''
@@ -22,7 +23,7 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
   const stress = beat ? beat.stress : ''
   const type = beat ? beat.type : 'narration'
   const textfx = beat ? beat.textfx : null
-  const plan = React.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles }), [chars, speed, say, stress, emo, type, key, textfx, offStyles])
+  const plan = React.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles, mood }), [chars, speed, say, stress, emo, type, key, textfx, offStyles, mood])
   const [shown, setShown] = React.useState({ key, done: false })
   const [start, setStart] = React.useState({ key: '', at: NaN })
   if (shown.key !== key) setShown({ key, done: false })
@@ -44,7 +45,8 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
     pending.current = fx.map(f => setTimeout(() => { if (fxRef.current) fxRef.current(f) }, f.at))
     // 打字音跟着演出计划：每 delivery.every 个字响一下，标点、空白不响，成块蹦出来的字只响一下；
     // 文字效果那几个字按它的音量、音高念（越说越小的越来越轻，波浪的一高一低）
-    const sounded = i => (plan.blips && plan.blips[i] ? { ...delivery, gain: delivery.gain * plan.blips[i].gain, pitch: delivery.pitch * plan.blips[i].pitch } : delivery)
+    // 情绪（plan.mood）跟着每一下：气声、起音、发颤
+    const sounded = i => ({ ...delivery, ...(plan.blips && plan.blips[i] ? { gain: delivery.gain * plan.blips[i].gain, pitch: delivery.pitch * plan.blips[i].pitch } : {}), mood: plan.mood })
     let next = 0
     const tick = sound ? setInterval(() => {
       const now = performance.now() - t0
