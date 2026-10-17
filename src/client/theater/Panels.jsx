@@ -2633,15 +2633,19 @@ function SoundSection({ data }) {
       <Field label="声音带情绪" hint="台词和心声的打字音跟着说话人此刻的情绪变：哭着说的压低、放慢、变轻、带气声，说到一半会哽一下；开心的抬高、起伏大；生气的变响、起音变硬；害怕的发颤。情绪按情绪库归的类（喜怒哀惧……）和强弱算，表演设计师给这个人标了强弱的照他的；导演新造的情绪（「哽咽着温柔」）按字面认，几种掺在一起。旁白不带情绪。强度 0 等于关掉，2 是加倍。">
         <div className="fg-row">
           <Toggle value={ui.voiceMood !== false} onChange={v => p({ voiceMood: v })} />
-          <input type="range" min="0" max="2" step="0.1" value={ui.voiceMoodAmount ?? 1} disabled={ui.voiceMood === false} aria-label="情绪起伏强度" onChange={e => p({ voiceMoodAmount: Number(e.target.value) })} style={{ flex: 1 }} />
-          <MoodPreview ui={ui} />
+          <input type="range" min="0" max="2" step="0.1" value={ui.voiceMoodAmount ?? 1} disabled={ui.voiceMood === false} aria-label="情绪起伏强度" onChange={e => p({ voiceMoodAmount: Number(e.target.value) })} style={{ flex: 1, minWidth: '8em' }} />
+          <span className="fg-note" style={{ minWidth: '3em' }}>{(ui.voiceMoodAmount ?? 1).toFixed(1)}×</span>
         </div>
+        <div className="fg-row" style={{ marginTop: '.5em' }}><span className="fg-note">试听：</span><MoodPreview ui={ui} /></div>
       </Field>
       <Field label="句调" hint="打字音像说话一样有抑扬：一句话慢慢往下走，陈述句句尾落下，「吗？」这样的问句扬上去，「什么时候？」这样的问句疑问词重读、句尾只轻轻扬，感叹开头最高，省略号越说越低越轻，「～」拖长往上滑，♡ 让最后一个字往上一挑。按词取音：每个词的第一个字一定响，日文按拍念（っ 停一下、ー 拖长）。起伏大小跟着情绪。关掉后跟以前一样每两个字响一下、音高不动。">
         <Toggle value={ui.prosody !== false} onChange={v => p({ prosody: v })} />
       </Field>
       <Field label="左右声道" hint="打字音从说话人站的那一边传来：站在左边的人声音偏左，走到另一边声音跟着过去；心声、电话、旁白在正中，门外、隔壁的画外音从他走出去的那一边传来，特写时往中间收。戴耳机最明显。拉到最左就是关掉。">
-        <input type="range" min="0" max="1" step="0.1" value={ui.blipPan ?? 0.7} aria-label="左右声道宽度" onChange={e => p({ blipPan: Number(e.target.value) })} style={{ flex: 1, width: '100%' }} />
+        <div className="fg-row">
+          <input type="range" min="0" max="1" step="0.1" value={ui.blipPan ?? 0.7} aria-label="左右声道宽度" onChange={e => p({ blipPan: Number(e.target.value) })} style={{ flex: 1, minWidth: '8em' }} />
+          <span className="fg-note" style={{ minWidth: '3em' }}>{(ui.blipPan ?? 0.7) > 0 ? Math.round((ui.blipPan ?? 0.7) * 100) + '%' : '关'}</span>
+        </div>
       </Field>
       <Field label="字跟着声音" hint="蓝牙耳机、有的声卡要晚一两百毫秒才出声，字会比打字音先跳出来。开着时字整体推迟同样那么久，字和声音对得上（只在开着打字音时推迟；有线耳机、扬声器基本不会察觉）。">
         <Toggle value={ui.blipSync !== false} onChange={v => p({ blipSync: v })} />
