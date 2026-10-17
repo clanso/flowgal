@@ -2,7 +2,7 @@
 import React from 'react'
 import { blip, sfx } from './audio.js'
 import { CARD_LABEL, VOICE_LABEL } from './playback.js'
-import { SILENT, planLine } from '../../../lib/typing.js'
+import { planLine } from '../../../lib/typing.js'
 
 const CARD_HEAD = { sms: '新消息', letter: '', note: '', news: '号外', terminal: '> SYSTEM', notice: '告示', diary: '', scroll: '' }
 
@@ -14,8 +14,9 @@ const CARD_HEAD = { sms: '新消息', letter: '', note: '', news: '号外', term
  * 开始时刻是 performance.now()，还没开始时是 NaN（逆转式立绘的口型按它对齐）。
  * offStyles 是设置里关掉的演法（effects.js 的 offDeliveries），这几种按平常的念。
  * mood 是剧场按情绪库认好的说话人情绪（lib/voice-mood.js；不给时按这句的情绪认，NEUTRAL_MOOD 是不带情绪）。
+ * prosody 为假时不要句调（lib/prosody.js），打字音照旧每几个字一下、音高不动。
  */
-export function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null, mood = null } = {}) {
+export function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null, mood = null, prosody = true } = {}) {
   const key = beat ? beat.key : ''
   const chars = React.useMemo(() => Array.from((beat && beat.text) || ''), [key, beat && beat.text])
   const emo = beat && beat.speaker ? (beat.emotions && beat.emotions[beat.speaker]) || beat.emo : ''
@@ -23,7 +24,7 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
   const stress = beat ? beat.stress : ''
   const type = beat ? beat.type : 'narration'
   const textfx = beat ? beat.textfx : null
-  const plan = React.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles, mood }), [chars, speed, say, stress, emo, type, key, textfx, offStyles, mood])
+  const plan = React.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles, mood, prosody }), [chars, speed, say, stress, emo, type, key, textfx, offStyles, mood, prosody])
   const [shown, setShown] = React.useState({ key, done: false })
   const [start, setStart] = React.useState({ key: '', at: NaN })
   if (shown.key !== key) setShown({ key, done: false })
@@ -43,18 +44,18 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
     const { times, blip: delivery, fx } = plan
     const finish = setTimeout(() => setShown({ key, done: true }), times[times.length - 1] + speed + 220)
     pending.current = fx.map(f => setTimeout(() => { if (fxRef.current) fxRef.current(f) }, f.at))
-    // 打字音跟着演出计划：每 delivery.every 个字响一下，标点、空白不响，成块蹦出来的字只响一下；
-    // 文字效果那几个字按它的音量、音高念（越说越小的越来越轻，波浪的一高一低）
-    // 情绪（plan.mood）跟着每一下：气声、起音、发颤
-    const sounded = i => ({ ...delivery, ...(plan.blips && plan.blips[i] ? { gain: delivery.gain * plan.blips[i].gain, pitch: delivery.pitch * plan.blips[i].pitch } : {}), mood: plan.mood })
+    // 打字音跟着演出计划的音符（lib/prosody.js：按词取音、句调；关掉句调时每 delivery.every 个字一下）；
+    // 文字效果、哽住那几个字按 plan.blips 的音量音高念，情绪（plan.mood）管气声、起音、发颤
+    const notes = plan.notes || []
+    const sounded = note => {
+      const b = plan.blips && plan.blips[note.i]
+      return { pitch: delivery.pitch * (b ? b.pitch : 1) * 2 ** ((note.semis || 0) / 12), gain: delivery.gain * (b ? b.gain : 1) * (note.gain ?? 1), hold: note.hold, glide: note.glide, jitter: note.jitter, mood: plan.mood }
+    }
     let next = 0
-    const tick = sound ? setInterval(() => {
+    const tick = sound && notes.length ? setInterval(() => {
       const now = performance.now() - t0
-      for (; next < chars.length && times[next] <= now; next += 1) {
-        const sameBurst = next > 0 && times[next] === times[next - 1]
-        if (next % delivery.every === 0 && !sameBurst && !SILENT.test(chars[next])) blip(voiceRef.current, sounded(next))
-      }
-      if (next >= chars.length) clearInterval(tick)
+      for (; next < notes.length && notes[next].at <= now; next += 1) blip(voiceRef.current, sounded(notes[next]))
+      if (next >= notes.length) clearInterval(tick)
     }, Math.max(8, Math.min(speed, plan.gap))) : null
     ticking.current = tick
     return () => { clearTimeout(finish); dropPending(); if (tick) clearInterval(tick) }

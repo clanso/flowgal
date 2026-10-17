@@ -6147,6 +6147,241 @@ function shapeBlip(parts, mood) {
   return out;
 }
 
+// lib/prosody.js
+var SILENT = /[\s，、,；;：:。！？!?.…—～~“”‘’「」『』（）()\[\]【】《》〈〉"']/u;
+var LETTER = /[\p{L}\p{N}]/u;
+var SMALL_KANA = /^[ぁぃぅぇぉゃゅょゎゕゖァィゥェォャュョヮヵヶ]$/u;
+var SOKUON = /^[っッ]$/u;
+var CHOON = /^[ーｰ]$/u;
+var MORAIC_N = /^[んン]$/u;
+var KANA = /[\u3040-\u30ff]/u;
+var SENT_END = /^[。！？!?…～~．]$/u;
+var CLOSER = /^[”’」』）)\]】》〉"']$/u;
+var CLAUSE = /^[，、,；;：:—]$/u;
+var HEART = /[♡♥❤💕💗💖💓💞]/u;
+var YN_PARTICLE = /[吗嗎么麼か][？?！!」』”）)\s]*$/u;
+var WH_WORDS = /什么|甚麼|什麼|怎么|怎麼|怎样|怎樣|为什么|為什麼|为何|為何|如何|谁|誰|哪|多少|几时|幾時|何时|何時|啥|なに|なん|何|どこ|どれ|どう|だれ|いつ|なぜ|どうして|いくら|どの|どちら/u;
+var DECLINE = 1.2;
+var CONTINUE_RISE = 0.9;
+var CLAMP_SEMIS = 5;
+var GAIN_RANGE = [0.4, 1.5];
+var WALK = { keep: 0.72, step: 0.22, max: 0.8 };
+var FORCED_MIN_MS = 25;
+var clamp4 = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+var round3 = (v) => Math.round(v * 1e3) / 1e3;
+function seeded(seed) {
+  let h = 2166136261;
+  for (const ch of String(seed)) h = Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0;
+  return () => {
+    h = h + 1831565813 >>> 0;
+    let x = Math.imul(h ^ h >>> 15, 1 | h);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+var SEGMENTERS = /* @__PURE__ */ new Map();
+function segmenterFor(lang) {
+  if (typeof Intl === "undefined" || typeof Intl.Segmenter !== "function") return null;
+  if (!SEGMENTERS.has(lang)) {
+    try {
+      SEGMENTERS.set(lang, new Intl.Segmenter(lang, { granularity: "word" }));
+    } catch {
+      SEGMENTERS.set(lang, null);
+    }
+  }
+  return SEGMENTERS.get(lang);
+}
+function wordStarts(chars, segmenter) {
+  const text = chars.join("");
+  const seg = segmenter === void 0 ? segmenterFor(KANA.test(text) ? "ja" : "zh") : segmenter;
+  if (!seg) return null;
+  const charAt = /* @__PURE__ */ new Map();
+  let pos = 0;
+  chars.forEach((ch, i) => {
+    charAt.set(pos, i);
+    pos += ch.length;
+  });
+  const out = new Array(chars.length).fill(false);
+  for (const s of seg.segment(text)) {
+    if (s.isWordLike === false) continue;
+    const i = charAt.get(s.index);
+    if (i !== void 0) out[i] = true;
+  }
+  return out;
+}
+var soundable = (ch) => LETTER.test(ch) && !SMALL_KANA.test(ch) && !SOKUON.test(ch) && !CHOON.test(ch);
+function pickNotes(chars, times, { every = 2, gap = 30, legacy = false, force = null } = {}) {
+  const out = [];
+  if (legacy) {
+    chars.forEach((ch, i) => {
+      if (i % every === 0 && !(i > 0 && times[i] === times[i - 1]) && !SILENT.test(ch)) out.push({ i, at: times[i] });
+    });
+    return out;
+  }
+  const starts = wordStarts(chars);
+  const minGap = every <= 1 ? FORCED_MIN_MS : clamp4(gap * every * 0.85, 45, 170);
+  let last = -Infinity;
+  chars.forEach((ch, i) => {
+    if (!soundable(ch)) return;
+    const at2 = times[i];
+    if (i > 0 && at2 === times[i - 1]) return;
+    const must = starts && starts[i] || force && force.has(i);
+    if (at2 - last < (must ? FORCED_MIN_MS : minGap)) return;
+    out.push({ i, at: at2 });
+    last = at2;
+  });
+  return out;
+}
+function sentencesOf(chars) {
+  const out = [];
+  let start = 0;
+  for (let i = 0; i < chars.length; i += 1) {
+    if (!SENT_END.test(chars[i])) continue;
+    let end = i;
+    while (end + 1 < chars.length && (SENT_END.test(chars[end + 1]) || CLOSER.test(chars[end + 1]) || HEART.test(chars[end + 1]))) end += 1;
+    const run = chars.slice(i, end + 1).join("");
+    if (/^[…\s]+$/u.test(run) && end + 1 < chars.length && LETTER.test(chars[end + 1])) {
+      i = end;
+      continue;
+    }
+    out.push({ start, end, kind: kindOf(chars.slice(start, end + 1).join(""), run) });
+    start = end + 1;
+    i = end;
+  }
+  if (start < chars.length && chars.slice(start).some((ch) => LETTER.test(ch))) out.push({ start, end: chars.length - 1, kind: "statement" });
+  return out;
+}
+function kindOf(sentence, run) {
+  const q = /[？?]/u.test(run), ex = /[！!]/u.test(run);
+  if (q && ex) return "exclaim-question";
+  if (q) return YN_PARTICLE.test(sentence) || !WH_WORDS.test(sentence) ? "question-yn" : "question-wh";
+  if (ex) return "exclaim";
+  if (/[～~]/u.test(run)) return "drawl";
+  if (run.includes("…")) return "ellipsis";
+  return "statement";
+}
+function speechNotes(chars, times, { type = "dialogue", every = 2, gap = 30, range = 1, seed = "", prosody = true, marks = null, force = null } = {}) {
+  if (!chars.length || !times.length) return [];
+  if (!prosody) return pickNotes(chars, times, { every, legacy: true }).map((n) => ({ ...n, semis: 0, gain: 1, hold: 1, glide: 0, jitter: true }));
+  const spoken = type === "dialogue" || type === "thought";
+  const sentences = spoken ? sentencesOf(chars) : [];
+  const must = new Set(force || []);
+  if (marks) marks.forEach((m, i) => {
+    if (m === "stress") must.add(i);
+  });
+  for (const s of sentences) {
+    const first = chars.findIndex((ch, i) => i >= s.start && soundable(ch));
+    if (first >= 0 && first <= s.end) must.add(first);
+  }
+  const picked = pickNotes(chars, times, { every, gap, force: must });
+  const notes = picked.map((n) => ({ ...n, semis: 0, gain: 1, hold: 1, glide: 0, jitter: false }));
+  const byIndex = new Map(notes.map((n) => [n.i, n]));
+  for (const n of notes) {
+    let k = n.i + 1;
+    while (k < chars.length && (SMALL_KANA.test(chars[k]) || CHOON.test(chars[k]))) {
+      if (CHOON.test(chars[k])) n.hold += 0.9;
+      k += 1;
+    }
+    if (MORAIC_N.test(chars[n.i])) n.gain *= 0.7;
+  }
+  if (spoken) {
+    const amount = range * (type === "thought" ? 0.8 : 1);
+    for (const s of sentences) contour(chars, notes.filter((n) => n.i >= s.start && n.i <= s.end), s, amount, byIndex);
+    if (marks) {
+      for (const n of notes) if (marks[n.i] === "stress") {
+        n.semis += 1.5 * amount;
+        n.gain *= 1.25;
+      }
+    }
+  }
+  const rand2 = seeded(`${seed}|walk|${chars.join("")}`);
+  let w = 0;
+  for (const n of notes) {
+    w = clamp4(w * WALK.keep + (rand2() * 2 - 1) * WALK.step * 1.6, -WALK.max, WALK.max);
+    n.semis = round3(clamp4(n.semis + w, -CLAMP_SEMIS, CLAMP_SEMIS));
+    n.gain = round3(clamp4(n.gain, GAIN_RANGE[0], GAIN_RANGE[1]));
+    n.hold = round3(n.hold);
+    n.glide = round3(n.glide);
+  }
+  return notes;
+}
+function contour(chars, notes, s, amount, byIndex) {
+  const n = notes.length;
+  if (!n) return;
+  const bend = (note, semis) => {
+    if (note) note.semis += semis * amount;
+  };
+  const last = notes[n - 1], second = notes[n - 2];
+  const exclaim = s.kind === "exclaim" || s.kind === "exclaim-question";
+  const decline = DECLINE * (exclaim ? 1.5 : 1);
+  notes.forEach((note, k) => bend(note, decline / 2 - (n > 1 ? decline * k / (n - 1) : 0)));
+  for (let i = s.start; i < s.end; i += 1) {
+    if (!CLAUSE.test(chars[i])) continue;
+    const before = [...notes].reverse().find((note) => note.i < i);
+    if (before && before !== last && i - before.i <= 2) bend(before, CONTINUE_RISE);
+  }
+  notes[0].gain *= 1.12;
+  switch (s.kind) {
+    case "statement":
+      bend(last, -1.2);
+      bend(second, -0.4);
+      last.gain *= 0.88;
+      break;
+    case "question-yn":
+      bend(last, 3);
+      bend(second, 0.5);
+      last.glide = 0.06 * Math.min(1.5, amount);
+      break;
+    case "question-wh": {
+      const text = chars.slice(s.start, s.end + 1).join("");
+      const m = text.match(WH_WORDS);
+      if (m) {
+        const from = s.start + Array.from(text.slice(0, m.index)).length;
+        for (let i = from; i < from + Array.from(m[0]).length; i += 1) {
+          const note = byIndex.get(i);
+          if (note) {
+            bend(note, 1.2);
+            note.gain *= 1.15;
+          }
+        }
+      }
+      bend(last, 0.8);
+      break;
+    }
+    case "exclaim":
+    case "exclaim-question":
+      for (const note of notes) {
+        bend(note, 1);
+        note.gain *= 1.15;
+      }
+      bend(notes[0], 1);
+      if (s.kind === "exclaim") bend(last, -0.8);
+      else {
+        bend(last, 2.5);
+        last.glide = 0.06 * Math.min(1.5, amount);
+      }
+      break;
+    case "ellipsis": {
+      const tail = notes.slice(-3);
+      tail.forEach((note, k) => {
+        bend(note, -0.6 * (k + 1 + 3 - tail.length));
+        note.gain *= [0.85, 0.72, 0.6][k + 3 - tail.length];
+      });
+      last.hold *= 1.4;
+      break;
+    }
+    case "drawl":
+      bend(last, 0.6);
+      last.glide = 0.1 * Math.min(1.5, amount);
+      last.hold *= 1.6;
+      break;
+  }
+  if (chars.slice(last.i + 1, s.end + 1).some((ch) => HEART.test(ch))) {
+    bend(last, 1);
+    last.glide = Math.max(last.glide, 0.05);
+  }
+}
+
 // lib/typing.js
 var PAUSE = [
   [/^[、]$/u, 2.5],
@@ -6159,8 +6394,8 @@ var PAUSE = [
 var DOTTED_MAX = 10;
 var NARRATION_PAUSE = 0.8;
 var DOTTED = /^[…—～~]$/u;
-var CLOSER = /^[”’」』）)\]】》〉"']$/u;
-var SILENT = /[\s，、,；;：:。！？!?.…—～~“”‘’「」『』（）()\[\]【】《》〈〉"']/u;
+var CLOSER2 = /^[”’」』）)\]】》〉"']$/u;
+var SILENT2 = /[\s，、,；;：:。！？!?.…—～~“”‘’「」『』（）()\[\]【】《》〈〉"']/u;
 var BANG = /^[！!]$/u;
 function pauseFactor(ch) {
   for (const [re, f] of PAUSE) if (re.test(ch)) return f;
@@ -6183,7 +6418,7 @@ function pausesAfter(chars, speed) {
     pending2 = Math.max(pending2, pauseFactor(ch));
     if (!pending2) continue;
     const next = chars[i + 1];
-    const joins = next !== void 0 && (CLOSER.test(next) || pauseFactor(next) > 0 && !DOTTED.test(next));
+    const joins = next !== void 0 && (CLOSER2.test(next) || pauseFactor(next) > 0 && !DOTTED.test(next));
     if (!joins) {
       out[i] = speed * pending2;
       pending2 = 0;
@@ -6242,7 +6477,7 @@ function textFxSpans(chars, textfx = []) {
   }
   return spans.sort((a, b) => a.s0 - b.s0);
 }
-function seeded(seed) {
+function seeded2(seed) {
   let h = 2166136261;
   for (const ch of String(seed)) h = Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0;
   return () => {
@@ -6268,7 +6503,7 @@ function inferDelivery(text, emo = "", type = "dialogue", mood = null) {
 }
 var MAX_SEMIS = 7;
 var semisOf = (ratio) => 12 * Math.log2(ratio);
-function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialogue", seed = "", textfx = null, offStyles = null, mood = null } = {}) {
+function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialogue", seed = "", textfx = null, offStyles = null, mood = null, prosody = true } = {}) {
   const n = chars.length;
   const text = chars.join("");
   const spoken = type === "dialogue" || type === "thought";
@@ -6282,7 +6517,7 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
   const moodGain = feel.gain < 1 && S.blip.gain < 1 ? 1 - (1 - feel.gain) / 2 : feel.gain || 1;
   const blipGain = style === "whisper" ? S.blip.gain * moodGain : Math.max(Math.min(0.6, S.blip.gain), S.blip.gain * moodGain);
   const blip2 = feel === NEUTRAL_MOOD ? S.blip : { ...S.blip, pitch: 2 ** (semis / 12), gain: blipGain, breath: feel.breath, tremor: feel.tremor, attack: feel.attack };
-  const plan = { times: [], marks: new Array(n).fill(""), say: style, gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: blip2, mood: feel, fx: [], tx: new Array(n).fill(""), txk: new Array(n).fill(0), txi: new Array(n).fill(0), blips: null };
+  const plan = { times: [], marks: new Array(n).fill(""), say: style, gap: S.chunk ? base * S.chunk : base, mouth: S.mouth, blip: blip2, mood: feel, fx: [], tx: new Array(n).fill(""), txk: new Array(n).fill(0), txi: new Array(n).fill(0), blips: null, notes: [] };
   if (!n) return plan;
   const spans = textFxSpans(chars, textfx);
   const spanAt = new Array(n).fill(null);
@@ -6313,12 +6548,12 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
     for (let i = s0; i <= s1; i += 1) plan.marks[i] = "stress";
   }
   const inStress = (i) => s0 >= 0 && i >= s0 && i <= s1;
-  const rand2 = seeded(`${seed}|${style}|${text}`);
+  const rand2 = seeded2(`${seed}|${style}|${text}`);
   const sobs = /* @__PURE__ */ new Set();
   if (feel.sob && speed > 0) {
-    const hic = seeded(`${seed}|sob|${text}`);
+    const hic = seeded2(`${seed}|sob|${text}`);
     const slots = [];
-    for (let i = 2; i < n; i += 1) if (!SILENT.test(chars[i]) && !SILENT.test(chars[i - 1]) && !inStress(i)) slots.push(i);
+    for (let i = 2; i < n; i += 1) if (!SILENT2.test(chars[i]) && !SILENT2.test(chars[i - 1]) && !inStress(i)) slots.push(i);
     const want = Math.min(3, Math.max(slots.length >= 6 ? 1 : 0, Math.round(slots.length / 9)));
     for (let k = 0; k < want && slots.length; k += 1) {
       const at3 = slots.splice(Math.floor(hic() * slots.length), 1)[0];
@@ -6335,14 +6570,14 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
     if (i > 0) {
       const prev = chars[i - 1];
       let gap = base;
-      if (S.chunk && !inStress(i)) gap = i % S.chunk === 0 || SILENT.test(prev) || inStress(i - 1) ? base * S.chunk : 0;
+      if (S.chunk && !inStress(i)) gap = i % S.chunk === 0 || SILENT2.test(prev) || inStress(i - 1) ? base * S.chunk : 0;
       if (S.jitter) gap = base * (0.4 + rand2() * 1.4) + (rand2() < 0.12 ? speed * 5 : 0);
       gap += pauses[i - 1] * S.pause * (spoken ? 1 : NARRATION_PAUSE);
-      if (S.stall && !SILENT.test(prev) && !SILENT.test(chars[i]) && rand2() < 0.2) gap += Math.max(speed * 4, 90);
+      if (S.stall && !SILENT2.test(prev) && !SILENT2.test(chars[i]) && rand2() < 0.2) gap += Math.max(speed * 4, 90);
       const sp = spanAt[i];
       if (sp) {
         const T = TEXT_STYLES[sp.style];
-        if (T.chunk && i > sp.s0) gap = (i - sp.s0) % T.chunk === 0 || SILENT.test(prev) ? gap * T.chunk * lerp(T.gap, plan.txk[i]) : 0;
+        if (T.chunk && i > sp.s0) gap = (i - sp.s0) % T.chunk === 0 || SILENT2.test(prev) ? gap * T.chunk * lerp(T.gap, plan.txk[i]) : 0;
         else gap *= lerp(T.gap, plan.txk[i]);
         if (i === sp.s0) gap += speed * (T.before || 0);
       }
@@ -6379,6 +6614,7 @@ function planLine(chars, speed, { say = "", stress = "", emo = "", type = "dialo
     });
   }
   fx.sort((a, b) => a.at - b.at);
+  plan.notes = speechNotes(chars, plan.times, { type, every: S.blip.every, gap: base, range: feel.range ?? 1, seed: `${seed}|${style}`, prosody, marks: plan.marks, force: sobs });
   return plan;
 }
 
@@ -6392,7 +6628,7 @@ var KANA_ROWS = [
   ["O", "おこそとのほもよろをごぞどぼぽぉょオコソトノホモヨロヲゴゾドボポォョ"],
   ["N", "んっンッ"]
 ];
-var KANA = new Map(KANA_ROWS.flatMap(([cls, s]) => [...s].map((ch) => [ch, cls])));
+var KANA2 = new Map(KANA_ROWS.flatMap(([cls, s]) => [...s].map((ch) => [ch, cls])));
 var LATIN = { a: "A", e: "E", i: "I", y: "I", o: "O", u: "U", w: "U", m: "N", b: "N", p: "N" };
 var HAN_WEIGHTS = [["A", 0.3], ["E", 0.25], ["I", 0.2], ["O", 0.12], ["U", 0.13]];
 function hash01(s) {
@@ -6404,9 +6640,9 @@ function hash01(s) {
   return (h >>> 0) / 4294967296;
 }
 function visemeOf(ch) {
-  if (!ch || SILENT.test(ch)) return null;
+  if (!ch || SILENT2.test(ch)) return null;
   if (ch === "ー" || ch === "〜") return "";
-  if (KANA.has(ch)) return KANA.get(ch);
+  if (KANA2.has(ch)) return KANA2.get(ch);
   const low = ch.toLowerCase();
   if (/^[a-z]$/.test(low)) return LATIN[low] || "E";
   if (/^[0-9０-９]$/.test(ch)) return "I";
@@ -6417,7 +6653,7 @@ function visemeOf(ch) {
   }
   return "E";
 }
-var clamp4 = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+var clamp5 = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 function mouthTrack(talk, plan) {
   const chars = plan?.chars || [];
   const times = plan?.times || [];
@@ -6428,7 +6664,7 @@ function mouthTrack(talk, plan) {
   const level2 = plan.mouth === "soft" ? "soft" : plan.mouth === "wide" || plan.mouth === "syllable" ? "loud" : "normal";
   const shapes = talk.shapes || {};
   const release = talk.release || {};
-  const attack = clamp4(talk.attack ?? 0.6, 0.3, 0.9);
+  const attack = clamp5(talk.attack ?? 0.6, 0.3, 0.9);
   const keys = [];
   let prevPeak = "";
   let cls = "A";
@@ -6546,7 +6782,7 @@ function stepAt(steps, t) {
   }
   return null;
 }
-function seeded2(seed) {
+function seeded3(seed) {
   let h = Math.floor(hash01(seed) * 4294967296) >>> 0;
   return () => {
     h = h + 1831565813 >>> 0;
@@ -6556,7 +6792,7 @@ function seeded2(seed) {
   };
 }
 function createActor(pack, { seed = "actor", now = 0 } = {}) {
-  const rand2 = seeded2(seed);
+  const rand2 = seeded3(seed);
   const pose = pack.default_pose || Object.keys(pack.poses || {})[0] || "front";
   const parts = pack.poses?.[pose]?.parts || {};
   const blink = fitBlink(pack.blink, new Set(Object.keys(parts.eyes || {})));
@@ -6585,7 +6821,7 @@ function createActor(pack, { seed = "actor", now = 0 } = {}) {
       const end = startAt + (track.length ? track[track.length - 1].at : 0);
       st.line = { track, start: startAt, end };
       st.queued = [];
-      const lr = seeded2(`${seed}|${(plan.chars || []).join("")}`);
+      const lr = seeded3(`${seed}|${(plan.chars || []).join("")}`);
       if (lr() < (blink.line_start_chance ?? 0)) st.queued.push(startAt + 40 + lr() * 120);
       (plan.chars || []).forEach((ch, i) => {
         if (SENTENCE_END.test(ch) && i < plan.chars.length - 1 && lr() < (blink.sentence_end_chance ?? 0)) {
@@ -6694,7 +6930,7 @@ function mouthAt(loop, talk, now) {
   if (!times || elapsed < times[0]) return "closed";
   let i = 0;
   while (i + 1 < times.length && times[i + 1] <= elapsed) i += 1;
-  if (SILENT.test(chars[i])) return "closed";
+  if (SILENT2.test(chars[i])) return "closed";
   const since = elapsed - times[i];
   const last = i >= chars.length - 1;
   if (last && since > gap) return "closed";
@@ -6705,7 +6941,7 @@ function mouthAt(loop, talk, now) {
     return since < slot * 0.5 ? "open" : since < slot * 0.75 ? "half" : "closed";
   }
   let start = i;
-  while (start > 0 && !SILENT.test(chars[start - 1]) && times[start] - times[start - 1] <= gap * 2.2) start -= 1;
+  while (start > 0 && !SILENT2.test(chars[start - 1]) && times[start] - times[start - 1] <= gap * 2.2) start -= 1;
   const t = elapsed - times[start];
   if (mode === "wide") return t < 40 ? "half" : "open";
   const factor = Math.min(1.4, Math.max(0.8, gap / 35));
@@ -7520,11 +7756,11 @@ function noise(ac) {
   }
   return noiseBuffer;
 }
-function playParts(ac, parts, { rate = 1, volume = 1, at: at2 = ac.currentTime, out = ac.destination } = {}) {
+function playParts(ac, parts, { rate = 1, volume = 1, at: at2 = ac.currentTime, out = ac.destination, stretch: stretch2 = 1, glide = 0 } = {}) {
   if (!(volume > 0)) return;
   for (const part of parts) {
-    const t = at2 + (part.at || 0);
-    const end = t + part.dur;
+    const t = at2 + (part.at || 0) * stretch2;
+    const end = t + part.dur * stretch2;
     const g = ac.createGain();
     const peak = Math.max(2e-4, part.gain * volume);
     const attack = part.attack ?? (part.wave === "noise" ? 0 : 6e-3);
@@ -7550,7 +7786,11 @@ function playParts(ac, parts, { rate = 1, volume = 1, at: at2 = ac.currentTime, 
     }
     const freq = part.wave === "noise" ? head.frequency : src.frequency;
     freq.setValueAtTime(part.f * rate, t);
-    if (part.to && part.to !== part.f) freq.exponentialRampToValueAtTime(part.to * rate, end);
+    if (glide) {
+      const f = (part.to || part.f) * rate;
+      freq.exponentialRampToValueAtTime(f * (1 + glide), t + (end - t) * 0.6);
+      freq.exponentialRampToValueAtTime(f * (1 + glide * 0.7), end);
+    } else if (part.to && part.to !== part.f) freq.exponentialRampToValueAtTime(part.to * rate, end);
     else if (part.vibrato) {
       const f = part.f * rate;
       freq.linearRampToValueAtTime(f * (1 + part.vibrato), t + part.dur * 0.35);
@@ -7671,12 +7911,16 @@ function loadSample(ac, id) {
   return null;
 }
 var sampleReady = (ac, id) => decoded(ac, id).then((buffer) => measured(id, buffer));
-function playSample(ac, sample2, { rate = 1, volume = 1, at: at2 = ac.currentTime, out = ac.destination, fadeIn = 0 } = {}) {
+function playSample(ac, sample2, { rate = 1, volume = 1, at: at2 = ac.currentTime, out = ac.destination, fadeIn = 0, glide = 0 } = {}) {
   if (!(volume > 0)) return;
   const src = ac.createBufferSource();
   const g = ac.createGain();
   src.buffer = sample2.buffer;
-  src.playbackRate.value = rate;
+  if (glide) {
+    const len = sample2.buffer.duration / rate;
+    src.playbackRate.setValueAtTime(rate, at2);
+    src.playbackRate.linearRampToValueAtTime(rate * (1 + glide), at2 + len * 0.7);
+  } else src.playbackRate.value = rate;
   if (fadeIn > 0) {
     g.gain.setValueAtTime(1e-4, at2);
     g.gain.linearRampToValueAtTime(volume, at2 + fadeIn);
@@ -7871,11 +8115,11 @@ function voiceSource(ac, id) {
   recipeLevel(CLASSIC);
   return sample2 ? { sample: sample2, gain: slotVolume(lib) * matchGain(CLASSIC, sample2) } : null;
 }
-function emit(ac, source, { rate = 1, volume = 1, at: at2 = ac.currentTime, out = ac.destination, memory = false, mood = null } = {}) {
+function emit(ac, source, { rate = 1, volume = 1, at: at2 = ac.currentTime, out = ac.destination, memory = false, mood = null, hold = 1, glide = 0 } = {}) {
   if (source.sample) {
-    playSample(ac, source.sample, { rate, volume: volume * source.gain, at: at2, out, fadeIn: mood && mood.attack > 1.05 ? 4e-3 * mood.attack : 0 });
-    if (mood && mood.breath >= 0.05) playParts(ac, BREATH, { rate, volume: volume * mood.breath, at: at2, out });
-  } else playParts(ac, shapeBlip(memory ? submerged(source.parts) : source.parts, mood), { rate, volume, at: at2, out });
+    playSample(ac, source.sample, { rate, volume: volume * source.gain, at: at2, out, fadeIn: mood && mood.attack > 1.05 ? 4e-3 * mood.attack : 0, glide });
+    if (mood && mood.breath >= 0.05) playParts(ac, BREATH, { rate, volume: volume * mood.breath, at: at2, out, stretch: hold });
+  } else playParts(ac, shapeBlip(memory ? submerged(source.parts) : source.parts, mood), { rate, volume, at: at2, out, stretch: hold > 1 ? 1 + (hold - 1) * 0.6 : 1, glide });
 }
 var BREATH = [{ wave: "noise", f: 2600, q: 1.4, dur: 0.06, gain: 0.012, attack: 8e-3 }];
 function warmVoices(voices) {
@@ -7888,31 +8132,31 @@ function warmVoices(voices) {
   }
   recipeLevel(CLASSIC);
 }
-function blip(voice, { pitch = 1, gain = 1, mood = null } = {}) {
+function blip(voice, { pitch = 1, gain = 1, mood = null, hold = 1, glide = 0, jitter: wobbly = true } = {}) {
   const ac = voice && audioCtx();
   const v = ac && voiceSource(ac, voice.id);
   if (!v) return;
   const style = voice.style || "";
-  const jitter = pitch * (0.96 + Math.random() * 0.08);
+  const jitter = pitch * (wobbly ? 0.96 + Math.random() * 0.08 : 0.995 + Math.random() * 0.01);
   const volume = (sounds.blipVolume ?? 1) * gain;
   const rateOf = (who) => 2 ** ((who.pitch || 0) / 12) * jitter;
   if (style === "chorus") {
     const others = (voice.also || []).map((o) => ({ who: o, source: voiceSource(ac, o.id) })).filter((o) => o.source);
     const group = others.length ? [{ who: voice, source: v }, ...others] : [voice, { ...voice, pitch: (voice.pitch || 0) - 3 }, { ...voice, pitch: (voice.pitch || 0) + 4 }].map((who) => ({ who, source: v }));
     const share = 1 / Math.sqrt(group.length);
-    group.forEach(({ who, source }, i) => emit(ac, source, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014, mood }));
+    group.forEach(({ who, source }, i) => emit(ac, source, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014, mood, hold, glide }));
     return;
   }
   const memory = style === "memory" ? MEMORY_DEPTH[voice.tone] ? voice.tone : "warm" : "";
   const out = chainFor(ac, memory ? "memory-" + memory : style);
   const rate = rateOf(voice) * (style === "telepathy" ? 1.08 : style === "machine" ? 0.94 : memory ? MEMORY_RATE[memory] : 1);
   if (memory) {
-    emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, memory: true, mood });
+    emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, memory: true, mood, hold, glide });
     emit(ac, v, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out, memory: true });
     if (Math.random() < 0.16) playParts(ac, BUBBLE, { rate: 0.8 + Math.random() * 0.6, volume, out, at: ac.currentTime + 0.03 + Math.random() * 0.04 });
     return;
   }
-  emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, mood });
+  emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, mood, hold, glide });
   if (style === "telepathy") emit(ac, v, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out });
   if (style === "radio") playParts(ac, [{ wave: "noise", f: 3200, q: 0.8, gain: 0.05, dur: 0.06 }], { volume, out });
 }
@@ -7947,11 +8191,11 @@ async function previewLine(voice, chars, plan, ui2 = sounds) {
   const base = 2 ** ((voice.pitch || 0) / 12);
   const t0 = ac.currentTime + 0.03;
   const d = plan.blip;
-  plan.times.forEach((ms, i) => {
-    if (i % d.every !== 0 || SILENT.test(chars[i]) || i > 0 && ms === plan.times[i - 1]) return;
-    const b = plan.blips && plan.blips[i];
-    emit(ac, v, { rate: base * d.pitch * (b ? b.pitch : 1) * (0.96 + Math.random() * 0.08), volume: (ui2.blipVolume ?? 1) * d.gain * (b ? b.gain : 1), at: t0 + ms / 1e3, mood: plan.mood });
-  });
+  for (const note of plan.notes || []) {
+    const b = plan.blips && plan.blips[note.i];
+    const wobble2 = note.jitter === false ? 0.995 + Math.random() * 0.01 : 0.96 + Math.random() * 0.08;
+    emit(ac, v, { rate: base * d.pitch * (b ? b.pitch : 1) * 2 ** ((note.semis || 0) / 12) * wobble2, volume: (ui2.blipVolume ?? 1) * d.gain * (b ? b.gain : 1) * (note.gain ?? 1), at: t0 + note.at / 1e3, mood: plan.mood, hold: note.hold, glide: note.glide });
+  }
   return plan.times[plan.times.length - 1] + 200;
 }
 async function loudnessVsClassic(parts) {
@@ -9114,7 +9358,7 @@ function cssOff(off) {
 // src/client/theater/Dialog.jsx
 var import_react5 = __toESM(require("react"), 1);
 var CARD_HEAD = { sms: "新消息", letter: "", note: "", news: "号外", terminal: "> SYSTEM", notice: "告示", diary: "", scroll: "" };
-function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null, mood = null } = {}) {
+function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null, mood = null, prosody = true } = {}) {
   const key = beat ? beat.key : "";
   const chars = import_react5.default.useMemo(() => Array.from(beat && beat.text || ""), [key, beat && beat.text]);
   const emo = beat && beat.speaker ? beat.emotions && beat.emotions[beat.speaker] || beat.emo : "";
@@ -9122,7 +9366,7 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
   const stress = beat ? beat.stress : "";
   const type = beat ? beat.type : "narration";
   const textfx = beat ? beat.textfx : null;
-  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles, mood }), [chars, speed, say, stress, emo, type, key, textfx, offStyles, mood]);
+  const plan = import_react5.default.useMemo(() => planLine(chars, speed || 0, { say, stress, emo, type, seed: key, textfx, offStyles, mood, prosody }), [chars, speed, say, stress, emo, type, key, textfx, offStyles, mood, prosody]);
   const [shown, setShown] = import_react5.default.useState({ key, done: false });
   const [start, setStart] = import_react5.default.useState({ key: "", at: NaN });
   if (shown.key !== key) setShown({ key, done: false });
@@ -9148,15 +9392,16 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
     pending2.current = fx.map((f) => setTimeout(() => {
       if (fxRef.current) fxRef.current(f);
     }, f.at));
-    const sounded = (i) => ({ ...delivery, ...plan.blips && plan.blips[i] ? { gain: delivery.gain * plan.blips[i].gain, pitch: delivery.pitch * plan.blips[i].pitch } : {}, mood: plan.mood });
+    const notes = plan.notes || [];
+    const sounded = (note) => {
+      const b = plan.blips && plan.blips[note.i];
+      return { pitch: delivery.pitch * (b ? b.pitch : 1) * 2 ** ((note.semis || 0) / 12), gain: delivery.gain * (b ? b.gain : 1) * (note.gain ?? 1), hold: note.hold, glide: note.glide, jitter: note.jitter, mood: plan.mood };
+    };
     let next = 0;
-    const tick = sound ? setInterval(() => {
+    const tick = sound && notes.length ? setInterval(() => {
       const now = performance.now() - t0;
-      for (; next < chars.length && times[next] <= now; next += 1) {
-        const sameBurst = next > 0 && times[next] === times[next - 1];
-        if (next % delivery.every === 0 && !sameBurst && !SILENT.test(chars[next])) blip(voiceRef.current, sounded(next));
-      }
-      if (next >= chars.length) clearInterval(tick);
+      for (; next < notes.length && notes[next].at <= now; next += 1) blip(voiceRef.current, sounded(notes[next]));
+      if (next >= notes.length) clearInterval(tick);
     }, Math.max(8, Math.min(speed, plan.gap))) : null;
     ticking.current = tick;
     return () => {
@@ -12054,6 +12299,8 @@ var DEFAULT_CONFIG = {
     // 打字音带情绪：哭着说的压低放慢、开心的抬高（lib/voice-mood.js）
     voiceMoodAmount: 1,
     // 情绪起伏的强度（倍数，0~2）
+    prosody: true,
+    // 句调：陈述句落下、问句扬上去、省略号越说越低，按词取音（lib/prosody.js）
     voiceDefault: "auto",
     // 档案里没指定声音的角色：auto 按性别分；或统一用某个音色（见 lib/sounds.js）
     narrationVoice: "classic",
@@ -13574,7 +13821,7 @@ function MoodPreview({ ui: ui2 }) {
     if (!voice) return;
     const chars = Array.from(MOOD_SAMPLE);
     const mood = ui2.voiceMood === false || !emo ? NEUTRAL_MOOD : scaleMood(voiceMood(emo, shownLib()), ui2.voiceMoodAmount ?? 1);
-    const plan = planLine(chars, ui2.textSpeed || 30, { emo, type: "dialogue", seed: "preview", mood });
+    const plan = planLine(chars, ui2.textSpeed || 30, { emo, type: "dialogue", seed: "preview", mood, prosody: ui2.prosody !== false });
     setPlaying(emo || "calm");
     const ms = await previewLine(voice, chars, plan, ui2);
     setTimeout(() => setPlaying((p4) => p4 === (emo || "calm") ? "" : p4), ms);
@@ -13623,7 +13870,7 @@ function SoundSection({ data }) {
   } }, "一键套用"), builtin && /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
     p4(builtin);
     toast("已换回内置的声音");
-  } }, "换回内置")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "声音带情绪", hint: "台词和心声的打字音跟着说话人此刻的情绪变：哭着说的压低、放慢、变轻、带气声，说到一半会哽一下；开心的抬高、起伏大；生气的变响、起音变硬；害怕的发颤。情绪按情绪库归的类（喜怒哀惧……）和强弱算，表演设计师给这个人标了强弱的照他的；导演新造的情绪（「哽咽着温柔」）按字面认，几种掺在一起。旁白不带情绪。强度 0 等于关掉，2 是加倍。" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.voiceMood !== false, onChange: (v) => p4({ voiceMood: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.voiceMoodAmount ?? 1, disabled: ui2.voiceMood === false, "aria-label": "情绪起伏强度", onChange: (e) => p4({ voiceMoodAmount: Number(e.target.value) }), style: { flex: 1 } }), /* @__PURE__ */ import_react14.default.createElement(MoodPreview, { ui: ui2 }))), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。" }, /* @__PURE__ */ import_react14.default.createElement(Select, { value: ui2.voiceDefault, options: defaultOptions, onChange: (v) => p4({ voiceDefault: v }) })), ui2.voiceDefault === "auto" && /* @__PURE__ */ import_react14.default.createElement(Field, { label: "自动分配的音色", hint: "选「自动」时每种性别从这一组里按名字挑一个（同一局里尽量不撞）。可以加减，内置的、自己做的、音效库里的打字音都能放进来；改了只影响还没指定声音的角色。" }, /* @__PURE__ */ import_react14.default.createElement(VoicePools, { ui: ui2, p: p4, options: allVoices })), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), { group: "自己的音色", options: customOptions(ui2, ui2.narrationVoice) }, { group: "音效库里的打字音", options: blipOptions(blips, ui2.narrationVoice) }, ["off", "不出声"]], style: INLINE, onChange: (v) => p4(narrationPatch(ui2, v)) }), /* @__PURE__ */ import_react14.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length + (ui2.customVoices || []).length + blips.length, " 个（点一下试听）"), VOICE_GENDERS.filter(([g]) => g !== "other").map(([g, label]) => /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, { key: g }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note fg-voice-group" }, label, " · ", VOICES2.filter((v) => v.gender === g).length, " 个"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react14.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react14.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react14.default.createElement("span", null, v.desc)))))), blips.length > 0 && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note fg-voice-group" }, "音效库里的打字音 · ", blips.length, " 个"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-skins fg-voices" }, blips.map((b) => /* @__PURE__ */ import_react14.default.createElement("button", { key: b.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: libRef(b.id), pitch: 0 }, ui2) }, /* @__PURE__ */ import_react14.default.createElement("b", null, "▶ ", b.name), /* @__PURE__ */ import_react14.default.createElement("span", null, "音效库 · ", VOICE_GENDER[b.gender || ""], b.use === "narration" ? " · 旁白用" : "", b.description ? " · " + b.description : "")))), !blips.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, "逆转女声、逆转男声、逆转打字机是照逆转裁判的声音合成的，不用导入。想用原版录音：把逆转裁判音效包（或别的打字音）导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。"), /* @__PURE__ */ import_react14.default.createElement(VoiceMaker, { ui: ui2, p: p4 }), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, { key: group }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）；也可以从音效库里挑一个。自己的文件和音效库的声音都按默认版本的响度放。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
+  } }, "换回内置")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "声音带情绪", hint: "台词和心声的打字音跟着说话人此刻的情绪变：哭着说的压低、放慢、变轻、带气声，说到一半会哽一下；开心的抬高、起伏大；生气的变响、起音变硬；害怕的发颤。情绪按情绪库归的类（喜怒哀惧……）和强弱算，表演设计师给这个人标了强弱的照他的；导演新造的情绪（「哽咽着温柔」）按字面认，几种掺在一起。旁白不带情绪。强度 0 等于关掉，2 是加倍。" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.voiceMood !== false, onChange: (v) => p4({ voiceMood: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.voiceMoodAmount ?? 1, disabled: ui2.voiceMood === false, "aria-label": "情绪起伏强度", onChange: (e) => p4({ voiceMoodAmount: Number(e.target.value) }), style: { flex: 1 } }), /* @__PURE__ */ import_react14.default.createElement(MoodPreview, { ui: ui2 }))), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "句调", hint: "打字音像说话一样有抑扬：一句话慢慢往下走，陈述句句尾落下，「吗？」这样的问句扬上去，「什么时候？」这样的问句疑问词重读、句尾只轻轻扬，感叹开头最高，省略号越说越低越轻，「～」拖长往上滑，♡ 让最后一个字往上一挑。按词取音：每个词的第一个字一定响，日文按拍念（っ 停一下、ー 拖长）。起伏大小跟着情绪。关掉后跟以前一样每两个字响一下、音高不动。" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.prosody !== false, onChange: (v) => p4({ prosody: v }) })), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。" }, /* @__PURE__ */ import_react14.default.createElement(Select, { value: ui2.voiceDefault, options: defaultOptions, onChange: (v) => p4({ voiceDefault: v }) })), ui2.voiceDefault === "auto" && /* @__PURE__ */ import_react14.default.createElement(Field, { label: "自动分配的音色", hint: "选「自动」时每种性别从这一组里按名字挑一个（同一局里尽量不撞）。可以加减，内置的、自己做的、音效库里的打字音都能放进来；改了只影响还没指定声音的角色。" }, /* @__PURE__ */ import_react14.default.createElement(VoicePools, { ui: ui2, p: p4, options: allVoices })), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), { group: "自己的音色", options: customOptions(ui2, ui2.narrationVoice) }, { group: "音效库里的打字音", options: blipOptions(blips, ui2.narrationVoice) }, ["off", "不出声"]], style: INLINE, onChange: (v) => p4(narrationPatch(ui2, v)) }), /* @__PURE__ */ import_react14.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length + (ui2.customVoices || []).length + blips.length, " 个（点一下试听）"), VOICE_GENDERS.filter(([g]) => g !== "other").map(([g, label]) => /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, { key: g }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note fg-voice-group" }, label, " · ", VOICES2.filter((v) => v.gender === g).length, " 个"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react14.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react14.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react14.default.createElement("span", null, v.desc)))))), blips.length > 0 && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note fg-voice-group" }, "音效库里的打字音 · ", blips.length, " 个"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-skins fg-voices" }, blips.map((b) => /* @__PURE__ */ import_react14.default.createElement("button", { key: b.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: libRef(b.id), pitch: 0 }, ui2) }, /* @__PURE__ */ import_react14.default.createElement("b", null, "▶ ", b.name), /* @__PURE__ */ import_react14.default.createElement("span", null, "音效库 · ", VOICE_GENDER[b.gender || ""], b.use === "narration" ? " · 旁白用" : "", b.description ? " · " + b.description : "")))), !blips.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, "逆转女声、逆转男声、逆转打字机是照逆转裁判的声音合成的，不用导入。想用原版录音：把逆转裁判音效包（或别的打字音）导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。"), /* @__PURE__ */ import_react14.default.createElement(VoiceMaker, { ui: ui2, p: p4 }), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, { key: group }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）；也可以从音效库里挑一个。自己的文件和音效库的声音都按默认版本的响度放。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
     const mine = ui2.customSounds[slot.id];
     const current2 = ui2.sounds[slot.id];
     const suggested = library.filter((s) => s.use === slot.id);
@@ -14711,7 +14958,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if (ui0.voiceMood === false || !speakerEmo) return NEUTRAL_MOOD;
     return scaleMood(voiceMood(speakerEmo, view && view.emotions || [], { acting: speakerActing }), ui0.voiceMoodAmount ?? 1);
   }, [speakerEmo, speakerActing, view && view.emotions, ui0.voiceMood, ui0.voiceMoodAmount]);
-  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff, mood });
+  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff, mood, prosody: ui0.prosody !== false });
   import_react18.default.useEffect(() => {
     if (panel && !done) finish();
   }, [panel, done]);

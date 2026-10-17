@@ -2584,7 +2584,7 @@ function MoodPreview({ ui }) {
     if (!voice) return
     const chars = Array.from(MOOD_SAMPLE)
     const mood = ui.voiceMood === false || !emo ? NEUTRAL_MOOD : scaleMood(voiceMood(emo, shownLib()), ui.voiceMoodAmount ?? 1)
-    const plan = planLine(chars, ui.textSpeed || 30, { emo, type: 'dialogue', seed: 'preview', mood })
+    const plan = planLine(chars, ui.textSpeed || 30, { emo, type: 'dialogue', seed: 'preview', mood, prosody: ui.prosody !== false })
     setPlaying(emo || 'calm')
     const ms = await previewLine(voice, chars, plan, ui)
     setTimeout(() => setPlaying(p => (p === (emo || 'calm') ? '' : p)), ms)
@@ -2636,6 +2636,9 @@ function SoundSection({ data }) {
           <input type="range" min="0" max="2" step="0.1" value={ui.voiceMoodAmount ?? 1} disabled={ui.voiceMood === false} aria-label="情绪起伏强度" onChange={e => p({ voiceMoodAmount: Number(e.target.value) })} style={{ flex: 1 }} />
           <MoodPreview ui={ui} />
         </div>
+      </Field>
+      <Field label="句调" hint="打字音像说话一样有抑扬：一句话慢慢往下走，陈述句句尾落下，「吗？」这样的问句扬上去，「什么时候？」这样的问句疑问词重读、句尾只轻轻扬，感叹开头最高，省略号越说越低越轻，「～」拖长往上滑，♡ 让最后一个字往上一挑。按词取音：每个词的第一个字一定响，日文按拍念（っ 停一下、ー 拖长）。起伏大小跟着情绪。关掉后跟以前一样每两个字响一下、音高不动。">
+        <Toggle value={ui.prosody !== false} onChange={v => p({ prosody: v })} />
       </Field>
       <Field label="没指定的角色" hint="每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。">
         <Select value={ui.voiceDefault} options={defaultOptions} onChange={v => p({ voiceDefault: v })} />
