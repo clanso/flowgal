@@ -1,7 +1,7 @@
 // 剧场：全屏 galgame 播放器。读宿主整理好的场景脚本，逐拍演出；导演没整理完的部分先按原文演。
 import React from 'react'
 import { api, ui, useUi, useGameView, useConfig, useUpdate, useMusic, useSoundlib, updateAvailable, toast, openTheater, assetUrl, hostName } from '../api.js'
-import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, showEmotions, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS } from './playback.js'
+import { buildBeats, TIME_LABEL, WEATHER_LABEL, MOOD_LABEL, LIGHT_LABEL, FX_LABEL, MODE_LABEL, emotionLabel, showEmotions, pickTrack, stageRatio, cgSrc, beatHold, WAKE_SWAP_MS, speakerX } from './playback.js'
 import { Backdrop, SceneCover, backgroundFor, Cast, CgLayer, SplitPanel, RecallLayer, RecallFace, HitImpact, MomentLayer, Fireworks, PhoneRing, CallChip, VideoPip, PhoneEnd, PhoneBanner, TitleCard, CutCard, CUT_MS, HAZE_MS, RECALL_HOLD_MS, FadeLayer, Flash, Particles, StageFlags, useCamera, useHits } from './Stage.jsx'
 import { effectsOff, muteView, muteBeats, offDeliveries, cssOff } from './effects.js'
 import { DialogBox, SceneCard, Choices, useTypewriter } from './Dialog.jsx'
@@ -18,6 +18,7 @@ import { loadSkinFonts, loadGlyphs, dialogVars } from './skins.js'
 import { preloadImage, whenImageReady } from './preload.js'
 import { castVoices, lineVoice, libraryBlips } from '../../../lib/sounds.js'
 import { voiceMood, scaleMood, NEUTRAL_MOOD } from '../../../lib/voice-mood.js'
+import { voicePan } from '../../../lib/voice-clock.js'
 import { ROMANCE_LABEL, SENSE_LABEL } from '../../../lib/vocab.js'
 
 // 读到哪一句：每局记在浏览器里。
@@ -277,7 +278,9 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if (ui0.voiceMood === false || !speakerEmo) return NEUTRAL_MOOD
     return scaleMood(voiceMood(speakerEmo, (view && view.emotions) || [], { acting: speakerActing }), ui0.voiceMoodAmount ?? 1)
   }, [speakerEmo, speakerActing, view && view.emotions, ui0.voiceMood, ui0.voiceMoodAmount])
-  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff, mood, prosody: ui0.prosody !== false })
+  // 打字音的声像：说话人站在台上哪儿就从哪边出声（lib/voice-clock.js；心声、电话、旁白居中，画外音从退场那边）
+  const pan = React.useMemo(() => (beat ? voicePan({ x: speakerX(beat, ui0.maxOnStage ?? 8) ?? undefined, width: ui0.blipPan ?? 0.7, type: beat.type, style: beat.voice || '', exitSide: beat.exitSide || '', cam: beat.cam || '' }) : 0), [beat, ui0.maxOnStage, ui0.blipPan])
+  const [done, chars, finish, typedAt, typed, typeLead] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff, mood, prosody: ui0.prosody !== false, sync: ui0.blipSync !== false, pan })
   // 说话人的逆转式立绘按这个对口型（没有素材包的立绘用不到）
   React.useEffect(() => { if (panel && !done) finish() }, [panel, done])
   const talk = React.useMemo(() => (beat ? { key: beat.key, type: beat.type, chars, times: typed.times, gap: typed.gap, mouth: typed.mouth, marks: typed.marks, speed: typeSpeed, startedAt: typedAt, done } : null), [beat, chars, typed, typeSpeed, typedAt, done])
@@ -581,7 +584,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
 
         {beat && !title && beat.card && <SceneCard beat={beat} />}
         {beat && !title && (
-          <DialogBox beat={beat} chars={chars} plan={typed} done={done} waiting={holdText} away={pausing && hold.away} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)}
+          <DialogBox beat={beat} chars={chars} plan={typed} lead={typeLead} done={done} waiting={holdText} away={pausing && hold.away} color={color} quick={quick} progress={progressInTurn} status={status} hiddenText={Boolean(beat.card)}
             recall={beat.recall ? { tone: recallTone || beat.recall.tone, name: ui0.recallName || 'blur' } : null}
             face={recallStyle === 'portrait' && beat.recall ? <RecallFace beat={beat} view={view} tone={recallTone} /> : null} />
         )}

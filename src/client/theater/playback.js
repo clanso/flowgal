@@ -66,6 +66,7 @@ export function buildBeats(view) {
   const spoke = new Map() // 每个人最近一次开口（或旁白写到他、立绘高亮）是第几拍：说话的人站到最前，说完也留在前面
   let recalled = null // 上一拍所在的短闪回：进出闪回时白闪一下
   let call = null // 正在打的电话 { who, video, dir, id, live, unanswered }：跨轮带着，挂断、电话那头的人走进画面时收起
+  const exitSides = {} // 退场的人从哪边下去的（站位在左半边的往左）：之后在画外说话时声音从那边传来
   let set = 0 // 第几堂布景：换了地方、进出回忆这类段落时加一，台上的人跟着旧画面一起退、在新画面里重新登场，不从旧站位滑过去
   // 有立绘的人：导演漏列进 cast、却当面开口时让他上台（lib/staging.js 的 walkOn）
   const drawn = new Set((view.cast || []).filter(p => Object.values(p.sprites || {}).some(s => s && s.assetId)).map(p => p.name))
@@ -174,6 +175,8 @@ export function buildBeats(view) {
       Object.assign(exitWay, line.exitHow || {})
       const gone = {}
       for (const name of steps[ui].left) if (exitWay[name]) { gone[name] = exitWay[name]; delete exitWay[name] }
+      if (ui > 0) for (const name of steps[ui].left) { const was = steps[ui - 1].cast.find(c => c.name === name); if (was) exitSides[name] = actorX(was.pos) < 50 ? 'left' : actorX(was.pos) > 50 ? 'right' : '' }
+      for (const name of steps[ui].entered) delete exitSides[name]
       // 一次出手：被击倒的人倒在那里，到他自己开口（台词、心声；旁白写到他不算）、走位或被治疗为止
       const hit = line.hit || null
       const target = hit && hit.to && onStageNames.includes(hit.to) ? [hit.to] : []
@@ -223,6 +226,7 @@ export function buildBeats(view) {
         speaker,
         ...(speakers.length > 1 ? { speakers } : {}), // 齐声：几个人一起高亮
         ...(voice ? { voice } : {}), // 声音的样子：电话里、广播、心灵感应……
+        ...(voice === 'offscreen' && exitSides[speaker] ? { exitSide: exitSides[speaker] } : {}), // 画外音：这个人从哪边退场的（声音从那边传来）
         ...(split ? { split } : {}),
         alias: line.as || '',
         emo: line.emo || '',
@@ -286,6 +290,14 @@ export function buildBeats(view) {
 }
 
 export function actorX(pos) { return POS_X[pos] ?? 50 }
+
+/** 说话人此刻在台上的横向位置（百分比，跟 Stage.jsx 画立绘一样：按人数排开、走位挪过）；不在台上回 null。打字音按它分左右。 */
+export function speakerX(beat, max = 8) {
+  if (!beat || !beat.speaker || !beat.cast) return null
+  const cast = (beat.split ? beat.cast.filter(c => !beat.split.who.includes(c.name)) : beat.cast)
+  const me = blockLayout(stageLayout(onStage(cast, beat.recent, max)), beat.poses).find(c => c.name === beat.speaker)
+  return me ? me.x : null
+}
 
 /** 同屏最多站几个人：超出的，最久没说话、没登场的先下场（还算在场，轮到他说话就回来）。临时上台说一两句的（extra）不算在内。max 为 0 不限。 */
 export function onStage(cast, recent, max) {

@@ -7,6 +7,7 @@ import { voiceById, findVoice, isCustomRef, soundFor, slotById, DEFAULT_SOUNDS, 
 import { FOLEY } from '../../../lib/foley.js'
 import { EROS_FOLEY, EROS_LOOPS, TENTACLE_LOOPS, TENTACLE_SWAP, PEAK_FOLEY } from '../../../lib/eros.js'
 import { shapeBlip } from '../../../lib/voice-mood.js'
+import { outputDelayMs } from '../../../lib/voice-clock.js'
 
 let preview = null   // { el, id, onEnd }
 let ctx = null
@@ -241,6 +242,7 @@ function playParts(ac, parts, { rate = 1, volume = 1, at = ac.currentTime, out =
     if (part.wave === 'noise') src.start(t, Math.random() * 0.4)
     else src.start(t)
     src.stop(end + 0.02)
+    if (tracking) track(src, t, end - t)
   }
 }
 
@@ -357,6 +359,7 @@ function playSample(ac, sample, { rate = 1, volume = 1, at = ac.currentTime, out
   if (fadeIn > 0) { g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(volume, at + fadeIn) } else g.gain.value = volume
   src.connect(g).connect(out)
   src.start(at)
+  if (tracking) track(src, at, sample.buffer.duration / rate)
 }
 
 /** 放上传的、音效库的文件：base 是它顶替的内置配方，按它的响度对齐。 */
@@ -571,13 +574,49 @@ export function warmVoices(voices) {
 }
 
 /**
+ * 打字音排在音频时钟上（lib/voice-clock.js 的前瞻排程）：live 里记着这一句已经排下、还没响完的声音，
+ * 点一下打完、翻页时 hushBlips() 掐掉（不然字全出来了，前瞻排下的那一小段还在响）。
+ */
+const live = new Set()
+let tracking = false // blip 里发的声音才记（别的音效不归打字音管）
+function track(src, at, dur) {
+  const entry = { src, end: at + dur + 0.05 }
+  live.add(entry)
+  src.addEventListener?.('ended', () => live.delete(entry))
+}
+export function hushBlips() {
+  const ac = ctx
+  for (const e of live) { try { if (!ac || e.end > ac.currentTime) e.src.stop() } catch {} }
+  live.clear()
+}
+/** 音频时钟现在几秒、声音排下去要多久才真的出来（毫秒）。剧场按它排打字音、推迟字。 */
+export function audioClock() {
+  const ac = audioCtx()
+  return ac ? { now: ac.currentTime, delayMs: outputDelayMs(ac), running: ac.state === 'running' } : null
+}
+/** 一句里每个声音都要一个声像节点太浪费：同一个声像值复用一个（接在这种声音样子的链前面）。 */
+const panners = new Map()
+function pannedOut(ac, out, pan) {
+  if (!pan || typeof ac.createStereoPanner !== 'function') return out
+  const key = `${Math.round(pan * 100)}`
+  let byOut = panners.get(out)
+  if (!byOut || byOut.context !== ac) { byOut = new Map(); byOut.context = ac; panners.set(out, byOut) }
+  if (!byOut.has(key)) { const p = ac.createStereoPanner(); p.pan.value = Math.round(pan * 100) / 100; p.connect(out); byOut.set(key, p) }
+  return byOut.get(key)
+}
+
+/**
  * 打字音：voice 是 lib/sounds.js 的 lineVoice 算出来的 { id 音色, pitch 升降几个半音, gain }，
  * 再带上这句的声音样子 style（电话、广播、心灵感应、齐声……见 lib/vocab.js 的 VOICES）；齐声时 also 是另外几个人的声音。
  * pitch / gain 是演法和情绪合起来的倍数（威压低沉、激动尖细、低语轻、哭着说压低）。每个字音高随机抖一点，不那么机械。
  * mood 是这句的情绪（lib/voice-mood.js）：气声、起音、发颤跟着它。
  * 音色可以是音效库里的打字音（lib:编号）：放那段采样，变速当移调。
  */
-export function blip(voice, { pitch = 1, gain = 1, mood = null, hold = 1, glide = 0, jitter: wobbly = true } = {}) {
+export function blip(voice, opts) {
+  tracking = true
+  try { blipNow(voice, opts) } finally { tracking = false }
+}
+function blipNow(voice, { pitch = 1, gain = 1, mood = null, hold = 1, glide = 0, jitter: wobbly = true, at = null, pan = 0 } = {}) {
   const ac = voice && audioCtx()
   const v = ac && voiceSource(ac, voice.id)
   if (!v) return
@@ -586,29 +625,30 @@ export function blip(voice, { pitch = 1, gain = 1, mood = null, hold = 1, glide 
   const jitter = pitch * (wobbly ? 0.96 + Math.random() * 0.08 : 0.995 + Math.random() * 0.01)
   const volume = (sounds.blipVolume ?? 1) * gain
   const rateOf = who => 2 ** ((who.pitch || 0) / 12) * jitter
+  const when = Number.isFinite(at) ? Math.max(at, ac.currentTime) : ac.currentTime // 前瞻排程给的准点
   if (style === 'chorus') {
     // 齐声：每个人的声音各响一下，错开几毫秒；只有一个人的声音时叠两个错开音高的分身
     const others = (voice.also || []).map(o => ({ who: o, source: voiceSource(ac, o.id) })).filter(o => o.source)
     const group = others.length ? [{ who: voice, source: v }, ...others] : [voice, { ...voice, pitch: (voice.pitch || 0) - 3 }, { ...voice, pitch: (voice.pitch || 0) + 4 }].map(who => ({ who, source: v }))
     const share = 1 / Math.sqrt(group.length)
-    group.forEach(({ who, source }, i) => emit(ac, source, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014, mood, hold, glide }))
+    group.forEach(({ who, source }, i) => emit(ac, source, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: when + i * 0.014, out: pannedOut(ac, ac.destination, pan), mood, hold, glide }))
     return
   }
   // 短闪回里的回忆声按基调换一条链（voice.tone，见 Theater.jsx）
   const memory = style === 'memory' ? (MEMORY_DEPTH[voice.tone] ? voice.tone : 'warm') : ''
-  const out = chainFor(ac, memory ? 'memory-' + memory : style)
+  const out = pannedOut(ac, chainFor(ac, memory ? 'memory-' + memory : style), pan)
   const rate = rateOf(voice) * (style === 'telepathy' ? 1.08 : style === 'machine' ? 0.94 : memory ? MEMORY_RATE[memory] : 1)
   if (memory) {
     // 回忆：软起音的字 + 低八度的一层（声音变厚、发闷），偶尔冒个气泡
-    emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, memory: true, mood, hold, glide })
-    emit(ac, v, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out, memory: true })
-    if (Math.random() < 0.16) playParts(ac, BUBBLE, { rate: 0.8 + Math.random() * 0.6, volume, out, at: ac.currentTime + 0.03 + Math.random() * 0.04 })
+    emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, memory: true, mood, hold, glide, at: when })
+    emit(ac, v, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out, memory: true, at: when })
+    if (Math.random() < 0.16) playParts(ac, BUBBLE, { rate: 0.8 + Math.random() * 0.6, volume, out, at: when + 0.03 + Math.random() * 0.04 })
     return
   }
-  emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, mood, hold, glide })
+  emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, mood, hold, glide, at: when })
   // 心灵感应：高八度的一层虚影；广播：一点电流声
-  if (style === 'telepathy') emit(ac, v, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out })
-  if (style === 'radio') playParts(ac, [{ wave: 'noise', f: 3200, q: 0.8, gain: 0.05, dur: 0.06 }], { volume, out })
+  if (style === 'telepathy') emit(ac, v, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out, at: when })
+  if (style === 'radio') playParts(ac, [{ wave: 'noise', f: 3200, q: 0.8, gain: 0.05, dur: 0.06 }], { volume, out, at: when })
 }
 
 /**

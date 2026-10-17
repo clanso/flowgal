@@ -1,6 +1,7 @@
 // 对话框（逐字显现 + 打字音）、情境卡片（短信 / 信件 / 便签……）、选项。
 import React from 'react'
-import { blip, sfx } from './audio.js'
+import { blip, sfx, audioClock, hushBlips } from './audio.js'
+import { createLookahead, PUMP_MS } from '../../../lib/voice-clock.js'
 import { CARD_LABEL, VOICE_LABEL } from './playback.js'
 import { planLine } from '../../../lib/typing.js'
 
@@ -15,8 +16,11 @@ const CARD_HEAD = { sms: '新消息', letter: '', note: '', news: '号外', term
  * offStyles 是设置里关掉的演法（effects.js 的 offDeliveries），这几种按平常的念。
  * mood 是剧场按情绪库认好的说话人情绪（lib/voice-mood.js；不给时按这句的情绪认，NEUTRAL_MOOD 是不带情绪）。
  * prosody 为假时不要句调（lib/prosody.js），打字音照旧每几个字一下、音高不动。
+ * 打字音排在音频时钟上（lib/voice-clock.js 的前瞻排程：主线程卡一下也不断、不挤成一团）；sync 为真时字整体推迟
+ * 「声音排下去到真的出来」那么久（蓝牙耳机一两百毫秒），字和声音对得上。pan 是这句的声像（-1 左 ~ 1 右）。
+ * 返回 [是否打完, 字, 立即打完, 第一个字出现的时刻, 演出计划, 字推迟了多少毫秒]。
  */
-export function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null, mood = null, prosody = true } = {}) {
+export function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null, mood = null, prosody = true, sync = true, pan = 0 } = {}) {
   const key = beat ? beat.key : ''
   const chars = React.useMemo(() => Array.from((beat && beat.text) || ''), [key, beat && beat.text])
   const emo = beat && beat.speaker ? (beat.emotions && beat.emotions[beat.speaker]) || beat.emo : ''
@@ -33,36 +37,41 @@ export function useTypewriter(beat, speed, { sound = true, voice = null, hold = 
   fxRef.current = onFx
   const voiceRef = React.useRef(voice)
   voiceRef.current = voice
+  const panRef = React.useRef(pan)
+  panRef.current = pan
   const pending = React.useRef([])
   const ticking = React.useRef(null)
-  // 点一下打完时：还没放的特效丢掉，打字音也停下（不然字已经全出来了还在嘟嘟嘟）
-  const dropPending = () => { pending.current.forEach(clearTimeout); pending.current = []; clearInterval(ticking.current); ticking.current = null }
+  // 字推迟多久：开着打字音、要对齐时，等于声音的输出延迟（这一句开始时量一次，换句才重量）
+  const lead = React.useMemo(() => { if (!sync || !sound || !speed) return 0; const c = audioClock(); return c && c.running ? c.delayMs : 0 }, [key, sync, sound, speed])
+  // 点一下打完时：还没放的特效丢掉，打字音也停下（前瞻排下的那一小段也掐掉，不然字已经全出来了还在嘟嘟嘟）
+  const dropPending = () => { pending.current.forEach(clearTimeout); pending.current = []; if (ticking.current) { ticking.current.stop(); ticking.current = null; hushBlips() } }
   React.useEffect(() => {
     if (!speed || !chars.length || hold) return undefined
-    const t0 = performance.now()
+    const t0 = performance.now() + lead // 第一个字真正出现的时刻（字整体推迟了 lead）
     setStart({ key, at: t0 })
     const { times, blip: delivery, fx } = plan
-    const finish = setTimeout(() => setShown({ key, done: true }), times[times.length - 1] + speed + 220)
-    pending.current = fx.map(f => setTimeout(() => { if (fxRef.current) fxRef.current(f) }, f.at))
+    const finish = setTimeout(() => setShown({ key, done: true }), lead + times[times.length - 1] + speed + 220)
+    pending.current = fx.map(f => setTimeout(() => { if (fxRef.current) fxRef.current(f) }, lead + f.at))
     // 打字音跟着演出计划的音符（lib/prosody.js：按词取音、句调；关掉句调时每 delivery.every 个字一下）；
     // 文字效果、哽住那几个字按 plan.blips 的音量音高念，情绪（plan.mood）管气声、起音、发颤
     const notes = plan.notes || []
-    const sounded = note => {
+    const clock = sound && notes.length ? audioClock() : null
+    if (!clock) return () => { clearTimeout(finish); dropPending() }
+    const sounded = (note, when) => {
       const b = plan.blips && plan.blips[note.i]
-      return { pitch: delivery.pitch * (b ? b.pitch : 1) * 2 ** ((note.semis || 0) / 12), gain: delivery.gain * (b ? b.gain : 1) * (note.gain ?? 1), hold: note.hold, glide: note.glide, jitter: note.jitter, mood: plan.mood }
+      return { pitch: delivery.pitch * (b ? b.pitch : 1) * 2 ** ((note.semis || 0) / 12), gain: delivery.gain * (b ? b.gain : 1) * (note.gain ?? 1), hold: note.hold, glide: note.glide, jitter: note.jitter, mood: plan.mood, at: when, pan: panRef.current }
     }
-    let next = 0
-    const tick = sound && notes.length ? setInterval(() => {
-      const now = performance.now() - t0
-      for (; next < notes.length && notes[next].at <= now; next += 1) blip(voiceRef.current, sounded(notes[next]))
-      if (next >= notes.length) clearInterval(tick)
-    }, Math.max(8, Math.min(speed, plan.gap))) : null
-    ticking.current = tick
-    return () => { clearTimeout(finish); dropPending(); if (tick) clearInterval(tick) }
+    // 声音从现在开始排（它要晚 lead 才出来，正好跟推迟了 lead 的字对上）
+    const la = createLookahead(notes, { start: clock.now, play: (note, when) => blip(voiceRef.current, sounded(note, when)) })
+    const pump = () => { const c = audioClock(); if (c) la.pump(c.now); if (la.done()) clearInterval(timer) }
+    const timer = setInterval(pump, PUMP_MS)
+    ticking.current = { stop: () => { la.stop(); clearInterval(timer) } }
+    pump()
+    return () => { clearTimeout(finish); dropPending() }
   }, [key, chars, plan, speed, sound, hold])
   // 点一下直接打完：还没轮到的震屏、闪光、音效不再补放，打字音停下
   React.useEffect(() => { if (done) dropPending() }, [done])
-  return [done, chars, () => setShown({ key, done: true }), start.key === key ? start.at : NaN, plan]
+  return [done, chars, () => setShown({ key, done: true }), start.key === key ? start.at : NaN, plan, lead]
 }
 
 /**
@@ -81,7 +90,7 @@ function origChars(orig, times, count, speed) {
  * 「回忆」小标和情绪小字不出：回忆里的声音靠对话框和打字音认出来，不靠界面上的标签。
  * face：短闪回时回忆里说话的人的小头像（Stage.jsx 的 RecallFace，设置里选了才有），挂在对话框右上角。
  */
-export function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quick, progress, status, hiddenText, recall = null, face = null }) {
+export function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quick, progress, status, hiddenText, recall = null, face = null, lead = 0 }) {
   const speaker = beat.alias || beat.speaker
   const showName = speaker && beat.type !== 'narration' && !(recall && recall.name === 'hide')
   const speed = quick.speed
@@ -90,7 +99,7 @@ export function DialogBox({ beat, chars, plan, done, waiting, away = false, colo
   const tx = plan ? plan.tx : []
   // 一个字的样子：重音、文字效果（tx-*，越说越大 / 越小按 --k 变，波浪按 --i 错开）
   const charClass = i => 'fg-char' + (marks[i] ? ' is-' + marks[i] : '') + (tx[i] ? ' tx-' + tx[i] : '')
-  const charStyle = i => ({ '--d': (times ? times[i] : i * speed) + 'ms', ...(tx[i] ? { '--k': plan.txk[i], '--i': plan.txi[i] } : {}) })
+  const charStyle = i => ({ '--d': lead + (times ? times[i] : i * speed) + 'ms', ...(tx[i] ? { '--k': plan.txk[i], '--i': plan.txi[i] } : {}) })
   // 声音的样子：名牌旁边一个小标（带跳动的音量条），对话框和字也换个样子（样式在 theater.css 的 data-voice）
   const voiceChip = !recall && beat.voice && VOICE_LABEL[beat.voice] ? <div className="fg-voice-chip" data-voice={beat.voice}><i /><i /><i /><span>{VOICE_LABEL[beat.voice]}</span></div> : null
   return (
@@ -107,7 +116,7 @@ export function DialogBox({ beat, chars, plan, done, waiting, away = false, colo
       {hiddenText && <div className="fg-text is-cardhint">〔 {CARD_LABEL[beat.card] || '卡片'} 〕</div>}
       {!hiddenText && (
         <div className={`fg-text is-${beat.type}${plan && plan.say ? ' say-' + plan.say : ''}${done ? ' is-done' : waiting ? ' is-wait' : ''}`} key={beat.key} aria-live="polite">
-          {beat.orig && <div className="fg-orig" lang="und">{origChars(beat.orig, times, chars.length, speed).map(([ch, d], i) => <span key={i} className="fg-char" style={{ '--d': d + 'ms' }}>{ch}</span>)}</div>}
+          {beat.orig && <div className="fg-orig" lang="und">{origChars(beat.orig, times, chars.length, speed).map(([ch, d], i) => <span key={i} className="fg-char" style={{ '--d': lead + d + 'ms' }}>{ch}</span>)}</div>}
           <span className="fg-line">{chars.map((ch, i) => <span key={i} className={charClass(i)} style={charStyle(i)}>{ch}</span>)}</span>
         </div>
       )}

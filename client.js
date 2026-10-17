@@ -4749,7 +4749,7 @@ function liveSheet(sheet, ctx2 = {}) {
   if (!poses.some((p4) => p4.emotions.includes("neutral"))) poses[0] = { ...poses[0], emotions: [...poses[0].emotions, "neutral"] };
   return { ...sheet, poses, full: sheet.full || sheet.poses };
 }
-var offPoses = (live) => live?.full ? live.full.filter((p4) => !live.poses.some((x) => x.id === p4.id)).map((p4) => p4.id) : [];
+var offPoses = (live2) => live2?.full ? live2.full.filter((p4) => !live2.poses.some((x) => x.id === p4.id)).map((p4) => p4.id) : [];
 function lineCtx(person, { turn, index, order = null, layer = null, pending: pending2 = null, needs = true }) {
   const then = layer?.then?.[person?.name] || null;
   let states = null;
@@ -5110,6 +5110,7 @@ function buildBeats(view) {
   const spoke = /* @__PURE__ */ new Map();
   let recalled = null;
   let call2 = null;
+  const exitSides = {};
   let set = 0;
   const drawn = new Set((view.cast || []).filter((p4) => Object.values(p4.sprites || {}).some((s) => s && s.assetId)).map((p4) => p4.name));
   const people = (view.cast || []).map((p4) => p4.name);
@@ -5199,13 +5200,13 @@ function buildBeats(view) {
       for (const [name2, st] of Object.entries(bodies.save())) if (st.pose) postures[name2] = st.pose;
       const offs = {};
       for (const name2 of onStageNames) {
-        const live = sheetFor(name2);
-        if (!live || !live.full) continue;
-        offs[name2] = offPoses(live);
+        const live2 = sheetFor(name2);
+        if (!live2 || !live2.full) continue;
+        offs[name2] = offPoses(live2);
         if (!postures[name2]) {
           const e = resolveEmotion(emotions[name2] || "neutral", view.emotions || []) || "neutral";
-          const home = homePose(fullSheet(live), e, view.emotions || []);
-          if (home && !live.poses.some((p4) => p4.id === home.id)) postures[name2] = (homePose(live, e, view.emotions || []) || live.poses[0]).id;
+          const home = homePose(fullSheet(live2), e, view.emotions || []);
+          if (home && !live2.poses.some((p4) => p4.id === home.id)) postures[name2] = (homePose(live2, e, view.emotions || []) || live2.poses[0]).id;
         }
       }
       moment = null;
@@ -5216,6 +5217,11 @@ function buildBeats(view) {
         gone[name2] = exitWay[name2];
         delete exitWay[name2];
       }
+      if (ui2 > 0) for (const name2 of steps[ui2].left) {
+        const was = steps[ui2 - 1].cast.find((c) => c.name === name2);
+        if (was) exitSides[name2] = actorX(was.pos) < 50 ? "left" : actorX(was.pos) > 50 ? "right" : "";
+      }
+      for (const name2 of steps[ui2].entered) delete exitSides[name2];
       const hit = line.hit || null;
       const target = hit && hit.to && onStageNames.includes(hit.to) ? [hit.to] : [];
       const block = blocking.step({ onStage: onStageNames, left: steps[ui2].left, speakers: type === "narration" ? [] : speakers, moves: line.move || [], peeks: Object.keys(ways).filter((name2) => ways[name2] === "peek"), downs: hit && hit.effect === "down" ? target : [], heals: hit && hit.effect === "heal" ? target : [] });
@@ -5263,6 +5269,8 @@ function buildBeats(view) {
         // 齐声：几个人一起高亮
         ...voice ? { voice } : {},
         // 声音的样子：电话里、广播、心灵感应……
+        ...voice === "offscreen" && exitSides[speaker] ? { exitSide: exitSides[speaker] } : {},
+        // 画外音：这个人从哪边退场的（声音从那边传来）
         ...split ? { split } : {},
         alias: line.as || "",
         emo: line.emo || "",
@@ -5349,6 +5357,12 @@ function buildBeats(view) {
 }
 function actorX(pos) {
   return POS_X[pos] ?? 50;
+}
+function speakerX(beat, max = 8) {
+  if (!beat || !beat.speaker || !beat.cast) return null;
+  const cast = beat.split ? beat.cast.filter((c) => !beat.split.who.includes(c.name)) : beat.cast;
+  const me = blockLayout(stageLayout(onStage(cast, beat.recent, max)), beat.poses).find((c) => c.name === beat.speaker);
+  return me ? me.x : null;
 }
 function onStage(cast, recent, max) {
   const main = cast.filter((c) => !c.extra);
@@ -6718,9 +6732,9 @@ function mouthTrack(talk, plan) {
   keys.sort((a, b) => a.at - b.at);
   return keys.filter((k, i) => i === 0 || k.mouth !== keys[i - 1].mouth);
 }
-function mouthOnTrack(track, elapsed) {
+function mouthOnTrack(track2, elapsed) {
   let state2 = "closed";
-  for (const k of track || []) {
+  for (const k of track2 || []) {
     if (k.at > elapsed) break;
     state2 = k.mouth;
   }
@@ -6817,9 +6831,9 @@ function createActor(pack, { seed = "actor", now = 0 } = {}) {
       return st.pose;
     },
     say(plan, startAt) {
-      const track = plan?.type && plan.type !== "dialogue" ? [] : mouthTrack(talk, plan);
-      const end = startAt + (track.length ? track[track.length - 1].at : 0);
-      st.line = { track, start: startAt, end };
+      const track2 = plan?.type && plan.type !== "dialogue" ? [] : mouthTrack(talk, plan);
+      const end = startAt + (track2.length ? track2[track2.length - 1].at : 0);
+      st.line = { track: track2, start: startAt, end };
       st.queued = [];
       const lr = seeded3(`${seed}|${(plan.chars || []).join("")}`);
       if (lr() < (blink.line_start_chance ?? 0)) st.queued.push(startAt + 40 + lr() * 120);
@@ -7203,13 +7217,13 @@ function AaSprite({ aa, talk, fallback, className, label }) {
   talkRef.current = talk;
   const key = packKey(aa);
   import_react3.default.useEffect(() => {
-    let live = true;
+    let live2 = true;
     loadAaPack(aa).then((p4) => {
-      if (live) setPack(p4);
+      if (live2) setPack(p4);
     }, () => {
     });
     return () => {
-      live = false;
+      live2 = false;
     };
   }, [key]);
   import_react3.default.useLayoutEffect(() => {
@@ -7536,6 +7550,69 @@ var PEAK_LABEL = { climax: "高潮", cum: "射精", both: "一起高潮" };
 var PEAK_FOLEY = Object.freeze({ climax: ["climax"], cum: ["cum"], both: ["climax", "cum"] });
 var EROS_PULSES = Object.freeze([0, 380, 780, 1220]);
 
+// lib/voice-clock.js
+var LOOKAHEAD_S = 0.1;
+var PUMP_MS = 25;
+var LATE_OK_S = 0.03;
+var MAX_DELAY_MS = 400;
+function createLookahead(notes, { start = 0, play, lookahead = LOOKAHEAD_S, lateOk = LATE_OK_S } = {}) {
+  const list3 = Array.isArray(notes) ? notes : [];
+  let next = 0;
+  let origin = start;
+  let pausedAt = null;
+  let stopped = false;
+  let lastWhen = -Infinity;
+  return {
+    pump(now) {
+      if (stopped || pausedAt !== null) return;
+      while (next < list3.length) {
+        const when = origin + list3[next].at / 1e3;
+        if (when > now + lookahead) break;
+        const note = list3[next];
+        next += 1;
+        if (when < now - lateOk) continue;
+        const at2 = Math.max(when, now, lastWhen + 1e-3);
+        lastWhen = at2;
+        play(note, at2);
+      }
+    },
+    pause(now) {
+      if (pausedAt === null && !stopped) pausedAt = now;
+    },
+    resume(now) {
+      if (pausedAt !== null) {
+        origin += now - pausedAt;
+        pausedAt = null;
+      }
+    },
+    stop() {
+      stopped = true;
+    },
+    done() {
+      return stopped || next >= list3.length;
+    }
+  };
+}
+function outputDelayMs(ac) {
+  const s = Number(ac?.outputLatency) || Number(ac?.baseLatency) || 0;
+  return s > 0 ? Math.min(MAX_DELAY_MS, Math.round(s * 1e3)) : 0;
+}
+var POS_X2 = { farleft: 14, left: 28, center: 50, right: 72, farright: 86 };
+var PAN_PER_PERCENT = 0.55 / 36;
+var CENTERED = /* @__PURE__ */ new Set(["phone", "radio", "telepathy", "machine", "memory"]);
+function voicePan({ pos = "", x, width = 0.7, type = "dialogue", style = "", exitSide = "", cam = "" } = {}) {
+  if (!(width > 0) || type !== "dialogue" || CENTERED.has(style)) return 0;
+  let pan;
+  if (style === "offscreen") pan = exitSide === "left" ? -0.55 : exitSide === "right" ? 0.55 : 0;
+  else {
+    const px = Number.isFinite(x) ? x : POS_X2[pos];
+    if (!Number.isFinite(px)) return 0;
+    pan = (px - 50) * PAN_PER_PERCENT;
+  }
+  if (cam === "closeup" || cam === "zoom" || cam === "focus") pan *= 0.5;
+  return Math.max(-1, Math.min(1, pan * width));
+}
+
 // src/client/theater/audio.js
 var preview = null;
 var ctx = null;
@@ -7684,8 +7761,8 @@ var ambience = loopPlayer({ loud: true });
 var erosRecording = loopPlayer({ loud: true });
 var players = [music, ambience, erosRecording];
 var loops = () => players.map((p4) => p4.current).filter(Boolean);
-function playBgm(track, volume = 0.45) {
-  music.play(track, volume);
+function playBgm(track2, volume = 0.45) {
+  music.play(track2, volume);
 }
 function hushBgm(on) {
   music.hush(on);
@@ -7708,14 +7785,14 @@ function stopAll() {
   stopEros();
   erosRecording.stop();
 }
-function previewTrack(track, onEnd) {
+function previewTrack(track2, onEnd) {
   stopPreview();
-  if (!track) return;
-  const el = new Audio(track.url);
-  const volume = track.volume ?? (music.current ? music.current.volume : 0.6);
+  if (!track2) return;
+  const el = new Audio(track2.url);
+  const volume = track2.volume ?? (music.current ? music.current.volume : 0.6);
   el.volume = Math.max(0, Math.min(1, volume));
   boost(el, volume);
-  preview = { el, id: track.id, onEnd };
+  preview = { el, id: track2.id, onEnd };
   el.onended = () => {
     if (preview && preview.el === el) stopPreview();
   };
@@ -7808,6 +7885,7 @@ function playParts(ac, parts, { rate = 1, volume = 1, at: at2 = ac.currentTime, 
     if (part.wave === "noise") src.start(t, Math.random() * 0.4);
     else src.start(t);
     src.stop(end + 0.02);
+    if (tracking) track(src, t, end - t);
   }
 }
 function loudness(data, rate) {
@@ -7927,6 +8005,7 @@ function playSample(ac, sample2, { rate = 1, volume = 1, at: at2 = ac.currentTim
   } else g.gain.value = volume;
   src.connect(g).connect(out);
   src.start(at2);
+  if (tracking) track(src, at2, sample2.buffer.duration / rate);
 }
 function playFile(ac, id, volume, base) {
   if (!(volume > 0)) return;
@@ -8132,7 +8211,54 @@ function warmVoices(voices) {
   }
   recipeLevel(CLASSIC);
 }
-function blip(voice, { pitch = 1, gain = 1, mood = null, hold = 1, glide = 0, jitter: wobbly = true } = {}) {
+var live = /* @__PURE__ */ new Set();
+var tracking = false;
+function track(src, at2, dur) {
+  const entry = { src, end: at2 + dur + 0.05 };
+  live.add(entry);
+  src.addEventListener?.("ended", () => live.delete(entry));
+}
+function hushBlips() {
+  const ac = ctx;
+  for (const e of live) {
+    try {
+      if (!ac || e.end > ac.currentTime) e.src.stop();
+    } catch {
+    }
+  }
+  live.clear();
+}
+function audioClock() {
+  const ac = audioCtx();
+  return ac ? { now: ac.currentTime, delayMs: outputDelayMs(ac), running: ac.state === "running" } : null;
+}
+var panners = /* @__PURE__ */ new Map();
+function pannedOut(ac, out, pan) {
+  if (!pan || typeof ac.createStereoPanner !== "function") return out;
+  const key = `${Math.round(pan * 100)}`;
+  let byOut = panners.get(out);
+  if (!byOut || byOut.context !== ac) {
+    byOut = /* @__PURE__ */ new Map();
+    byOut.context = ac;
+    panners.set(out, byOut);
+  }
+  if (!byOut.has(key)) {
+    const p4 = ac.createStereoPanner();
+    p4.pan.value = Math.round(pan * 100) / 100;
+    p4.connect(out);
+    byOut.set(key, p4);
+  }
+  return byOut.get(key);
+}
+function blip(voice, opts) {
+  tracking = true;
+  try {
+    blipNow(voice, opts);
+  } finally {
+    tracking = false;
+  }
+}
+function blipNow(voice, { pitch = 1, gain = 1, mood = null, hold = 1, glide = 0, jitter: wobbly = true, at: at2 = null, pan = 0 } = {}) {
   const ac = voice && audioCtx();
   const v = ac && voiceSource(ac, voice.id);
   if (!v) return;
@@ -8140,25 +8266,26 @@ function blip(voice, { pitch = 1, gain = 1, mood = null, hold = 1, glide = 0, ji
   const jitter = pitch * (wobbly ? 0.96 + Math.random() * 0.08 : 0.995 + Math.random() * 0.01);
   const volume = (sounds.blipVolume ?? 1) * gain;
   const rateOf = (who) => 2 ** ((who.pitch || 0) / 12) * jitter;
+  const when = Number.isFinite(at2) ? Math.max(at2, ac.currentTime) : ac.currentTime;
   if (style === "chorus") {
     const others = (voice.also || []).map((o) => ({ who: o, source: voiceSource(ac, o.id) })).filter((o) => o.source);
     const group = others.length ? [{ who: voice, source: v }, ...others] : [voice, { ...voice, pitch: (voice.pitch || 0) - 3 }, { ...voice, pitch: (voice.pitch || 0) + 4 }].map((who) => ({ who, source: v }));
     const share = 1 / Math.sqrt(group.length);
-    group.forEach(({ who, source }, i) => emit(ac, source, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: ac.currentTime + i * 0.014, mood, hold, glide }));
+    group.forEach(({ who, source }, i) => emit(ac, source, { rate: rateOf(who), volume: volume * share * (who.gain ?? 1), at: when + i * 0.014, out: pannedOut(ac, ac.destination, pan), mood, hold, glide }));
     return;
   }
   const memory = style === "memory" ? MEMORY_DEPTH[voice.tone] ? voice.tone : "warm" : "";
-  const out = chainFor(ac, memory ? "memory-" + memory : style);
+  const out = pannedOut(ac, chainFor(ac, memory ? "memory-" + memory : style), pan);
   const rate = rateOf(voice) * (style === "telepathy" ? 1.08 : style === "machine" ? 0.94 : memory ? MEMORY_RATE[memory] : 1);
   if (memory) {
-    emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, memory: true, mood, hold, glide });
-    emit(ac, v, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out, memory: true });
-    if (Math.random() < 0.16) playParts(ac, BUBBLE, { rate: 0.8 + Math.random() * 0.6, volume, out, at: ac.currentTime + 0.03 + Math.random() * 0.04 });
+    emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, memory: true, mood, hold, glide, at: when });
+    emit(ac, v, { rate: rate / 2, volume: volume * 0.45 * (voice.gain ?? 1), out, memory: true, at: when });
+    if (Math.random() < 0.16) playParts(ac, BUBBLE, { rate: 0.8 + Math.random() * 0.6, volume, out, at: when + 0.03 + Math.random() * 0.04 });
     return;
   }
-  emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, mood, hold, glide });
-  if (style === "telepathy") emit(ac, v, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out });
-  if (style === "radio") playParts(ac, [{ wave: "noise", f: 3200, q: 0.8, gain: 0.05, dur: 0.06 }], { volume, out });
+  emit(ac, v, { rate, volume: volume * (voice.gain ?? 1), out, mood, hold, glide, at: when });
+  if (style === "telepathy") emit(ac, v, { rate: rate * 2, volume: volume * 0.22 * (voice.gain ?? 1), out, at: when });
+  if (style === "radio") playParts(ac, [{ wave: "noise", f: 3200, q: 0.8, gain: 0.05, dur: 0.06 }], { volume, out, at: when });
 }
 async function previewVoice(voice, ui2 = sounds) {
   const ac = voice && audioCtx();
@@ -8602,19 +8729,19 @@ function Actor({ entry, person, beat, emo, emotions, groups = [], leaving = fals
       show(SIZES.get(src));
       return void 0;
     }
-    let live = true;
+    let live2 = true;
     const img = new Image();
     img.onload = () => {
-      if (!live || !img.naturalHeight) return;
+      if (!live2 || !img.naturalHeight) return;
       SIZES.set(src, [img.naturalWidth, img.naturalHeight]);
       show(SIZES.get(src));
     };
     img.onerror = () => {
-      if (live) setPics({ cur: null, prev: null, broken: src });
+      if (live2) setPics({ cur: null, prev: null, broken: src });
     };
     img.src = src;
     return () => {
-      live = false;
+      live2 = false;
     };
   }, [src]);
   import_react4.default.useEffect(() => {
@@ -8762,14 +8889,14 @@ function useFace(person, beat, view, then = null) {
   import_react4.default.useEffect(() => {
     setSize(null);
     if (!src) return void 0;
-    let live = true;
+    let live2 = true;
     const img = new Image();
     img.onload = () => {
-      if (live && img.naturalHeight) setSize([img.naturalWidth, img.naturalHeight]);
+      if (live2 && img.naturalHeight) setSize([img.naturalWidth, img.naturalHeight]);
     };
     img.src = src;
     return () => {
-      live = false;
+      live2 = false;
     };
   }, [src]);
   if (!src) return { src: "", crop: null };
@@ -9358,7 +9485,7 @@ function cssOff(off) {
 // src/client/theater/Dialog.jsx
 var import_react5 = __toESM(require("react"), 1);
 var CARD_HEAD = { sms: "新消息", letter: "", note: "", news: "号外", terminal: "> SYSTEM", notice: "告示", diary: "", scroll: "" };
-function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null, mood = null, prosody = true } = {}) {
+function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, onFx = null, offStyles = null, mood = null, prosody = true, sync = true, pan = 0 } = {}) {
   const key = beat ? beat.key : "";
   const chars = import_react5.default.useMemo(() => Array.from(beat && beat.text || ""), [key, beat && beat.text]);
   const emo = beat && beat.speaker ? beat.emotions && beat.emotions[beat.speaker] || beat.emo : "";
@@ -9375,52 +9502,71 @@ function useTypewriter(beat, speed, { sound = true, voice = null, hold = false, 
   fxRef.current = onFx;
   const voiceRef = import_react5.default.useRef(voice);
   voiceRef.current = voice;
+  const panRef = import_react5.default.useRef(pan);
+  panRef.current = pan;
   const pending2 = import_react5.default.useRef([]);
   const ticking = import_react5.default.useRef(null);
+  const lead = import_react5.default.useMemo(() => {
+    if (!sync || !sound || !speed) return 0;
+    const c = audioClock();
+    return c && c.running ? c.delayMs : 0;
+  }, [key, sync, sound, speed]);
   const dropPending = () => {
     pending2.current.forEach(clearTimeout);
     pending2.current = [];
-    clearInterval(ticking.current);
-    ticking.current = null;
+    if (ticking.current) {
+      ticking.current.stop();
+      ticking.current = null;
+      hushBlips();
+    }
   };
   import_react5.default.useEffect(() => {
     if (!speed || !chars.length || hold) return void 0;
-    const t0 = performance.now();
+    const t0 = performance.now() + lead;
     setStart({ key, at: t0 });
     const { times, blip: delivery, fx } = plan;
-    const finish = setTimeout(() => setShown({ key, done: true }), times[times.length - 1] + speed + 220);
+    const finish = setTimeout(() => setShown({ key, done: true }), lead + times[times.length - 1] + speed + 220);
     pending2.current = fx.map((f) => setTimeout(() => {
       if (fxRef.current) fxRef.current(f);
-    }, f.at));
+    }, lead + f.at));
     const notes = plan.notes || [];
-    const sounded = (note) => {
-      const b = plan.blips && plan.blips[note.i];
-      return { pitch: delivery.pitch * (b ? b.pitch : 1) * 2 ** ((note.semis || 0) / 12), gain: delivery.gain * (b ? b.gain : 1) * (note.gain ?? 1), hold: note.hold, glide: note.glide, jitter: note.jitter, mood: plan.mood };
+    const clock3 = sound && notes.length ? audioClock() : null;
+    if (!clock3) return () => {
+      clearTimeout(finish);
+      dropPending();
     };
-    let next = 0;
-    const tick = sound && notes.length ? setInterval(() => {
-      const now = performance.now() - t0;
-      for (; next < notes.length && notes[next].at <= now; next += 1) blip(voiceRef.current, sounded(notes[next]));
-      if (next >= notes.length) clearInterval(tick);
-    }, Math.max(8, Math.min(speed, plan.gap))) : null;
-    ticking.current = tick;
+    const sounded = (note, when) => {
+      const b = plan.blips && plan.blips[note.i];
+      return { pitch: delivery.pitch * (b ? b.pitch : 1) * 2 ** ((note.semis || 0) / 12), gain: delivery.gain * (b ? b.gain : 1) * (note.gain ?? 1), hold: note.hold, glide: note.glide, jitter: note.jitter, mood: plan.mood, at: when, pan: panRef.current };
+    };
+    const la = createLookahead(notes, { start: clock3.now, play: (note, when) => blip(voiceRef.current, sounded(note, when)) });
+    const pump2 = () => {
+      const c = audioClock();
+      if (c) la.pump(c.now);
+      if (la.done()) clearInterval(timer);
+    };
+    const timer = setInterval(pump2, PUMP_MS);
+    ticking.current = { stop: () => {
+      la.stop();
+      clearInterval(timer);
+    } };
+    pump2();
     return () => {
       clearTimeout(finish);
       dropPending();
-      if (tick) clearInterval(tick);
     };
   }, [key, chars, plan, speed, sound, hold]);
   import_react5.default.useEffect(() => {
     if (done) dropPending();
   }, [done]);
-  return [done, chars, () => setShown({ key, done: true }), start.key === key ? start.at : NaN, plan];
+  return [done, chars, () => setShown({ key, done: true }), start.key === key ? start.at : NaN, plan, lead];
 }
 function origChars(orig, times, count, speed) {
   const list3 = Array.from(orig);
   const at2 = (i) => times && times.length ? times[Math.min(times.length - 1, i)] : i * speed;
   return list3.map((ch, j) => [ch, count ? at2(Math.floor(j / list3.length * count)) : 0]);
 }
-function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quick, progress, status, hiddenText, recall = null, face = null }) {
+function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quick, progress, status, hiddenText, recall = null, face = null, lead = 0 }) {
   const speaker = beat.alias || beat.speaker;
   const showName = speaker && beat.type !== "narration" && !(recall && recall.name === "hide");
   const speed = quick.speed;
@@ -9428,9 +9574,9 @@ function DialogBox({ beat, chars, plan, done, waiting, away = false, color, quic
   const marks = plan ? plan.marks : [];
   const tx = plan ? plan.tx : [];
   const charClass = (i) => "fg-char" + (marks[i] ? " is-" + marks[i] : "") + (tx[i] ? " tx-" + tx[i] : "");
-  const charStyle = (i) => ({ "--d": (times ? times[i] : i * speed) + "ms", ...tx[i] ? { "--k": plan.txk[i], "--i": plan.txi[i] } : {} });
+  const charStyle = (i) => ({ "--d": lead + (times ? times[i] : i * speed) + "ms", ...tx[i] ? { "--k": plan.txk[i], "--i": plan.txi[i] } : {} });
   const voiceChip = !recall && beat.voice && VOICE_LABEL[beat.voice] ? /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-voice-chip", "data-voice": beat.voice }, /* @__PURE__ */ import_react5.default.createElement("i", null), /* @__PURE__ */ import_react5.default.createElement("i", null), /* @__PURE__ */ import_react5.default.createElement("i", null), /* @__PURE__ */ import_react5.default.createElement("span", null, VOICE_LABEL[beat.voice])) : null;
-  return /* @__PURE__ */ import_react5.default.createElement("div", { className: `fg-dialog${away ? " is-away" : ""}`, "data-voice": beat.voice || void 0, "data-recall": recall ? recall.tone || "warm" : void 0, "data-recall-name": recall ? recall.name : void 0, style: { "--speaker": color || void 0 } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-box" }), face, (showName || voiceChip) && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name", key: beat.speaker + beat.alias + (beat.voice || "") }, showName && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-plate" }, speaker), voiceChip, showName && !recall && beat.emo && quick.emoLabel && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-sub" }, quick.emoLabel)), hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-text is-cardhint" }, "〔 ", CARD_LABEL[beat.card] || "卡片", " 〕"), !hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: `fg-text is-${beat.type}${plan && plan.say ? " say-" + plan.say : ""}${done ? " is-done" : waiting ? " is-wait" : ""}`, key: beat.key, "aria-live": "polite" }, beat.orig && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-orig", lang: "und" }, origChars(beat.orig, times, chars.length, speed).map(([ch, d], i) => /* @__PURE__ */ import_react5.default.createElement("span", { key: i, className: "fg-char", style: { "--d": d + "ms" } }, ch))), /* @__PURE__ */ import_react5.default.createElement("span", { className: "fg-line" }, chars.map((ch, i) => /* @__PURE__ */ import_react5.default.createElement("span", { key: i, className: charClass(i), style: charStyle(i) }, ch)))), done && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-wait", "aria-hidden": "true" }), status && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-status" }, status), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-progress" }, /* @__PURE__ */ import_react5.default.createElement("i", { style: { width: Math.round(progress * 100) + "%" } })), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-quick", onClick: (e) => e.stopPropagation() }, quick.items.map((item) => /* @__PURE__ */ import_react5.default.createElement("button", { key: item.id, type: "button", className: item.on ? "is-on" : "", title: item.title, onClick: () => {
+  return /* @__PURE__ */ import_react5.default.createElement("div", { className: `fg-dialog${away ? " is-away" : ""}`, "data-voice": beat.voice || void 0, "data-recall": recall ? recall.tone || "warm" : void 0, "data-recall-name": recall ? recall.name : void 0, style: { "--speaker": color || void 0 } }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-box" }), face, (showName || voiceChip) && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name", key: beat.speaker + beat.alias + (beat.voice || "") }, showName && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-plate" }, speaker), voiceChip, showName && !recall && beat.emo && quick.emoLabel && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-name-sub" }, quick.emoLabel)), hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-text is-cardhint" }, "〔 ", CARD_LABEL[beat.card] || "卡片", " 〕"), !hiddenText && /* @__PURE__ */ import_react5.default.createElement("div", { className: `fg-text is-${beat.type}${plan && plan.say ? " say-" + plan.say : ""}${done ? " is-done" : waiting ? " is-wait" : ""}`, key: beat.key, "aria-live": "polite" }, beat.orig && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-orig", lang: "und" }, origChars(beat.orig, times, chars.length, speed).map(([ch, d], i) => /* @__PURE__ */ import_react5.default.createElement("span", { key: i, className: "fg-char", style: { "--d": lead + d + "ms" } }, ch))), /* @__PURE__ */ import_react5.default.createElement("span", { className: "fg-line" }, chars.map((ch, i) => /* @__PURE__ */ import_react5.default.createElement("span", { key: i, className: charClass(i), style: charStyle(i) }, ch)))), done && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-wait", "aria-hidden": "true" }), status && /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-status" }, status), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-progress" }, /* @__PURE__ */ import_react5.default.createElement("i", { style: { width: Math.round(progress * 100) + "%" } })), /* @__PURE__ */ import_react5.default.createElement("div", { className: "fg-quick", onClick: (e) => e.stopPropagation() }, quick.items.map((item) => /* @__PURE__ */ import_react5.default.createElement("button", { key: item.id, type: "button", className: item.on ? "is-on" : "", title: item.title, onClick: () => {
     sfx("select");
     item.run();
   }, onMouseEnter: () => sfx("hover") }, item.label))));
@@ -11385,10 +11531,10 @@ function VisionBar({ status, setStatus }) {
 function StateThumb({ still: still2, patch, box }) {
   const ref = import_react11.default.useRef(null);
   import_react11.default.useEffect(() => {
-    let live = true;
+    let live2 = true;
     Promise.all([loadImage3(still2), loadImage3(patch.src)]).then(([a, b]) => {
       const c = ref.current;
-      if (!live || !c) return;
+      if (!live2 || !c) return;
       const [x0, y0, x1, y1] = box;
       c.width = x1 - x0;
       c.height = y1 - y0;
@@ -11398,7 +11544,7 @@ function StateThumb({ still: still2, patch, box }) {
     }, () => {
     });
     return () => {
-      live = false;
+      live2 = false;
     };
   }, [still2, patch.src, patch.x, patch.y, box.join(",")]);
   return /* @__PURE__ */ import_react11.default.createElement("canvas", { ref, className: "fg-aa-thumb" });
@@ -12301,6 +12447,10 @@ var DEFAULT_CONFIG = {
     // 情绪起伏的强度（倍数，0~2）
     prosody: true,
     // 句调：陈述句落下、问句扬上去、省略号越说越低，按词取音（lib/prosody.js）
+    blipPan: 0.7,
+    // 打字音的声像宽度（0~1）：按说话人站位分左右，0 关掉（lib/voice-clock.js）
+    blipSync: true,
+    // 字跟着声音的输出延迟推迟（蓝牙耳机），字和打字音对得上
     voiceDefault: "auto",
     // 档案里没指定声音的角色：auto 按性别分；或统一用某个音色（见 lib/sounds.js）
     narrationVoice: "classic",
@@ -12473,7 +12623,7 @@ function Gallery({ view, gameId, onClose, focusId }) {
   const [busy, run] = useBusy3();
   const images = view && view.images || [];
   const places = Object.values(view && view.places || {});
-  const live = open && images.find((i) => i.id === open.id);
+  const live2 = open && images.find((i) => i.id === open.id);
   const editTurn = edit && (view && view.turns || []).find((t) => t.textVersion === edit.textVersion);
   return /* @__PURE__ */ import_react14.default.createElement(
     Panel,
@@ -12489,10 +12639,10 @@ function Gallery({ view, gameId, onClose, focusId }) {
     edit && /* @__PURE__ */ import_react14.default.createElement(ImageEditor, { key: edit.id, gameId, image: images.find((i) => i.id === edit.id) || edit, units: editTurn ? playedUnits(editTurn.units, editTurn.script) : [], onClose: () => setEdit(null) }),
     tab === "cg" && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-grid" }, [...images].sort((a, b) => Number(a.retired) - Number(b.retired)).map((img) => /* @__PURE__ */ import_react14.default.createElement(CgTile, { key: img.id, gameId, image: img, onOpen: setOpen, onEdit: setEdit })), !images.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, "还没有插画。导演会在值得画的地方自动安排；也可以在聊天里点每条消息下方的「🎬 配一张」。")),
     tab === "bg" && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-grid" }, places.map((p4) => /* @__PURE__ */ import_react14.default.createElement("div", { key: p4.key }, /* @__PURE__ */ import_react14.default.createElement("div", { className: `fg-thumb${p4.assetId ? "" : " is-locked"}`, onClick: () => p4.assetId && setOpen({ place: p4 }) }, p4.assetId ? /* @__PURE__ */ import_react14.default.createElement("img", { src: assetUrl(p4.assetId), alt: p4.location, loading: "lazy" }) : /* @__PURE__ */ import_react14.default.createElement("span", null, STATUS_LABEL[p4.status] || p4.error || "未生成"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-thumb-cap" }, p4.location, " · ", TIME_LABEL[p4.time] || p4.time)), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row", style: { marginTop: ".6cqw" } }, /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: busy === p4.key, onClick: () => run(p4.key, () => api.place(gameId, p4.key), "已加入出图队列") }, "重画背景")), p4.status === "failed" && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note fg-err" }, p4.error))), !places.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, "新地点出现时会自动生成背景（设置里可关）；没有生成时用程序化天空（按时段、天气变化）。")),
-    live && cgSrc(live, assetUrl) && /* @__PURE__ */ import_react14.default.createElement(Lightbox, { src: cgSrc(live, assetUrl), onClose: () => setOpen(null) }, /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: live.current <= 0, onClick: () => run("v", () => api.version(gameId, live.id, live.current - 1)) }, "‹ 上一版"), /* @__PURE__ */ import_react14.default.createElement("span", { className: "fg-pill" }, live.current + 1, " / ", live.versions.length), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: live.current >= live.versions.length - 1, onClick: () => run("v", () => api.version(gameId, live.id, live.current + 1)) }, "下一版 ›"), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
+    live2 && cgSrc(live2, assetUrl) && /* @__PURE__ */ import_react14.default.createElement(Lightbox, { src: cgSrc(live2, assetUrl), onClose: () => setOpen(null) }, /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: live2.current <= 0, onClick: () => run("v", () => api.version(gameId, live2.id, live2.current - 1)) }, "‹ 上一版"), /* @__PURE__ */ import_react14.default.createElement("span", { className: "fg-pill" }, live2.current + 1, " / ", live2.versions.length), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: live2.current >= live2.versions.length - 1, onClick: () => run("v", () => api.version(gameId, live2.id, live2.current + 1)) }, "下一版 ›"), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
       setOpen(null);
-      setEdit(live);
-    } }, "改词重画"), /* @__PURE__ */ import_react14.default.createElement("a", { className: "fg-btn", href: cgSrc(live, assetUrl), download: `${live.title || live.id}.png` }, "下载")),
+      setEdit(live2);
+    } }, "改词重画"), /* @__PURE__ */ import_react14.default.createElement("a", { className: "fg-btn", href: cgSrc(live2, assetUrl), download: `${live2.title || live2.id}.png` }, "下载")),
     open && open.place && /* @__PURE__ */ import_react14.default.createElement(Lightbox, { src: assetUrl(open.place.assetId), onClose: () => setOpen(null) }, /* @__PURE__ */ import_react14.default.createElement("span", { className: "fg-pill" }, open.place.location))
   );
 }
@@ -12664,17 +12814,17 @@ function FaceBoxEditor({ gameId, person, bodyKey, record, onDone }) {
   const [busy, run] = useBusy3();
   const src = assetUrl(record.assetId);
   import_react14.default.useEffect(() => {
-    let live = true;
+    let live2 = true;
     const img = new Image();
     img.onload = () => {
-      if (!live) return;
+      if (!live2) return;
       const w = img.naturalWidth, h = img.naturalHeight;
       setSize({ w, h });
       setBox(record.faceBox || record.aa && record.aa.rects && faceBoxFrom(record.aa.rects, w, h) || faceBoxFrom(defaultRects(w, h), w, h) || [0, 0, 64, 64]);
     };
     img.src = src;
     return () => {
-      live = false;
+      live2 = false;
     };
   }, [src]);
   if (!size || !box) return /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, "读图中…");
@@ -13870,7 +14020,7 @@ function SoundSection({ data }) {
   } }, "一键套用"), builtin && /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", onClick: () => {
     p4(builtin);
     toast("已换回内置的声音");
-  } }, "换回内置")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "声音带情绪", hint: "台词和心声的打字音跟着说话人此刻的情绪变：哭着说的压低、放慢、变轻、带气声，说到一半会哽一下；开心的抬高、起伏大；生气的变响、起音变硬；害怕的发颤。情绪按情绪库归的类（喜怒哀惧……）和强弱算，表演设计师给这个人标了强弱的照他的；导演新造的情绪（「哽咽着温柔」）按字面认，几种掺在一起。旁白不带情绪。强度 0 等于关掉，2 是加倍。" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.voiceMood !== false, onChange: (v) => p4({ voiceMood: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.voiceMoodAmount ?? 1, disabled: ui2.voiceMood === false, "aria-label": "情绪起伏强度", onChange: (e) => p4({ voiceMoodAmount: Number(e.target.value) }), style: { flex: 1 } }), /* @__PURE__ */ import_react14.default.createElement(MoodPreview, { ui: ui2 }))), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "句调", hint: "打字音像说话一样有抑扬：一句话慢慢往下走，陈述句句尾落下，「吗？」这样的问句扬上去，「什么时候？」这样的问句疑问词重读、句尾只轻轻扬，感叹开头最高，省略号越说越低越轻，「～」拖长往上滑，♡ 让最后一个字往上一挑。按词取音：每个词的第一个字一定响，日文按拍念（っ 停一下、ー 拖长）。起伏大小跟着情绪。关掉后跟以前一样每两个字响一下、音高不动。" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.prosody !== false, onChange: (v) => p4({ prosody: v }) })), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。" }, /* @__PURE__ */ import_react14.default.createElement(Select, { value: ui2.voiceDefault, options: defaultOptions, onChange: (v) => p4({ voiceDefault: v }) })), ui2.voiceDefault === "auto" && /* @__PURE__ */ import_react14.default.createElement(Field, { label: "自动分配的音色", hint: "选「自动」时每种性别从这一组里按名字挑一个（同一局里尽量不撞）。可以加减，内置的、自己做的、音效库里的打字音都能放进来；改了只影响还没指定声音的角色。" }, /* @__PURE__ */ import_react14.default.createElement(VoicePools, { ui: ui2, p: p4, options: allVoices })), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), { group: "自己的音色", options: customOptions(ui2, ui2.narrationVoice) }, { group: "音效库里的打字音", options: blipOptions(blips, ui2.narrationVoice) }, ["off", "不出声"]], style: INLINE, onChange: (v) => p4(narrationPatch(ui2, v)) }), /* @__PURE__ */ import_react14.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length + (ui2.customVoices || []).length + blips.length, " 个（点一下试听）"), VOICE_GENDERS.filter(([g]) => g !== "other").map(([g, label]) => /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, { key: g }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note fg-voice-group" }, label, " · ", VOICES2.filter((v) => v.gender === g).length, " 个"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react14.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react14.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react14.default.createElement("span", null, v.desc)))))), blips.length > 0 && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note fg-voice-group" }, "音效库里的打字音 · ", blips.length, " 个"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-skins fg-voices" }, blips.map((b) => /* @__PURE__ */ import_react14.default.createElement("button", { key: b.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: libRef(b.id), pitch: 0 }, ui2) }, /* @__PURE__ */ import_react14.default.createElement("b", null, "▶ ", b.name), /* @__PURE__ */ import_react14.default.createElement("span", null, "音效库 · ", VOICE_GENDER[b.gender || ""], b.use === "narration" ? " · 旁白用" : "", b.description ? " · " + b.description : "")))), !blips.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, "逆转女声、逆转男声、逆转打字机是照逆转裁判的声音合成的，不用导入。想用原版录音：把逆转裁判音效包（或别的打字音）导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。"), /* @__PURE__ */ import_react14.default.createElement(VoiceMaker, { ui: ui2, p: p4 }), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, { key: group }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）；也可以从音效库里挑一个。自己的文件和音效库的声音都按默认版本的响度放。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
+  } }, "换回内置")), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "打字音"), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "打字音" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.blip, onChange: (v) => p4({ blip: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.blipVolume, "aria-label": "打字音音量", onChange: (e) => p4({ blipVolume: Number(e.target.value) }), style: { flex: 1 } }))), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "声音带情绪", hint: "台词和心声的打字音跟着说话人此刻的情绪变：哭着说的压低、放慢、变轻、带气声，说到一半会哽一下；开心的抬高、起伏大；生气的变响、起音变硬；害怕的发颤。情绪按情绪库归的类（喜怒哀惧……）和强弱算，表演设计师给这个人标了强弱的照他的；导演新造的情绪（「哽咽着温柔」）按字面认，几种掺在一起。旁白不带情绪。强度 0 等于关掉，2 是加倍。" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.voiceMood !== false, onChange: (v) => p4({ voiceMood: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.voiceMoodAmount ?? 1, disabled: ui2.voiceMood === false, "aria-label": "情绪起伏强度", onChange: (e) => p4({ voiceMoodAmount: Number(e.target.value) }), style: { flex: 1 } }), /* @__PURE__ */ import_react14.default.createElement(MoodPreview, { ui: ui2 }))), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "句调", hint: "打字音像说话一样有抑扬：一句话慢慢往下走，陈述句句尾落下，「吗？」这样的问句扬上去，「什么时候？」这样的问句疑问词重读、句尾只轻轻扬，感叹开头最高，省略号越说越低越轻，「～」拖长往上滑，♡ 让最后一个字往上一挑。按词取音：每个词的第一个字一定响，日文按拍念（っ 停一下、ー 拖长）。起伏大小跟着情绪。关掉后跟以前一样每两个字响一下、音高不动。" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.prosody !== false, onChange: (v) => p4({ prosody: v }) })), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "左右声道", hint: "打字音从说话人站的那一边传来：站在左边的人声音偏左，走到另一边声音跟着过去；心声、电话、旁白在正中，门外、隔壁的画外音从他走出去的那一边传来，特写时往中间收。戴耳机最明显。拉到最左就是关掉。" }, /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "1", step: "0.1", value: ui2.blipPan ?? 0.7, "aria-label": "左右声道宽度", onChange: (e) => p4({ blipPan: Number(e.target.value) }), style: { flex: 1, width: "100%" } })), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "字跟着声音", hint: "蓝牙耳机、有的声卡要晚一两百毫秒才出声，字会比打字音先跳出来。开着时字整体推迟同样那么久，字和声音对得上（只在开着打字音时推迟；有线耳机、扬声器基本不会察觉）。" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.blipSync !== false, onChange: (v) => p4({ blipSync: v }) })), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "没指定的角色", hint: "每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。" }, /* @__PURE__ */ import_react14.default.createElement(Select, { value: ui2.voiceDefault, options: defaultOptions, onChange: (v) => p4({ voiceDefault: v }) })), ui2.voiceDefault === "auto" && /* @__PURE__ */ import_react14.default.createElement(Field, { label: "自动分配的音色", hint: "选「自动」时每种性别从这一组里按名字挑一个（同一局里尽量不撞）。可以加减，内置的、自己做的、音效库里的打字音都能放进来；改了只影响还没指定声音的角色。" }, /* @__PURE__ */ import_react14.default.createElement(VoicePools, { ui: ui2, p: p4, options: allVoices })), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "旁白" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Select, { value: ui2.narrationVoice, options: [...VOICES2.map((v) => [v.id, v.label]), { group: "自己的音色", options: customOptions(ui2, ui2.narrationVoice) }, { group: "音效库里的打字音", options: blipOptions(blips, ui2.narrationVoice) }, ["off", "不出声"]], style: INLINE, onChange: (v) => p4(narrationPatch(ui2, v)) }), /* @__PURE__ */ import_react14.default.createElement(Select, { value: String(ui2.narrationPitch), options: PITCHES, style: INLINE, onChange: (v) => p4({ narrationPitch: Number(v) }) }), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn", disabled: !narration, onClick: () => previewVoice(narration, ui2) }, "▶ 试听"))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "音色一览 · ", VOICES2.length + (ui2.customVoices || []).length + blips.length, " 个（点一下试听）"), VOICE_GENDERS.filter(([g]) => g !== "other").map(([g, label]) => /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, { key: g }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note fg-voice-group" }, label, " · ", VOICES2.filter((v) => v.gender === g).length, " 个"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-skins fg-voices" }, VOICES2.filter((v) => v.gender === g).map((v) => /* @__PURE__ */ import_react14.default.createElement("button", { key: v.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: v.id, pitch: 0 }, ui2) }, /* @__PURE__ */ import_react14.default.createElement("b", null, "▶ ", v.label), /* @__PURE__ */ import_react14.default.createElement("span", null, v.desc)))))), blips.length > 0 && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note fg-voice-group" }, "音效库里的打字音 · ", blips.length, " 个"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-skins fg-voices" }, blips.map((b) => /* @__PURE__ */ import_react14.default.createElement("button", { key: b.id, type: "button", className: "fg-skin", onClick: () => previewVoice({ id: libRef(b.id), pitch: 0 }, ui2) }, /* @__PURE__ */ import_react14.default.createElement("b", null, "▶ ", b.name), /* @__PURE__ */ import_react14.default.createElement("span", null, "音效库 · ", VOICE_GENDER[b.gender || ""], b.use === "narration" ? " · 旁白用" : "", b.description ? " · " + b.description : "")))), !blips.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, "逆转女声、逆转男声、逆转打字机是照逆转裁判的声音合成的，不用导入。想用原版录音：把逆转裁判音效包（或别的打字音）导进「音效库」，种类选「打字音」，它就会出现在这里、档案和上面的下拉框里。"), /* @__PURE__ */ import_react14.default.createElement(VoiceMaker, { ui: ui2, p: p4 }), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, "音效"), /* @__PURE__ */ import_react14.default.createElement(Field, { label: "音效" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Toggle, { value: ui2.sfx, onChange: (v) => p4({ sfx: v }) }), /* @__PURE__ */ import_react14.default.createElement("input", { type: "range", min: "0", max: "2", step: "0.1", value: ui2.sfxVolume, "aria-label": "音效音量", onChange: (e) => p4({ sfxVolume: Number(e.target.value) }), style: { flex: 1 } }))), SOUND_GROUPS.map(([group, title, note]) => /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, { key: group }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-section" }, title), /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, note, "。换一个版本会马上响一下；「用自己的」可以传 mp3、m4a、ogg、wav、flac（最大 5 MB，只放前 4 秒）；也可以从音效库里挑一个。自己的文件和音效库的声音都按默认版本的响度放。"), SOUND_SLOTS.filter((s) => s.group === group).map((slot) => {
     const mine = ui2.customSounds[slot.id];
     const current2 = ui2.sounds[slot.id];
     const suggested = library.filter((s) => s.use === slot.id);
@@ -13897,18 +14047,18 @@ function LibPicker({ sounds: sounds2, slot, current: current2, ui: ui2, onPick }
 }
 var sizeMB = (bytes) => (bytes / 1048576).toFixed(1) + " MB";
 var MUSIC_LIST = "fg-music-cats";
-function TrackEditor({ track }) {
+function TrackEditor({ track: track2 }) {
   const [busy, run] = useBusy3();
   const save = (patch) => run("s", async () => {
-    await api.updateTrack(track.id, patch);
+    await api.updateTrack(track2.id, patch);
     await loadMusic();
   });
-  return /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Text, { value: track.name, style: { flex: 2, width: "auto", fontWeight: 600 }, onCommit: (v) => save({ name: v }) }), /* @__PURE__ */ import_react14.default.createElement(Text, { value: track.category, list: MUSIC_LIST, placeholder: "分类，两层用 / 隔开：日常/校园", style: { flex: 1, width: "auto" }, onCommit: (v) => save({ category: v }) }), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "d", onClick: async () => {
-    if (await confirmBox(`从曲库删除「${track.name}」？电脑上的原文件不受影响。`, { ok: "删除", danger: true })) run("d", async () => {
-      await api.removeTrack(track.id);
+  return /* @__PURE__ */ import_react14.default.createElement(import_react14.default.Fragment, null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-row" }, /* @__PURE__ */ import_react14.default.createElement(Text, { value: track2.name, style: { flex: 2, width: "auto", fontWeight: 600 }, onCommit: (v) => save({ name: v }) }), /* @__PURE__ */ import_react14.default.createElement(Text, { value: track2.category, list: MUSIC_LIST, placeholder: "分类，两层用 / 隔开：日常/校园", style: { flex: 1, width: "auto" }, onCommit: (v) => save({ category: v }) }), /* @__PURE__ */ import_react14.default.createElement("button", { type: "button", className: "fg-btn is-mini fg-danger", disabled: busy === "d", onClick: async () => {
+    if (await confirmBox(`从曲库删除「${track2.name}」？电脑上的原文件不受影响。`, { ok: "删除", danger: true })) run("d", async () => {
+      await api.removeTrack(track2.id);
       await loadMusic();
     }, "已删除");
-  } }, "删除")), /* @__PURE__ */ import_react14.default.createElement(TextArea, { value: track.description, placeholder: "听起来什么样、适合什么场面。例如：慢板萨克斯和雨声，深夜独处、心事重重，也适合告白前的沉默", onCommit: (v) => save({ description: v }) }), /* @__PURE__ */ import_react14.default.createElement(Text, { value: (track.tags || []).join("、"), placeholder: "标签，用顿号或逗号隔开：深夜、城市、雨、怀旧", style: { width: "100%" }, onCommit: (v) => save({ tags: v }) }), track.file && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, "文件：", track.file));
+  } }, "删除")), /* @__PURE__ */ import_react14.default.createElement(TextArea, { value: track2.description, placeholder: "听起来什么样、适合什么场面。例如：慢板萨克斯和雨声，深夜独处、心事重重，也适合告白前的沉默", onCommit: (v) => save({ description: v }) }), /* @__PURE__ */ import_react14.default.createElement(Text, { value: (track2.tags || []).join("、"), placeholder: "标签，用顿号或逗号隔开：深夜、城市、雨、怀旧", style: { width: "100%" }, onCommit: (v) => save({ tags: v }) }), track2.file && /* @__PURE__ */ import_react14.default.createElement("div", { className: "fg-note" }, "文件：", track2.file));
 }
 var trackSummary = (t) => [(t.tags || []).join("、"), t.description].filter(Boolean).join(" · ") || "（还没有描述和标签）";
 function TextArea({ value, onCommit, placeholder }) {
@@ -14086,13 +14236,13 @@ function MusicSection({ data }) {
   const filesRef = import_react14.default.useRef(null);
   const p4 = (patch) => patchConfig({ ui: patch }).catch((e) => toast(e.message, "error"));
   import_react14.default.useEffect(() => () => stopPreview(), []);
-  const play = (track) => {
-    if (playing === track.id) {
+  const play = (track2) => {
+    if (playing === track2.id) {
       stopPreview();
       return;
     }
-    previewTrack({ id: track.id, url: assetUrl(track.assetId) }, () => setPlaying((id) => id === track.id ? "" : id));
-    setPlaying(track.id);
+    previewTrack({ id: track2.id, url: assetUrl(track2.assetId) }, () => setPlaying((id) => id === track2.id ? "" : id));
+    setPlaying(track2.id);
   };
   const importFiles = async (list3) => {
     const files2 = [...list3 || []];
@@ -14116,11 +14266,11 @@ function MusicSection({ data }) {
       const file2 = audio[i];
       setProgress(`导入中 ${i + 1} / ${audio.length}：${file2.name}`);
       try {
-        const track = await api.uploadTrack(file2);
+        const track2 = await api.uploadTrack(file2);
         const m = meta.get(file2.name);
         const folder = folderCategory(file2);
-        const patch = { ...m || {}, ...folder && !track.category && (!m || m.category === void 0) ? { category: folder } : {} };
-        if (Object.keys(patch).length) await api.updateTrack(track.id, patch);
+        const patch = { ...m || {}, ...folder && !track2.category && (!m || m.category === void 0) ? { category: folder } : {} };
+        if (Object.keys(patch).length) await api.updateTrack(track2.id, patch);
         if (m) described++;
       } catch (e) {
         failed.push(`${file2.name}：${e.message}`);
@@ -14560,9 +14710,9 @@ function LogDetail({ gameId, summary }) {
   const judge = summary.kind === "judge";
   const writer = sprite || cg || acting;
   const tabs = running ? [["live", "实时输出"], ["prompt", "提示词"]] : [["result", acting ? "设计结果" : judge ? "归类结果" : writer ? "写出的提示词" : "整理结果"], ["raw", `原始输出${summary.attempts > 1 ? ` · ${summary.attempts} 次` : ""}`], ["prompt", "提示词"]];
-  const live = summary.live || { output: "", reasoning: "", chars: 0, note: "" };
+  const live2 = summary.live || { output: "", reasoning: "", chars: 0, note: "" };
   const elapsed = running ? Math.max(summary.ms, now - summary.at) : summary.ms;
-  return /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-dlog-detail" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-dlog-head" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-dlog-title" }, sprite || acting ? `${entryTitle(summary)}（读到第 ${summary.turn} 轮）` : entryTitle(summary), " ", /* @__PURE__ */ import_react15.default.createElement(StatusPill, { status: summary.status }), /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-spacer" }), running && /* @__PURE__ */ import_react15.default.createElement("button", { type: "button", className: "fg-btn", disabled: stopping, onClick: stop2 }, writer || judge ? "停止" : "停止整理")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-dlog-facts" }, /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "模型"), summary.model || "—", summary.provider ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, " · ", summary.provider) : null, sourceLabel(summary.source) ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, "（", sourceLabel(summary.source), "）") : null, summary.stream === false ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, " · 不流式") : null), /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "时间"), clock2(summary.at), " · ", secs(elapsed), " · ", REASON[summary.reason] || summary.reason), /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "最大输出"), num2(summary.maxTokens), " token", entry && entry.temperature != null ? ` · 温度 ${entry.temperature}` : ""), /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "模型窗口"), summary.window ? `${num2(summary.window)} token` : "宿主没给窗口大小，按设置原样发", entry && entry.outputDefault ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, " · 模型默认输出 ", num2(entry.outputDefault)) : null), entry && /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "资料"), entry.contextLength ? `发了 ${num2(entry.contextChars)} 字（人物卡与世界书共 ${num2(entry.contextLength)} 字）` : "这张卡没有人物卡 / 世界书资料"), entry && writer && /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "剧情"), `发了 ${num2(entry.storyChars)} 字（到这一轮为止共 ${num2(entry.storyLength)} 字）`), entry?.listen && /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "先听一遍"), entry.listen.model || "—", sourceLabel(entry.listen.source, "听音师") ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, "（", sourceLabel(entry.listen.source, "听音师"), "）") : null, entry.listen.stream === false ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, " · 不流式") : null, " · ", entry.listen.ms ? secs(entry.listen.ms) : "进行中", entry.listen.error ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-err" }, " · 失败") : entry.listen.heard ? ` · 听到 ${entry.listen.heard.ambience.length + entry.listen.heard.sfx.length} 个声音${entry.listen.heard.bgm?.length ? `、${entry.listen.heard.bgm.length} 段配乐` : ""}` : ""), summary.usage && /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "用量"), usageText(summary.usage), entry?.listen?.usage ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, "（含先听一遍）") : null)), summary.notes.map((n, i) => /* @__PURE__ */ import_react15.default.createElement("div", { key: i, className: "fg-dlog-notice" }, "⚠ ", n)), summary.error && /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-err fg-dlog-error" }, summary.error)), /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-tabs fg-dlog-tabs" }, tabs.map(([id, label]) => /* @__PURE__ */ import_react15.default.createElement("button", { key: id, type: "button", className: `fg-tab${tab === id ? " is-on" : ""}`, onClick: () => setTab(id) }, label))), loadError && /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-err" }, loadError), tab === "live" && /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-dlog-meter" }, /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-dlog-dot" }), live.note || `第 ${summary.attempts || 1} 次请求`, " · 已收到 ", num2(live.chars), " 字", live.chars ? "" : live.reasoning ? " · 模型在思考" : summary.stream === false ? " · 不流式：模型整段写完才一次拿回" : " · 等模型开口…"), live.reasoning && /* @__PURE__ */ import_react15.default.createElement(Block, { label: "模型思考（实时）" }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: live.reasoning, follow: true })), /* @__PURE__ */ import_react15.default.createElement(Block, { label: "模型输出（实时）" }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: live.output, follow: true, cursor: true, empty: "还没有输出" }))), tab === "result" && (entry ? sprite ? /* @__PURE__ */ import_react15.default.createElement(SpritesView, { sprites: entry.sprites, acting: entry.acting }) : acting ? /* @__PURE__ */ import_react15.default.createElement(ActingView, { acting: entry.acting }) : cg ? /* @__PURE__ */ import_react15.default.createElement(CgsView, { cgs: entry.cgs }) : judge ? /* @__PURE__ */ import_react15.default.createElement(JudgeView, { judge: entry.judge }) : /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, entry.listen && /* @__PURE__ */ import_react15.default.createElement(HeardView, { listen: entry.listen }), /* @__PURE__ */ import_react15.default.createElement(ScriptView, { script: entry.script, units: entry.units || [] })) : /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "raw" && (entry ? /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, entry.listen && /* @__PURE__ */ import_react15.default.createElement(ListenRaw, { listen: entry.listen }), /* @__PURE__ */ import_react15.default.createElement(Attempts, { attempts: entry.attempts || [] })) : /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "prompt" && (entry ? /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, /* @__PURE__ */ import_react15.default.createElement(Block, { label: `系统提示词 · ${num2((entry.system || "").length)} 字`, text: entry.system }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: entry.system })), /* @__PURE__ */ import_react15.default.createElement(Block, { label: `用户消息 · ${num2((entry.user || "").length)} 字${sprite ? "（资料 + 全部剧情 + 角色档案 + 要画的差分）" : acting ? "（资料 + 全部剧情 + 角色档案 + 要设计的情绪）" : cg ? "（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）" : judge ? "（情绪库 + 这一轮新造的词和用到它的台词）" : "（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）"}`, text: entry.user }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: entry.user })), entry.listen && /* @__PURE__ */ import_react15.default.createElement(Block, { label: `先听一遍 · 系统提示词 · ${num2((entry.listen.system || "").length)} 字`, text: entry.listen.system }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: entry.listen.system })), entry.listen && /* @__PURE__ */ import_react15.default.createElement(Block, { label: `先听一遍 · 用户消息 · ${num2((entry.listen.user || "").length)} 字（上一幕 + 库里的分类 + 曲库 + 本轮正文单元）`, text: entry.listen.user }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: entry.listen.user }))) : /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-note" }, "读取中…")));
+  return /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-dlog-detail" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-dlog-head" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-dlog-title" }, sprite || acting ? `${entryTitle(summary)}（读到第 ${summary.turn} 轮）` : entryTitle(summary), " ", /* @__PURE__ */ import_react15.default.createElement(StatusPill, { status: summary.status }), /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-spacer" }), running && /* @__PURE__ */ import_react15.default.createElement("button", { type: "button", className: "fg-btn", disabled: stopping, onClick: stop2 }, writer || judge ? "停止" : "停止整理")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-dlog-facts" }, /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "模型"), summary.model || "—", summary.provider ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, " · ", summary.provider) : null, sourceLabel(summary.source) ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, "（", sourceLabel(summary.source), "）") : null, summary.stream === false ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, " · 不流式") : null), /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "时间"), clock2(summary.at), " · ", secs(elapsed), " · ", REASON[summary.reason] || summary.reason), /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "最大输出"), num2(summary.maxTokens), " token", entry && entry.temperature != null ? ` · 温度 ${entry.temperature}` : ""), /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "模型窗口"), summary.window ? `${num2(summary.window)} token` : "宿主没给窗口大小，按设置原样发", entry && entry.outputDefault ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, " · 模型默认输出 ", num2(entry.outputDefault)) : null), entry && /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "资料"), entry.contextLength ? `发了 ${num2(entry.contextChars)} 字（人物卡与世界书共 ${num2(entry.contextLength)} 字）` : "这张卡没有人物卡 / 世界书资料"), entry && writer && /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "剧情"), `发了 ${num2(entry.storyChars)} 字（到这一轮为止共 ${num2(entry.storyLength)} 字）`), entry?.listen && /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "先听一遍"), entry.listen.model || "—", sourceLabel(entry.listen.source, "听音师") ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, "（", sourceLabel(entry.listen.source, "听音师"), "）") : null, entry.listen.stream === false ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, " · 不流式") : null, " · ", entry.listen.ms ? secs(entry.listen.ms) : "进行中", entry.listen.error ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-err" }, " · 失败") : entry.listen.heard ? ` · 听到 ${entry.listen.heard.ambience.length + entry.listen.heard.sfx.length} 个声音${entry.listen.heard.bgm?.length ? `、${entry.listen.heard.bgm.length} 段配乐` : ""}` : ""), summary.usage && /* @__PURE__ */ import_react15.default.createElement("div", null, /* @__PURE__ */ import_react15.default.createElement("i", null, "用量"), usageText(summary.usage), entry?.listen?.usage ? /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-note" }, "（含先听一遍）") : null)), summary.notes.map((n, i) => /* @__PURE__ */ import_react15.default.createElement("div", { key: i, className: "fg-dlog-notice" }, "⚠ ", n)), summary.error && /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-err fg-dlog-error" }, summary.error)), /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-tabs fg-dlog-tabs" }, tabs.map(([id, label]) => /* @__PURE__ */ import_react15.default.createElement("button", { key: id, type: "button", className: `fg-tab${tab === id ? " is-on" : ""}`, onClick: () => setTab(id) }, label))), loadError && /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-err" }, loadError), tab === "live" && /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-dlog-meter" }, /* @__PURE__ */ import_react15.default.createElement("span", { className: "fg-dlog-dot" }), live2.note || `第 ${summary.attempts || 1} 次请求`, " · 已收到 ", num2(live2.chars), " 字", live2.chars ? "" : live2.reasoning ? " · 模型在思考" : summary.stream === false ? " · 不流式：模型整段写完才一次拿回" : " · 等模型开口…"), live2.reasoning && /* @__PURE__ */ import_react15.default.createElement(Block, { label: "模型思考（实时）" }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: live2.reasoning, follow: true })), /* @__PURE__ */ import_react15.default.createElement(Block, { label: "模型输出（实时）" }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: live2.output, follow: true, cursor: true, empty: "还没有输出" }))), tab === "result" && (entry ? sprite ? /* @__PURE__ */ import_react15.default.createElement(SpritesView, { sprites: entry.sprites, acting: entry.acting }) : acting ? /* @__PURE__ */ import_react15.default.createElement(ActingView, { acting: entry.acting }) : cg ? /* @__PURE__ */ import_react15.default.createElement(CgsView, { cgs: entry.cgs }) : judge ? /* @__PURE__ */ import_react15.default.createElement(JudgeView, { judge: entry.judge }) : /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, entry.listen && /* @__PURE__ */ import_react15.default.createElement(HeardView, { listen: entry.listen }), /* @__PURE__ */ import_react15.default.createElement(ScriptView, { script: entry.script, units: entry.units || [] })) : /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "raw" && (entry ? /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, entry.listen && /* @__PURE__ */ import_react15.default.createElement(ListenRaw, { listen: entry.listen }), /* @__PURE__ */ import_react15.default.createElement(Attempts, { attempts: entry.attempts || [] })) : /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-note" }, "读取中…")), tab === "prompt" && (entry ? /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, /* @__PURE__ */ import_react15.default.createElement(Block, { label: `系统提示词 · ${num2((entry.system || "").length)} 字`, text: entry.system }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: entry.system })), /* @__PURE__ */ import_react15.default.createElement(Block, { label: `用户消息 · ${num2((entry.user || "").length)} 字${sprite ? "（资料 + 全部剧情 + 角色档案 + 要画的差分）" : acting ? "（资料 + 全部剧情 + 角色档案 + 要设计的情绪）" : cg ? "（资料 + 此前的剧情 + 本轮正文 + 角色档案 + 要画的插画）" : judge ? "（情绪库 + 这一轮新造的词和用到它的台词）" : "（资料 + 上一幕 + 角色档案 + 情绪库 + 本轮正文单元）"}`, text: entry.user }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: entry.user })), entry.listen && /* @__PURE__ */ import_react15.default.createElement(Block, { label: `先听一遍 · 系统提示词 · ${num2((entry.listen.system || "").length)} 字`, text: entry.listen.system }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: entry.listen.system })), entry.listen && /* @__PURE__ */ import_react15.default.createElement(Block, { label: `先听一遍 · 用户消息 · ${num2((entry.listen.user || "").length)} 字（上一幕 + 库里的分类 + 曲库 + 本轮正文单元）`, text: entry.listen.user }, /* @__PURE__ */ import_react15.default.createElement(Pre, { text: entry.listen.user }))) : /* @__PURE__ */ import_react15.default.createElement("div", { className: "fg-note" }, "读取中…")));
 }
 function DirectorLog({ gameId, onClose, focusTurn = null }) {
   const { log, error } = useDirectorLog(gameId);
@@ -14874,13 +15024,13 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if (!change) return void 0;
     const key = visit;
     const bg = backgroundFor(beat.scene, view).src;
-    let live = true, timer = 0, i = 0;
+    let live2 = true, timer = 0, i = 0;
     const t0 = performance.now();
     const next = () => {
-      if (!live) return;
+      if (!live2) return;
       if (i >= change.steps.length) {
         timer = setTimeout(() => {
-          if (live) setPauseSeen(key);
+          if (live2) setPauseSeen(key);
         }, Math.max(0, pauseMs - (performance.now() - t0)));
         return;
       }
@@ -14888,7 +15038,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       const end = i + 1 < change.steps.length ? change.steps[i + 1][1] : change.total;
       i += 1;
       const run = () => {
-        if (!live) return;
+        if (!live2) return;
         setChangeAt({ key, phase: phase2 });
         timer = setTimeout(next, end - at2);
       };
@@ -14898,7 +15048,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     preloadImage(bg);
     next();
     return () => {
-      live = false;
+      live2 = false;
       clearTimeout(timer);
     };
   }, [change, visit]);
@@ -14958,7 +15108,8 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
     if (ui0.voiceMood === false || !speakerEmo) return NEUTRAL_MOOD;
     return scaleMood(voiceMood(speakerEmo, view && view.emotions || [], { acting: speakerActing }), ui0.voiceMoodAmount ?? 1);
   }, [speakerEmo, speakerActing, view && view.emotions, ui0.voiceMood, ui0.voiceMoodAmount]);
-  const [done, chars, finish, typedAt, typed] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff, mood, prosody: ui0.prosody !== false });
+  const pan = import_react18.default.useMemo(() => beat ? voicePan({ x: speakerX(beat, ui0.maxOnStage ?? 8) ?? void 0, width: ui0.blipPan ?? 0.7, type: beat.type, style: beat.voice || "", exitSide: beat.exitSide || "", cam: beat.cam || "" }) : 0, [beat, ui0.maxOnStage, ui0.blipPan]);
+  const [done, chars, finish, typedAt, typed, typeLead] = useTypewriter(beat, typeSpeed, { sound: blipOn, voice, hold: holdText, onFx: title ? null : typeFx, offStyles: sayOff, mood, prosody: ui0.prosody !== false, sync: ui0.blipSync !== false, pan });
   import_react18.default.useEffect(() => {
     if (panel && !done) finish();
   }, [panel, done]);
@@ -14977,12 +15128,12 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   }, [fontKey]);
   import_react18.default.useEffect(() => {
     if (!beat) return void 0;
-    let live = true;
+    let live2 = true;
     loadSkinFonts(ui0.skin, ui0.fontBase, fontUi).then(() => loadGlyphs(rootRef.current, glyphsOf([beat]), GLYPH_WAIT)).then(() => {
-      if (live) setGlyphKey(beat.key);
+      if (live2) setGlyphKey(beat.key);
     });
     return () => {
-      live = false;
+      live2 = false;
     };
   }, [beat && beat.key, fontKey]);
   import_react18.default.useEffect(() => {
@@ -15006,10 +15157,10 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
   const restartMusic = Boolean(change && was && ui0.bgm) && (pickTrack(beat, tracks, assetUrl) || {}).id !== (pickTrack(was, tracks, assetUrl) || {}).id;
   const silent = restartMusic && ["clear", "up", "hold"].includes(phase);
   const musicBeat = waking || silent ? null : beat;
-  const track = import_react18.default.useMemo(() => ui0.bgm ? pickTrack(musicBeat, tracks, assetUrl) : null, [ui0.bgm, tracks, musicBeat && musicBeat.bgm, scene && scene.mood, scene && scene.location]);
+  const track2 = import_react18.default.useMemo(() => ui0.bgm ? pickTrack(musicBeat, tracks, assetUrl) : null, [ui0.bgm, tracks, musicBeat && musicBeat.bgm, scene && scene.mood, scene && scene.location]);
   import_react18.default.useEffect(() => {
-    if (!closingRef.current && (track || !ui0.bgm || waking || silent)) playBgm(track, ui0.bgmVolume);
-  }, [track && track.id, ui0.bgm, ui0.bgmVolume]);
+    if (!closingRef.current && (track2 || !ui0.bgm || waking || silent)) playBgm(track2, ui0.bgmVolume);
+  }, [track2 && track2.id, ui0.bgm, ui0.bgmVolume]);
   const hushed = Boolean(musicBeat && musicBeat.hush);
   import_react18.default.useEffect(() => {
     if (!closingRef.current) hushBgm(hushed);
@@ -15287,7 +15438,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
       if (!place && !meta.length) return null;
       return /* @__PURE__ */ import_react18.default.createElement("div", { className: "fg-hud" }, /* @__PURE__ */ import_react18.default.createElement("div", { className: "fg-hud-bar" }), /* @__PURE__ */ import_react18.default.createElement("div", null, place && /* @__PURE__ */ import_react18.default.createElement("div", { className: "fg-hud-place" }, place), meta.length > 0 && /* @__PURE__ */ import_react18.default.createElement("div", { className: "fg-hud-meta" + (place ? "" : " is-alone") }, meta)));
     })(),
-    !title && /* @__PURE__ */ import_react18.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, corner.director && directing && /* @__PURE__ */ import_react18.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), corner.drawing && drawing > 0 && /* @__PURE__ */ import_react18.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), beat && beat.call && beat.call.state === "live" && /* @__PURE__ */ import_react18.default.createElement(CallChip, { key: beat.call.id, call: beat.call, sound: sfxOn, hidden: !corner.call }), corner.track && track && /* @__PURE__ */ import_react18.default.createElement("span", { className: "fg-pill" + (hushed ? " is-hushed" : ""), title: hushed ? `${track.name}（留白，一会儿回来）` : track.name }, "♪ ", track.name), corner.error && viewError && /* @__PURE__ */ import_react18.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react18.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
+    !title && /* @__PURE__ */ import_react18.default.createElement("div", { className: "fg-topright", onClick: (e) => e.stopPropagation() }, corner.director && directing && /* @__PURE__ */ import_react18.default.createElement("button", { type: "button", className: "fg-pill is-busy is-link", title: "看导演正在写什么", onClick: () => setPanel("director") }, "导演整理中 ›"), corner.drawing && drawing > 0 && /* @__PURE__ */ import_react18.default.createElement("span", { className: "fg-pill is-busy" }, "出图 ", drawing), beat && beat.call && beat.call.state === "live" && /* @__PURE__ */ import_react18.default.createElement(CallChip, { key: beat.call.id, call: beat.call, sound: sfxOn, hidden: !corner.call }), corner.track && track2 && /* @__PURE__ */ import_react18.default.createElement("span", { className: "fg-pill" + (hushed ? " is-hushed" : ""), title: hushed ? `${track2.name}（留白，一会儿回来）` : track2.name }, "♪ ", track2.name), corner.error && viewError && /* @__PURE__ */ import_react18.default.createElement("span", { className: "fg-pill fg-err", title: viewError }, "连接中断，重连中"), /* @__PURE__ */ import_react18.default.createElement("button", { type: "button", className: "fg-iconbtn", title: "回到聊天（Esc）", onClick: close }, "✕")),
     beat && !title && beat.card && /* @__PURE__ */ import_react18.default.createElement(SceneCard, { beat }),
     beat && !title && /* @__PURE__ */ import_react18.default.createElement(
       DialogBox,
@@ -15295,6 +15446,7 @@ function Theater({ gameId, view, viewError, cfg, startTurn, panel: initialPanel,
         beat,
         chars,
         plan: typed,
+        lead: typeLead,
         done,
         waiting: holdText,
         away: pausing && hold.away,

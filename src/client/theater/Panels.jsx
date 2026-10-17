@@ -2640,6 +2640,12 @@ function SoundSection({ data }) {
       <Field label="句调" hint="打字音像说话一样有抑扬：一句话慢慢往下走，陈述句句尾落下，「吗？」这样的问句扬上去，「什么时候？」这样的问句疑问词重读、句尾只轻轻扬，感叹开头最高，省略号越说越低越轻，「～」拖长往上滑，♡ 让最后一个字往上一挑。按词取音：每个词的第一个字一定响，日文按拍念（っ 停一下、ー 拖长）。起伏大小跟着情绪。关掉后跟以前一样每两个字响一下、音高不动。">
         <Toggle value={ui.prosody !== false} onChange={v => p({ prosody: v })} />
       </Field>
+      <Field label="左右声道" hint="打字音从说话人站的那一边传来：站在左边的人声音偏左，走到另一边声音跟着过去；心声、电话、旁白在正中，门外、隔壁的画外音从他走出去的那一边传来，特写时往中间收。戴耳机最明显。拉到最左就是关掉。">
+        <input type="range" min="0" max="1" step="0.1" value={ui.blipPan ?? 0.7} aria-label="左右声道宽度" onChange={e => p({ blipPan: Number(e.target.value) })} style={{ flex: 1, width: '100%' }} />
+      </Field>
+      <Field label="字跟着声音" hint="蓝牙耳机、有的声卡要晚一两百毫秒才出声，字会比打字音先跳出来。开着时字整体推迟同样那么久，字和声音对得上（只在开着打字音时推迟；有线耳机、扬声器基本不会察觉）。">
+        <Toggle value={ui.blipSync !== false} onChange={v => p({ blipSync: v })} />
+      </Field>
       <Field label="没指定的角色" hint="每个角色的声音可以在「人物志 → 档案」里单独挑、调音高。自动：女性、男性各从一组音色里按名字分一个，同一局里先登场的先挑、后来的避开已经有人用的；一组用完了才重复，靠音高错开。没标性别的用经典哔哔。逆转式：女性都用逆转女声、男性都用逆转男声，跟逆转裁判一样同性别的人一个声音，没标性别的按名字二选一。音效库里的打字音（按性别分）：女性用标了女声的，男性用标了男声的，跟逆转裁判一样同性别的人一个声音；库里没有这个性别的就照自动分。">
         <Select value={ui.voiceDefault} options={defaultOptions} onChange={v => p({ voiceDefault: v })} />
       </Field>
